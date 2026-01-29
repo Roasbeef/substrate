@@ -1,5 +1,179 @@
 // Subtrate UI JavaScript
 
+// =============================================================================
+// Browser Desktop Notifications
+// =============================================================================
+
+// Notification state.
+let notificationsEnabled = false;
+let lastNotificationTime = 0;
+const NOTIFICATION_COOLDOWN = 5000; // 5 seconds between notifications.
+
+// Request notification permission on page load.
+function initNotifications() {
+    if (!('Notification' in window)) {
+        console.log('Browser does not support notifications');
+        return;
+    }
+
+    if (Notification.permission === 'granted') {
+        notificationsEnabled = true;
+        console.log('Notifications already enabled');
+    } else if (Notification.permission !== 'denied') {
+        // Show a prompt to enable notifications.
+        showNotificationPrompt();
+    }
+}
+
+// Show a prompt asking user to enable notifications.
+function showNotificationPrompt() {
+    const prompt = document.createElement('div');
+    prompt.id = 'notification-prompt';
+    prompt.className = 'fixed bottom-20 right-4 bg-white rounded-lg shadow-xl border border-gray-200 p-4 z-50 max-w-sm';
+    prompt.innerHTML = `
+        <div class="flex items-start gap-3">
+            <div class="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center flex-shrink-0">
+                <svg class="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"/>
+                </svg>
+            </div>
+            <div class="flex-1">
+                <h4 class="font-medium text-gray-900 text-sm">Enable Notifications</h4>
+                <p class="text-xs text-gray-500 mt-1">Get notified when new messages arrive from your agents.</p>
+                <div class="flex gap-2 mt-3">
+                    <button onclick="requestNotificationPermission()" class="px-3 py-1.5 bg-blue-600 text-white text-xs font-medium rounded hover:bg-blue-700">
+                        Enable
+                    </button>
+                    <button onclick="dismissNotificationPrompt()" class="px-3 py-1.5 text-gray-600 text-xs hover:bg-gray-100 rounded">
+                        Not now
+                    </button>
+                </div>
+            </div>
+            <button onclick="dismissNotificationPrompt()" class="text-gray-400 hover:text-gray-600">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                </svg>
+            </button>
+        </div>
+    `;
+    document.body.appendChild(prompt);
+}
+
+// Dismiss the notification prompt.
+function dismissNotificationPrompt() {
+    const prompt = document.getElementById('notification-prompt');
+    if (prompt) {
+        prompt.remove();
+    }
+    // Remember dismissal in localStorage.
+    localStorage.setItem('notifications-prompt-dismissed', 'true');
+}
+
+// Request permission from the browser.
+function requestNotificationPermission() {
+    dismissNotificationPrompt();
+
+    Notification.requestPermission().then(permission => {
+        if (permission === 'granted') {
+            notificationsEnabled = true;
+            showToast('Notifications enabled!', 'success');
+            // Show a test notification.
+            showBrowserNotification('Notifications Enabled', 'You will now receive alerts for new messages.', 'info');
+        } else {
+            showToast('Notifications were denied', 'warning');
+        }
+    });
+}
+
+// Show a browser desktop notification.
+function showBrowserNotification(title, body, type = 'message', data = {}) {
+    if (!notificationsEnabled) return;
+
+    // Respect cooldown to avoid notification spam.
+    const now = Date.now();
+    if (now - lastNotificationTime < NOTIFICATION_COOLDOWN) return;
+    lastNotificationTime = now;
+
+    // Don't show if page is visible.
+    if (document.visibilityState === 'visible' && type !== 'info') {
+        return;
+    }
+
+    const iconMap = {
+        'message': '/static/icons/message.svg',
+        'urgent': '/static/icons/message.svg',
+        'session': '/static/icons/message.svg',
+        'info': '/static/icons/message.svg'
+    };
+
+    const notification = new Notification(title, {
+        body: body,
+        icon: iconMap[type] || '/static/icons/message.svg',
+        tag: data.id || 'subtrate-notification',
+        requireInteraction: type === 'urgent',
+        data: data
+    });
+
+    // Handle click - focus window and navigate if needed.
+    notification.onclick = function(event) {
+        event.preventDefault();
+        window.focus();
+        if (data.url) {
+            window.location.href = data.url;
+        }
+        notification.close();
+    };
+
+    // Auto-close after 10 seconds for non-urgent.
+    if (type !== 'urgent') {
+        setTimeout(() => notification.close(), 10000);
+    }
+}
+
+// Listen for SSE events and show notifications.
+function setupSSENotifications() {
+    // Listen for activity-update events.
+    document.body.addEventListener('sse:activity-update', function(evt) {
+        const data = evt.detail;
+        if (data && data.type === 'message') {
+            showBrowserNotification(
+                'New Message from ' + (data.agentName || 'Agent'),
+                data.subject || data.description || 'You have a new message',
+                data.priority === 'urgent' ? 'urgent' : 'message',
+                { id: data.id, url: '/inbox' }
+            );
+        }
+    });
+
+    // Listen for inbox-update events.
+    document.body.addEventListener('sse:inbox-update', function(evt) {
+        const data = evt.detail;
+        if (data && data.newCount > 0) {
+            showBrowserNotification(
+                'New Messages',
+                `You have ${data.newCount} new message${data.newCount > 1 ? 's' : ''}`,
+                'message',
+                { url: '/inbox' }
+            );
+        }
+    });
+}
+
+// Initialize notifications on page load.
+document.addEventListener('DOMContentLoaded', function() {
+    // Only show prompt if not previously dismissed.
+    if (!localStorage.getItem('notifications-prompt-dismissed')) {
+        initNotifications();
+    } else if (Notification.permission === 'granted') {
+        notificationsEnabled = true;
+    }
+    setupSSENotifications();
+});
+
+// =============================================================================
+// HTMX Configuration
+// =============================================================================
+
 // Configure HTMX.
 document.body.addEventListener('htmx:configRequest', function(evt) {
     // Add CSRF token if needed.
@@ -118,4 +292,21 @@ function switchSessionTab(button, tabId) {
     // Show/hide content.
     document.querySelectorAll('.session-tab-content').forEach(c => c.classList.add('hidden'));
     document.getElementById('tab-' + tabId).classList.remove('hidden');
+}
+
+// Agent filter tab switching.
+function setAgentFilter(button, filter) {
+    // Update button styles.
+    document.querySelectorAll('.filter-tab').forEach(t => {
+        t.classList.remove('active');
+    });
+    button.classList.add('active');
+
+    // Store filter state and update hx-get URL for polling.
+    const grid = document.getElementById('agents-grid');
+    if (grid) {
+        grid.dataset.filter = filter;
+        // Update hx-get URL so polling respects the filter.
+        grid.setAttribute('hx-get', '/api/agents/cards?filter=' + filter);
+    }
 }

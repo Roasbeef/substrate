@@ -6,13 +6,13 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{{block "title" .}}Substrate - Agent Command Center{{end}}</title>
 
-    <!-- HTMX for server-driven interactivity -->
-    <script src="https://unpkg.com/htmx.org@1.9.10"></script>
+    <!-- HTMX for server-driven interactivity (embedded, no CDN) -->
+    <script src="/static/js/vendor/htmx.min.js"></script>
     <!-- HTMX SSE extension for real-time updates -->
-    <script src="https://unpkg.com/htmx.org@1.9.10/dist/ext/sse.js"></script>
+    <script src="/static/js/vendor/htmx-sse.js"></script>
     <!-- Idiomorph for smooth DOM morphing (prevents flashing on SSE updates) -->
-    <script src="https://unpkg.com/idiomorph@0.3.0"></script>
-    <script src="https://unpkg.com/idiomorph@0.3.0/dist/idiomorph-ext.min.js"></script>
+    <script src="/static/js/vendor/idiomorph.min.js"></script>
+    <script src="/static/js/vendor/idiomorph-ext.min.js"></script>
 
     <!-- Base styles -->
     <link rel="stylesheet" href="/static/css/main.css">

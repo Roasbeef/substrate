@@ -24,7 +24,7 @@ import (
 //go:embed templates/*.html templates/partials/*.html
 var templatesFS embed.FS
 
-//go:embed static/css/*.css static/js/*.js
+//go:embed static/css/*.css static/js/*.js static/js/vendor/*.js static/icons/*.svg
 var staticFS embed.FS
 
 // UserAgentName is the name of the agent used for human-sent messages.
@@ -153,6 +153,7 @@ func (s *Server) registerRoutes() {
 	s.mux.HandleFunc("/api/agents/cards", s.handleAPIAgentsCards)
 	s.mux.HandleFunc("/api/activity", s.handleAPIActivity)
 	s.mux.HandleFunc("/api/sessions/active", s.handleAPIActiveSessions)
+	s.mux.HandleFunc("/api/sessions", s.handleAPISessionCreate)
 	s.mux.HandleFunc("/api/heartbeat", s.handleAPIHeartbeat)
 	s.mux.HandleFunc("/api/agents/status", s.handleAPIAgentsStatus)
 
