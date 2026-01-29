@@ -211,7 +211,7 @@
             <div class="flex items-center justify-between">
                 <div>
                     <p class="text-xs font-medium text-gray-500 uppercase tracking-wide">Active Agents</p>
-                    <p class="text-2xl font-semibold text-gray-900 mt-1" id="stat-active">{{.Stats.ActiveAgents}}</p>
+                    <p class="text-2xl font-semibold text-gray-900 mt-1" id="stat-active">{{.AgentStats.ActiveAgents}}</p>
                 </div>
                 <div class="w-10 h-10 bg-green-50 rounded-full flex items-center justify-center">
                     <span class="status-dot status-active"></span>
@@ -222,7 +222,7 @@
             <div class="flex items-center justify-between">
                 <div>
                     <p class="text-xs font-medium text-gray-500 uppercase tracking-wide">Running Sessions</p>
-                    <p class="text-2xl font-semibold text-gray-900 mt-1" id="stat-sessions">{{.Stats.RunningSessions}}</p>
+                    <p class="text-2xl font-semibold text-gray-900 mt-1" id="stat-sessions">{{.AgentStats.RunningSessions}}</p>
                 </div>
                 <div class="w-10 h-10 bg-blue-50 rounded-full flex items-center justify-center">
                     <svg class="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -236,7 +236,7 @@
             <div class="flex items-center justify-between">
                 <div>
                     <p class="text-xs font-medium text-gray-500 uppercase tracking-wide">Pending Messages</p>
-                    <p class="text-2xl font-semibold text-gray-900 mt-1" id="stat-pending">{{.Stats.PendingMessages}}</p>
+                    <p class="text-2xl font-semibold text-gray-900 mt-1" id="stat-pending">{{.AgentStats.PendingMessages}}</p>
                 </div>
                 <div class="w-10 h-10 bg-yellow-50 rounded-full flex items-center justify-center">
                     <svg class="w-5 h-5 text-yellow-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -250,7 +250,7 @@
             <div class="flex items-center justify-between">
                 <div>
                     <p class="text-xs font-medium text-gray-500 uppercase tracking-wide">Completed Today</p>
-                    <p class="text-2xl font-semibold text-gray-900 mt-1" id="stat-completed">{{.Stats.CompletedToday}}</p>
+                    <p class="text-2xl font-semibold text-gray-900 mt-1" id="stat-completed">{{.AgentStats.CompletedToday}}</p>
                 </div>
                 <div class="w-10 h-10 bg-purple-50 rounded-full flex items-center justify-center">
                     <svg class="w-5 h-5 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">

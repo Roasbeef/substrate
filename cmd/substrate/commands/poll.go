@@ -38,6 +38,9 @@ func runPoll(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
+	// Send heartbeat to indicate agent activity.
+	sendHeartbeatQuiet(ctx, store, agentID)
+
 	// Get current offsets from database.
 	offsets, err := store.Queries().ListConsumerOffsetsByAgent(ctx, agentID)
 	if err != nil {

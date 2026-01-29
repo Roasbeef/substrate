@@ -11,6 +11,7 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/roasbeef/subtrate/internal/agent"
 	"github.com/roasbeef/subtrate/internal/db"
 )
 
@@ -22,12 +23,14 @@ var staticFS embed.FS
 
 // Server is the HTTP server for the Subtrate web UI.
 type Server struct {
-	store     *db.Store
-	templates map[string]*template.Template // Page-specific template sets.
-	partials  *template.Template            // Shared partials.
-	mux       *http.ServeMux
-	srv       *http.Server
-	addr      string
+	store        *db.Store
+	registry     *agent.Registry
+	heartbeatMgr *agent.HeartbeatManager
+	templates    map[string]*template.Template // Page-specific template sets.
+	partials     *template.Template            // Shared partials.
+	mux          *http.ServeMux
+	srv          *http.Server
+	addr         string
 }
 
 // Config holds configuration for the web server.
@@ -44,11 +47,16 @@ func DefaultConfig() *Config {
 
 // NewServer creates a new web server.
 func NewServer(cfg *Config, store *db.Store) (*Server, error) {
+	registry := agent.NewRegistry(store)
+	heartbeatMgr := agent.NewHeartbeatManager(registry, nil)
+
 	s := &Server{
-		store:     store,
-		templates: make(map[string]*template.Template),
-		mux:       http.NewServeMux(),
-		addr:      cfg.Addr,
+		store:        store,
+		registry:     registry,
+		heartbeatMgr: heartbeatMgr,
+		templates:    make(map[string]*template.Template),
+		mux:          http.NewServeMux(),
+		addr:         cfg.Addr,
 	}
 
 	// Common template functions.
@@ -122,10 +130,13 @@ func (s *Server) registerRoutes() {
 	s.mux.HandleFunc("/api/agents/cards", s.handleAPIAgentsCards)
 	s.mux.HandleFunc("/api/activity", s.handleAPIActivity)
 	s.mux.HandleFunc("/api/sessions/active", s.handleAPIActiveSessions)
+	s.mux.HandleFunc("/api/heartbeat", s.handleAPIHeartbeat)
+	s.mux.HandleFunc("/api/agents/status", s.handleAPIAgentsStatus)
 
 	// SSE event streams.
 	s.mux.HandleFunc("/events/agents", s.handleSSEAgents)
 	s.mux.HandleFunc("/events/activity", s.handleSSEActivity)
+	s.mux.HandleFunc("/events/inbox", s.handleSSEInbox)
 }
 
 // Start starts the HTTP server.

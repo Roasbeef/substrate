@@ -20,15 +20,15 @@ build:
 
 .PHONY: build-cli
 build-cli:
-	go build -o bin/substrate ./cmd/substrate
+	go build -o substrate ./cmd/substrate
 
 .PHONY: build-daemon
 build-daemon:
-	go build -o bin/substrated ./cmd/substrated
+	go build -o substrated ./cmd/substrated
 
 .PHONY: build-web
 build-web:
-	go build -o bin/subtrate-web ./cmd/subtrate-web
+	go build -o subtrate-web ./cmd/subtrate-web
 
 .PHONY: build-all
 build-all: build-cli build-daemon build-web
@@ -136,7 +136,7 @@ migrate-down:
 # Clean
 .PHONY: clean
 clean:
-	rm -rf bin/
+	rm -f substrate substrated subtrate-web
 	rm -f coverage.out coverage.html
 
 # Web server
@@ -144,11 +144,53 @@ WEB_PORT ?= 8080
 
 .PHONY: run-web
 run-web: build-web
-	./bin/subtrate-web -addr :$(WEB_PORT)
+	./subtrate-web -addr :$(WEB_PORT)
 
 .PHONY: run-web-dev
 run-web-dev:
 	go run ./cmd/subtrate-web -addr :$(WEB_PORT)
+
+# Start web server in background.
+.PHONY: start
+start: build-web
+	@echo "Starting web server on port $(WEB_PORT)..."
+	@./subtrate-web -addr :$(WEB_PORT) &
+	@sleep 1
+	@echo "Server started. PID: $$(lsof -ti :$(WEB_PORT))"
+
+# Stop web server.
+.PHONY: stop
+stop:
+	@echo "Stopping web server on port $(WEB_PORT)..."
+	@-lsof -ti :$(WEB_PORT) | xargs kill 2>/dev/null || true
+	@sleep 1
+	@echo "Server stopped."
+
+# Restart web server (stop, rebuild, start).
+.PHONY: restart
+restart: stop build-web
+	@echo "Starting web server on port $(WEB_PORT)..."
+	@./subtrate-web -addr :$(WEB_PORT) &
+	@sleep 1
+	@echo "Server restarted. PID: $$(lsof -ti :$(WEB_PORT))"
+
+# Integration testing
+.PHONY: test-integration
+test-integration:
+	go test -v -timeout 10m ./tests/integration/sdk/...
+
+.PHONY: test-integration-short
+test-integration-short:
+	go test -v -short ./tests/integration/sdk/...
+
+.PHONY: test-integration-seed
+test-integration-seed:
+	@echo "Seeding test database..."
+	@mkdir -p /tmp/subtrate-test
+	@rm -f /tmp/subtrate-test/test.db
+	sqlite3 /tmp/subtrate-test/test.db < internal/db/migrations/000001_init.up.sql
+	sqlite3 /tmp/subtrate-test/test.db < tests/integration/fixtures/seed_data.sql
+	@echo "Test database created at /tmp/subtrate-test/test.db"
 
 # Development helpers
 .PHONY: check
@@ -171,9 +213,9 @@ help:
 	@echo ""
 	@echo "Build targets:"
 	@echo "  build          Build all packages (default)"
-	@echo "  build-cli      Build CLI binary to bin/substrate"
-	@echo "  build-daemon   Build daemon binary to bin/substrated"
-	@echo "  build-web      Build web server binary to bin/subtrate-web"
+	@echo "  build-cli      Build CLI binary (./substrate)"
+	@echo "  build-daemon   Build daemon binary (./substrated)"
+	@echo "  build-web      Build web server binary (./subtrate-web)"
 	@echo "  build-all      Build all binaries"
 	@echo "  install        Install binaries to GOPATH/bin"
 	@echo "  quick          Quick build check (compile only)"
@@ -187,6 +229,11 @@ help:
 	@echo "                 Usage: make unit pkg=./internal/mail case=TestService"
 	@echo "  run-test       Run a specific test"
 	@echo "                 Usage: make run-test test=TestThreadFSM pkg=./internal/mail"
+	@echo ""
+	@echo "Integration testing:"
+	@echo "  test-integration      Run SDK integration tests (requires claude CLI)"
+	@echo "  test-integration-short Run short integration tests (no API calls)"
+	@echo "  test-integration-seed Create seeded test database"
 	@echo ""
 	@echo "Code generation:"
 	@echo "  sqlc           Generate sqlc code (requires sqlc installed)"
@@ -206,7 +253,10 @@ help:
 	@echo "Web server:"
 	@echo "  run-web        Build and run web server (default port 8080)"
 	@echo "  run-web-dev    Run web server without building (for development)"
-	@echo "                 Usage: make run-web WEB_PORT=3000"
+	@echo "  start          Build and start web server in background"
+	@echo "  stop           Stop running web server"
+	@echo "  restart        Stop, rebuild, and start web server"
+	@echo "                 Usage: make restart WEB_PORT=8081"
 	@echo ""
 	@echo "Development:"
 	@echo "  check          Run fmt, vet, lint, and tests"

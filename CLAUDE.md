@@ -320,6 +320,104 @@ web/
 └── react/               # React components for complex UI
 ```
 
+## Agent Heartbeat System
+
+Subtrate tracks agent liveness via heartbeats. Agents are classified as:
+- **Active**: Last seen < 5 minutes ago
+- **Busy**: Active with running session
+- **Idle**: Last seen 5-30 minutes ago
+- **Offline**: Last seen > 30 minutes ago
+
+### CLI Integration
+The CLI automatically sends heartbeats when running:
+- `substrate inbox` - Sends heartbeat before fetching messages
+- `substrate poll` - Sends heartbeat before polling for new messages
+- `substrate status` - Sends heartbeat before checking status
+- `substrate heartbeat` - Explicit heartbeat command
+
+### Heartbeat Command
+```bash
+# Send heartbeat
+substrate heartbeat
+
+# Send heartbeat and start session tracking
+substrate heartbeat --session-start --session-id $CLAUDE_SESSION_ID
+
+# Quiet mode (for hooks)
+substrate heartbeat --format context
+```
+
+### API Endpoints
+- `POST /api/heartbeat` - Record agent heartbeat (JSON body: `{"agent_name": "..."}`)
+- `GET /api/agents/status` - Get status of all agents
+
+## Claude Code Hooks Configuration
+
+Configure hooks in `~/.claude/settings.json` to integrate Subtrate with Claude Code sessions.
+
+### Recommended Hooks
+```json
+{
+  "hooks": {
+    "SessionStart": [
+      {
+        "matcher": "",
+        "hooks": [{
+          "type": "command",
+          "command": "substrate heartbeat --session-start --format context && substrate poll --format context --quiet"
+        }]
+      }
+    ],
+    "UserPromptSubmit": [{
+      "matcher": "",
+      "hooks": [{
+        "type": "command",
+        "command": "substrate poll --format context --quiet"
+      }]
+    }],
+    "Stop": [{
+      "hooks": [{
+        "type": "command",
+        "command": "substrate status --format context"
+      }]
+    }]
+  }
+}
+```
+
+### Hook Behavior
+- **SessionStart**: Sends heartbeat + checks for new mail at session start
+- **UserPromptSubmit**: Quietly checks for new mail on each user message
+- **Stop**: Shows status summary before ending session
+
+### Output Formats
+- `--format text` (default): Human-readable output
+- `--format json`: Machine-readable JSON
+- `--format context`: Minimal output for hook injection
+
+## JavaScript Tooling
+
+Use **bun** for any JavaScript-related work:
+```bash
+# Install dependencies
+bun install
+
+# Run scripts
+bun run build
+
+# Add new package
+bun add <package>
+```
+
+## Claude Agent SDK
+
+For agent messaging and session kickoff, use the Claude Agent Go SDK:
+```
+github.com/Roasbeef/claude-agent-sdk-go
+```
+
+This SDK enables spawning and communicating with Claude Code agents programmatically.
+
 ## Session Management
 
 This project uses session tracking in `.sessions/` for execution continuity.

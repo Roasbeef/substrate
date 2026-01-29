@@ -8,6 +8,7 @@ require (
 	github.com/lightningnetwork/lnd/fn/v2 v2.0.9
 	github.com/mattn/go-sqlite3 v1.14.24
 	github.com/modelcontextprotocol/go-sdk v1.2.0
+	github.com/roasbeef/claude-agent-sdk-go v0.0.0
 	github.com/spf13/cobra v1.10.2
 	github.com/stretchr/testify v1.11.1
 	google.golang.org/grpc v1.78.0
@@ -35,3 +36,5 @@ require (
 )
 
 replace github.com/lightninglabs/darepo-client/baselib => /Users/roasbeef/gocode/src/github.com/lightninglabs/darepo-client/baselib
+
+replace github.com/roasbeef/claude-agent-sdk-go => /Users/roasbeef/gocode/src/github.com/Roasbeef/claude-agent-sdk-go

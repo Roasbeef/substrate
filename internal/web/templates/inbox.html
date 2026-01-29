@@ -6,7 +6,7 @@
 
 {{define "head"}}
 <style>
-    /* Google Inbox-inspired container */
+    /* Unified styles matching dashboard design */
     .inbox-container {
         background-color: #f5f5f5;
         min-height: calc(100vh - 56px);
@@ -16,62 +16,124 @@
         background: white;
         border-radius: 8px;
         box-shadow: 0 1px 2px 0 rgba(60,64,67,.3), 0 1px 3px 1px rgba(60,64,67,.15);
-        max-width: 1200px;
-        margin: 0 auto;
     }
 
-    /* Gmail-style tabs with proper spacing */
-    .inbox-tabs {
-        display: flex;
+    .inbox-header {
+        padding: 16px 24px;
         border-bottom: 1px solid #e0e0e0;
     }
 
-    .inbox-tab {
-        position: relative;
-        padding: 14px 48px;
-        color: #5f6368;
+    /* Stats card hover effect */
+    .stat-card {
+        transition: box-shadow 0.15s, transform 0.15s;
+    }
+
+    .stat-card:hover {
+        box-shadow: 0 1px 3px 0 rgba(60,64,67,.3), 0 4px 8px 3px rgba(60,64,67,.15);
+        transform: translateY(-1px);
+    }
+
+    /* Filter tabs matching dashboard */
+    .filter-tab {
+        padding: 6px 12px;
         font-size: 13px;
+        border-radius: 16px;
+        color: #5f6368;
+        transition: background-color 0.15s, color 0.15s;
+        cursor: pointer;
+    }
+
+    .filter-tab:hover {
+        background-color: #f1f3f4;
+    }
+
+    .filter-tab.active {
+        background-color: #e8eaed;
+        color: #202124;
         font-weight: 500;
-        letter-spacing: 0.25px;
+    }
+
+    /* Section header consistent with dashboard */
+    .section-header {
         display: flex;
         align-items: center;
-        gap: 10px;
-        cursor: pointer;
+        justify-content: space-between;
+        padding: 14px 16px;
+        border-bottom: 1px solid #e0e0e0;
+    }
+
+    .section-header h2 {
+        font-size: 14px;
+        font-weight: 500;
+        color: #202124;
+        letter-spacing: 0.1px;
+    }
+
+    /* Category tabs - dashboard style pills */
+    .category-tabs {
+        display: flex;
+        gap: 8px;
+        padding: 12px 16px;
+        border-bottom: 1px solid #e0e0e0;
+        background: #fafafa;
+    }
+
+    .category-tab {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        padding: 8px 16px;
+        font-size: 13px;
+        font-weight: 500;
+        border-radius: 20px;
+        color: #5f6368;
+        background: white;
+        border: 1px solid #e0e0e0;
         text-decoration: none;
-        transition: background-color 0.15s, color 0.15s;
-        border-bottom: 3px solid transparent;
-        margin-bottom: -1px;
+        transition: all 0.15s;
     }
 
-    .inbox-tab:hover {
-        background-color: #f6f8fc;
+    .category-tab:hover {
+        border-color: #dadce0;
+        box-shadow: 0 1px 2px rgba(0,0,0,0.05);
     }
 
-    .inbox-tab.active {
-        color: #d93025;
-        border-bottom-color: #d93025;
+    .category-tab.active {
+        border-color: transparent;
+    }
+
+    .category-tab.primary.active {
         background-color: #fce8e6;
+        color: #d93025;
     }
 
-    .inbox-tab svg {
-        width: 18px;
-        height: 18px;
-    }
-
-    /* Category-specific colors */
-    .inbox-tab.agents.active {
-        color: #1a73e8;
-        border-bottom-color: #1a73e8;
+    .category-tab.agents.active {
         background-color: #e8f0fe;
+        color: #1a73e8;
     }
 
-    .inbox-tab.topics.active {
-        color: #188038;
-        border-bottom-color: #188038;
+    .category-tab.topics.active {
         background-color: #e6f4ea;
+        color: #188038;
     }
 
-    /* Time section dividers (Google Inbox style) */
+    .category-tab svg {
+        width: 16px;
+        height: 16px;
+    }
+
+    .category-tab .count {
+        background: rgba(0,0,0,0.08);
+        padding: 2px 6px;
+        border-radius: 10px;
+        font-size: 11px;
+    }
+
+    .category-tab.active .count {
+        background: rgba(0,0,0,0.1);
+    }
+
+    /* Time section dividers */
     .time-section {
         padding: 12px 16px 8px 16px;
         font-size: 12px;
@@ -96,109 +158,104 @@
         opacity: 1;
     }
 
-    /* Message row - Gmail clean style */
-    .message-row {
+    /* Message card - dashboard style */
+    .message-card {
         display: flex;
-        align-items: center;
-        height: 40px;
-        padding: 0 8px 0 0;
+        align-items: flex-start;
+        padding: 16px;
         border-bottom: 1px solid #f1f3f4;
         cursor: pointer;
-        font-size: 14px;
-        line-height: 20px;
-        transition: box-shadow 0.1s;
+        transition: background-color 0.1s;
+        gap: 12px;
     }
 
-    .message-row:hover {
-        box-shadow: inset 1px 0 0 #dadce0, inset -1px 0 0 #dadce0,
-                    0 1px 2px 0 rgba(60,64,67,.3), 0 1px 3px 1px rgba(60,64,67,.15);
-        z-index: 2;
-        position: relative;
+    .message-card:hover {
+        background-color: #f8f9fa;
     }
 
-    .message-row.unread {
+    .message-card:last-child {
+        border-bottom: none;
+    }
+
+    .message-card.unread {
         background-color: #fff;
     }
 
-    .message-row.unread .msg-sender,
-    .message-row.unread .msg-subject {
-        font-weight: 700;
-        color: #202124;
-    }
-
-    .message-row.unread .msg-date {
+    .message-card.unread .message-sender,
+    .message-card.unread .message-subject {
         font-weight: 600;
         color: #202124;
     }
 
-    /* Message row columns */
-    .msg-checkbox {
+    /* Message avatar/icon */
+    .message-avatar {
         width: 40px;
-        flex-shrink: 0;
+        height: 40px;
+        border-radius: 50%;
         display: flex;
-        justify-content: center;
         align-items: center;
-    }
-
-    .msg-star {
-        width: 32px;
-        flex-shrink: 0;
-        display: flex;
         justify-content: center;
-        align-items: center;
-    }
-
-    .msg-star svg {
-        width: 20px;
-        height: 20px;
-    }
-
-    .msg-sender {
-        width: 200px;
         flex-shrink: 0;
-        padding-right: 16px;
-        color: #202124;
-        font-weight: 400;
-        white-space: nowrap;
-        overflow: hidden;
-        text-overflow: ellipsis;
+        font-weight: 600;
+        font-size: 14px;
     }
 
-    .msg-content {
+    .message-avatar.agent { background-color: #e8f0fe; color: #1a73e8; }
+    .message-avatar.topic { background-color: #e6f4ea; color: #188038; }
+    .message-avatar.user { background-color: #fef7e0; color: #f9ab00; }
+
+    /* Message content area */
+    .message-content {
         flex: 1;
         min-width: 0;
+    }
+
+    .message-header {
         display: flex;
-        align-items: baseline;
-        gap: 4px;
-        overflow: hidden;
+        align-items: center;
+        gap: 8px;
+        margin-bottom: 4px;
     }
 
-    .msg-subject {
+    .message-sender {
+        font-size: 14px;
+        font-weight: 500;
         color: #202124;
-        font-weight: 400;
-        white-space: nowrap;
     }
 
-    .msg-separator {
+    .message-time {
+        font-size: 12px;
         color: #5f6368;
-        flex-shrink: 0;
+        margin-left: auto;
     }
 
-    .msg-preview {
+    .message-subject {
+        font-size: 14px;
+        color: #202124;
+        font-weight: 500;
+        margin-bottom: 4px;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+
+    .message-preview {
+        font-size: 13px;
         color: #5f6368;
         white-space: nowrap;
         overflow: hidden;
         text-overflow: ellipsis;
     }
 
-    .msg-labels {
-        flex-shrink: 0;
-        padding: 0 8px;
+    .message-tags {
+        display: flex;
+        gap: 6px;
+        margin-top: 8px;
     }
 
-    .msg-label {
+    .message-tag {
         display: inline-block;
-        padding: 2px 6px;
+        padding: 2px 8px;
         font-size: 11px;
         font-weight: 500;
         border-radius: 4px;
@@ -206,90 +263,73 @@
         color: #5f6368;
     }
 
-    .msg-date {
-        width: 70px;
-        flex-shrink: 0;
-        text-align: right;
-        color: #5f6368;
-        font-size: 12px;
-        padding-right: 8px;
-    }
-
-    /* Hover actions */
-    .msg-actions {
-        width: 0;
-        overflow: hidden;
+    /* Message actions */
+    .message-actions {
         display: flex;
-        align-items: center;
+        flex-direction: column;
+        align-items: flex-end;
+        gap: 8px;
+        flex-shrink: 0;
+    }
+
+    .message-actions-row {
+        display: flex;
         gap: 4px;
-        transition: width 0.15s;
+        opacity: 0;
+        transition: opacity 0.15s;
     }
 
-    .message-row:hover .msg-actions {
-        width: 88px;
+    .message-card:hover .message-actions-row {
+        opacity: 1;
     }
 
-    .message-row:hover .msg-date {
-        display: none;
-    }
-
-    .msg-actions button {
+    .message-action-btn {
         padding: 6px;
         border-radius: 50%;
         color: #5f6368;
         background: transparent;
         border: none;
         cursor: pointer;
+        transition: background-color 0.1s;
     }
 
-    .msg-actions button:hover {
+    .message-action-btn:hover {
         background-color: #e8eaed;
     }
 
-    .msg-actions svg {
+    .message-action-btn svg {
         width: 18px;
         height: 18px;
     }
 
-    /* Important/Priority indicator */
-    .priority-indicator {
-        width: 4px;
-        height: 100%;
-        flex-shrink: 0;
+    /* Star button */
+    .star-btn {
+        color: #5f6368;
     }
 
-    .priority-urgent {
-        background-color: #d93025;
+    .star-btn.starred {
+        color: #fbbc05;
     }
 
-    /* FAB - Floating Action Button */
-    .fab {
-        position: fixed;
-        bottom: 24px;
-        right: 24px;
-        width: 56px;
-        height: 56px;
-        border-radius: 50%;
-        background: linear-gradient(135deg, #4285f4, #34a853, #fbbc05, #ea4335);
-        box-shadow: 0 2px 5px rgba(0,0,0,.26);
-        display: flex;
+    /* Priority indicator */
+    .priority-badge {
+        display: inline-flex;
         align-items: center;
-        justify-content: center;
-        cursor: pointer;
-        transition: box-shadow 0.2s, transform 0.2s;
-        z-index: 100;
-        border: none;
+        gap: 4px;
+        padding: 2px 8px;
+        font-size: 11px;
+        font-weight: 500;
+        border-radius: 4px;
     }
 
-    .fab:hover {
-        box-shadow: 0 4px 10px rgba(0,0,0,.3);
-        transform: scale(1.05);
+    .priority-badge.urgent {
+        background-color: #fce8e6;
+        color: #d93025;
     }
 
-    .fab svg {
-        width: 24px;
-        height: 24px;
-        color: white;
+    .priority-badge.normal {
+        background-color: #e8f0fe;
+        color: #1a73e8;
     }
 
     /* Empty state */
@@ -302,7 +342,7 @@
         width: 120px;
         height: 120px;
         color: #dadce0;
-        margin-bottom: 16px;
+        margin: 0 auto 16px;
     }
 
     .inbox-empty h3 {
@@ -321,86 +361,143 @@
 
 {{define "content"}}
 <div class="inbox-container p-6">
-    <div class="inbox-card">
-        <!-- Toolbar -->
-        <div class="flex items-center justify-between px-2 py-2 border-b border-gray-100">
-            <div class="flex items-center gap-1">
-                <!-- Select dropdown -->
-                <div class="flex items-center" onclick="event.stopPropagation()">
-                    <button class="flex items-center gap-0.5 p-2 hover:bg-gray-100 rounded">
-                        <input type="checkbox" id="select-all" class="w-4 h-4 rounded border-gray-300">
-                        <svg class="w-4 h-4 text-gray-500" fill="currentColor" viewBox="0 0 20 20">
-                            <path fill-rule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clip-rule="evenodd"/>
-                        </svg>
-                    </button>
-                </div>
-
-                <!-- Refresh -->
-                <button class="p-2 hover:bg-gray-100 rounded"
+    <!-- Header -->
+    <div class="inbox-card mb-6">
+        <div class="flex items-center justify-between px-6 py-4">
+            <div>
+                <h1 class="text-xl font-medium text-gray-900">Inbox</h1>
+                <p class="text-sm text-gray-500 mt-0.5">Messages from agents and topics</p>
+            </div>
+            <div class="flex items-center gap-3">
+                <button class="flex items-center gap-2 px-4 py-2 text-gray-700 text-sm font-medium rounded-lg
+                               border border-gray-300 hover:bg-gray-50 transition-all"
                         hx-get="/inbox/messages"
                         hx-target="#message-list"
-                        hx-swap="innerHTML"
-                        title="Refresh">
-                    <svg class="w-5 h-5 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
+                        hx-swap="innerHTML">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
                         <path stroke-linecap="round" stroke-linejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
                     </svg>
+                    Refresh
                 </button>
-
-                <!-- More actions -->
-                <button class="p-2 hover:bg-gray-100 rounded" title="More">
-                    <svg class="w-5 h-5 text-gray-600" fill="currentColor" viewBox="0 0 20 20">
-                        <path d="M10 6a2 2 0 110-4 2 2 0 010 4zM10 12a2 2 0 110-4 2 2 0 010 4zM10 18a2 2 0 110-4 2 2 0 010 4z"/>
+                <button class="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg
+                               hover:bg-blue-700 shadow-sm transition-all"
+                        hx-get="/compose"
+                        hx-target="#modal-container">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4"/>
                     </svg>
+                    Compose
                 </button>
             </div>
+        </div>
+    </div>
 
-            <!-- Pagination -->
-            <div class="flex items-center gap-4 text-sm text-gray-600">
-                <span class="text-xs">{{if .Messages}}1–{{len .Messages}} of {{.TotalCount}}{{else}}0{{end}}</span>
-                <div class="flex items-center">
-                    <button class="p-1.5 hover:bg-gray-100 rounded disabled:opacity-30"
-                            hx-get="/inbox/messages?page={{.PrevPage}}"
-                            hx-target="#message-list"
-                            {{if not .HasPrev}}disabled{{end}}>
-                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
-                            <path stroke-linecap="round" stroke-linejoin="round" d="M15 19l-7-7 7-7"/>
-                        </svg>
-                    </button>
-                    <button class="p-1.5 hover:bg-gray-100 rounded disabled:opacity-30"
-                            hx-get="/inbox/messages?page={{.NextPage}}"
-                            hx-target="#message-list"
-                            {{if not .HasNext}}disabled{{end}}>
-                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
-                            <path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7"/>
-                        </svg>
-                    </button>
+    <!-- Stats Overview -->
+    <div class="grid grid-cols-4 gap-4 mb-6">
+        <div class="inbox-card stat-card p-4">
+            <div class="flex items-center justify-between">
+                <div>
+                    <p class="text-xs font-medium text-gray-500 uppercase tracking-wide">Unread</p>
+                    <p class="text-2xl font-semibold text-gray-900 mt-1" id="stat-unread">{{.Stats.Unread}}</p>
+                </div>
+                <div class="w-10 h-10 bg-blue-50 rounded-full flex items-center justify-center">
+                    <svg class="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                              d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/>
+                    </svg>
                 </div>
             </div>
         </div>
+        <div class="inbox-card stat-card p-4">
+            <div class="flex items-center justify-between">
+                <div>
+                    <p class="text-xs font-medium text-gray-500 uppercase tracking-wide">Starred</p>
+                    <p class="text-2xl font-semibold text-gray-900 mt-1" id="stat-starred">{{.Stats.Starred}}</p>
+                </div>
+                <div class="w-10 h-10 bg-yellow-50 rounded-full flex items-center justify-center">
+                    <svg class="w-5 h-5 text-yellow-500" fill="currentColor" viewBox="0 0 20 20">
+                        <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"/>
+                    </svg>
+                </div>
+            </div>
+        </div>
+        <div class="inbox-card stat-card p-4">
+            <div class="flex items-center justify-between">
+                <div>
+                    <p class="text-xs font-medium text-gray-500 uppercase tracking-wide">Snoozed</p>
+                    <p class="text-2xl font-semibold text-gray-900 mt-1" id="stat-snoozed">{{.Stats.Snoozed}}</p>
+                </div>
+                <div class="w-10 h-10 bg-purple-50 rounded-full flex items-center justify-center">
+                    <svg class="w-5 h-5 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                              d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                    </svg>
+                </div>
+            </div>
+        </div>
+        <div class="inbox-card stat-card p-4">
+            <div class="flex items-center justify-between">
+                <div>
+                    <p class="text-xs font-medium text-gray-500 uppercase tracking-wide">Urgent</p>
+                    <p class="text-2xl font-semibold text-gray-900 mt-1" id="stat-urgent">{{.Stats.Urgent}}</p>
+                </div>
+                <div class="w-10 h-10 bg-red-50 rounded-full flex items-center justify-center">
+                    <svg class="w-5 h-5 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                              d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/>
+                    </svg>
+                </div>
+            </div>
+        </div>
+    </div>
 
-        <!-- Category Tabs (Gmail style with proper spacing) -->
-        <div class="inbox-tabs">
+    <!-- Main Content -->
+    <div class="inbox-card">
+        <!-- Category Tabs -->
+        <div class="category-tabs">
             <a href="/inbox?category=primary"
-               class="inbox-tab {{if or (not .Category) (eq .Category "primary")}}active{{end}}">
+               class="category-tab primary {{if or (not .Category) (eq .Category "primary")}}active{{end}}">
                 <svg fill="currentColor" viewBox="0 0 24 24">
                     <path d="M20 4H4c-1.1 0-1.99.9-1.99 2L2 18c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 4l-8 5-8-5V6l8 5 8-5v2z"/>
                 </svg>
                 Primary
+                {{if .Stats.PrimaryCount}}<span class="count">{{.Stats.PrimaryCount}}</span>{{end}}
             </a>
             <a href="/inbox?category=agents"
-               class="inbox-tab agents {{if eq .Category "agents"}}active{{end}}">
+               class="category-tab agents {{if eq .Category "agents"}}active{{end}}">
                 <svg fill="currentColor" viewBox="0 0 24 24">
                     <path d="M16 11c1.66 0 2.99-1.34 2.99-3S17.66 5 16 5c-1.66 0-3 1.34-3 3s1.34 3 3 3zm-8 0c1.66 0 2.99-1.34 2.99-3S9.66 5 8 5C6.34 5 5 6.34 5 8s1.34 3 3 3zm0 2c-2.33 0-7 1.17-7 3.5V19h14v-2.5c0-2.33-4.67-3.5-7-3.5zm8 0c-.29 0-.62.02-.97.05 1.16.84 1.97 1.97 1.97 3.45V19h6v-2.5c0-2.33-4.67-3.5-7-3.5z"/>
                 </svg>
                 Agents
+                {{if .Stats.AgentsCount}}<span class="count">{{.Stats.AgentsCount}}</span>{{end}}
             </a>
             <a href="/inbox?category=topics"
-               class="inbox-tab topics {{if eq .Category "topics"}}active{{end}}">
+               class="category-tab topics {{if eq .Category "topics"}}active{{end}}">
                 <svg fill="currentColor" viewBox="0 0 24 24">
                     <path d="M21.41 11.58l-9-9C12.05 2.22 11.55 2 11 2H4c-1.1 0-2 .9-2 2v7c0 .55.22 1.05.59 1.42l9 9c.36.36.86.58 1.41.58.55 0 1.05-.22 1.41-.59l7-7c.37-.36.59-.86.59-1.41 0-.55-.23-1.06-.59-1.42zM5.5 7C4.67 7 4 6.33 4 5.5S4.67 4 5.5 4 7 4.67 7 5.5 6.33 7 5.5 7z"/>
                 </svg>
                 Topics
+                {{if .Stats.TopicsCount}}<span class="count">{{.Stats.TopicsCount}}</span>{{end}}
             </a>
+        </div>
+
+        <!-- Filter Bar -->
+        <div class="section-header">
+            <h2>Messages</h2>
+            <div class="flex items-center gap-1">
+                <button class="filter-tab active"
+                        hx-get="/inbox/messages?filter=all"
+                        hx-target="#message-list"
+                        onclick="setActiveTab(this)">All</button>
+                <button class="filter-tab"
+                        hx-get="/inbox/messages?filter=unread"
+                        hx-target="#message-list"
+                        onclick="setActiveTab(this)">Unread</button>
+                <button class="filter-tab"
+                        hx-get="/inbox/messages?filter=starred"
+                        hx-target="#message-list"
+                        onclick="setActiveTab(this)">Starred</button>
+            </div>
         </div>
 
         <!-- Message List -->
@@ -419,30 +516,20 @@
     </div>
 </div>
 
-<!-- Floating Action Button (Compose) -->
-<button class="fab"
-        hx-get="/compose"
-        hx-target="#modal-container"
-        hx-swap="innerHTML"
-        title="Compose">
-    <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5">
-        <path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4"/>
-    </svg>
-</button>
-
 <!-- Real-time updates via SSE -->
 <div hx-ext="sse" sse-connect="/events/inbox" class="hidden">
     <div sse-swap="new-message" hx-swap="afterbegin" hx-target="#message-list"></div>
-    <div sse-swap="unread-count" hx-swap="innerHTML" hx-target="#unread-badge"></div>
+    <div sse-swap="unread-count" hx-swap="innerHTML" hx-target="#stat-unread"></div>
 </div>
 {{end}}
 
 {{define "scripts"}}
 <script>
-// Select all functionality
-document.getElementById('select-all')?.addEventListener('change', function() {
-    const checkboxes = document.querySelectorAll('input[name="message-ids"]');
-    checkboxes.forEach(cb => cb.checked = this.checked);
-});
+function setActiveTab(btn) {
+    btn.parentElement.querySelectorAll('.filter-tab').forEach(tab => {
+        tab.classList.remove('active');
+    });
+    btn.classList.add('active');
+}
 </script>
 {{end}}

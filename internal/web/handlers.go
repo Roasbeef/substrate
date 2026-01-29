@@ -1,9 +1,14 @@
 package web
 
 import (
+	"context"
+	"encoding/json"
+	"fmt"
 	"net/http"
 	"strings"
 	"time"
+
+	"github.com/roasbeef/subtrate/internal/agent"
 )
 
 // PageData holds common data for page templates.
@@ -12,10 +17,14 @@ type PageData struct {
 	ActiveNav   string
 	UnreadCount int
 	Category    string
-	Stats       *DashboardStats
-	Messages    []MessageView
-	Agents      []AgentView
-	Sessions    []SessionView
+
+	// Page-specific stats (use the one that applies).
+	Stats      *InboxStats
+	AgentStats *DashboardStats
+
+	Messages []MessageView
+	Agents   []AgentView
+	Sessions []SessionView
 
 	// Pagination fields.
 	TotalCount int
@@ -34,16 +43,30 @@ type DashboardStats struct {
 	CompletedToday  int
 }
 
+// InboxStats holds stats for the inbox page.
+type InboxStats struct {
+	Unread       int
+	Starred      int
+	Snoozed      int
+	Urgent       int
+	PrimaryCount int
+	AgentsCount  int
+	TopicsCount  int
+}
+
 // MessageView represents a message for display.
 type MessageView struct {
 	ID               string
 	ThreadID         string
 	SenderName       string
+	SenderInitials   string
 	Subject          string
 	Body             string
 	State            string
 	IsStarred        bool
 	IsImportant      bool
+	IsAgent          bool
+	IsTopic          bool
 	HasAttachments   bool
 	Labels           []string
 	TopicName        string
@@ -91,6 +114,65 @@ type ActivityView struct {
 	Timestamp   time.Time
 }
 
+// ThreadView represents a thread for display.
+type ThreadView struct {
+	ID            string
+	ThreadID      string // Alias for ID, used in templates.
+	Subject       string
+	Labels        []string
+	TopicName     string
+	Messages      []ThreadMessage
+	MessageIndex  int
+	TotalMessages int
+	HasPrev       bool
+	HasNext       bool
+}
+
+// ThreadMessage represents a message within a thread view.
+type ThreadMessage struct {
+	ID           string
+	SenderName   string
+	SenderAvatar string
+	Body         string
+	State        string // "unread", "read", "starred"
+	TopicName    string
+	Deadline     time.Time
+	AckedAt      time.Time
+	CreatedAt    time.Time
+	IsStarred    bool
+}
+
+// StatusView represents status data for the sidebar.
+type StatusView struct {
+	AgentName   string
+	UnreadCount int
+	UrgentCount int
+}
+
+// TopicView represents a topic for display.
+type TopicView struct {
+	ID          string
+	Name        string
+	TopicType   string
+	UnreadCount int
+}
+
+// TopicsListData holds data for the topics list partial.
+type TopicsListData struct {
+	Topics      []TopicView
+	ActiveTopic string
+}
+
+// AgentsListData holds data for the agents list partial.
+type AgentsListData struct {
+	Agents []AgentView
+}
+
+// MessagesListData holds data for the messages list partial.
+type MessagesListData struct {
+	Messages []MessageView
+}
+
 // handleIndex redirects to the inbox.
 func (s *Server) handleIndex(w http.ResponseWriter, r *http.Request) {
 	if r.URL.Path != "/" {
@@ -117,12 +199,21 @@ func (s *Server) handleInbox(w http.ResponseWriter, r *http.Request) {
 		ActiveNav:   "inbox",
 		UnreadCount: 5, // TODO: Get from store.
 		Category:    category,
-		TotalCount:  totalCount,
-		Page:        page,
-		PrevPage:    page - 1,
-		NextPage:    page + 1,
-		HasPrev:     page > 1,
-		HasNext:     totalCount > page*pageSize,
+		Stats: &InboxStats{
+			Unread:       5,
+			Starred:      2,
+			Snoozed:      1,
+			Urgent:       1,
+			PrimaryCount: 5,
+			AgentsCount:  3,
+			TopicsCount:  2,
+		},
+		TotalCount: totalCount,
+		Page:       page,
+		PrevPage:   page - 1,
+		NextPage:   page + 1,
+		HasPrev:    page > 1,
+		HasNext:    totalCount > page*pageSize,
 	}
 
 	s.render(w, "inbox.html", data)
@@ -133,7 +224,7 @@ func (s *Server) handleAgentsDashboard(w http.ResponseWriter, r *http.Request) {
 	data := PageData{
 		Title:     "Agent Dashboard",
 		ActiveNav: "agents",
-		Stats: &DashboardStats{
+		AgentStats: &DashboardStats{
 			ActiveAgents:    3,
 			RunningSessions: 2,
 			PendingMessages: 7,
@@ -156,60 +247,70 @@ func (s *Server) handleInboxMessages(w http.ResponseWriter, r *http.Request) {
 	// Mock data for testing.
 	messages := []MessageView{
 		{
-			ID:          "1",
-			ThreadID:    "t1",
-			SenderName:  "backend-agent",
-			Subject:     "Implemented user authentication",
-			Body:        "I've completed the JWT authentication implementation. The changes include login, logout, and token refresh endpoints.",
-			State:       "unread",
-			IsStarred:   true,
-			IsImportant: true,
-			CreatedAt:   time.Now().Add(-30 * time.Minute),
+			ID:             "1",
+			ThreadID:       "t1",
+			SenderName:     "backend-agent",
+			SenderInitials: "BA",
+			Subject:        "Implemented user authentication",
+			Body:           "I've completed the JWT authentication implementation. The changes include login, logout, and token refresh endpoints.",
+			State:          "unread",
+			IsStarred:      true,
+			IsImportant:    true,
+			IsAgent:        true,
+			CreatedAt:      time.Now().Add(-30 * time.Minute),
 		},
 		{
-			ID:          "2",
-			ThreadID:    "t2",
-			SenderName:  "test-writer",
-			Subject:     "Added unit tests for auth module",
-			Body:        "Test coverage is now at 87% for the authentication module. All edge cases covered.",
-			State:       "unread",
-			CreatedAt:   time.Now().Add(-2 * time.Hour),
+			ID:             "2",
+			ThreadID:       "t2",
+			SenderName:     "test-writer",
+			SenderInitials: "TW",
+			Subject:        "Added unit tests for auth module",
+			Body:           "Test coverage is now at 87% for the authentication module. All edge cases covered.",
+			State:          "unread",
+			IsAgent:        true,
+			CreatedAt:      time.Now().Add(-2 * time.Hour),
 		},
 		{
-			ID:          "3",
-			ThreadID:    "t3",
-			SenderName:  "code-reviewer",
-			Subject:     "Review: PR #42 - Database optimization",
-			Body:        "Found a few issues with the query optimization. See detailed comments below.",
-			State:       "read",
-			Labels:      []string{"review"},
-			CreatedAt:   time.Now().Add(-5 * time.Hour),
+			ID:             "3",
+			ThreadID:       "t3",
+			SenderName:     "code-reviewer",
+			SenderInitials: "CR",
+			Subject:        "Review: PR #42 - Database optimization",
+			Body:           "Found a few issues with the query optimization. See detailed comments below.",
+			State:          "read",
+			IsAgent:        true,
+			Labels:         []string{"review"},
+			CreatedAt:      time.Now().Add(-5 * time.Hour),
 		},
 		{
-			ID:          "4",
-			ThreadID:    "t4",
-			SenderName:  "security-auditor",
-			Subject:     "Security scan completed",
-			Body:        "No critical vulnerabilities found. Two medium-severity issues flagged for review.",
-			State:       "read",
-			IsImportant: true,
-			Labels:      []string{"security"},
-			CreatedAt:   time.Now().Add(-24 * time.Hour),
+			ID:             "4",
+			ThreadID:       "t4",
+			SenderName:     "security-auditor",
+			SenderInitials: "SA",
+			Subject:        "Security scan completed",
+			Body:           "No critical vulnerabilities found. Two medium-severity issues flagged for review.",
+			State:          "read",
+			IsImportant:    true,
+			IsAgent:        true,
+			Labels:         []string{"security"},
+			CreatedAt:      time.Now().Add(-24 * time.Hour),
 		},
 		{
 			ID:               "5",
 			ThreadID:         "t5",
-			SenderName:       "refactor-agent, me",
+			SenderName:       "refactor-agent",
+			SenderInitials:   "RA",
 			Subject:          "Code cleanup proposal",
 			Body:             "Proposing to consolidate duplicate helper functions across packages.",
 			State:            "read",
+			IsAgent:          true,
 			ParticipantCount: 2,
 			CreatedAt:        time.Now().Add(-48 * time.Hour),
 		},
 	}
 
-	s.renderPartial(w, "message-list", map[string]interface{}{
-		"Messages": messages,
+	s.renderPartial(w, "message-list", MessagesListData{
+		Messages: messages,
 	})
 }
 
@@ -221,21 +322,27 @@ func (s *Server) handleCompose(w http.ResponseWriter, r *http.Request) {
 // handleThread returns the thread view partial.
 func (s *Server) handleThread(w http.ResponseWriter, r *http.Request) {
 	threadID := strings.TrimPrefix(r.URL.Path, "/thread/")
-	_ = threadID // TODO: Use to fetch thread.
 
 	// Mock thread data.
-	thread := map[string]interface{}{
-		"ID":      threadID,
-		"Subject": "Implemented user authentication",
-		"Labels":  []string{"feature"},
-		"Messages": []map[string]interface{}{
+	thread := ThreadView{
+		ID:            threadID,
+		ThreadID:      threadID, // Alias for templates.
+		Subject:       "Implemented user authentication",
+		Labels:        []string{"feature"},
+		TopicName:     "",
+		MessageIndex:  1,
+		TotalMessages: 1,
+		HasPrev:       false,
+		HasNext:       true,
+		Messages: []ThreadMessage{
 			{
-				"ID":         "1",
-				"SenderName": "backend-agent",
-				"SenderAvatar": "B",
-				"Body":       "I've completed the JWT authentication implementation.\n\nThe changes include:\n- Login endpoint at POST /api/auth/login\n- Logout endpoint at POST /api/auth/logout\n- Token refresh at POST /api/auth/refresh\n\nAll endpoints are tested and documented.",
-				"CreatedAt":  time.Now().Add(-30 * time.Minute),
-				"IsStarred":  true,
+				ID:           "1",
+				SenderName:   "backend-agent",
+				SenderAvatar: "B",
+				Body:         "I've completed the JWT authentication implementation.\n\nThe changes include:\n- Login endpoint at POST /api/auth/login\n- Logout endpoint at POST /api/auth/logout\n- Token refresh at POST /api/auth/refresh\n\nAll endpoints are tested and documented.",
+				State:        "read",
+				CreatedAt:    time.Now().Add(-30 * time.Minute),
+				IsStarred:    true,
 			},
 		},
 	}
@@ -255,28 +362,28 @@ func (s *Server) handleNewSessionModal(w http.ResponseWriter, r *http.Request) {
 
 // handleAPIStatus returns the status partial.
 func (s *Server) handleAPIStatus(w http.ResponseWriter, r *http.Request) {
-	status := map[string]interface{}{
-		"AgentName":   "primary",
-		"UnreadCount": 5,
-		"UrgentCount": 1,
+	status := StatusView{
+		AgentName:   "primary",
+		UnreadCount: 5,
+		UrgentCount: 1,
 	}
 	s.renderPartial(w, "status", status)
 }
 
 // handleAPITopics returns the topics list partial.
 func (s *Server) handleAPITopics(w http.ResponseWriter, r *http.Request) {
-	topics := []map[string]interface{}{
-		{"ID": "1", "Name": "builds", "Type": "broadcast", "UnreadCount": 3},
-		{"ID": "2", "Name": "deployments", "Type": "broadcast", "UnreadCount": 0},
-		{"ID": "3", "Name": "alerts", "Type": "broadcast", "UnreadCount": 1},
+	topics := []TopicView{
+		{ID: "1", Name: "builds", TopicType: "broadcast", UnreadCount: 3},
+		{ID: "2", Name: "deployments", TopicType: "broadcast", UnreadCount: 0},
+		{ID: "3", Name: "alerts", TopicType: "broadcast", UnreadCount: 1},
 	}
-	s.renderPartial(w, "topics-list", map[string]interface{}{"Topics": topics})
+	s.renderPartial(w, "topics-list", TopicsListData{Topics: topics})
 }
 
 // handleAPIAgents returns the agents list partial.
 func (s *Server) handleAPIAgents(w http.ResponseWriter, r *http.Request) {
 	agents := s.getMockAgents()
-	s.renderPartial(w, "agents-list", map[string]interface{}{"Agents": agents})
+	s.renderPartial(w, "agents-list", AgentsListData{Agents: agents})
 }
 
 // handleAPIAgentsSidebar returns the sidebar agents partial.
@@ -439,6 +546,26 @@ func (s *Server) handleSSEActivity(w http.ResponseWriter, r *http.Request) {
 	_ = flusher // Use flusher when we have real events.
 }
 
+// handleSSEInbox streams inbox updates via SSE.
+func (s *Server) handleSSEInbox(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "text/event-stream")
+	w.Header().Set("Cache-Control", "no-cache")
+	w.Header().Set("Connection", "keep-alive")
+
+	flusher, ok := w.(http.Flusher)
+	if !ok {
+		http.Error(w, "SSE not supported", http.StatusInternalServerError)
+		return
+	}
+
+	// Keep connection alive until client disconnects.
+	// TODO: Subscribe to mail service notifications and emit:
+	// - "new-message" events with message HTML
+	// - "unread-count" events with updated count
+	<-r.Context().Done()
+	_ = flusher // Use flusher when we have real events.
+}
+
 // getMockAgents returns mock agent data for testing.
 func (s *Server) getMockAgents() []AgentView {
 	return []AgentView{
@@ -514,4 +641,144 @@ func (s *Server) renderPartial(w http.ResponseWriter, name string, data any) {
 	if err := s.partials.ExecuteTemplate(w, name, data); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}
+}
+
+// HeartbeatRequest represents a heartbeat request from an agent.
+type HeartbeatRequest struct {
+	AgentName string `json:"agent_name"`
+	SessionID string `json:"session_id,omitempty"`
+}
+
+// HeartbeatResponse represents the response to a heartbeat request.
+type HeartbeatResponse struct {
+	Status  string `json:"status"`
+	Message string `json:"message,omitempty"`
+}
+
+// handleAPIHeartbeat handles heartbeat requests from agents.
+func (s *Server) handleAPIHeartbeat(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	var req HeartbeatRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "Invalid request body", http.StatusBadRequest)
+		return
+	}
+
+	if req.AgentName == "" {
+		http.Error(w, "agent_name is required", http.StatusBadRequest)
+		return
+	}
+
+	ctx := r.Context()
+
+	// Record the heartbeat.
+	if err := s.heartbeatMgr.RecordHeartbeatByName(ctx, req.AgentName); err != nil {
+		// If agent doesn't exist, return 404.
+		http.Error(
+			w, fmt.Sprintf("Agent not found: %s", req.AgentName),
+			http.StatusNotFound,
+		)
+		return
+	}
+
+	// If session ID provided, track it.
+	if req.SessionID != "" {
+		agentData, err := s.registry.GetAgentByName(ctx, req.AgentName)
+		if err == nil {
+			s.heartbeatMgr.StartSession(agentData.ID, req.SessionID)
+		}
+	}
+
+	// Return success response.
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(HeartbeatResponse{
+		Status:  "ok",
+		Message: "Heartbeat recorded",
+	})
+}
+
+// AgentStatusResponse represents an agent's current status.
+type AgentStatusResponse struct {
+	Name           string    `json:"name"`
+	Status         string    `json:"status"`
+	LastActiveAt   time.Time `json:"last_active_at"`
+	SessionID      string    `json:"session_id,omitempty"`
+	SecondsSinceHB int       `json:"seconds_since_heartbeat"`
+}
+
+// AgentStatusListResponse represents the list of agent statuses.
+type AgentStatusListResponse struct {
+	Agents []AgentStatusResponse `json:"agents"`
+	Counts agent.StatusCounts    `json:"counts"`
+}
+
+// handleAPIAgentsStatus returns the current status of all agents (JSON).
+func (s *Server) handleAPIAgentsStatus(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+
+	agents, err := s.heartbeatMgr.ListAgentsWithStatus(ctx)
+	if err != nil {
+		http.Error(w, "Failed to list agents", http.StatusInternalServerError)
+		return
+	}
+
+	counts, err := s.heartbeatMgr.GetStatusCounts(ctx)
+	if err != nil {
+		http.Error(w, "Failed to get status counts", http.StatusInternalServerError)
+		return
+	}
+
+	resp := AgentStatusListResponse{
+		Agents: make([]AgentStatusResponse, len(agents)),
+		Counts: *counts,
+	}
+
+	for i, aws := range agents {
+		resp.Agents[i] = AgentStatusResponse{
+			Name:           aws.Agent.Name,
+			Status:         string(aws.Status),
+			LastActiveAt:   aws.LastActive,
+			SessionID:      aws.ActiveSessionID,
+			SecondsSinceHB: int(time.Since(aws.LastActive).Seconds()),
+		}
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(resp)
+}
+
+// getAgentsFromHeartbeat returns agents with real status data when available,
+// otherwise falls back to mock data.
+func (s *Server) getAgentsFromHeartbeat() []AgentView {
+	ctx := context.Background()
+
+	agents, err := s.heartbeatMgr.ListAgentsWithStatus(ctx)
+	if err != nil || len(agents) == 0 {
+		// Fall back to mock data if no real agents exist.
+		return s.getMockAgents()
+	}
+
+	result := make([]AgentView, len(agents))
+	for i, aws := range agents {
+		result[i] = AgentView{
+			ID:             fmt.Sprintf("agent-%d", aws.Agent.ID),
+			Name:           aws.Agent.Name,
+			Type:           "claude-code",
+			Status:         string(aws.Status),
+			LastActivityAt: aws.LastActive,
+		}
+
+		// Add session info if available.
+		if aws.ActiveSessionID != "" {
+			result[i].CurrentSession = &SessionView{
+				ID: aws.ActiveSessionID,
+			}
+		}
+	}
+
+	return result
 }

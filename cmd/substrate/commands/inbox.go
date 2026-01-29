@@ -41,6 +41,9 @@ func runInbox(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
+	// Send heartbeat to indicate agent activity.
+	sendHeartbeatQuiet(ctx, store, agentID)
+
 	svc := mail.NewService(store)
 
 	req := mail.FetchInboxRequest{
