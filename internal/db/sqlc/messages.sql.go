@@ -175,6 +175,75 @@ func (q *Queries) DeleteMessagesByTopicOlderThan(ctx context.Context, arg Delete
 	return result.RowsAffected()
 }
 
+const GetAllInboxMessages = `-- name: GetAllInboxMessages :many
+SELECT m.id, m.thread_id, m.topic_id, m.log_offset, m.sender_id, m.subject, m.body_md, m.priority, m.deadline_at, m.attachments, m.created_at, mr.state, mr.snoozed_until, mr.read_at, mr.acked_at, mr.agent_id as recipient_agent_id
+FROM messages m
+JOIN message_recipients mr ON m.id = mr.message_id
+WHERE mr.state NOT IN ('archived', 'trash')
+ORDER BY m.created_at DESC
+LIMIT ?
+`
+
+type GetAllInboxMessagesRow struct {
+	ID               int64
+	ThreadID         string
+	TopicID          int64
+	LogOffset        int64
+	SenderID         int64
+	Subject          string
+	BodyMd           string
+	Priority         string
+	DeadlineAt       sql.NullInt64
+	Attachments      sql.NullString
+	CreatedAt        int64
+	State            string
+	SnoozedUntil     sql.NullInt64
+	ReadAt           sql.NullInt64
+	AckedAt          sql.NullInt64
+	RecipientAgentID int64
+}
+
+// Global inbox view: all messages across all agents, not archived or trashed.
+func (q *Queries) GetAllInboxMessages(ctx context.Context, limit int64) ([]GetAllInboxMessagesRow, error) {
+	rows, err := q.db.QueryContext(ctx, GetAllInboxMessages, limit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []GetAllInboxMessagesRow
+	for rows.Next() {
+		var i GetAllInboxMessagesRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.ThreadID,
+			&i.TopicID,
+			&i.LogOffset,
+			&i.SenderID,
+			&i.Subject,
+			&i.BodyMd,
+			&i.Priority,
+			&i.DeadlineAt,
+			&i.Attachments,
+			&i.CreatedAt,
+			&i.State,
+			&i.SnoozedUntil,
+			&i.ReadAt,
+			&i.AckedAt,
+			&i.RecipientAgentID,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const GetArchivedMessages = `-- name: GetArchivedMessages :many
 SELECT m.id, m.thread_id, m.topic_id, m.log_offset, m.sender_id, m.subject, m.body_md, m.priority, m.deadline_at, m.attachments, m.created_at, mr.state, mr.snoozed_until, mr.read_at, mr.acked_at
 FROM messages m

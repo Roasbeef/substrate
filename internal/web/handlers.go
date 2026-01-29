@@ -25,6 +25,11 @@ type PageData struct {
 	// MessagesEndpoint is the HTMX endpoint for loading messages.
 	MessagesEndpoint string
 
+	// Agent context for inbox filtering.
+	CurrentAgentID   int64  // 0 = global view (all agents).
+	CurrentAgentName string // "Global" or agent name.
+	AllAgents        []AgentSwitcherItem
+
 	// Page-specific stats (use the one that applies).
 	Stats      *InboxStats
 	AgentStats *DashboardStats
@@ -40,6 +45,13 @@ type PageData struct {
 	NextPage   int
 	HasPrev    bool
 	HasNext    bool
+}
+
+// AgentSwitcherItem represents an agent in the switcher dropdown.
+type AgentSwitcherItem struct {
+	ID       int64
+	Name     string
+	IsActive bool
 }
 
 // DashboardStats holds stats for the agents dashboard.
@@ -67,6 +79,7 @@ type MessageView struct {
 	ThreadID         string
 	SenderName       string
 	SenderInitials   string
+	RecipientName    string // For global view, shows which agent received the message.
 	Subject          string
 	Body             string
 	State            string
@@ -200,23 +213,81 @@ func (s *Server) handleInbox(w http.ResponseWriter, r *http.Request) {
 		category = "primary"
 	}
 
-	// Find first non-User agent for default stats.
-	var agentID int64
+	// Get all agents for the switcher dropdown.
 	agents, err := s.store.Queries().ListAgents(ctx)
-	if err == nil && len(agents) > 0 {
+	if err != nil {
+		agents = nil
+	}
+
+	// Determine which agent's inbox to show.
+	// Priority: query param > User agent > first non-User agent.
+	agentIDStr := r.URL.Query().Get("agent_id")
+	var currentAgentID int64
+	var currentAgentName string
+
+	if agentIDStr == "all" || agentIDStr == "0" {
+		// Global view - show all messages.
+		currentAgentID = 0
+		currentAgentName = "Global"
+	} else if agentIDStr != "" {
+		// Specific agent requested.
+		fmt.Sscanf(agentIDStr, "%d", &currentAgentID)
 		for _, a := range agents {
-			if a.Name != UserAgentName {
-				agentID = a.ID
+			if a.ID == currentAgentID {
+				currentAgentName = a.Name
 				break
+			}
+		}
+	} else {
+		// Default: find User agent, or fall back to first non-User agent.
+		for _, a := range agents {
+			if a.Name == UserAgentName {
+				currentAgentID = a.ID
+				currentAgentName = a.Name
+				break
+			}
+		}
+		// If no User agent found, use first non-User agent.
+		if currentAgentID == 0 && len(agents) > 0 {
+			for _, a := range agents {
+				if a.Name != UserAgentName {
+					currentAgentID = a.ID
+					currentAgentName = a.Name
+					break
+				}
 			}
 		}
 	}
 
+	// Build agent switcher items.
+	agentSwitcherItems := make([]AgentSwitcherItem, 0, len(agents)+1)
+	// Add "Global" option first.
+	agentSwitcherItems = append(agentSwitcherItems, AgentSwitcherItem{
+		ID:       0,
+		Name:     "Global",
+		IsActive: currentAgentID == 0,
+	})
+	for _, a := range agents {
+		agentSwitcherItems = append(agentSwitcherItems, AgentSwitcherItem{
+			ID:       a.ID,
+			Name:     a.Name,
+			IsActive: a.ID == currentAgentID,
+		})
+	}
+
 	// Get real counts from store.
 	var unreadCount, urgentCount int64
-	if agentID > 0 {
-		unreadCount, _ = s.store.Queries().CountUnreadByAgent(ctx, agentID)
-		urgentCount, _ = s.store.Queries().CountUnreadUrgentByAgent(ctx, agentID)
+	if currentAgentID > 0 {
+		unreadCount, _ = s.store.Queries().CountUnreadByAgent(ctx, currentAgentID)
+		urgentCount, _ = s.store.Queries().CountUnreadUrgentByAgent(ctx, currentAgentID)
+	} else {
+		// Global view - sum across all agents.
+		for _, a := range agents {
+			cnt, _ := s.store.Queries().CountUnreadByAgent(ctx, a.ID)
+			unreadCount += cnt
+			urg, _ := s.store.Queries().CountUnreadUrgentByAgent(ctx, a.ID)
+			urgentCount += urg
+		}
 	}
 
 	// Count topics.
@@ -230,12 +301,23 @@ func (s *Server) handleInbox(w http.ResponseWriter, r *http.Request) {
 	page := 1
 	pageSize := 50
 
+	// Build messages endpoint with agent filter.
+	messagesEndpoint := "/inbox/messages"
+	if currentAgentID == 0 {
+		messagesEndpoint = "/inbox/messages?agent_id=all"
+	} else {
+		messagesEndpoint = fmt.Sprintf("/inbox/messages?agent_id=%d", currentAgentID)
+	}
+
 	data := PageData{
 		Title:            "Inbox",
 		ActiveNav:        "inbox",
 		UnreadCount:      int(unreadCount),
 		Category:         category,
-		MessagesEndpoint: "/inbox/messages",
+		MessagesEndpoint: messagesEndpoint,
+		CurrentAgentID:   currentAgentID,
+		CurrentAgentName: currentAgentName,
+		AllAgents:        agentSwitcherItems,
 		Stats: &InboxStats{
 			Unread:       int(unreadCount),
 			Starred:      0, // TODO: Add starred count query.
@@ -408,71 +490,115 @@ func (s *Server) handleArchive(w http.ResponseWriter, r *http.Request) {
 func (s *Server) handleInboxMessages(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 
-	// Get agent ID from query parameter, or find first non-User agent.
+	// Check if global view is requested.
 	agentIDStr := r.URL.Query().Get("agent_id")
-	var agentID int64
+	isGlobal := agentIDStr == "all" || agentIDStr == "0"
 
-	if agentIDStr != "" {
-		fmt.Sscanf(agentIDStr, "%d", &agentID)
+	var messages []MessageView
+
+	if isGlobal {
+		// Global view: get all messages.
+		dbMessages, err := s.store.Queries().GetAllInboxMessages(ctx, 50)
+		if err != nil {
+			s.renderPartial(w, "message-list", MessagesListData{Messages: nil})
+			return
+		}
+
+		messages = make([]MessageView, len(dbMessages))
+		for i, m := range dbMessages {
+			// Get sender name.
+			senderName := fmt.Sprintf("Agent#%d", m.SenderID)
+			sender, err := s.store.Queries().GetAgent(ctx, m.SenderID)
+			if err == nil {
+				senderName = sender.Name
+			}
+
+			// Get recipient name for global view context.
+			recipientName := ""
+			if recipient, err := s.store.Queries().GetAgent(ctx, m.RecipientAgentID); err == nil {
+				recipientName = recipient.Name
+			}
+
+			initials := getInitials(senderName)
+
+			messages[i] = MessageView{
+				ID:             fmt.Sprintf("%d", m.ID),
+				ThreadID:       m.ThreadID,
+				SenderName:     senderName,
+				SenderInitials: initials,
+				RecipientName:  recipientName,
+				Subject:        m.Subject,
+				Body:           m.BodyMd,
+				State:          m.State,
+				IsStarred:      m.State == "starred",
+				IsImportant:    m.Priority == "urgent",
+				IsAgent:        true,
+				CreatedAt:      time.Unix(m.CreatedAt, 0),
+			}
+		}
 	} else {
-		// Find first agent that isn't the User agent.
-		agents, err := s.store.Queries().ListAgents(ctx)
-		if err == nil && len(agents) > 0 {
-			for _, a := range agents {
-				if a.Name != UserAgentName {
-					agentID = a.ID
-					break
+		// Specific agent view.
+		var agentID int64
+		if agentIDStr != "" {
+			fmt.Sscanf(agentIDStr, "%d", &agentID)
+		} else {
+			// Default: find User agent, or fall back to first non-User agent.
+			agents, err := s.store.Queries().ListAgents(ctx)
+			if err == nil && len(agents) > 0 {
+				for _, a := range agents {
+					if a.Name == UserAgentName {
+						agentID = a.ID
+						break
+					}
+				}
+				if agentID == 0 {
+					for _, a := range agents {
+						if a.Name != UserAgentName {
+							agentID = a.ID
+							break
+						}
+					}
 				}
 			}
 		}
-	}
 
-	// If no agent ID, return empty list.
-	if agentID == 0 {
-		s.renderPartial(w, "message-list", MessagesListData{
-			Messages: nil,
-		})
-		return
-	}
-
-	// Fetch inbox messages from database.
-	dbMessages, err := s.store.Queries().GetInboxMessages(ctx, sqlc.GetInboxMessagesParams{
-		AgentID: agentID,
-		Limit:   50,
-	})
-	if err != nil {
-		// Return empty list on error.
-		s.renderPartial(w, "message-list", MessagesListData{
-			Messages: nil,
-		})
-		return
-	}
-
-	// Convert to view models.
-	messages := make([]MessageView, len(dbMessages))
-	for i, m := range dbMessages {
-		// Get sender name.
-		senderName := fmt.Sprintf("Agent#%d", m.SenderID)
-		sender, err := s.store.Queries().GetAgent(ctx, m.SenderID)
-		if err == nil {
-			senderName = sender.Name
+		if agentID == 0 {
+			s.renderPartial(w, "message-list", MessagesListData{Messages: nil})
+			return
 		}
 
-		// Generate initials from sender name.
-		initials := getInitials(senderName)
+		dbMessages, err := s.store.Queries().GetInboxMessages(ctx, sqlc.GetInboxMessagesParams{
+			AgentID: agentID,
+			Limit:   50,
+		})
+		if err != nil {
+			s.renderPartial(w, "message-list", MessagesListData{Messages: nil})
+			return
+		}
 
-		messages[i] = MessageView{
-			ID:             fmt.Sprintf("%d", m.ID),
-			ThreadID:       m.ThreadID,
-			SenderName:     senderName,
-			SenderInitials: initials,
-			Subject:        m.Subject,
-			Body:           m.BodyMd,
-			State:          m.State,
-			IsStarred:      m.State == "starred",
-			IsImportant:    m.Priority == "urgent",
-			IsAgent:        true,
-			CreatedAt:      time.Unix(m.CreatedAt, 0),
+		messages = make([]MessageView, len(dbMessages))
+		for i, m := range dbMessages {
+			senderName := fmt.Sprintf("Agent#%d", m.SenderID)
+			sender, err := s.store.Queries().GetAgent(ctx, m.SenderID)
+			if err == nil {
+				senderName = sender.Name
+			}
+
+			initials := getInitials(senderName)
+
+			messages[i] = MessageView{
+				ID:             fmt.Sprintf("%d", m.ID),
+				ThreadID:       m.ThreadID,
+				SenderName:     senderName,
+				SenderInitials: initials,
+				Subject:        m.Subject,
+				Body:           m.BodyMd,
+				State:          m.State,
+				IsStarred:      m.State == "starred",
+				IsImportant:    m.Priority == "urgent",
+				IsAgent:        true,
+				CreatedAt:      time.Unix(m.CreatedAt, 0),
+			}
 		}
 	}
 

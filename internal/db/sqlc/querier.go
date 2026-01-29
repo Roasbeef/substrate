@@ -36,6 +36,8 @@ type Querier interface {
 	GetAgent(ctx context.Context, id int64) (Agent, error)
 	GetAgentByName(ctx context.Context, name string) (Agent, error)
 	GetAgentBySessionID(ctx context.Context, sessionID string) (Agent, error)
+	// Global inbox view: all messages across all agents, not archived or trashed.
+	GetAllInboxMessages(ctx context.Context, limit int64) ([]GetAllInboxMessagesRow, error)
 	GetArchivedMessages(ctx context.Context, arg GetArchivedMessagesParams) ([]GetArchivedMessagesRow, error)
 	GetConsumerOffset(ctx context.Context, arg GetConsumerOffsetParams) (int64, error)
 	GetInboxMessages(ctx context.Context, arg GetInboxMessagesParams) ([]GetInboxMessagesRow, error)

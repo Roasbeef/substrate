@@ -55,6 +55,9 @@
 
             <!-- Right side actions -->
             <div class="flex items-center gap-4">
+                <!-- Agent Switcher -->
+                {{template "agent-switcher" .}}
+
                 <!-- Status indicator -->
                 <div id="agent-status"
                      hx-get="/api/status"
