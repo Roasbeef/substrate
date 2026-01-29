@@ -880,6 +880,81 @@ func (s *Server) handleTopicView(w http.ResponseWriter, r *http.Request) {
 </html>`)
 }
 
+// handleSearch handles search queries and returns search results as HTML.
+func (s *Server) handleSearch(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	query := r.URL.Query().Get("q")
+
+	w.Header().Set("Content-Type", "text/html")
+
+	// If no query, return empty content (div stays hidden).
+	if query == "" {
+		fmt.Fprint(w, ``)
+		return
+	}
+
+	// Search messages.
+	results, err := s.store.SearchMessages(ctx, query, 20)
+	if err != nil {
+		fmt.Fprintf(w, `<div class="p-4 text-red-600">Search error: %s</div>
+			<script>document.getElementById('search-results').classList.remove('hidden')</script>`)
+		return
+	}
+
+	// Render results as dropdown.
+	if len(results) == 0 {
+		fmt.Fprintf(w, `<div class="p-4 text-gray-500">No results found for "%s"</div>
+			<script>document.getElementById('search-results').classList.remove('hidden')</script>`, query)
+		return
+	}
+
+	fmt.Fprint(w, `<div class="max-h-96 overflow-y-auto">`)
+	for _, result := range results {
+		// Get sender name.
+		senderName := fmt.Sprintf("Agent#%d", result.SenderID)
+		if sender, err := s.store.Queries().GetAgent(ctx, result.SenderID); err == nil {
+			senderName = sender.Name
+		}
+
+		// Format time.
+		createdAt := time.Unix(result.CreatedAt, 0)
+		timeStr := formatTimeAgo(createdAt)
+
+		// Priority badge.
+		priorityBadge := ""
+		if result.Priority == "urgent" {
+			priorityBadge = `<span class="px-1.5 py-0.5 bg-red-100 text-red-700 text-xs rounded">URGENT</span>`
+		}
+
+		fmt.Fprintf(w, `
+			<a href="/thread/%s"
+			   class="block p-3 hover:bg-gray-50 border-b border-gray-100 last:border-0"
+			   hx-get="/thread/%s"
+			   hx-target="#content-area"
+			   hx-swap="innerHTML"
+			   onclick="document.getElementById('search-results').classList.add('hidden')">
+				<div class="flex items-center justify-between mb-1">
+					<span class="font-medium text-gray-900 text-sm">%s</span>
+					<span class="text-xs text-gray-500">%s</span>
+				</div>
+				<div class="flex items-center gap-2">
+					<span class="text-sm text-gray-700">%s</span>
+					%s
+				</div>
+				<div class="text-xs text-gray-500 truncate mt-1">%s</div>
+			</a>`,
+			result.ThreadID, result.ThreadID,
+			senderName, timeStr,
+			result.Subject, priorityBadge,
+			truncate(result.BodyMd, 80))
+	}
+	fmt.Fprint(w, `</div>`)
+
+	// Show count footer and unhide the results div.
+	fmt.Fprintf(w, `<div class="p-2 bg-gray-50 border-t text-xs text-gray-500 text-center">%d result(s) for "%s"</div>
+		<script>document.getElementById('search-results').classList.remove('hidden')</script>`, len(results), query)
+}
+
 // handleThread returns the thread view partial.
 func (s *Server) handleThread(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()

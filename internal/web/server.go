@@ -137,6 +137,7 @@ func (s *Server) registerRoutes() {
 	s.mux.HandleFunc("/sent/messages", s.handleSentMessages)
 	s.mux.HandleFunc("/archive/messages", s.handleArchivedMessages)
 	s.mux.HandleFunc("/compose", s.handleCompose)
+	s.mux.HandleFunc("/search", s.handleSearch)
 	s.mux.HandleFunc("/thread/", s.handleThread)
 	s.mux.HandleFunc("/topic/", s.handleTopicView)
 	s.mux.HandleFunc("/agents/new", s.handleNewAgentModal)
