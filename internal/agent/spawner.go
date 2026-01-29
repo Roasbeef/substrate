@@ -35,6 +35,10 @@ type SpawnConfig struct {
 	// NoSessionPersistence disables session saving (useful for testing).
 	NoSessionPersistence bool
 
+	// ConfigDir specifies a custom config directory for isolation (testing).
+	// If set, the agent will use this directory instead of ~/.claude.
+	ConfigDir string
+
 	// Timeout is the maximum time to wait for a response.
 	Timeout time.Duration
 }
@@ -138,6 +142,10 @@ func (s *Spawner) buildClientOptions() []claudeagent.Option {
 
 	if s.cfg.NoSessionPersistence {
 		opts = append(opts, claudeagent.WithNoSessionPersistence())
+	}
+
+	if s.cfg.ConfigDir != "" {
+		opts = append(opts, claudeagent.WithConfigDir(s.cfg.ConfigDir))
 	}
 
 	return opts

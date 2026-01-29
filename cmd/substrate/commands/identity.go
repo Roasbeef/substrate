@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/roasbeef/subtrate/internal/agent"
 	"github.com/spf13/cobra"
 )
 
@@ -77,11 +76,11 @@ func init() {
 func runIdentityEnsure(cmd *cobra.Command, args []string) error {
 	ctx := context.Background()
 
-	store, err := getStore()
+	client, err := getClient()
 	if err != nil {
 		return err
 	}
-	defer store.Close()
+	defer client.Close()
 
 	// Get session ID from flag or environment.
 	sid := sessionID
@@ -98,13 +97,7 @@ func runIdentityEnsure(cmd *cobra.Command, args []string) error {
 		proj = os.Getenv("CLAUDE_PROJECT_DIR")
 	}
 
-	registry := agent.NewRegistry(store)
-	mgr, err := agent.NewIdentityManager(store, registry)
-	if err != nil {
-		return fmt.Errorf("failed to create identity manager: %w", err)
-	}
-
-	identity, err := mgr.EnsureIdentity(ctx, sid, proj)
+	identity, err := client.EnsureIdentity(ctx, sid, proj)
 	if err != nil {
 		return fmt.Errorf("failed to ensure identity: %w", err)
 	}
@@ -130,11 +123,11 @@ func runIdentityEnsure(cmd *cobra.Command, args []string) error {
 func runIdentityRestore(cmd *cobra.Command, args []string) error {
 	ctx := context.Background()
 
-	store, err := getStore()
+	client, err := getClient()
 	if err != nil {
 		return err
 	}
-	defer store.Close()
+	defer client.Close()
 
 	sid := sessionID
 	if sid == "" {
@@ -144,13 +137,7 @@ func runIdentityRestore(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("session ID required (use --session-id or set CLAUDE_SESSION_ID)")
 	}
 
-	registry := agent.NewRegistry(store)
-	mgr, err := agent.NewIdentityManager(store, registry)
-	if err != nil {
-		return fmt.Errorf("failed to create identity manager: %w", err)
-	}
-
-	identity, err := mgr.RestoreIdentity(ctx, sid)
+	identity, err := client.RestoreIdentity(ctx, sid)
 	if err != nil {
 		return fmt.Errorf("failed to restore identity: %w", err)
 	}
@@ -173,11 +160,11 @@ func runIdentityRestore(cmd *cobra.Command, args []string) error {
 func runIdentitySave(cmd *cobra.Command, args []string) error {
 	ctx := context.Background()
 
-	store, err := getStore()
+	client, err := getClient()
 	if err != nil {
 		return err
 	}
-	defer store.Close()
+	defer client.Close()
 
 	sid := sessionID
 	if sid == "" {
@@ -187,31 +174,22 @@ func runIdentitySave(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("session ID required (use --session-id or set CLAUDE_SESSION_ID)")
 	}
 
-	registry := agent.NewRegistry(store)
-	mgr, err := agent.NewIdentityManager(store, registry)
-	if err != nil {
-		return fmt.Errorf("failed to create identity manager: %w", err)
-	}
-
 	// First restore the identity to get current state.
-	identity, err := mgr.RestoreIdentity(ctx, sid)
+	identity, err := client.RestoreIdentity(ctx, sid)
 	if err != nil {
 		return fmt.Errorf("failed to restore identity for saving: %w", err)
 	}
 
 	// Get current offsets from database.
-	offsets, err := store.Queries().ListConsumerOffsetsByAgent(ctx, identity.AgentID)
+	offsets, err := client.ListConsumerOffsets(ctx, identity.AgentID)
 	if err != nil {
 		return fmt.Errorf("failed to get offsets: %w", err)
 	}
 
-	identity.ConsumerOffsets = make(map[string]int64)
-	for _, offset := range offsets {
-		identity.ConsumerOffsets[offset.TopicName] = offset.LastOffset
-	}
+	identity.ConsumerOffsets = offsets
 
 	// Save identity.
-	if err := mgr.SaveIdentity(ctx, identity); err != nil {
+	if err := client.SaveIdentity(ctx, identity); err != nil {
 		return fmt.Errorf("failed to save identity: %w", err)
 	}
 
@@ -228,25 +206,25 @@ func runIdentitySave(cmd *cobra.Command, args []string) error {
 func runIdentityCurrent(cmd *cobra.Command, args []string) error {
 	ctx := context.Background()
 
-	store, err := getStore()
+	client, err := getClient()
 	if err != nil {
 		return err
 	}
-	defer store.Close()
+	defer client.Close()
 
-	agentID, agentName, err := getCurrentAgent(ctx, store)
+	agentID, agentName, err := getCurrentAgentWithClient(ctx, client)
 	if err != nil {
 		return err
 	}
 
-	agentRow, err := store.Queries().GetAgent(ctx, agentID)
+	agentRow, err := client.GetAgent(ctx, agentID)
 	if err != nil {
 		return fmt.Errorf("failed to get agent details: %w", err)
 	}
 
 	switch outputFormat {
 	case "json":
-		return outputJSON(map[string]interface{}{
+		return outputJSON(map[string]any{
 			"id":         agentID,
 			"name":       agentName,
 			"project":    nullStringToInterface(agentRow.ProjectKey),
@@ -269,13 +247,13 @@ func runIdentityCurrent(cmd *cobra.Command, args []string) error {
 func runIdentityList(cmd *cobra.Command, args []string) error {
 	ctx := context.Background()
 
-	store, err := getStore()
+	client, err := getClient()
 	if err != nil {
 		return err
 	}
-	defer store.Close()
+	defer client.Close()
 
-	agents, err := store.Queries().ListAgents(ctx)
+	agents, err := client.ListAgents(ctx)
 	if err != nil {
 		return fmt.Errorf("failed to list agents: %w", err)
 	}
@@ -305,11 +283,11 @@ func runIdentityList(cmd *cobra.Command, args []string) error {
 func runIdentitySetDefault(cmd *cobra.Command, args []string) error {
 	ctx := context.Background()
 
-	store, err := getStore()
+	client, err := getClient()
 	if err != nil {
 		return err
 	}
-	defer store.Close()
+	defer client.Close()
 
 	proj := projectDir
 	if proj == "" {
@@ -319,13 +297,7 @@ func runIdentitySetDefault(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("project required (use --project or set CLAUDE_PROJECT_DIR)")
 	}
 
-	registry := agent.NewRegistry(store)
-	mgr, err := agent.NewIdentityManager(store, registry)
-	if err != nil {
-		return fmt.Errorf("failed to create identity manager: %w", err)
-	}
-
-	if err := mgr.SetProjectDefault(ctx, proj, setDefaultAgentName); err != nil {
+	if err := client.SetProjectDefault(ctx, proj, setDefaultAgentName); err != nil {
 		return fmt.Errorf("failed to set default: %w", err)
 	}
 

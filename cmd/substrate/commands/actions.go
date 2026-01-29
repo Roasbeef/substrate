@@ -6,7 +6,6 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/roasbeef/subtrate/internal/mail"
 	"github.com/spf13/cobra"
 )
 
@@ -97,58 +96,29 @@ func runMessageAction(msgIDStr string, action string,
 		return fmt.Errorf("invalid message ID: %w", err)
 	}
 
-	store, err := getStore()
+	client, err := getClient()
 	if err != nil {
 		return err
 	}
-	defer store.Close()
+	defer client.Close()
 
-	agentID, _, err := getCurrentAgent(ctx, store)
+	agentID, _, err := getCurrentAgentWithClient(ctx, client)
 	if err != nil {
 		return err
 	}
-
-	svc := mail.NewService(store)
 
 	// Handle ack specially.
 	if action == "ack" {
-		req := mail.AckMessageRequest{
-			AgentID:   agentID,
-			MessageID: msgID,
-		}
-
-		result := svc.Receive(ctx, req)
-		val, err := result.Unpack()
-		if err != nil {
+		if err := client.AckMessage(ctx, agentID, msgID); err != nil {
 			return err
 		}
-
-		resp := val.(mail.AckMessageResponse)
-		if resp.Error != nil {
-			return resp.Error
-		}
-
 		fmt.Printf("Message #%d acknowledged.\n", msgID)
 		return nil
 	}
 
 	// Other state changes.
-	req := mail.UpdateStateRequest{
-		AgentID:      agentID,
-		MessageID:    msgID,
-		NewState:     action,
-		SnoozedUntil: snoozedUntil,
-	}
-
-	result := svc.Receive(ctx, req)
-	val, err := result.Unpack()
-	if err != nil {
+	if err := client.UpdateState(ctx, agentID, msgID, action, snoozedUntil); err != nil {
 		return err
-	}
-
-	resp := val.(mail.UpdateStateResponse)
-	if resp.Error != nil {
-		return resp.Error
 	}
 
 	fmt.Printf("Message #%d moved to %s.\n", msgID, action)

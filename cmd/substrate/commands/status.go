@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/roasbeef/subtrate/internal/mail"
 	"github.com/spf13/cobra"
 )
 
@@ -18,51 +17,39 @@ var statusCmd = &cobra.Command{
 func runStatus(cmd *cobra.Command, args []string) error {
 	ctx := context.Background()
 
-	store, err := getStore()
+	client, err := getClient()
 	if err != nil {
 		return err
 	}
-	defer store.Close()
+	defer client.Close()
 
-	agentID, _, err := getCurrentAgent(ctx, store)
+	agentID, _, err := getCurrentAgentWithClient(ctx, client)
 	if err != nil {
 		return err
 	}
 
 	// Send heartbeat to indicate agent activity.
-	sendHeartbeatQuiet(ctx, store, agentID)
+	_ = client.UpdateHeartbeat(ctx, agentID)
 
-	svc := mail.NewService(store)
-
-	req := mail.GetStatusRequest{
-		AgentID: agentID,
-	}
-
-	result := svc.Receive(ctx, req)
-	val, err := result.Unpack()
+	status, err := client.GetStatus(ctx, agentID)
 	if err != nil {
 		return err
 	}
 
-	resp := val.(mail.GetStatusResponse)
-	if resp.Error != nil {
-		return resp.Error
-	}
-
 	switch outputFormat {
 	case "json":
-		return outputJSON(resp.Status)
+		return outputJSON(status)
 	case "context":
-		if resp.Status.UrgentCount > 0 {
+		if status.UrgentCount > 0 {
 			fmt.Printf("[Subtrate] %d urgent, %d unread messages\n",
-				resp.Status.UrgentCount, resp.Status.UnreadCount)
-		} else if resp.Status.UnreadCount > 0 {
+				status.UrgentCount, status.UnreadCount)
+		} else if status.UnreadCount > 0 {
 			fmt.Printf("[Subtrate] %d unread messages\n",
-				resp.Status.UnreadCount)
+				status.UnreadCount)
 		}
 		return nil
 	default:
-		fmt.Print(formatStatus(resp.Status))
+		fmt.Print(formatStatus(*status))
 	}
 
 	return nil

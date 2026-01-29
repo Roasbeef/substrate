@@ -38,13 +38,13 @@ func runPublish(cmd *cobra.Command, args []string) error {
 	ctx := context.Background()
 	topicName := args[0]
 
-	store, err := getStore()
+	client, err := getClient()
 	if err != nil {
 		return err
 	}
-	defer store.Close()
+	defer client.Close()
 
-	agentID, _, err := getCurrentAgent(ctx, store)
+	agentID, _, err := getCurrentAgentWithClient(ctx, client)
 	if err != nil {
 		return err
 	}
@@ -62,37 +62,23 @@ func runPublish(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("invalid priority: %s", publishPriority)
 	}
 
-	svc := mail.NewService(store)
-
-	req := mail.PublishRequest{
-		SenderID:  agentID,
-		TopicName: topicName,
-		Subject:   publishSubject,
-		Body:      publishBody,
-		Priority:  priority,
-	}
-
-	result := svc.Receive(ctx, req)
-	val, err := result.Unpack()
+	msgID, recipientsCount, err := client.Publish(
+		ctx, agentID, topicName, publishSubject, publishBody, priority,
+	)
 	if err != nil {
 		return err
 	}
 
-	resp := val.(mail.PublishResponse)
-	if resp.Error != nil {
-		return resp.Error
-	}
-
 	switch outputFormat {
 	case "json":
-		return outputJSON(map[string]interface{}{
-			"message_id":       resp.MessageID,
+		return outputJSON(map[string]any{
+			"message_id":       msgID,
 			"topic":            topicName,
-			"recipients_count": resp.RecipientsCount,
+			"recipients_count": recipientsCount,
 		})
 	default:
 		fmt.Printf("Published to %s! Message ID: %d, Recipients: %d\n",
-			topicName, resp.MessageID, resp.RecipientsCount)
+			topicName, msgID, recipientsCount)
 	}
 
 	return nil

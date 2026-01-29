@@ -1,6 +1,8 @@
 {{define "thread-view"}}
 <!-- Google Inbox-style Message Detail View -->
-<div class="fixed inset-0 bg-white z-50 flex flex-col">
+<!-- Leave sidebar visible (left-64 matches sidebar width), add top margin for header -->
+<!-- pointer-events-auto re-enables clicks on this content (parent container has pointer-events-none) -->
+<div class="fixed top-14 left-64 right-0 bottom-0 bg-white z-40 flex flex-col shadow-xl pointer-events-auto">
     <!-- Top Toolbar -->
     <div class="flex items-center justify-between px-4 py-2 border-b border-gray-200">
         <div class="flex items-center gap-1">

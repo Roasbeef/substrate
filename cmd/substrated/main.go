@@ -4,6 +4,7 @@ import (
 	"context"
 	"flag"
 	"log"
+	"log/slog"
 	"net/http"
 	"os"
 	"os/signal"
@@ -32,12 +33,20 @@ func main() {
 		dbPathExpanded = home + (*dbPath)[1:]
 	}
 
-	// Open the database.
-	store, err := db.Open(dbPathExpanded)
+	// Create a logger for the database.
+	logger := slog.Default()
+
+	// Open the database with migrations.
+	sqliteStore, err := db.NewSqliteStore(&db.SqliteConfig{
+		DatabaseFileName: dbPathExpanded,
+	}, logger)
 	if err != nil {
 		log.Fatalf("Failed to open database: %v", err)
 	}
-	defer store.Close()
+	defer sqliteStore.Close()
+
+	// Get the underlying store for services.
+	store := sqliteStore.Store
 
 	// Create the MCP server.
 	mcpServer := mcp.NewServer(store)

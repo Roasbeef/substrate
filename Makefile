@@ -177,7 +177,15 @@ restart: stop build-web
 # Integration testing
 .PHONY: test-integration
 test-integration:
+	go test -v -timeout 10m ./tests/integration/...
+
+.PHONY: test-integration-sdk
+test-integration-sdk:
 	go test -v -timeout 10m ./tests/integration/sdk/...
+
+.PHONY: test-integration-e2e
+test-integration-e2e:
+	go test -v -timeout 2m ./tests/integration/e2e/...
 
 .PHONY: test-integration-short
 test-integration-short:
@@ -231,9 +239,11 @@ help:
 	@echo "                 Usage: make run-test test=TestThreadFSM pkg=./internal/mail"
 	@echo ""
 	@echo "Integration testing:"
-	@echo "  test-integration      Run SDK integration tests (requires claude CLI)"
+	@echo "  test-integration       Run all integration tests (SDK + e2e)"
+	@echo "  test-integration-sdk   Run SDK integration tests (requires claude CLI)"
+	@echo "  test-integration-e2e   Run e2e backend tests (no external deps)"
 	@echo "  test-integration-short Run short integration tests (no API calls)"
-	@echo "  test-integration-seed Create seeded test database"
+	@echo "  test-integration-seed  Create seeded test database"
 	@echo ""
 	@echo "Code generation:"
 	@echo "  sqlc           Generate sqlc code (requires sqlc installed)"

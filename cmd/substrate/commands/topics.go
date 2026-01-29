@@ -27,47 +27,47 @@ func init() {
 func runTopics(cmd *cobra.Command, args []string) error {
 	ctx := context.Background()
 
-	store, err := getStore()
+	client, err := getClient()
 	if err != nil {
 		return err
 	}
-	defer store.Close()
+	defer client.Close()
 
 	if topicsSubscribed {
-		agentID, agentName, err := getCurrentAgent(ctx, store)
+		agentID, agentName, err := getCurrentAgentWithClient(ctx, client)
 		if err != nil {
 			return err
 		}
 
-		topics, err := store.Queries().ListSubscriptionsByAgent(ctx, agentID)
+		subs, err := client.ListSubscriptionsByAgent(ctx, agentID)
 		if err != nil {
 			return fmt.Errorf("failed to list subscriptions: %w", err)
 		}
 
 		switch outputFormat {
 		case "json":
-			return outputJSON(topics)
+			return outputJSON(subs)
 		default:
-			if len(topics) == 0 {
+			if len(subs) == 0 {
 				fmt.Printf("%s has no subscriptions.\n", agentName)
 				return nil
 			}
 
-			fmt.Printf("Subscriptions for %s (%d):\n\n", agentName, len(topics))
-			for _, t := range topics {
+			fmt.Printf("Subscriptions for %s (%d):\n\n", agentName, len(subs))
+			for _, s := range subs {
 				retention := "default"
-				if t.RetentionSeconds.Valid {
-					retention = fmt.Sprintf("%dd", t.RetentionSeconds.Int64/86400)
+				if s.RetentionSeconds > 0 {
+					retention = fmt.Sprintf("%dd", s.RetentionSeconds/86400)
 				}
 				fmt.Printf("  %s (%s, %s retention)\n",
-					t.Name, t.TopicType, retention)
+					s.TopicName, s.TopicType, retention)
 			}
 		}
 		return nil
 	}
 
 	// List all topics.
-	topics, err := store.Queries().ListTopics(ctx)
+	topics, err := client.ListTopics(ctx)
 	if err != nil {
 		return fmt.Errorf("failed to list topics: %w", err)
 	}
@@ -84,19 +84,13 @@ func runTopics(cmd *cobra.Command, args []string) error {
 		fmt.Printf("Topics (%d):\n\n", len(topics))
 		for _, t := range topics {
 			retention := "default"
-			if t.RetentionSeconds.Valid {
-				retention = fmt.Sprintf("%dd", t.RetentionSeconds.Int64/86400)
-			}
-
-			// Get subscriber count.
-			count, err := store.Queries().CountSubscribersByTopic(ctx, t.ID)
-			if err != nil {
-				count = 0
+			if t.RetentionSeconds > 0 {
+				retention = fmt.Sprintf("%dd", t.RetentionSeconds/86400)
 			}
 
 			fmt.Printf("  %s\n", t.Name)
 			fmt.Printf("    Type: %s | Retention: %s | Subscribers: %d\n",
-				t.TopicType, retention, count)
+				t.Type, retention, t.SubscriberCount)
 		}
 	}
 

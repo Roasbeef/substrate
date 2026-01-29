@@ -2,12 +2,9 @@ package commands
 
 import (
 	"context"
-	"database/sql"
 	"fmt"
 	"time"
 
-	"github.com/roasbeef/subtrate/internal/agent"
-	"github.com/roasbeef/subtrate/internal/db/sqlc"
 	"github.com/spf13/cobra"
 )
 
@@ -54,82 +51,35 @@ func init() {
 func runAgentRegister(cmd *cobra.Command, args []string) error {
 	ctx := context.Background()
 
-	store, err := getStore()
+	client, err := getClient()
 	if err != nil {
 		return err
 	}
-	defer store.Close()
+	defer client.Close()
 
 	var name string
 	if len(args) > 0 {
 		name = args[0]
-	} else {
-		// Generate a memorable name.
-		registry := agent.NewRegistry(store)
-		name, err = registry.EnsureUniqueAgentName(ctx)
-		if err != nil {
-			return fmt.Errorf("failed to generate name: %w", err)
-		}
 	}
 
-	// Check if agent already exists.
-	_, err = store.Queries().GetAgentByName(ctx, name)
-	if err == nil {
-		return fmt.Errorf("agent %q already exists", name)
-	}
-
-	// Create the agent.
-	now := time.Now().Unix()
-	params := sqlc.CreateAgentParams{
-		Name: name,
-		ProjectKey: sql.NullString{
-			String: registerProject,
-			Valid:  registerProject != "",
-		},
-		CreatedAt:    now,
-		LastActiveAt: now,
-	}
-
-	agentRow, err := store.Queries().CreateAgent(ctx, params)
+	// RegisterAgent handles name generation if empty.
+	agentID, agentNameResult, err := client.RegisterAgent(ctx, name, registerProject)
 	if err != nil {
-		return fmt.Errorf("failed to create agent: %w", err)
+		return fmt.Errorf("failed to register agent: %w", err)
 	}
 
-	// Create the agent's inbox topic.
-	topicName := fmt.Sprintf("agent/%s/inbox", name)
-	topicParams := sqlc.CreateTopicParams{
-		Name:             topicName,
-		TopicType:        "direct",
-		RetentionSeconds: sql.NullInt64{Int64: 604800, Valid: true},
-		CreatedAt:        now,
-	}
-
-	topic, err := store.Queries().CreateTopic(ctx, topicParams)
-	if err != nil {
-		return fmt.Errorf("failed to create inbox topic: %w", err)
-	}
-
-	// Subscribe the agent to their inbox.
-	subParams := sqlc.CreateSubscriptionParams{
-		AgentID:      agentRow.ID,
-		TopicID:      topic.ID,
-		SubscribedAt: now,
-	}
-	err = store.Queries().CreateSubscription(ctx, subParams)
-	if err != nil {
-		return fmt.Errorf("failed to subscribe to inbox: %w", err)
-	}
+	topicName := fmt.Sprintf("agent/%s/inbox", agentNameResult)
 
 	switch outputFormat {
 	case "json":
-		return outputJSON(map[string]interface{}{
-			"id":      agentRow.ID,
-			"name":    name,
+		return outputJSON(map[string]any{
+			"id":      agentID,
+			"name":    agentNameResult,
 			"project": registerProject,
 			"topic":   topicName,
 		})
 	default:
-		fmt.Printf("Agent registered: %s (ID: %d)\n", name, agentRow.ID)
+		fmt.Printf("Agent registered: %s (ID: %d)\n", agentNameResult, agentID)
 		fmt.Printf("  Inbox topic: %s\n", topicName)
 		if registerProject != "" {
 			fmt.Printf("  Project: %s\n", registerProject)
@@ -142,13 +92,13 @@ func runAgentRegister(cmd *cobra.Command, args []string) error {
 func runAgentList(cmd *cobra.Command, args []string) error {
 	ctx := context.Background()
 
-	store, err := getStore()
+	client, err := getClient()
 	if err != nil {
 		return err
 	}
-	defer store.Close()
+	defer client.Close()
 
-	agents, err := store.Queries().ListAgents(ctx)
+	agents, err := client.ListAgents(ctx)
 	if err != nil {
 		return fmt.Errorf("failed to list agents: %w", err)
 	}
@@ -183,28 +133,28 @@ func runAgentList(cmd *cobra.Command, args []string) error {
 func runAgentWhoami(cmd *cobra.Command, args []string) error {
 	ctx := context.Background()
 
-	store, err := getStore()
+	client, err := getClient()
 	if err != nil {
 		return err
 	}
-	defer store.Close()
+	defer client.Close()
 
-	agentID, agentName, err := getCurrentAgent(ctx, store)
+	agentID, agentNameStr, err := getCurrentAgentWithClient(ctx, client)
 	if err != nil {
 		return err
 	}
 
 	switch outputFormat {
 	case "json":
-		return outputJSON(map[string]interface{}{
+		return outputJSON(map[string]any{
 			"id":   agentID,
-			"name": agentName,
+			"name": agentNameStr,
 		})
 	case "context":
-		fmt.Printf("[Subtrate] You are %s\n", agentName)
+		fmt.Printf("[Subtrate] You are %s\n", agentNameStr)
 		return nil
 	default:
-		fmt.Printf("You are %s (ID: %d)\n", agentName, agentID)
+		fmt.Printf("You are %s (ID: %d)\n", agentNameStr, agentID)
 	}
 
 	return nil

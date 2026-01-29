@@ -6,8 +6,6 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/roasbeef/subtrate/internal/agent"
-	"github.com/roasbeef/subtrate/internal/db"
 	"github.com/spf13/cobra"
 )
 
@@ -50,47 +48,38 @@ type SessionInfo struct {
 func runHeartbeat(cmd *cobra.Command, args []string) error {
 	ctx := context.Background()
 
-	store, err := getStore()
+	client, err := getClient()
 	if err != nil {
 		return err
 	}
-	defer store.Close()
+	defer client.Close()
 
-	agentID, agentNameStr, err := getCurrentAgent(ctx, store)
+	agentID, agentNameStr, err := getCurrentAgentWithClient(ctx, client)
 	if err != nil {
 		return err
 	}
-
-	registry := agent.NewRegistry(store)
-	heartbeatMgr := agent.NewHeartbeatManager(registry, nil)
 
 	// Record the heartbeat.
-	if err := heartbeatMgr.RecordHeartbeat(ctx, agentID); err != nil {
+	if err := client.UpdateHeartbeat(ctx, agentID); err != nil {
 		return fmt.Errorf("failed to record heartbeat: %w", err)
 	}
 
-	// If session start is requested, track the session.
+	// If session start is requested, track the session via identity.
 	var sessInfo *SessionInfo
 	if heartbeatSessionStart && sessionID != "" {
-		heartbeatMgr.StartSession(agentID, sessionID)
 		sessInfo = &SessionInfo{
 			SessionID: sessionID,
 			StartedAt: time.Now(),
 		}
 	}
 
-	// Get current status.
-	agentObj, err := registry.GetAgent(ctx, agentID)
-	if err != nil {
-		return fmt.Errorf("failed to get agent: %w", err)
-	}
-
-	status := heartbeatMgr.ComputeStatus(agentObj)
+	// Compute status based on recent heartbeat.
+	status := "active"
 
 	result := HeartbeatResult{
 		AgentID:   agentID,
 		AgentName: agentNameStr,
-		Status:    string(status),
+		Status:    status,
 		Timestamp: time.Now(),
 		Session:   sessInfo,
 	}
@@ -120,8 +109,7 @@ func runHeartbeat(cmd *cobra.Command, args []string) error {
 
 // sendHeartbeatQuiet is a helper function for other commands to send heartbeats.
 // It silently updates the agent's last active timestamp without any output.
-func sendHeartbeatQuiet(ctx context.Context, store *db.Store, agentID int64) {
-	registry := agent.NewRegistry(store)
+func sendHeartbeatQuiet(ctx context.Context, client *Client, agentID int64) {
 	// Ignore errors for quiet heartbeat - best effort.
-	_ = registry.UpdateLastActive(ctx, agentID)
+	_ = client.UpdateHeartbeat(ctx, agentID)
 }

@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"strconv"
 
-	"github.com/roasbeef/subtrate/internal/mail"
 	"github.com/spf13/cobra"
 )
 
@@ -25,40 +24,27 @@ func runRead(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("invalid message ID: %w", err)
 	}
 
-	store, err := getStore()
+	client, err := getClient()
 	if err != nil {
 		return err
 	}
-	defer store.Close()
+	defer client.Close()
 
-	agentID, _, err := getCurrentAgent(ctx, store)
-	if err != nil {
-		return err
-	}
-
-	svc := mail.NewService(store)
-
-	req := mail.ReadMessageRequest{
-		AgentID:   agentID,
-		MessageID: msgID,
-	}
-
-	result := svc.Receive(ctx, req)
-	val, err := result.Unpack()
+	agentID, _, err := getCurrentAgentWithClient(ctx, client)
 	if err != nil {
 		return err
 	}
 
-	resp := val.(mail.ReadMessageResponse)
-	if resp.Error != nil {
-		return resp.Error
+	msg, err := client.ReadMessage(ctx, agentID, msgID)
+	if err != nil {
+		return err
 	}
 
 	switch outputFormat {
 	case "json":
-		return outputJSON(resp.Message)
+		return outputJSON(msg)
 	default:
-		fmt.Print(formatMessageFull(resp.Message))
+		fmt.Print(formatMessageFull(msg))
 	}
 
 	return nil

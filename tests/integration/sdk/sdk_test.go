@@ -19,6 +19,9 @@ type testEnv struct {
 	// dbPath is the path to the test database.
 	dbPath string
 
+	// configDir is the isolated Claude config directory for testing.
+	configDir string
+
 	// store is the database store.
 	store *db.Store
 
@@ -29,7 +32,7 @@ type testEnv struct {
 	cleanups []func()
 }
 
-// setup creates a test environment with a temporary database.
+// setup creates a test environment with a temporary database and isolated config.
 func setup(t *testing.T) *testEnv {
 	t.Helper()
 
@@ -40,6 +43,14 @@ func setup(t *testing.T) *testEnv {
 	}
 
 	dbPath := filepath.Join(tmpDir, "test.db")
+
+	// Create isolated Claude config directory to avoid interacting with
+	// user's global hooks, sessions, and settings.
+	configDir := filepath.Join(tmpDir, "claude-config")
+	if err := os.MkdirAll(configDir, 0755); err != nil {
+		os.RemoveAll(tmpDir)
+		t.Fatalf("failed to create config dir: %v", err)
+	}
 
 	// Open database.
 	store, err := db.Open(dbPath)
@@ -59,18 +70,20 @@ func setup(t *testing.T) *testEnv {
 		t.Fatalf("failed to run migrations: %v", err)
 	}
 
-	// Create spawner with test configuration.
+	// Create spawner with test configuration and isolated config dir.
 	spawner := agent.NewSpawner(&agent.SpawnConfig{
 		CLIPath:              "claude",
-		Model:                "claude-sonnet-4-5-20250929",
+		Model:                "sonnet",
 		Timeout:              2 * time.Minute,
 		NoSessionPersistence: true,
+		ConfigDir:            configDir,
 	})
 
 	env := &testEnv{
-		dbPath:  dbPath,
-		store:   store,
-		spawner: spawner,
+		dbPath:    dbPath,
+		configDir: configDir,
+		store:     store,
+		spawner:   spawner,
 	}
 
 	env.cleanups = append(env.cleanups, func() {
@@ -86,6 +99,19 @@ func (e *testEnv) cleanup() {
 	for i := len(e.cleanups) - 1; i >= 0; i-- {
 		e.cleanups[i]()
 	}
+}
+
+// setupIsolatedConfig creates an isolated Claude config directory for tests
+// that don't need the full testEnv but still need config isolation.
+func setupIsolatedConfig(t *testing.T) (configDir string, cleanup func()) {
+	t.Helper()
+
+	tmpDir, err := os.MkdirTemp("", "subtrate-isolated-config-*")
+	if err != nil {
+		t.Fatalf("failed to create temp config dir: %v", err)
+	}
+
+	return tmpDir, func() { os.RemoveAll(tmpDir) }
 }
 
 // skipIfNoCLI skips the test if the claude CLI is not available.
@@ -198,16 +224,9 @@ func TestSDK_CLIIntegration(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
 	defer cancel()
 
-	// Create a spawner with restricted permissions for safety.
-	spawner := agent.NewSpawner(&agent.SpawnConfig{
-		Model:                "sonnet", // Use cheaper model.
-		MaxTurns:             1,
-		NoSessionPersistence: true,
-		PermissionMode:       claudeagent.PermissionModeDefault,
-	})
-
+	// Use the spawner from setup which has isolated config dir.
 	// Spawn an agent with a simple prompt that uses substrate CLI.
-	resp, err := spawner.Spawn(ctx,
+	resp, err := env.spawner.Spawn(ctx,
 		"Run 'substrate --help' and tell me what commands are available. "+
 			"Only respond with a brief list of the main commands.",
 	)
@@ -281,12 +300,16 @@ func TestSDK_SessionResume(t *testing.T) {
 		t.Skip("skipping integration test in short mode")
 	}
 
+	configDir, cleanup := setupIsolatedConfig(t)
+	defer cleanup()
+
 	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Minute)
 	defer cancel()
 
 	spawner := agent.NewSpawner(&agent.SpawnConfig{
-		Model:    "haiku",
-		MaxTurns: 1,
+		Model:     "haiku",
+		MaxTurns:  1,
+		ConfigDir: configDir,
 		// Note: NOT setting NoSessionPersistence so session is saved.
 	})
 
@@ -328,6 +351,9 @@ func TestSDK_StreamingSpawn(t *testing.T) {
 		t.Skip("skipping integration test in short mode")
 	}
 
+	configDir, cleanup := setupIsolatedConfig(t)
+	defer cleanup()
+
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
 	defer cancel()
 
@@ -335,6 +361,7 @@ func TestSDK_StreamingSpawn(t *testing.T) {
 		Model:                "sonnet",
 		MaxTurns:             1,
 		NoSessionPersistence: true,
+		ConfigDir:            configDir,
 	})
 
 	// Track messages received.
@@ -368,6 +395,9 @@ func TestSDK_InteractiveSession(t *testing.T) {
 		t.Skip("skipping integration test in short mode")
 	}
 
+	configDir, cleanup := setupIsolatedConfig(t)
+	defer cleanup()
+
 	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Minute)
 	defer cancel()
 
@@ -375,6 +405,7 @@ func TestSDK_InteractiveSession(t *testing.T) {
 		Model:                "sonnet",
 		MaxTurns:             5,
 		NoSessionPersistence: true,
+		ConfigDir:            configDir,
 	})
 
 	session, err := spawner.SpawnInteractive(ctx)
@@ -432,6 +463,9 @@ func TestSDK_SendReceiveMessage(t *testing.T) {
 		t.Skip("substrate CLI not found, skipping send/receive test")
 	}
 
+	configDir, cleanup := setupIsolatedConfig(t)
+	defer cleanup()
+
 	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Minute)
 	defer cancel()
 
@@ -440,6 +474,7 @@ func TestSDK_SendReceiveMessage(t *testing.T) {
 		MaxTurns:             5,
 		NoSessionPersistence: true,
 		PermissionMode:       claudeagent.PermissionModeAcceptEdits,
+		ConfigDir:            configDir,
 	})
 
 	// Have agent send a message using substrate CLI.

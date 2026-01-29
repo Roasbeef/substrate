@@ -3,9 +3,7 @@ package commands
 import (
 	"context"
 	"fmt"
-	"time"
 
-	"github.com/roasbeef/subtrate/internal/db/sqlc"
 	"github.com/spf13/cobra"
 )
 
@@ -28,6 +26,7 @@ var unsubscribeCmd = &cobra.Command{
 }
 
 func init() {
+	rootCmd.AddCommand(subscribeCmd)
 	rootCmd.AddCommand(unsubscribeCmd)
 }
 
@@ -35,49 +34,27 @@ func runSubscribe(cmd *cobra.Command, args []string) error {
 	ctx := context.Background()
 	topicName := args[0]
 
-	store, err := getStore()
+	client, err := getClient()
 	if err != nil {
 		return err
 	}
-	defer store.Close()
+	defer client.Close()
 
-	agentID, agentName, err := getCurrentAgent(ctx, store)
+	agentID, agentName, err := getCurrentAgentWithClient(ctx, client)
 	if err != nil {
 		return err
 	}
 
-	// Get or create the topic.
-	topic, err := store.Queries().GetTopicByName(ctx, topicName)
-	if err != nil {
-		return fmt.Errorf("topic %q not found", topicName)
-	}
-
-	// Check if already subscribed.
-	_, err = store.Queries().GetSubscription(ctx, sqlc.GetSubscriptionParams{
-		AgentID: agentID,
-		TopicID: topic.ID,
-	})
-	if err == nil {
-		fmt.Printf("%s is already subscribed to %s.\n", agentName, topicName)
-		return nil
-	}
-
-	// Create subscription.
-	err = store.Queries().CreateSubscription(ctx, sqlc.CreateSubscriptionParams{
-		AgentID:      agentID,
-		TopicID:      topic.ID,
-		SubscribedAt: time.Now().Unix(),
-	})
-	if err != nil {
+	if err := client.Subscribe(ctx, agentID, topicName); err != nil {
 		return fmt.Errorf("failed to subscribe: %w", err)
 	}
 
 	switch outputFormat {
 	case "json":
-		return outputJSON(map[string]interface{}{
-			"agent":   agentName,
-			"topic":   topicName,
-			"status":  "subscribed",
+		return outputJSON(map[string]any{
+			"agent":  agentName,
+			"topic":  topicName,
+			"status": "subscribed",
 		})
 	default:
 		fmt.Printf("%s subscribed to %s.\n", agentName, topicName)
@@ -90,38 +67,27 @@ func runUnsubscribe(cmd *cobra.Command, args []string) error {
 	ctx := context.Background()
 	topicName := args[0]
 
-	store, err := getStore()
+	client, err := getClient()
 	if err != nil {
 		return err
 	}
-	defer store.Close()
+	defer client.Close()
 
-	agentID, agentName, err := getCurrentAgent(ctx, store)
+	agentID, agentName, err := getCurrentAgentWithClient(ctx, client)
 	if err != nil {
 		return err
 	}
 
-	// Get the topic.
-	topic, err := store.Queries().GetTopicByName(ctx, topicName)
-	if err != nil {
-		return fmt.Errorf("topic %q not found", topicName)
-	}
-
-	// Delete subscription.
-	err = store.Queries().DeleteSubscription(ctx, sqlc.DeleteSubscriptionParams{
-		AgentID: agentID,
-		TopicID: topic.ID,
-	})
-	if err != nil {
+	if err := client.Unsubscribe(ctx, agentID, topicName); err != nil {
 		return fmt.Errorf("failed to unsubscribe: %w", err)
 	}
 
 	switch outputFormat {
 	case "json":
-		return outputJSON(map[string]interface{}{
-			"agent":   agentName,
-			"topic":   topicName,
-			"status":  "unsubscribed",
+		return outputJSON(map[string]any{
+			"agent":  agentName,
+			"topic":  topicName,
+			"status": "unsubscribed",
 		})
 	default:
 		fmt.Printf("%s unsubscribed from %s.\n", agentName, topicName)

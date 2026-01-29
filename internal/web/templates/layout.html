@@ -207,7 +207,8 @@
     </div>
 
     <!-- Modal Container for compose/dialogs -->
-    <div id="modal-container"></div>
+    <!-- pointer-events:none lets clicks pass through to sidebar; child content uses pointer-events:auto -->
+    <div id="modal-container" class="pointer-events-none"></div>
 
     <!-- Search Results Dropdown -->
     <div id="search-results" class="hidden absolute top-14 left-72 w-96 bg-white rounded-lg shadow-xl border border-gray-200 z-50"></div>

@@ -32,19 +32,23 @@ func runSearch(cmd *cobra.Command, args []string) error {
 	ctx := context.Background()
 	query := args[0]
 
-	store, err := getStore()
+	client, err := getClient()
 	if err != nil {
 		return err
 	}
-	defer store.Close()
+	defer client.Close()
 
-	agentID, _, err := getCurrentAgent(ctx, store)
+	agentID, _, err := getCurrentAgentWithClient(ctx, client)
 	if err != nil {
 		return err
 	}
 
-	// Use the search implementation on store.
-	results, err := store.SearchMessagesForAgent(ctx, query, agentID, searchLimit)
+	// Get topic ID if searching within a specific topic.
+	var topicID int64
+	// Note: Topic lookup would need to be added to the client if needed.
+	// For now, we pass 0 to search all topics.
+
+	results, err := client.Search(ctx, agentID, query, topicID, searchLimit)
 	if err != nil {
 		return fmt.Errorf("search failed: %w", err)
 	}

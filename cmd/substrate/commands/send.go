@@ -46,13 +46,13 @@ func init() {
 func runSend(cmd *cobra.Command, args []string) error {
 	ctx := context.Background()
 
-	store, err := getStore()
+	client, err := getClient()
 	if err != nil {
 		return err
 	}
-	defer store.Close()
+	defer client.Close()
 
-	agentID, _, err := getCurrentAgent(ctx, store)
+	agentID, _, err := getCurrentAgentWithClient(ctx, client)
 	if err != nil {
 		return err
 	}
@@ -80,8 +80,6 @@ func runSend(cmd *cobra.Command, args []string) error {
 		deadline = &d
 	}
 
-	svc := mail.NewService(store)
-
 	req := mail.SendMailRequest{
 		SenderID:       agentID,
 		RecipientNames: []string{sendTo},
@@ -92,26 +90,19 @@ func runSend(cmd *cobra.Command, args []string) error {
 		ThreadID:       sendThreadID,
 	}
 
-	result := svc.Receive(ctx, req)
-	val, err := result.Unpack()
+	msgID, threadID, err := client.SendMail(ctx, req)
 	if err != nil {
 		return err
 	}
 
-	resp := val.(mail.SendMailResponse)
-	if resp.Error != nil {
-		return resp.Error
-	}
-
 	switch outputFormat {
 	case "json":
-		return outputJSON(map[string]interface{}{
-			"message_id": resp.MessageID,
-			"thread_id":  resp.ThreadID,
+		return outputJSON(map[string]any{
+			"message_id": msgID,
+			"thread_id":  threadID,
 		})
 	default:
-		fmt.Printf("Message sent! ID: %d, Thread: %s\n",
-			resp.MessageID, resp.ThreadID)
+		fmt.Printf("Message sent! ID: %d, Thread: %s\n", msgID, threadID)
 	}
 
 	return nil

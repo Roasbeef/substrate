@@ -6,6 +6,7 @@ import (
 	"context"
 	"flag"
 	"log"
+	"log/slog"
 	"net/http"
 	"os"
 	"os/signal"
@@ -37,18 +38,21 @@ func main() {
 		log.Fatalf("Failed to create database directory: %v", err)
 	}
 
-	// Open the database.
-	store, err := db.Open(dbPathExpanded)
+	// Open the database with migrations.
+	logger := slog.New(slog.NewTextHandler(os.Stdout, nil))
+	sqliteStore, err := db.NewSqliteStore(&db.SqliteConfig{
+		DatabaseFileName: dbPathExpanded,
+	}, logger)
 	if err != nil {
 		log.Fatalf("Failed to open database: %v", err)
 	}
-	defer store.Close()
+	defer sqliteStore.Close()
 
 	// Create and start the web server.
 	cfg := web.DefaultConfig()
 	cfg.Addr = *addr
 
-	server, err := web.NewServer(cfg, store)
+	server, err := web.NewServer(cfg, sqliteStore.Store)
 	if err != nil {
 		log.Fatalf("Failed to create web server: %v", err)
 	}

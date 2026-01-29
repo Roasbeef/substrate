@@ -8,6 +8,9 @@ var (
 	// dbPath is the path to the SQLite database.
 	dbPath string
 
+	// grpcAddr is the address of the substrated daemon.
+	grpcAddr string
+
 	// agentName is the name of the current agent.
 	agentName string
 
@@ -19,6 +22,9 @@ var (
 
 	// outputFormat controls output format (text, json, context).
 	outputFormat string
+
+	// verbose enables verbose output.
+	verbose bool
 )
 
 // rootCmd is the base command for the CLI.
@@ -43,6 +49,10 @@ func init() {
 		"Path to SQLite database (default: ~/.subtrate/subtrate.db)",
 	)
 	rootCmd.PersistentFlags().StringVar(
+		&grpcAddr, "grpc-addr", "",
+		"Address of substrated daemon (default: localhost:10009)",
+	)
+	rootCmd.PersistentFlags().StringVar(
 		&agentName, "agent", "",
 		"Agent name to use for operations",
 	)
@@ -57,6 +67,10 @@ func init() {
 	rootCmd.PersistentFlags().StringVar(
 		&outputFormat, "format", "text",
 		"Output format: text, json, context",
+	)
+	rootCmd.PersistentFlags().BoolVarP(
+		&verbose, "verbose", "v", false,
+		"Enable verbose output",
 	)
 
 	// Add subcommands.

@@ -30,21 +30,19 @@ func init() {
 func runInbox(cmd *cobra.Command, args []string) error {
 	ctx := context.Background()
 
-	store, err := getStore()
+	client, err := getClient()
 	if err != nil {
 		return err
 	}
-	defer store.Close()
+	defer client.Close()
 
-	agentID, agentName, err := getCurrentAgent(ctx, store)
+	agentID, agentNameStr, err := getCurrentAgentWithClient(ctx, client)
 	if err != nil {
 		return err
 	}
 
 	// Send heartbeat to indicate agent activity.
-	sendHeartbeatQuiet(ctx, store, agentID)
-
-	svc := mail.NewService(store)
+	_ = client.UpdateHeartbeat(ctx, agentID)
 
 	req := mail.FetchInboxRequest{
 		AgentID:    agentID,
@@ -52,36 +50,30 @@ func runInbox(cmd *cobra.Command, args []string) error {
 		UnreadOnly: inboxUnreadOnly,
 	}
 
-	result := svc.Receive(ctx, req)
-	val, err := result.Unpack()
+	messages, err := client.FetchInbox(ctx, req)
 	if err != nil {
 		return err
 	}
 
-	resp := val.(mail.FetchInboxResponse)
-	if resp.Error != nil {
-		return resp.Error
-	}
-
 	switch outputFormat {
 	case "json":
-		return outputJSON(resp.Messages)
+		return outputJSON(messages)
 
 	case "context":
-		if len(resp.Messages) > 0 {
-			fmt.Print(formatContext(resp.Messages))
+		if len(messages) > 0 {
+			fmt.Print(formatContext(messages))
 		}
 		return nil
 
 	default:
-		if len(resp.Messages) == 0 {
-			fmt.Printf("Inbox for %s is empty.\n", agentName)
+		if len(messages) == 0 {
+			fmt.Printf("Inbox for %s is empty.\n", agentNameStr)
 			return nil
 		}
 
-		fmt.Printf("Inbox for %s (%d messages):\n\n", agentName,
-			len(resp.Messages))
-		for _, msg := range resp.Messages {
+		fmt.Printf("Inbox for %s (%d messages):\n\n", agentNameStr,
+			len(messages))
+		for _, msg := range messages {
 			fmt.Print(formatMessage(msg))
 			fmt.Println()
 		}

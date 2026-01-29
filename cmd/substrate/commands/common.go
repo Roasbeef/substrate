@@ -8,12 +8,12 @@ import (
 	"strings"
 	"time"
 
-	"github.com/roasbeef/subtrate/internal/agent"
 	"github.com/roasbeef/subtrate/internal/db"
 	"github.com/roasbeef/subtrate/internal/mail"
 )
 
 // getStore opens the database and returns a store instance.
+// NOTE: This is only used as fallback when daemon is not running.
 func getStore() (*db.Store, error) {
 	path := dbPath
 	if path == "" {
@@ -32,26 +32,19 @@ func getStore() (*db.Store, error) {
 	return db.NewStore(sqlDB), nil
 }
 
-// getIdentityManager creates an identity manager.
-func getIdentityManager(store *db.Store) (*agent.IdentityManager, error) {
-	registry := agent.NewRegistry(store)
-	return agent.NewIdentityManager(store, registry)
-}
-
-// getCurrentAgent returns the current agent ID, resolving from session or name.
-func getCurrentAgent(ctx context.Context, store *db.Store) (int64, string,
-	error) {
-
-	registry := agent.NewRegistry(store)
+// getCurrentAgentWithClient returns the current agent ID using the Client
+// interface. It supports both gRPC and direct database access.
+func getCurrentAgentWithClient(ctx context.Context, client *Client) (int64,
+	string, error) {
 
 	// If agent name is specified directly, use it.
 	if agentName != "" {
-		agent, err := registry.GetAgentByName(ctx, agentName)
+		ag, err := client.GetAgentByName(ctx, agentName)
 		if err != nil {
 			return 0, "", fmt.Errorf("agent %q not found: %w",
 				agentName, err)
 		}
-		return agent.ID, agent.Name, nil
+		return ag.ID, ag.Name, nil
 	}
 
 	// Try to get session ID from environment.
@@ -70,13 +63,8 @@ func getCurrentAgent(ctx context.Context, store *db.Store) (int64, string,
 			"--session-id, or set CLAUDE_SESSION_ID")
 	}
 
-	// Use identity manager to resolve.
-	idMgr, err := getIdentityManager(store)
-	if err != nil {
-		return 0, "", err
-	}
-
-	identity, err := idMgr.EnsureIdentity(ctx, sessID, projDir)
+	// Use identity resolution via client.
+	identity, err := client.EnsureIdentity(ctx, sessID, projDir)
 	if err != nil {
 		return 0, "", fmt.Errorf("failed to resolve identity: %w", err)
 	}

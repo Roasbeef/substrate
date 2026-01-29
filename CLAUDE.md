@@ -32,9 +32,25 @@ Subtrate is a central command center for managing Claude Code agents with mail/m
 - `make gen` - Run all code generation (sqlc + proto)
 
 ### Testing Commands
-- Single package: `make unit pkg=./internal/mail case=TestService_SendMail`
-- All tests with coverage: `make test-cover`
-- HTML coverage report: `make test-cover-html`
+The Makefile exports CGO flags automatically, so all test commands handle FTS5 correctly.
+
+**Unit tests (single package):**
+```bash
+# Test entire package
+make unit pkg=./internal/mail
+
+# Test specific test case
+make unit pkg=./internal/mail case=TestService_SendMail
+
+# Test pattern matching
+make unit pkg=./internal/mcp case=TestNewServer
+```
+
+**Other test commands:**
+- `make test` - Run all tests
+- `make test-cover` - Run tests with coverage summary
+- `make test-cover-html` - Generate HTML coverage report
+- `make test-integration-e2e` - Run e2e backend tests (no external deps)
 
 ### Pre-commit
 - `make pre-commit` - Run all checks (tidy, fmt, vet, lint, test)

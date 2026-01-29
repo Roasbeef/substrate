@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/roasbeef/subtrate/internal/mail"
 	"github.com/spf13/cobra"
 )
 
@@ -27,65 +26,45 @@ func init() {
 func runPoll(cmd *cobra.Command, args []string) error {
 	ctx := context.Background()
 
-	store, err := getStore()
+	client, err := getClient()
 	if err != nil {
 		return err
 	}
-	defer store.Close()
+	defer client.Close()
 
-	agentID, agentName, err := getCurrentAgent(ctx, store)
+	agentID, agentNameStr, err := getCurrentAgentWithClient(ctx, client)
 	if err != nil {
 		return err
 	}
 
 	// Send heartbeat to indicate agent activity.
-	sendHeartbeatQuiet(ctx, store, agentID)
+	_ = client.UpdateHeartbeat(ctx, agentID)
 
-	// Get current offsets from database.
-	offsets, err := store.Queries().ListConsumerOffsetsByAgent(ctx, agentID)
-	if err != nil {
-		return fmt.Errorf("failed to get offsets: %w", err)
-	}
-
-	sinceOffsets := make(map[int64]int64)
-	for _, offset := range offsets {
-		sinceOffsets[offset.TopicID] = offset.LastOffset
-	}
-
-	svc := mail.NewService(store)
-
-	req := mail.PollChangesRequest{
-		AgentID:      agentID,
-		SinceOffsets: sinceOffsets,
-	}
-
-	result := svc.Receive(ctx, req)
-	val, err := result.Unpack()
+	// PollChanges with empty offsets to get all unread messages.
+	// The client will track offsets internally if using gRPC.
+	newMessages, _, err := client.PollChanges(ctx, agentID, nil)
 	if err != nil {
 		return err
 	}
 
-	resp := val.(mail.PollChangesResponse)
-	if resp.Error != nil {
-		return resp.Error
-	}
-
-	if len(resp.NewMessages) == 0 {
+	if len(newMessages) == 0 {
 		if !pollQuiet {
-			fmt.Printf("No new messages for %s.\n", agentName)
+			fmt.Printf("No new messages for %s.\n", agentNameStr)
 		}
 		return nil
 	}
 
 	switch outputFormat {
 	case "json":
-		return outputJSON(resp)
+		return outputJSON(map[string]any{
+			"new_messages": newMessages,
+		})
 	case "context":
-		fmt.Print(formatContext(resp.NewMessages))
+		fmt.Print(formatContext(newMessages))
 		return nil
 	default:
-		fmt.Printf("New messages for %s:\n\n", agentName)
-		for _, msg := range resp.NewMessages {
+		fmt.Printf("New messages for %s:\n\n", agentNameStr)
+		for _, msg := range newMessages {
 			fmt.Print(formatMessage(msg))
 			fmt.Println()
 		}

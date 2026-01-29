@@ -3,6 +3,7 @@ package mcp
 import (
 	"context"
 	"fmt"
+	"strconv"
 	"time"
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
@@ -13,22 +14,22 @@ import (
 // SendMailArgs are the arguments for the send_mail tool.
 type SendMailArgs struct {
 	// AgentID is the sending agent's ID.
-	AgentID int64 `json:"agent_id" jsonschema:"description=ID of the sending agent"`
+	AgentID int64 `json:"agent_id" jsonschema:"ID of the sending agent"`
 
 	// Recipients is a list of recipient agent names.
-	Recipients []string `json:"recipients" jsonschema:"description=List of recipient agent names"`
+	Recipients []string `json:"recipients" jsonschema:"List of recipient agent names"`
 
 	// Subject is the message subject line.
-	Subject string `json:"subject" jsonschema:"description=Message subject line"`
+	Subject string `json:"subject" jsonschema:"Message subject line"`
 
 	// Body is the message body in markdown format.
-	Body string `json:"body" jsonschema:"description=Message body in markdown format"`
+	Body string `json:"body" jsonschema:"Message body in markdown format"`
 
 	// Priority is the message priority (urgent, normal, low).
-	Priority string `json:"priority,omitempty" jsonschema:"description=Priority: urgent, normal, or low,default=normal"`
+	Priority string `json:"priority,omitempty" jsonschema:"Priority: urgent, normal, or low,default=normal"`
 
 	// ThreadID is an optional thread ID for threading messages.
-	ThreadID string `json:"thread_id,omitempty" jsonschema:"description=Optional thread ID for threading related messages"`
+	ThreadID string `json:"thread_id,omitempty" jsonschema:"Optional thread ID for threading related messages"`
 }
 
 // SendMailResult is the result of the send_mail tool.
@@ -73,9 +74,9 @@ func (s *Server) handleSendMail(ctx context.Context,
 
 // FetchInboxArgs are the arguments for the fetch_inbox tool.
 type FetchInboxArgs struct {
-	AgentID    int64 `json:"agent_id" jsonschema:"description=ID of the agent to fetch inbox for"`
-	Limit      int   `json:"limit,omitempty" jsonschema:"description=Maximum number of messages to return,default=50"`
-	UnreadOnly bool  `json:"unread_only,omitempty" jsonschema:"description=Only return unread messages"`
+	AgentID    int64 `json:"agent_id" jsonschema:"ID of the agent to fetch inbox for"`
+	Limit      int   `json:"limit,omitempty" jsonschema:"Maximum number of messages to return,default=50"`
+	UnreadOnly bool  `json:"unread_only,omitempty" jsonschema:"Only return unread messages"`
 }
 
 // FetchInboxResult is the result of the fetch_inbox tool.
@@ -138,8 +139,8 @@ func (s *Server) handleFetchInbox(ctx context.Context,
 
 // ReadMessageArgs are the arguments for the read_message tool.
 type ReadMessageArgs struct {
-	AgentID   int64 `json:"agent_id" jsonschema:"description=ID of the requesting agent"`
-	MessageID int64 `json:"message_id" jsonschema:"description=ID of the message to read"`
+	AgentID   int64 `json:"agent_id" jsonschema:"ID of the requesting agent"`
+	MessageID int64 `json:"message_id" jsonschema:"ID of the message to read"`
 }
 
 // ReadMessageResult is the result of the read_message tool.
@@ -192,8 +193,8 @@ func (s *Server) handleReadMessage(ctx context.Context,
 
 // AckMessageArgs are the arguments for the ack_message tool.
 type AckMessageArgs struct {
-	AgentID   int64 `json:"agent_id" jsonschema:"description=ID of the agent"`
-	MessageID int64 `json:"message_id" jsonschema:"description=ID of the message to acknowledge"`
+	AgentID   int64 `json:"agent_id" jsonschema:"ID of the agent"`
+	MessageID int64 `json:"message_id" jsonschema:"ID of the message to acknowledge"`
 }
 
 // AckMessageResult is the result of the ack_message tool.
@@ -225,8 +226,8 @@ func (s *Server) handleAckMessage(ctx context.Context,
 
 // StateChangeArgs are common arguments for state change tools.
 type StateChangeArgs struct {
-	AgentID   int64 `json:"agent_id" jsonschema:"description=ID of the agent"`
-	MessageID int64 `json:"message_id" jsonschema:"description=ID of the message"`
+	AgentID   int64 `json:"agent_id" jsonschema:"ID of the agent"`
+	MessageID int64 `json:"message_id" jsonschema:"ID of the message"`
 }
 
 // StateChangeResult is the result of state change tools.
@@ -248,9 +249,9 @@ func (s *Server) handleStarMessage(ctx context.Context,
 
 // SnoozeArgs are the arguments for the snooze_message tool.
 type SnoozeArgs struct {
-	AgentID      int64  `json:"agent_id" jsonschema:"description=ID of the agent"`
-	MessageID    int64  `json:"message_id" jsonschema:"description=ID of the message"`
-	SnoozedUntil string `json:"snoozed_until" jsonschema:"description=RFC3339 timestamp when the message should reappear"`
+	AgentID      int64  `json:"agent_id" jsonschema:"ID of the agent"`
+	MessageID    int64  `json:"message_id" jsonschema:"ID of the message"`
+	SnoozedUntil string `json:"snoozed_until" jsonschema:"RFC3339 timestamp when the message should reappear"`
 }
 
 func (s *Server) handleSnoozeMessage(ctx context.Context,
@@ -302,8 +303,8 @@ func (s *Server) updateState(ctx context.Context, agentID, messageID int64,
 
 // SubscribeArgs are the arguments for the subscribe tool.
 type SubscribeArgs struct {
-	AgentID   int64  `json:"agent_id" jsonschema:"description=ID of the agent"`
-	TopicName string `json:"topic_name" jsonschema:"description=Name of the topic to subscribe to"`
+	AgentID   int64  `json:"agent_id" jsonschema:"ID of the agent"`
+	TopicName string `json:"topic_name" jsonschema:"Name of the topic to subscribe to"`
 }
 
 // SubscribeResult is the result of the subscribe tool.
@@ -339,8 +340,8 @@ func (s *Server) handleSubscribe(ctx context.Context,
 
 // UnsubscribeArgs are the arguments for the unsubscribe tool.
 type UnsubscribeArgs struct {
-	AgentID   int64  `json:"agent_id" jsonschema:"description=ID of the agent"`
-	TopicName string `json:"topic_name" jsonschema:"description=Name of the topic to unsubscribe from"`
+	AgentID   int64  `json:"agent_id" jsonschema:"ID of the agent"`
+	TopicName string `json:"topic_name" jsonschema:"Name of the topic to unsubscribe from"`
 }
 
 func (s *Server) handleUnsubscribe(ctx context.Context,
@@ -369,8 +370,8 @@ func (s *Server) handleUnsubscribe(ctx context.Context,
 
 // ListTopicsArgs are the arguments for the list_topics tool.
 type ListTopicsArgs struct {
-	AgentID        int64 `json:"agent_id,omitempty" jsonschema:"description=If set, only list topics the agent is subscribed to"`
-	SubscribedOnly bool  `json:"subscribed_only,omitempty" jsonschema:"description=Only show topics this agent is subscribed to"`
+	AgentID        int64 `json:"agent_id,omitempty" jsonschema:"If set, only list topics the agent is subscribed to"`
+	SubscribedOnly bool  `json:"subscribed_only,omitempty" jsonschema:"Only show topics this agent is subscribed to"`
 }
 
 // TopicInfo is information about a topic.
@@ -423,11 +424,11 @@ func (s *Server) handleListTopics(ctx context.Context,
 
 // PublishArgs are the arguments for the publish tool.
 type PublishArgs struct {
-	AgentID   int64  `json:"agent_id" jsonschema:"description=ID of the sending agent"`
-	TopicName string `json:"topic_name" jsonschema:"description=Name of the topic to publish to"`
-	Subject   string `json:"subject" jsonschema:"description=Message subject line"`
-	Body      string `json:"body" jsonschema:"description=Message body in markdown format"`
-	Priority  string `json:"priority,omitempty" jsonschema:"description=Priority: urgent, normal, or low,default=normal"`
+	AgentID   int64  `json:"agent_id" jsonschema:"ID of the sending agent"`
+	TopicName string `json:"topic_name" jsonschema:"Name of the topic to publish to"`
+	Subject   string `json:"subject" jsonschema:"Message subject line"`
+	Body      string `json:"body" jsonschema:"Message body in markdown format"`
+	Priority  string `json:"priority,omitempty" jsonschema:"Priority: urgent, normal, or low,default=normal"`
 }
 
 // PublishResult is the result of the publish tool.
@@ -471,9 +472,9 @@ func (s *Server) handlePublish(ctx context.Context,
 
 // SearchArgs are the arguments for the search tool.
 type SearchArgs struct {
-	AgentID int64  `json:"agent_id" jsonschema:"description=ID of the agent to search for"`
-	Query   string `json:"query" jsonschema:"description=Search query string"`
-	Limit   int    `json:"limit,omitempty" jsonschema:"description=Maximum number of results,default=20"`
+	AgentID int64  `json:"agent_id" jsonschema:"ID of the agent to search for"`
+	Query   string `json:"query" jsonschema:"Search query string"`
+	Limit   int    `json:"limit,omitempty" jsonschema:"Maximum number of results,default=20"`
 }
 
 // SearchResult is the result of the search tool.
@@ -512,7 +513,7 @@ func (s *Server) handleSearch(ctx context.Context,
 
 // GetStatusArgs are the arguments for the get_status tool.
 type GetStatusArgs struct {
-	AgentID int64 `json:"agent_id" jsonschema:"description=ID of the agent"`
+	AgentID int64 `json:"agent_id" jsonschema:"ID of the agent"`
 }
 
 // GetStatusResult is the result of the get_status tool.
@@ -551,22 +552,29 @@ func (s *Server) handleGetStatus(ctx context.Context,
 
 // PollChangesArgs are the arguments for the poll_changes tool.
 type PollChangesArgs struct {
-	AgentID      int64            `json:"agent_id" jsonschema:"description=ID of the agent"`
-	SinceOffsets map[int64]int64  `json:"since_offsets,omitempty" jsonschema:"description=Last seen offset per topic ID"`
+	AgentID      int64             `json:"agent_id" jsonschema:"ID of the agent"`
+	SinceOffsets map[string]int64  `json:"since_offsets,omitempty" jsonschema:"Last seen offset per topic ID (keys are topic IDs as strings)"`
 }
 
 // PollChangesResult is the result of the poll_changes tool.
 type PollChangesResult struct {
 	NewMessages []InboxMessageResult `json:"new_messages"`
-	NewOffsets  map[int64]int64      `json:"new_offsets"`
+	NewOffsets  map[string]int64     `json:"new_offsets"`
 }
 
 func (s *Server) handlePollChanges(ctx context.Context,
 	req *mcp.CallToolRequest, args PollChangesArgs) (*mcp.CallToolResult, PollChangesResult, error) {
 
-	sinceOffsets := args.SinceOffsets
-	if sinceOffsets == nil {
-		sinceOffsets = make(map[int64]int64)
+	// Convert string-keyed map to int64-keyed map for the mail service.
+	sinceOffsets := make(map[int64]int64)
+	for k, v := range args.SinceOffsets {
+		topicID, err := strconv.ParseInt(k, 10, 64)
+		if err != nil {
+			return nil, PollChangesResult{}, fmt.Errorf(
+				"invalid topic ID %q: %w", k, err,
+			)
+		}
+		sinceOffsets[topicID] = v
 	}
 
 	mailReq := mail.PollChangesRequest{
@@ -597,16 +605,22 @@ func (s *Server) handlePollChanges(ctx context.Context,
 		})
 	}
 
+	// Convert int64-keyed map to string-keyed map for JSON.
+	newOffsets := make(map[string]int64)
+	for k, v := range resp.NewOffsets {
+		newOffsets[strconv.FormatInt(k, 10)] = v
+	}
+
 	return nil, PollChangesResult{
 		NewMessages: messages,
-		NewOffsets:  resp.NewOffsets,
+		NewOffsets:  newOffsets,
 	}, nil
 }
 
 // RegisterAgentArgs are the arguments for the register_agent tool.
 type RegisterAgentArgs struct {
-	Name       string `json:"name" jsonschema:"description=Name for the new agent"`
-	ProjectKey string `json:"project_key,omitempty" jsonschema:"description=Optional project key to bind the agent to"`
+	Name       string `json:"name" jsonschema:"Name for the new agent"`
+	ProjectKey string `json:"project_key,omitempty" jsonschema:"Optional project key to bind the agent to"`
 }
 
 // RegisterAgentResult is the result of the register_agent tool.
@@ -631,7 +645,7 @@ func (s *Server) handleRegisterAgent(ctx context.Context,
 
 // WhoAmIArgs are the arguments for the whoami tool.
 type WhoAmIArgs struct {
-	AgentID int64 `json:"agent_id" jsonschema:"description=ID of the agent to look up"`
+	AgentID int64 `json:"agent_id" jsonschema:"ID of the agent to look up"`
 }
 
 // WhoAmIResult is the result of the whoami tool.

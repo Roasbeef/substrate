@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/roasbeef/subtrate/internal/agent"
+	"github.com/roasbeef/subtrate/internal/db/sqlc"
 )
 
 // PageData holds common data for page templates.
@@ -184,29 +185,50 @@ func (s *Server) handleIndex(w http.ResponseWriter, r *http.Request) {
 
 // handleInbox renders the inbox page.
 func (s *Server) handleInbox(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
 	category := r.URL.Query().Get("category")
 	if category == "" {
 		category = "primary"
 	}
 
-	// TODO: Get actual counts from store.
-	totalCount := 5
+	// Try to get first agent for default stats.
+	var agentID int64
+	agents, err := s.store.Queries().ListAgents(ctx)
+	if err == nil && len(agents) > 0 {
+		agentID = agents[0].ID
+	}
+
+	// Get real counts from store.
+	var unreadCount, urgentCount int64
+	if agentID > 0 {
+		unreadCount, _ = s.store.Queries().CountUnreadByAgent(ctx, agentID)
+		urgentCount, _ = s.store.Queries().CountUnreadUrgentByAgent(ctx, agentID)
+	}
+
+	// Count topics.
+	topics, _ := s.store.Queries().ListTopics(ctx)
+	topicsCount := len(topics)
+
+	// Count agents.
+	agentsCount := len(agents)
+
+	totalCount := int(unreadCount)
 	page := 1
 	pageSize := 50
 
 	data := PageData{
 		Title:       "Inbox",
 		ActiveNav:   "inbox",
-		UnreadCount: 5, // TODO: Get from store.
+		UnreadCount: int(unreadCount),
 		Category:    category,
 		Stats: &InboxStats{
-			Unread:       5,
-			Starred:      2,
-			Snoozed:      1,
-			Urgent:       1,
-			PrimaryCount: 5,
-			AgentsCount:  3,
-			TopicsCount:  2,
+			Unread:       int(unreadCount),
+			Starred:      0, // TODO: Add starred count query.
+			Snoozed:      0, // TODO: Add snoozed count query.
+			Urgent:       int(urgentCount),
+			PrimaryCount: int(unreadCount),
+			AgentsCount:  agentsCount,
+			TopicsCount:  topicsCount,
 		},
 		TotalCount: totalCount,
 		Page:       page,
@@ -221,14 +243,23 @@ func (s *Server) handleInbox(w http.ResponseWriter, r *http.Request) {
 
 // handleAgentsDashboard renders the agents dashboard page.
 func (s *Server) handleAgentsDashboard(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+
+	// Get real stats from heartbeat manager.
+	counts, err := s.heartbeatMgr.GetStatusCounts(ctx)
+	activeAgents := 0
+	if err == nil {
+		activeAgents = counts.Active + counts.Busy
+	}
+
 	data := PageData{
 		Title:     "Agent Dashboard",
 		ActiveNav: "agents",
 		AgentStats: &DashboardStats{
-			ActiveAgents:    3,
-			RunningSessions: 2,
-			PendingMessages: 7,
-			CompletedToday:  5,
+			ActiveAgents:    activeAgents,
+			RunningSessions: 0, // TODO: Track sessions in database.
+			PendingMessages: 0, // TODO: Aggregate from all agent inboxes.
+			CompletedToday:  0, // TODO: Track completed sessions.
 		},
 	}
 
@@ -244,74 +275,91 @@ func (s *Server) handleSessions(w http.ResponseWriter, r *http.Request) {
 
 // handleInboxMessages returns the message list partial.
 func (s *Server) handleInboxMessages(w http.ResponseWriter, r *http.Request) {
-	// Mock data for testing.
-	messages := []MessageView{
-		{
-			ID:             "1",
-			ThreadID:       "t1",
-			SenderName:     "backend-agent",
-			SenderInitials: "BA",
-			Subject:        "Implemented user authentication",
-			Body:           "I've completed the JWT authentication implementation. The changes include login, logout, and token refresh endpoints.",
-			State:          "unread",
-			IsStarred:      true,
-			IsImportant:    true,
+	ctx := r.Context()
+
+	// Get agent ID from query parameter, or try first registered agent.
+	agentIDStr := r.URL.Query().Get("agent_id")
+	var agentID int64
+
+	if agentIDStr != "" {
+		fmt.Sscanf(agentIDStr, "%d", &agentID)
+	} else {
+		// Try to get first agent as default for demo purposes.
+		agents, err := s.store.Queries().ListAgents(ctx)
+		if err == nil && len(agents) > 0 {
+			agentID = agents[0].ID
+		}
+	}
+
+	// If no agent ID, return empty list.
+	if agentID == 0 {
+		s.renderPartial(w, "message-list", MessagesListData{
+			Messages: nil,
+		})
+		return
+	}
+
+	// Fetch inbox messages from database.
+	dbMessages, err := s.store.Queries().GetInboxMessages(ctx, sqlc.GetInboxMessagesParams{
+		AgentID: agentID,
+		Limit:   50,
+	})
+	if err != nil {
+		// Return empty list on error.
+		s.renderPartial(w, "message-list", MessagesListData{
+			Messages: nil,
+		})
+		return
+	}
+
+	// Convert to view models.
+	messages := make([]MessageView, len(dbMessages))
+	for i, m := range dbMessages {
+		// Get sender name.
+		senderName := fmt.Sprintf("Agent#%d", m.SenderID)
+		sender, err := s.store.Queries().GetAgent(ctx, m.SenderID)
+		if err == nil {
+			senderName = sender.Name
+		}
+
+		// Generate initials from sender name.
+		initials := getInitials(senderName)
+
+		messages[i] = MessageView{
+			ID:             fmt.Sprintf("%d", m.ID),
+			ThreadID:       m.ThreadID,
+			SenderName:     senderName,
+			SenderInitials: initials,
+			Subject:        m.Subject,
+			Body:           m.BodyMd,
+			State:          m.State,
+			IsStarred:      m.State == "starred",
+			IsImportant:    m.Priority == "urgent",
 			IsAgent:        true,
-			CreatedAt:      time.Now().Add(-30 * time.Minute),
-		},
-		{
-			ID:             "2",
-			ThreadID:       "t2",
-			SenderName:     "test-writer",
-			SenderInitials: "TW",
-			Subject:        "Added unit tests for auth module",
-			Body:           "Test coverage is now at 87% for the authentication module. All edge cases covered.",
-			State:          "unread",
-			IsAgent:        true,
-			CreatedAt:      time.Now().Add(-2 * time.Hour),
-		},
-		{
-			ID:             "3",
-			ThreadID:       "t3",
-			SenderName:     "code-reviewer",
-			SenderInitials: "CR",
-			Subject:        "Review: PR #42 - Database optimization",
-			Body:           "Found a few issues with the query optimization. See detailed comments below.",
-			State:          "read",
-			IsAgent:        true,
-			Labels:         []string{"review"},
-			CreatedAt:      time.Now().Add(-5 * time.Hour),
-		},
-		{
-			ID:             "4",
-			ThreadID:       "t4",
-			SenderName:     "security-auditor",
-			SenderInitials: "SA",
-			Subject:        "Security scan completed",
-			Body:           "No critical vulnerabilities found. Two medium-severity issues flagged for review.",
-			State:          "read",
-			IsImportant:    true,
-			IsAgent:        true,
-			Labels:         []string{"security"},
-			CreatedAt:      time.Now().Add(-24 * time.Hour),
-		},
-		{
-			ID:               "5",
-			ThreadID:         "t5",
-			SenderName:       "refactor-agent",
-			SenderInitials:   "RA",
-			Subject:          "Code cleanup proposal",
-			Body:             "Proposing to consolidate duplicate helper functions across packages.",
-			State:            "read",
-			IsAgent:          true,
-			ParticipantCount: 2,
-			CreatedAt:        time.Now().Add(-48 * time.Hour),
-		},
+			CreatedAt:      time.Unix(m.CreatedAt, 0),
+		}
 	}
 
 	s.renderPartial(w, "message-list", MessagesListData{
 		Messages: messages,
 	})
+}
+
+// getInitials returns the initials from a name (e.g., "backend-agent" -> "BA").
+func getInitials(name string) string {
+	parts := strings.FieldsFunc(name, func(r rune) bool {
+		return r == '-' || r == '_' || r == ' '
+	})
+	if len(parts) == 0 {
+		return "?"
+	}
+	if len(parts) == 1 {
+		if len(parts[0]) >= 2 {
+			return strings.ToUpper(parts[0][:2])
+		}
+		return strings.ToUpper(parts[0])
+	}
+	return strings.ToUpper(string(parts[0][0]) + string(parts[1][0]))
 }
 
 // handleCompose returns the compose modal partial.
@@ -321,30 +369,68 @@ func (s *Server) handleCompose(w http.ResponseWriter, r *http.Request) {
 
 // handleThread returns the thread view partial.
 func (s *Server) handleThread(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
 	threadID := strings.TrimPrefix(r.URL.Path, "/thread/")
 
-	// Mock thread data.
+	// Fetch messages in this thread from database.
+	dbMessages, err := s.store.Queries().GetMessagesByThread(ctx, threadID)
+	if err != nil || len(dbMessages) == 0 {
+		// Return empty thread view if not found.
+		s.renderPartial(w, "thread-view", ThreadView{
+			ID:       threadID,
+			ThreadID: threadID,
+			Subject:  "Thread not found",
+			Messages: nil,
+		})
+		return
+	}
+
+	// Convert to thread messages.
+	threadMessages := make([]ThreadMessage, len(dbMessages))
+	subject := ""
+	for i, m := range dbMessages {
+		// Use first message subject as thread subject.
+		if i == 0 {
+			subject = m.Subject
+		}
+
+		// Get sender name.
+		senderName := fmt.Sprintf("Agent#%d", m.SenderID)
+		sender, err := s.store.Queries().GetAgent(ctx, m.SenderID)
+		if err == nil {
+			senderName = sender.Name
+		}
+
+		// Get avatar initial.
+		avatar := "?"
+		if len(senderName) > 0 {
+			avatar = strings.ToUpper(string(senderName[0]))
+		}
+
+		threadMessages[i] = ThreadMessage{
+			ID:           fmt.Sprintf("%d", m.ID),
+			SenderName:   senderName,
+			SenderAvatar: avatar,
+			Body:         m.BodyMd,
+			State:        "read", // TODO: Get actual state from recipient.
+			CreatedAt:    time.Unix(m.CreatedAt, 0),
+		}
+
+		// Check for deadline.
+		if m.DeadlineAt.Valid {
+			threadMessages[i].Deadline = time.Unix(m.DeadlineAt.Int64, 0)
+		}
+	}
+
 	thread := ThreadView{
 		ID:            threadID,
-		ThreadID:      threadID, // Alias for templates.
-		Subject:       "Implemented user authentication",
-		Labels:        []string{"feature"},
-		TopicName:     "",
+		ThreadID:      threadID,
+		Subject:       subject,
+		Messages:      threadMessages,
 		MessageIndex:  1,
-		TotalMessages: 1,
+		TotalMessages: len(threadMessages),
 		HasPrev:       false,
-		HasNext:       true,
-		Messages: []ThreadMessage{
-			{
-				ID:           "1",
-				SenderName:   "backend-agent",
-				SenderAvatar: "B",
-				Body:         "I've completed the JWT authentication implementation.\n\nThe changes include:\n- Login endpoint at POST /api/auth/login\n- Logout endpoint at POST /api/auth/logout\n- Token refresh at POST /api/auth/refresh\n\nAll endpoints are tested and documented.",
-				State:        "read",
-				CreatedAt:    time.Now().Add(-30 * time.Minute),
-				IsStarred:    true,
-			},
-		},
+		HasNext:       len(threadMessages) > 1,
 	}
 
 	s.renderPartial(w, "thread-view", thread)
@@ -362,33 +448,61 @@ func (s *Server) handleNewSessionModal(w http.ResponseWriter, r *http.Request) {
 
 // handleAPIStatus returns the status partial.
 func (s *Server) handleAPIStatus(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+
+	// Try to get first agent for status.
+	var agentName string = "no agents"
+	var unreadCount, urgentCount int64
+
+	agents, err := s.store.Queries().ListAgents(ctx)
+	if err == nil && len(agents) > 0 {
+		agentName = agents[0].Name
+		unreadCount, _ = s.store.Queries().CountUnreadByAgent(ctx, agents[0].ID)
+		urgentCount, _ = s.store.Queries().CountUnreadUrgentByAgent(ctx, agents[0].ID)
+	}
+
 	status := StatusView{
-		AgentName:   "primary",
-		UnreadCount: 5,
-		UrgentCount: 1,
+		AgentName:   agentName,
+		UnreadCount: int(unreadCount),
+		UrgentCount: int(urgentCount),
 	}
 	s.renderPartial(w, "status", status)
 }
 
 // handleAPITopics returns the topics list partial.
 func (s *Server) handleAPITopics(w http.ResponseWriter, r *http.Request) {
-	topics := []TopicView{
-		{ID: "1", Name: "builds", TopicType: "broadcast", UnreadCount: 3},
-		{ID: "2", Name: "deployments", TopicType: "broadcast", UnreadCount: 0},
-		{ID: "3", Name: "alerts", TopicType: "broadcast", UnreadCount: 1},
+	ctx := r.Context()
+
+	// Fetch topics from database.
+	dbTopics, err := s.store.Queries().ListTopics(ctx)
+	if err != nil {
+		// Return empty list on error.
+		s.renderPartial(w, "topics-list", TopicsListData{Topics: nil})
+		return
 	}
+
+	topics := make([]TopicView, len(dbTopics))
+	for i, t := range dbTopics {
+		topics[i] = TopicView{
+			ID:          fmt.Sprintf("%d", t.ID),
+			Name:        t.Name,
+			TopicType:   t.TopicType,
+			UnreadCount: 0, // TODO: Calculate unread count per topic.
+		}
+	}
+
 	s.renderPartial(w, "topics-list", TopicsListData{Topics: topics})
 }
 
 // handleAPIAgents returns the agents list partial.
 func (s *Server) handleAPIAgents(w http.ResponseWriter, r *http.Request) {
-	agents := s.getMockAgents()
+	agents := s.getAgentsFromHeartbeat()
 	s.renderPartial(w, "agents-list", AgentsListData{Agents: agents})
 }
 
 // handleAPIAgentsSidebar returns the sidebar agents partial.
 func (s *Server) handleAPIAgentsSidebar(w http.ResponseWriter, r *http.Request) {
-	agents := s.getMockAgents()
+	agents := s.getAgentsFromHeartbeat()
 
 	var html strings.Builder
 	for _, agent := range agents {
@@ -401,7 +515,7 @@ func (s *Server) handleAPIAgentsSidebar(w http.ResponseWriter, r *http.Request) 
 // handleAPIAgentsCards returns the agent cards partial.
 func (s *Server) handleAPIAgentsCards(w http.ResponseWriter, r *http.Request) {
 	filter := r.URL.Query().Get("filter")
-	agents := s.getMockAgents()
+	agents := s.getAgentsFromHeartbeat()
 
 	// Filter agents if requested.
 	if filter != "" && filter != "all" {
@@ -426,88 +540,40 @@ func (s *Server) handleAPIAgentsCards(w http.ResponseWriter, r *http.Request) {
 
 // handleAPIActivity returns the activity feed partial.
 func (s *Server) handleAPIActivity(w http.ResponseWriter, r *http.Request) {
-	activities := []ActivityView{
-		{
-			ID:          "a1",
-			AgentName:   "backend-agent",
-			SessionID:   "s1",
-			Type:        "commit",
-			Description: "Added JWT token validation middleware",
-			File:        "internal/auth/middleware.go",
-			Line:        45,
-			Timestamp:   time.Now().Add(-5 * time.Minute),
-		},
-		{
-			ID:          "a2",
-			AgentName:   "test-writer",
-			SessionID:   "s2",
-			Type:        "session_start",
-			Description: "Started session: Write unit tests for auth module",
-			Timestamp:   time.Now().Add(-15 * time.Minute),
-		},
-		{
-			ID:          "a3",
-			AgentName:   "backend-agent",
-			SessionID:   "s1",
-			Type:        "decision",
-			Description: "Using RS256 for JWT signing (more secure than HS256)",
-			Timestamp:   time.Now().Add(-25 * time.Minute),
-		},
-		{
-			ID:          "a4",
-			AgentName:   "code-reviewer",
-			Type:        "message",
-			Description: "Posted review comments on PR #42",
-			Timestamp:   time.Now().Add(-1 * time.Hour),
-		},
-		{
-			ID:          "a5",
-			AgentName:   "security-auditor",
-			Type:        "session_complete",
-			Description: "Completed security scan - no critical issues",
-			Timestamp:   time.Now().Add(-2 * time.Hour),
-		},
-	}
+	// TODO: Implement activity tracking in database.
+	// For now, return empty activity feed.
+	var activities []ActivityView
 
 	var html strings.Builder
 	for _, activity := range activities {
 		s.partials.ExecuteTemplate(&html, "activity-item", activity)
 	}
+
+	// If no activities, return a placeholder message.
+	if len(activities) == 0 {
+		html.WriteString(`<div class="p-4 text-gray-500 text-sm">No recent activity</div>`)
+	}
+
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	w.Write([]byte(html.String()))
 }
 
 // handleAPIActiveSessions returns the active sessions partial.
 func (s *Server) handleAPIActiveSessions(w http.ResponseWriter, r *http.Request) {
-	sessions := []SessionView{
-		{
-			ID:             "s1",
-			AgentName:      "backend-agent",
-			Goal:           "Implement user authentication with JWT",
-			Status:         "active",
-			CurrentStep:    "Writing documentation",
-			CompletedSteps: 4,
-			TotalSteps:     5,
-			ProgressPct:    80,
-			StartedAt:      time.Now().Add(-45 * time.Minute),
-		},
-		{
-			ID:             "s2",
-			AgentName:      "test-writer",
-			Goal:           "Write unit tests for auth module",
-			Status:         "active",
-			CurrentStep:    "Testing edge cases",
-			CompletedSteps: 2,
-			TotalSteps:     4,
-			ProgressPct:    50,
-			StartedAt:      time.Now().Add(-15 * time.Minute),
-		},
-	}
+	// TODO: Implement session tracking in database.
+	// For now, return empty sessions list.
+	var sessions []SessionView
 
 	var html strings.Builder
 	for _, session := range sessions {
 		s.partials.ExecuteTemplate(&html, "session-row", session)
 	}
+
+	// If no sessions, return a placeholder message.
+	if len(sessions) == 0 {
+		html.WriteString(`<tr><td colspan="4" class="p-4 text-gray-500 text-sm text-center">No active sessions</td></tr>`)
+	}
+
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	w.Write([]byte(html.String()))
 }
@@ -564,62 +630,6 @@ func (s *Server) handleSSEInbox(w http.ResponseWriter, r *http.Request) {
 	// - "unread-count" events with updated count
 	<-r.Context().Done()
 	_ = flusher // Use flusher when we have real events.
-}
-
-// getMockAgents returns mock agent data for testing.
-func (s *Server) getMockAgents() []AgentView {
-	return []AgentView{
-		{
-			ID:             "agent-1",
-			Name:           "backend-agent",
-			Type:           "claude-code",
-			Status:         "busy",
-			Description:    "General-purpose backend development",
-			Tags:           []string{"go", "backend", "api"},
-			LastActivityAt: time.Now().Add(-5 * time.Minute),
-			LastAction:     "Committed auth middleware",
-			CurrentSession: &SessionView{
-				ID:          "s1",
-				Goal:        "Implement JWT authentication",
-				ProgressPct: 80,
-			},
-		},
-		{
-			ID:             "agent-2",
-			Name:           "test-writer",
-			Type:           "test-writer",
-			Status:         "active",
-			Description:    "Writes comprehensive test suites",
-			Tags:           []string{"testing", "go"},
-			LastActivityAt: time.Now().Add(-2 * time.Minute),
-			LastAction:     "Added edge case tests",
-			CurrentSession: &SessionView{
-				ID:          "s2",
-				Goal:        "Write unit tests for auth",
-				ProgressPct: 50,
-			},
-		},
-		{
-			ID:             "agent-3",
-			Name:           "code-reviewer",
-			Type:           "code-review",
-			Status:         "idle",
-			Description:    "Reviews PRs and suggests improvements",
-			Tags:           []string{"review", "quality"},
-			LastActivityAt: time.Now().Add(-1 * time.Hour),
-			LastAction:     "Reviewed PR #42",
-		},
-		{
-			ID:             "agent-4",
-			Name:           "security-auditor",
-			Type:           "security",
-			Status:         "idle",
-			Description:    "Security vulnerability scanning",
-			Tags:           []string{"security", "audit"},
-			LastActivityAt: time.Now().Add(-2 * time.Hour),
-			LastAction:     "Completed security scan",
-		},
-	}
 }
 
 // render renders a full page template.
@@ -751,15 +761,14 @@ func (s *Server) handleAPIAgentsStatus(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(resp)
 }
 
-// getAgentsFromHeartbeat returns agents with real status data when available,
-// otherwise falls back to mock data.
+// getAgentsFromHeartbeat returns agents with real status data from the
+// heartbeat manager. Returns empty list if no agents exist.
 func (s *Server) getAgentsFromHeartbeat() []AgentView {
 	ctx := context.Background()
 
 	agents, err := s.heartbeatMgr.ListAgentsWithStatus(ctx)
-	if err != nil || len(agents) == 0 {
-		// Fall back to mock data if no real agents exist.
-		return s.getMockAgents()
+	if err != nil {
+		return nil
 	}
 
 	result := make([]AgentView, len(agents))
