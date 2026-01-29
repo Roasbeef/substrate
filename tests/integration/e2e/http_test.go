@@ -246,7 +246,7 @@ func TestHTTP_IndexPage(t *testing.T) {
 	require.Equal(t, http.StatusOK, resp.StatusCode)
 
 	body := readBody(t, resp)
-	require.Contains(t, body, "Subtrate")
+	require.Contains(t, body, "Substrate")
 }
 
 // TestHTTP_InboxPage tests the inbox page.

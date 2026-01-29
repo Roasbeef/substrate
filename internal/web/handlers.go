@@ -1391,9 +1391,62 @@ func (s *Server) handleSSEAgents(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Keep connection alive until client disconnects.
-	<-r.Context().Done()
-	_ = flusher // Use flusher when we have real events.
+	ctx := r.Context()
+	ticker := time.NewTicker(5 * time.Second)
+	defer ticker.Stop()
+
+	// Send initial agent status.
+	s.sendAgentStatusEvent(w, flusher)
+
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-ticker.C:
+			s.sendAgentStatusEvent(w, flusher)
+		}
+	}
+}
+
+// sendAgentStatusEvent sends an SSE event with current agent statuses.
+func (s *Server) sendAgentStatusEvent(w http.ResponseWriter, flusher http.Flusher) {
+	ctx := context.Background()
+	agents, err := s.store.Queries().ListAgents(ctx)
+	if err != nil {
+		return
+	}
+
+	var html strings.Builder
+	for _, agent := range agents {
+		if agent.Name == UserAgentName {
+			continue
+		}
+		status := s.heartbeatMgr.ComputeStatus(&agent)
+		html.WriteString(fmt.Sprintf(
+			`<div class="flex items-center gap-2" id="agent-status-%d">
+				<span class="w-2 h-2 rounded-full %s"></span>
+				<span class="text-sm">%s</span>
+			</div>`,
+			agent.ID, statusColor(string(status)), agent.Name,
+		))
+	}
+
+	fmt.Fprintf(w, "event: agent-update\ndata: %s\n\n", strings.ReplaceAll(html.String(), "\n", ""))
+	flusher.Flush()
+}
+
+// statusColor returns the CSS class for an agent status color.
+func statusColor(status string) string {
+	switch status {
+	case "active":
+		return "bg-green-500"
+	case "busy":
+		return "bg-yellow-500"
+	case "idle":
+		return "bg-gray-400"
+	default:
+		return "bg-red-500"
+	}
 }
 
 // handleSSEActivity streams activity updates via SSE.
@@ -1408,9 +1461,94 @@ func (s *Server) handleSSEActivity(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Keep connection alive until client disconnects.
-	<-r.Context().Done()
-	_ = flusher // Use flusher when we have real events.
+	ctx := r.Context()
+	ticker := time.NewTicker(10 * time.Second)
+	defer ticker.Stop()
+
+	var lastActivityID int64
+
+	// Send initial activities.
+	lastActivityID = s.sendActivityEvent(w, flusher, lastActivityID)
+
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-ticker.C:
+			lastActivityID = s.sendActivityEvent(w, flusher, lastActivityID)
+		}
+	}
+}
+
+// sendActivityEvent sends an SSE event with new activities since lastID.
+func (s *Server) sendActivityEvent(w http.ResponseWriter, flusher http.Flusher, lastID int64) int64 {
+	ctx := context.Background()
+	activities, err := s.store.Queries().ListRecentActivities(ctx, 10)
+	if err != nil || len(activities) == 0 {
+		return lastID
+	}
+
+	// Find new activities.
+	var newActivities []sqlc.Activity
+	for _, act := range activities {
+		if act.ID > lastID {
+			newActivities = append(newActivities, act)
+		}
+	}
+
+	if len(newActivities) == 0 {
+		return lastID
+	}
+
+	// Build HTML for new activities.
+	var html strings.Builder
+	for _, act := range newActivities {
+		agentName := fmt.Sprintf("Agent#%d", act.AgentID)
+		if agent, err := s.store.Queries().GetAgent(ctx, act.AgentID); err == nil {
+			agentName = agent.Name
+		}
+
+		icon := activityIcon(act.ActivityType)
+		timeAgo := formatTimeAgo(time.Unix(act.CreatedAt, 0))
+
+		html.WriteString(fmt.Sprintf(
+			`<div class="flex items-start gap-3 p-3 border-b border-gray-100">
+				<div class="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center text-blue-600">%s</div>
+				<div class="flex-1">
+					<p class="text-sm"><strong>%s</strong> %s</p>
+					<p class="text-xs text-gray-500">%s</p>
+				</div>
+			</div>`,
+			icon, agentName, act.Description, timeAgo,
+		))
+	}
+
+	fmt.Fprintf(w, "event: activity-update\ndata: %s\n\n", strings.ReplaceAll(html.String(), "\n", ""))
+	flusher.Flush()
+
+	return activities[0].ID // Return the highest ID.
+}
+
+// activityIcon returns an icon for an activity type.
+func activityIcon(activityType string) string {
+	switch activityType {
+	case "commit":
+		return "📝"
+	case "message":
+		return "✉️"
+	case "session_start":
+		return "🚀"
+	case "session_complete":
+		return "✅"
+	case "decision":
+		return "⚖️"
+	case "error":
+		return "❌"
+	case "blocker":
+		return "🚧"
+	default:
+		return "📌"
+	}
 }
 
 // handleSSEInbox streams inbox updates via SSE.
@@ -1425,12 +1563,133 @@ func (s *Server) handleSSEInbox(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Keep connection alive until client disconnects.
-	// TODO: Subscribe to mail service notifications and emit:
-	// - "new-message" events with message HTML
-	// - "unread-count" events with updated count
-	<-r.Context().Done()
-	_ = flusher // Use flusher when we have real events.
+	ctx := r.Context()
+	ticker := time.NewTicker(5 * time.Second)
+	defer ticker.Stop()
+
+	var lastMessageID int64
+
+	// Get agent ID from query param or use first available agent.
+	agentIDStr := r.URL.Query().Get("agent_id")
+	var agentID int64
+	if agentIDStr != "" {
+		agentID, _ = strconv.ParseInt(agentIDStr, 10, 64)
+	} else {
+		// Use first non-User agent.
+		agents, _ := s.store.Queries().ListAgents(ctx)
+		for _, a := range agents {
+			if a.Name != UserAgentName {
+				agentID = a.ID
+				break
+			}
+		}
+	}
+
+	// Send initial unread count.
+	s.sendInboxCountEvent(w, flusher, agentID)
+
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-ticker.C:
+			lastMessageID = s.sendNewMessagesEvent(w, flusher, agentID, lastMessageID)
+			s.sendInboxCountEvent(w, flusher, agentID)
+		}
+	}
+}
+
+// sendInboxCountEvent sends an SSE event with unread message count.
+func (s *Server) sendInboxCountEvent(w http.ResponseWriter, flusher http.Flusher, agentID int64) {
+	ctx := context.Background()
+	count, err := s.store.Queries().CountUnreadByAgent(ctx, agentID)
+	if err != nil {
+		return
+	}
+
+	fmt.Fprintf(w, "event: unread-count\ndata: %d\n\n", count)
+	flusher.Flush()
+}
+
+// sendNewMessagesEvent sends an SSE event with new messages since lastID.
+func (s *Server) sendNewMessagesEvent(w http.ResponseWriter, flusher http.Flusher, agentID int64, lastID int64) int64 {
+	ctx := context.Background()
+	messages, err := s.store.Queries().GetInboxMessages(ctx, sqlc.GetInboxMessagesParams{
+		AgentID: agentID,
+		Limit:   10,
+	})
+	if err != nil || len(messages) == 0 {
+		return lastID
+	}
+
+	// Find new messages (iterate in reverse to get oldest first for insertion).
+	var newMsgs []sqlc.GetInboxMessagesRow
+	for i := len(messages) - 1; i >= 0; i-- {
+		if messages[i].ID > lastID {
+			newMsgs = append(newMsgs, messages[i])
+		}
+	}
+
+	if len(newMsgs) == 0 {
+		return lastID
+	}
+
+	// Build HTML for each new message.
+	var html strings.Builder
+	for _, m := range newMsgs {
+		// Get sender name.
+		senderName := "Unknown"
+		if sender, err := s.store.Queries().GetAgent(ctx, m.SenderID); err == nil {
+			senderName = sender.Name
+		}
+
+		// Format time.
+		msgTime := time.Unix(m.CreatedAt, 0)
+		timeAgo := formatTimeAgo(msgTime)
+
+		// Build class list.
+		class := "message-card"
+		if m.State == "unread" {
+			class += " unread"
+		}
+
+		// Truncate body preview.
+		preview := m.BodyMd
+		if len(preview) > 100 {
+			preview = preview[:100] + "..."
+		}
+
+		// Priority badge.
+		priorityBadge := ""
+		if m.Priority == "urgent" {
+			priorityBadge = `<span class="priority-badge urgent">Urgent</span>`
+		}
+
+		html.WriteString(fmt.Sprintf(
+			`<div id="message-%d" class="%s" hx-get="/thread/%s" hx-target="#modal-container" hx-swap="innerHTML">
+				<div class="message-avatar">%s</div>
+				<div class="message-content">
+					<div class="message-header">
+						<span class="message-sender">%s</span>
+						%s
+						<span class="message-time">%s</span>
+					</div>
+					<div class="message-subject">%s</div>
+					<div class="message-preview">%s</div>
+				</div>
+			</div>`,
+			m.ID, class, m.ThreadID,
+			string([]rune(senderName)[0:1]),
+			senderName, priorityBadge, timeAgo,
+			m.Subject, preview,
+		))
+	}
+
+	// Send as SSE event.
+	fmt.Fprintf(w, "event: new-message\ndata: %s\n\n", strings.ReplaceAll(html.String(), "\n", ""))
+	flusher.Flush()
+
+	return messages[0].ID
 }
 
 // render renders a full page template.
