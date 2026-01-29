@@ -500,11 +500,11 @@
             </div>
         </div>
 
-        <!-- Message List -->
+        <!-- Message List - SSE triggers refresh, morph prevents flicker -->
         <div id="message-list"
              hx-get="{{if .MessagesEndpoint}}{{.MessagesEndpoint}}{{else}}/inbox/messages{{end}}{{if .Category}}?category={{.Category}}{{end}}"
-             hx-trigger="load"
-             hx-swap="innerHTML">
+             hx-trigger="load, refresh"
+             hx-swap="morph:innerHTML">
             <div class="p-8 text-center text-gray-500">
                 <svg class="animate-spin w-6 h-6 mx-auto mb-2" fill="none" viewBox="0 0 24 24">
                     <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/>
@@ -516,9 +516,8 @@
     </div>
 </div>
 
-<!-- Real-time updates via SSE -->
+<!-- SSE for real-time updates - JavaScript handles new-message events to trigger refresh -->
 <div hx-ext="sse" sse-connect="/events/inbox" class="hidden">
-    <div sse-swap="new-message" hx-swap="afterbegin" hx-target="#message-list"></div>
     <div sse-swap="unread-count" hx-swap="innerHTML" hx-target="#stat-unread"></div>
 </div>
 {{end}}

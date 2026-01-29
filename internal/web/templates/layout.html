@@ -19,7 +19,7 @@
 
     {{block "head" .}}{{end}}
 </head>
-<body hx-boost="true" class="bg-gray-50 min-h-screen">
+<body hx-boost="true" hx-ext="morph" class="bg-gray-50 min-h-screen">
     <!-- Top Navigation Bar -->
     <header class="bg-white border-b border-gray-200 fixed top-0 left-0 right-0 z-50">
         <div class="flex items-center justify-between px-4 h-14">
@@ -86,7 +86,7 @@
                                shadow-md hover:bg-blue-700 hover:shadow-lg transition-all mb-6"
                         hx-get="/compose"
                         hx-target="#modal-container"
-                        hx-swap="innerHTML">
+                        hx-swap="morph:innerHTML">
                     <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
                     </svg>
@@ -97,6 +97,12 @@
                 <ul class="space-y-1">
                     <li>
                         <a href="/inbox"
+                           hx-get="/inbox"
+                           hx-target="#main-content"
+                           hx-swap="innerHTML"
+                           hx-select="#main-content > *"
+                           hx-push-url="true"
+                           onclick="document.getElementById('modal-container').innerHTML = ''"
                            class="flex items-center gap-3 px-4 py-2 text-gray-700 rounded-lg
                                   hover:bg-gray-100 {{if eq .ActiveNav "inbox"}}bg-blue-50 text-blue-700 font-medium{{end}}">
                             <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -113,6 +119,12 @@
                     </li>
                     <li>
                         <a href="/starred"
+                           hx-get="/starred"
+                           hx-target="#main-content"
+                           hx-swap="innerHTML"
+                           hx-select="#main-content > *"
+                           hx-push-url="true"
+                           onclick="document.getElementById('modal-container').innerHTML = ''"
                            class="flex items-center gap-3 px-4 py-2 text-gray-700 rounded-lg
                                   hover:bg-gray-100 {{if eq .ActiveNav "starred"}}bg-blue-50 text-blue-700 font-medium{{end}}">
                             <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -124,6 +136,12 @@
                     </li>
                     <li>
                         <a href="/snoozed"
+                           hx-get="/snoozed"
+                           hx-target="#main-content"
+                           hx-swap="innerHTML"
+                           hx-select="#main-content > *"
+                           hx-push-url="true"
+                           onclick="document.getElementById('modal-container').innerHTML = ''"
                            class="flex items-center gap-3 px-4 py-2 text-gray-700 rounded-lg
                                   hover:bg-gray-100 {{if eq .ActiveNav "snoozed"}}bg-blue-50 text-blue-700 font-medium{{end}}">
                             <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -135,6 +153,12 @@
                     </li>
                     <li>
                         <a href="/sent"
+                           hx-get="/sent"
+                           hx-target="#main-content"
+                           hx-swap="innerHTML"
+                           hx-select="#main-content > *"
+                           hx-push-url="true"
+                           onclick="document.getElementById('modal-container').innerHTML = ''"
                            class="flex items-center gap-3 px-4 py-2 text-gray-700 rounded-lg
                                   hover:bg-gray-100 {{if eq .ActiveNav "sent"}}bg-blue-50 text-blue-700 font-medium{{end}}">
                             <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -146,6 +170,12 @@
                     </li>
                     <li>
                         <a href="/archive"
+                           hx-get="/archive"
+                           hx-target="#main-content"
+                           hx-swap="innerHTML"
+                           hx-select="#main-content > *"
+                           hx-push-url="true"
+                           onclick="document.getElementById('modal-container').innerHTML = ''"
                            class="flex items-center gap-3 px-4 py-2 text-gray-700 rounded-lg
                                   hover:bg-gray-100 {{if eq .ActiveNav "archive"}}bg-blue-50 text-blue-700 font-medium{{end}}">
                             <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -187,14 +217,17 @@
                     </div>
                     <div id="agents-list"
                          hx-get="/api/agents/sidebar"
-                         hx-trigger="load, every 10s"
-                         hx-ext="sse"
-                         sse-connect="/events/agents"
-                         sse-swap="agent-update"
+                         hx-trigger="load, every 30s"
+                         hx-swap="morph:innerHTML"
                          class="space-y-1">
                         <!-- Agents loaded via HTMX with live updates -->
                     </div>
                     <a href="/agents"
+                       hx-get="/agents"
+                       hx-target="#main-content"
+                       hx-swap="morph:innerHTML"
+                       hx-select="#main-content"
+                       hx-push-url="true"
                        class="flex items-center gap-2 px-4 py-2 mt-2 text-sm text-blue-600 hover:bg-blue-50 rounded-lg">
                         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
@@ -207,7 +240,7 @@
         </aside>
 
         <!-- Main Content Area -->
-        <main class="ml-64 flex-1 min-h-screen">
+        <main id="main-content" class="ml-64 flex-1 min-h-screen">
             {{template "content" .}}
         </main>
     </div>

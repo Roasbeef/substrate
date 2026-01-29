@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
+	"log"
 	"net/http"
 	"strconv"
 	"strings"
@@ -832,21 +833,22 @@ func (s *Server) handleTopicView(w http.ResponseWriter, r *http.Request) {
     <script src="https://cdn.tailwindcss.com"></script>
 </head>
 <body class="bg-gray-50">
-    <div class="max-w-4xl mx-auto p-6">
-        <div class="mb-6">
-            <a href="/inbox" class="text-blue-600 hover:underline">← Back to Inbox</a>
-        </div>
-        <div class="bg-white rounded-lg shadow p-6">
-            <div class="flex items-center justify-between mb-4">
-                <div>
-                    <h1 class="text-2xl font-bold">%s</h1>
-                    <p class="text-gray-500">Type: %s</p>
-                </div>
-                <span class="px-3 py-1 bg-blue-100 text-blue-700 rounded-full text-sm">%d messages</span>
+    <main id="main-content" class="ml-64 flex-1 min-h-screen">
+        <div class="max-w-4xl mx-auto p-6">
+            <div class="mb-6">
+                <a href="/inbox" class="text-blue-600 hover:underline">← Back to Inbox</a>
             </div>
-            <div class="border-t pt-4">
-                <h2 class="font-semibold mb-2">Subscribers (%d)</h2>
-                <div class="flex flex-wrap gap-2 mb-4">`, topicName, topicName, topic.TopicType, len(messages), len(subscribers))
+            <div class="bg-white rounded-lg shadow p-6">
+                <div class="flex items-center justify-between mb-4">
+                    <div>
+                        <h1 class="text-2xl font-bold">%s</h1>
+                        <p class="text-gray-500">Type: %s</p>
+                    </div>
+                    <span class="px-3 py-1 bg-blue-100 text-blue-700 rounded-full text-sm">%d messages</span>
+                </div>
+                <div class="border-t pt-4">
+                    <h2 class="font-semibold mb-2">Subscribers (%d)</h2>
+                    <div class="flex flex-wrap gap-2 mb-4">`, topicName, topicName, topic.TopicType, len(messages), len(subscribers))
 
 	for _, sub := range subscribers {
 		fmt.Fprintf(w, `<span class="px-2 py-1 bg-gray-100 rounded text-sm">%s</span>`, sub.Name)
@@ -874,9 +876,10 @@ func (s *Server) handleTopicView(w http.ResponseWriter, r *http.Request) {
 	}
 
 	fmt.Fprintf(w, `</div>
+                </div>
             </div>
         </div>
-    </div>
+    </main>
 </body>
 </html>`)
 }
@@ -971,8 +974,8 @@ func (s *Server) handleSettings(w http.ResponseWriter, r *http.Request) {
 <html>
 <head>
     <title>Settings - Substrate</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <script src="https://unpkg.com/htmx.org@1.9.10"></script>
+    <link rel="stylesheet" href="/static/css/main.css">
+    <script src="/static/js/vendor/htmx.min.js"></script>
 </head>
 <body class="bg-gray-50">
     <div class="max-w-4xl mx-auto p-6">
@@ -1094,10 +1097,15 @@ func (s *Server) handleSettings(w http.ResponseWriter, r *http.Request) {
                         <span class="font-medium">Desktop Notifications</span>
                         <p class="text-sm text-gray-500">Show browser notifications</p>
                     </div>
-                    <label class="relative inline-flex items-center cursor-pointer">
-                        <input type="checkbox" class="sr-only peer" checked>
-                        <div class="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
-                    </label>
+                    <div class="flex items-center gap-3">
+                        <button onclick="testNotification()" class="px-3 py-1 text-sm bg-blue-100 text-blue-700 rounded hover:bg-blue-200">
+                            Test
+                        </button>
+                        <label class="relative inline-flex items-center cursor-pointer">
+                            <input type="checkbox" id="desktop-notifications-toggle" class="sr-only peer" onchange="toggleDesktopNotifications(this)">
+                            <div class="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
+                        </label>
+                    </div>
                 </div>
                 <div class="flex items-center justify-between">
                     <div>
@@ -1142,6 +1150,8 @@ func (s *Server) handleSettings(w http.ResponseWriter, r *http.Request) {
             </button>
         </div>
     </div>
+
+    <script src="/static/js/main.js"></script>
 </body>
 </html>`, len(agents)-1, len(topics))
 }
@@ -1322,6 +1332,89 @@ func (s *Server) handleAPIActiveSessions(w http.ResponseWriter, r *http.Request)
 	w.Write([]byte(html.String()))
 }
 
+// handleAPISessionCreate creates a new session for an agent.
+func (s *Server) handleAPISessionCreate(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	// Parse form data.
+	if err := r.ParseForm(); err != nil {
+		http.Error(w, "Invalid form data", http.StatusBadRequest)
+		return
+	}
+
+	agentIDStr := r.FormValue("agent_id")
+	goal := r.FormValue("goal")
+	workDir := r.FormValue("work_dir")
+	gitBranch := r.FormValue("git_branch")
+	priority := r.FormValue("priority")
+
+	if agentIDStr == "" || goal == "" {
+		http.Error(w, "Agent ID and goal are required", http.StatusBadRequest)
+		return
+	}
+
+	agentID, err := strconv.ParseInt(agentIDStr, 10, 64)
+	if err != nil {
+		http.Error(w, "Invalid agent ID", http.StatusBadRequest)
+		return
+	}
+
+	// Get agent.
+	ctx := r.Context()
+	agent, err := s.store.Queries().GetAgent(ctx, agentID)
+	if err != nil {
+		http.Error(w, "Agent not found", http.StatusNotFound)
+		return
+	}
+
+	// Use agent's project key as work dir if not specified.
+	if workDir == "" && agent.ProjectKey.Valid {
+		workDir = agent.ProjectKey.String
+	}
+
+	// Generate session ID.
+	sessionID := fmt.Sprintf("session-%d-%d", agentID, time.Now().Unix())
+
+	// Log the session start activity.
+	_, err = s.store.Queries().CreateActivity(ctx, sqlc.CreateActivityParams{
+		AgentID:      agentID,
+		ActivityType: "session_start",
+		Description:  fmt.Sprintf("Started session: %s", truncateString(goal, 50)),
+		Metadata:     sql.NullString{},
+		CreatedAt:    time.Now().Unix(),
+	})
+	if err != nil {
+		// Log error but continue.
+		log.Printf("Failed to log session activity: %v", err)
+	}
+
+	// For now, we don't actually spawn the agent (that would require the
+	// Claude Agent SDK). Just show a success message and close the modal.
+	// In a real implementation, we would use the spawner to start the agent.
+	_ = gitBranch
+	_ = priority
+	_ = sessionID
+
+	// Return success HTML that closes the modal and shows a toast.
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	w.Header().Set("HX-Trigger", `{"showToast": {"message": "Session started for `+agent.Name+`", "type": "success"}}`)
+	fmt.Fprintf(w, `<script>
+		document.querySelector('#modal-container > .fixed')?.remove();
+		if (window.showToast) showToast('Session started for %s', 'success');
+	</script>`, agent.Name)
+}
+
+// truncateString truncates a string to the given length with ellipsis.
+func truncateString(s string, maxLen int) string {
+	if len(s) <= maxLen {
+		return s
+	}
+	return s[:maxLen-3] + "..."
+}
+
 // handleSSEAgents streams agent updates via SSE.
 func (s *Server) handleSSEAgents(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "text/event-stream")
@@ -1332,6 +1425,12 @@ func (s *Server) handleSSEAgents(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		http.Error(w, "SSE not supported", http.StatusInternalServerError)
 		return
+	}
+
+	// Disable write deadline for SSE (long-lived connection).
+	rc := http.NewResponseController(w)
+	if err := rc.SetWriteDeadline(time.Time{}); err != nil {
+		log.Printf("SSE: Failed to disable write deadline: %v", err)
 	}
 
 	ctx := r.Context()
@@ -1354,27 +1453,44 @@ func (s *Server) handleSSEAgents(w http.ResponseWriter, r *http.Request) {
 
 // sendAgentStatusEvent sends an SSE event with current agent statuses.
 func (s *Server) sendAgentStatusEvent(w http.ResponseWriter, flusher http.Flusher) {
-	// Get agents with full details for rendering as cards.
+	// Get agents with full details for rendering.
 	agents := s.getAgentsFromHeartbeat()
 
-	var html strings.Builder
+	// Send compact sidebar items.
+	var sidebarHTML strings.Builder
 	for _, agent := range agents {
 		if agent.Name == UserAgentName {
 			continue
 		}
-		if err := s.partials.ExecuteTemplate(&html, "agent-card", agent); err != nil {
-			// Log but continue - don't break SSE stream.
+		if err := s.partials.ExecuteTemplate(&sidebarHTML, "agent-sidebar-item", agent); err != nil {
 			continue
 		}
 	}
 
-	// Replace newlines for SSE format.
-	data := strings.ReplaceAll(html.String(), "\n", "")
-	// Only send if we have data to prevent empty updates.
-	if len(data) > 0 {
-		fmt.Fprintf(w, "event: agent-update\ndata: %s\n\n", data)
-		flusher.Flush()
+	// Send full cards for dashboard.
+	var cardsHTML strings.Builder
+	for _, agent := range agents {
+		if agent.Name == UserAgentName {
+			continue
+		}
+		if err := s.partials.ExecuteTemplate(&cardsHTML, "agent-card", agent); err != nil {
+			continue
+		}
 	}
+
+	// Send sidebar update event.
+	sidebarData := strings.ReplaceAll(sidebarHTML.String(), "\n", "")
+	if len(sidebarData) > 0 {
+		fmt.Fprintf(w, "event: agent-sidebar-update\ndata: %s\n\n", sidebarData)
+	}
+
+	// Send cards update event for dashboard.
+	cardsData := strings.ReplaceAll(cardsHTML.String(), "\n", "")
+	if len(cardsData) > 0 {
+		fmt.Fprintf(w, "event: agent-update\ndata: %s\n\n", cardsData)
+	}
+
+	flusher.Flush()
 }
 
 // statusColor returns the CSS class for an agent status color.
@@ -1401,6 +1517,12 @@ func (s *Server) handleSSEActivity(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		http.Error(w, "SSE not supported", http.StatusInternalServerError)
 		return
+	}
+
+	// Disable write deadline for SSE (long-lived connection).
+	rc := http.NewResponseController(w)
+	if err := rc.SetWriteDeadline(time.Time{}); err != nil {
+		log.Printf("SSE: Failed to disable write deadline: %v", err)
 	}
 
 	ctx := r.Context()
@@ -1505,11 +1627,15 @@ func (s *Server) handleSSEInbox(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	ctx := r.Context()
-	ticker := time.NewTicker(5 * time.Second)
-	defer ticker.Stop()
+	// Disable write deadline for SSE (long-lived connection).
+	rc := http.NewResponseController(w)
+	if err := rc.SetWriteDeadline(time.Time{}); err != nil {
+		log.Printf("SSE: Failed to disable write deadline: %v", err)
+	}
 
-	var lastMessageID int64
+	ctx := r.Context()
+	ticker := time.NewTicker(2 * time.Second) // Fast polling for snappy real-time feel.
+	defer ticker.Stop()
 
 	// Get agent ID from query param or use first available agent.
 	agentIDStr := r.URL.Query().Get("agent_id")
@@ -1527,6 +1653,17 @@ func (s *Server) handleSSEInbox(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
+	// Track last message ID to detect new messages.
+	var lastMessageID int64
+	messages, err := s.store.Queries().GetInboxMessages(ctx, sqlc.GetInboxMessagesParams{
+		AgentID: agentID,
+		Limit:   1,
+	})
+	if err == nil && len(messages) > 0 {
+		lastMessageID = messages[0].ID
+	}
+	log.Printf("SSE: Connection started for agent %d, lastMessageID=%d", agentID, lastMessageID)
+
 	// Send initial unread count.
 	s.sendInboxCountEvent(w, flusher, agentID)
 
@@ -1535,6 +1672,8 @@ func (s *Server) handleSSEInbox(w http.ResponseWriter, r *http.Request) {
 		case <-ctx.Done():
 			return
 		case <-ticker.C:
+			// Check for new messages and send notification event (JSON, not HTML).
+			// JavaScript handles this by triggering a morph refresh.
 			lastMessageID = s.sendNewMessagesEvent(w, flusher, agentID, lastMessageID)
 			s.sendInboxCountEvent(w, flusher, agentID)
 		}
@@ -1553,7 +1692,20 @@ func (s *Server) sendInboxCountEvent(w http.ResponseWriter, flusher http.Flusher
 	flusher.Flush()
 }
 
-// sendNewMessagesEvent sends an SSE event with new messages since lastID.
+// newMessageEvent represents a new message notification for SSE.
+type newMessageEvent struct {
+	ID       int64  `json:"id"`
+	ThreadID string `json:"thread_id"`
+	Sender   string `json:"sender"`
+	Project  string `json:"project"`
+	Subject  string `json:"subject"`
+	Preview  string `json:"preview"`
+	Priority string `json:"priority"`
+	State    string `json:"state"`
+}
+
+// sendNewMessagesEvent sends an SSE event with new message metadata as JSON.
+// The client uses this to: (1) check for duplicates, (2) trigger list refresh, (3) show notifications.
 func (s *Server) sendNewMessagesEvent(w http.ResponseWriter, flusher http.Flusher, agentID int64, lastID int64) int64 {
 	ctx := context.Background()
 	messages, err := s.store.Queries().GetInboxMessages(ctx, sqlc.GetInboxMessagesParams{
@@ -1564,11 +1716,37 @@ func (s *Server) sendNewMessagesEvent(w http.ResponseWriter, flusher http.Flushe
 		return lastID
 	}
 
-	// Find new messages (iterate in reverse to get oldest first for insertion).
-	var newMsgs []sqlc.GetInboxMessagesRow
+	// Find new messages.
+	var newMsgs []newMessageEvent
 	for i := len(messages) - 1; i >= 0; i-- {
-		if messages[i].ID > lastID {
-			newMsgs = append(newMsgs, messages[i])
+		m := messages[i]
+		if m.ID > lastID {
+			// Get sender name and project.
+			senderName := "Unknown"
+			senderProject := ""
+			if sender, err := s.store.Queries().GetAgent(ctx, m.SenderID); err == nil {
+				senderName = sender.Name
+				if sender.ProjectKey.Valid {
+					senderProject = shortProject(sender.ProjectKey.String)
+				}
+			}
+
+			// Truncate body preview.
+			preview := m.BodyMd
+			if len(preview) > 100 {
+				preview = preview[:100] + "..."
+			}
+
+			newMsgs = append(newMsgs, newMessageEvent{
+				ID:       m.ID,
+				ThreadID: m.ThreadID,
+				Sender:   senderName,
+				Project:  senderProject,
+				Subject:  m.Subject,
+				Preview:  preview,
+				Priority: m.Priority,
+				State:    m.State,
+			})
 		}
 	}
 
@@ -1576,59 +1754,15 @@ func (s *Server) sendNewMessagesEvent(w http.ResponseWriter, flusher http.Flushe
 		return lastID
 	}
 
-	// Build HTML for each new message.
-	var html strings.Builder
-	for _, m := range newMsgs {
-		// Get sender name.
-		senderName := "Unknown"
-		if sender, err := s.store.Queries().GetAgent(ctx, m.SenderID); err == nil {
-			senderName = sender.Name
-		}
-
-		// Format time.
-		msgTime := time.Unix(m.CreatedAt, 0)
-		timeAgo := formatTimeAgo(msgTime)
-
-		// Build class list.
-		class := "message-card"
-		if m.State == "unread" {
-			class += " unread"
-		}
-
-		// Truncate body preview.
-		preview := m.BodyMd
-		if len(preview) > 100 {
-			preview = preview[:100] + "..."
-		}
-
-		// Priority badge.
-		priorityBadge := ""
-		if m.Priority == "urgent" {
-			priorityBadge = `<span class="priority-badge urgent">Urgent</span>`
-		}
-
-		html.WriteString(fmt.Sprintf(
-			`<div id="message-%d" class="%s" hx-get="/thread/%s" hx-target="#modal-container" hx-swap="innerHTML">
-				<div class="message-avatar">%s</div>
-				<div class="message-content">
-					<div class="message-header">
-						<span class="message-sender">%s</span>
-						%s
-						<span class="message-time">%s</span>
-					</div>
-					<div class="message-subject">%s</div>
-					<div class="message-preview">%s</div>
-				</div>
-			</div>`,
-			m.ID, class, m.ThreadID,
-			string([]rune(senderName)[0:1]),
-			senderName, priorityBadge, timeAgo,
-			m.Subject, preview,
-		))
+	// Send as JSON SSE event - client will handle deduplication and refresh.
+	jsonData, err := json.Marshal(newMsgs)
+	if err != nil {
+		return lastID
 	}
 
-	// Send as SSE event.
-	fmt.Fprintf(w, "event: new-message\ndata: %s\n\n", strings.ReplaceAll(html.String(), "\n", ""))
+	log.Printf("SSE: Sending new-message event with %d messages (lastID was %d, now %d)",
+		len(newMsgs), lastID, messages[0].ID)
+	fmt.Fprintf(w, "event: new-message\ndata: %s\n\n", string(jsonData))
 	flusher.Flush()
 
 	return messages[0].ID

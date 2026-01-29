@@ -87,84 +87,358 @@ function requestNotificationPermission() {
 
 // Show a browser desktop notification.
 function showBrowserNotification(title, body, type = 'message', data = {}) {
-    if (!notificationsEnabled) return;
+    console.log('showBrowserNotification called:', title, 'enabled:', notificationsEnabled, 'permission:', Notification.permission);
 
-    // Respect cooldown to avoid notification spam.
-    const now = Date.now();
-    if (now - lastNotificationTime < NOTIFICATION_COOLDOWN) return;
-    lastNotificationTime = now;
-
-    // Don't show if page is visible.
-    if (document.visibilityState === 'visible' && type !== 'info') {
+    if (!notificationsEnabled) {
+        console.log('Notifications disabled, skipping');
         return;
     }
 
-    const iconMap = {
-        'message': '/static/icons/message.svg',
-        'urgent': '/static/icons/message.svg',
-        'session': '/static/icons/message.svg',
-        'info': '/static/icons/message.svg'
-    };
+    // Respect cooldown to avoid notification spam.
+    const now = Date.now();
+    if (now - lastNotificationTime < NOTIFICATION_COOLDOWN) {
+        console.log('Notification in cooldown, skipping');
+        return;
+    }
+    lastNotificationTime = now;
 
-    const notification = new Notification(title, {
-        body: body,
-        icon: iconMap[type] || '/static/icons/message.svg',
-        tag: data.id || 'subtrate-notification',
-        requireInteraction: type === 'urgent',
-        data: data
-    });
+    // Note: We show notifications even when page is visible so users
+    // can see them while working in the inbox.
 
-    // Handle click - focus window and navigate if needed.
-    notification.onclick = function(event) {
-        event.preventDefault();
-        window.focus();
-        if (data.url) {
-            window.location.href = data.url;
+    try {
+        console.log('Creating notification:', title, body);
+        const notification = new Notification(title, {
+            body: body,
+            icon: '/static/icons/message.svg',
+            requireInteraction: type === 'urgent'
+        });
+        console.log('Notification created successfully');
+
+        // Handle click - focus window and navigate if needed.
+        notification.onclick = function(event) {
+            event.preventDefault();
+            window.focus();
+            if (data.url) {
+                window.location.href = data.url;
+            }
+            notification.close();
+        };
+
+        // Auto-close after 10 seconds for non-urgent.
+        if (type !== 'urgent') {
+            setTimeout(() => notification.close(), 10000);
         }
-        notification.close();
-    };
-
-    // Auto-close after 10 seconds for non-urgent.
-    if (type !== 'urgent') {
-        setTimeout(() => notification.close(), 10000);
+    } catch (err) {
+        console.error('Failed to create notification:', err);
     }
 }
 
+// Track known message IDs to prevent duplicate refreshes.
+let knownMessageIds = new Set();
+
+// Initialize known message IDs from the current DOM.
+function initKnownMessageIds() {
+    document.querySelectorAll('[id^="message-"]').forEach(el => {
+        const match = el.id.match(/^message-(\d+)$/);
+        if (match) {
+            knownMessageIds.add(parseInt(match[1], 10));
+        }
+    });
+}
+
+// Track SSE connection state.
+let sseConnected = false;
+let sseReconnectCount = 0;
+let lastUnreadCount = -1;
+
 // Listen for SSE events and show notifications.
 function setupSSENotifications() {
-    // Listen for activity-update events.
-    document.body.addEventListener('sse:activity-update', function(evt) {
-        const data = evt.detail;
-        if (data && data.type === 'message') {
-            showBrowserNotification(
-                'New Message from ' + (data.agentName || 'Agent'),
-                data.subject || data.description || 'You have a new message',
-                data.priority === 'urgent' ? 'urgent' : 'message',
-                { id: data.id, url: '/inbox' }
-            );
+    // Initialize known IDs on page load.
+    initKnownMessageIds();
+
+    // Get initial unread count from DOM.
+    const unreadEl = document.getElementById('stat-unread');
+    if (unreadEl) {
+        lastUnreadCount = parseInt(unreadEl.textContent, 10) || 0;
+    }
+
+    // Re-initialize after HTMX swaps (e.g., after message list refresh).
+    document.body.addEventListener('htmx:afterSwap', function(evt) {
+        if (evt.detail.target && evt.detail.target.id === 'message-list') {
+            initKnownMessageIds();
         }
     });
 
-    // Listen for inbox-update events.
-    document.body.addEventListener('sse:inbox-update', function(evt) {
-        const data = evt.detail;
-        if (data && data.newCount > 0) {
-            showBrowserNotification(
-                'New Messages',
-                `You have ${data.newCount} new message${data.newCount > 1 ? 's' : ''}`,
-                'message',
-                { url: '/inbox' }
-            );
+    // Handle SSE connection open - refresh messages on reconnect.
+    document.body.addEventListener('htmx:sseOpen', function(evt) {
+        console.log('SSE connection opened');
+        if (sseConnected) {
+            // This is a reconnection - we may have missed messages.
+            sseReconnectCount++;
+            console.log('SSE reconnected (count:', sseReconnectCount, '), triggering refresh');
+            const messageList = document.getElementById('message-list');
+            if (messageList) {
+                htmx.trigger(messageList, 'refresh');
+            }
+        }
+        sseConnected = true;
+    });
+
+    // Handle SSE connection errors.
+    document.body.addEventListener('htmx:sseError', function(evt) {
+        console.log('SSE connection error, will reconnect');
+        sseConnected = false;
+    });
+
+    // Listen for HTMX SSE messages (htmx:sseMessage is dispatched for all SSE events).
+    document.body.addEventListener('htmx:sseMessage', function(evt) {
+        const eventType = evt.detail.type;
+        const rawData = evt.detail.data;
+
+        // Debug logging disabled - uncomment for debugging SSE events:
+        console.log('SSE event received:', eventType, 'data:', rawData, 'notificationsEnabled:', notificationsEnabled);
+
+        // If unread count increased, trigger a refresh (fallback for missed new-message events).
+        // Note: The htmx:sseMessage event fires BEFORE the sse-swap happens, so rawData is the
+        // new count before it's swapped into the DOM. We compare against lastUnreadCount which
+        // was set from the previous event or page load.
+        if (eventType === 'unread-count') {
+            const newCount = parseInt(rawData, 10);
+            if (!isNaN(newCount) && lastUnreadCount >= 0 && newCount > lastUnreadCount) {
+                // Unread count increased - trigger message list refresh.
+                const messageList = document.getElementById('message-list');
+                if (messageList) {
+                    htmx.trigger(messageList, 'refresh');
+                }
+
+                // Show browser notification for new messages.
+                const newMsgCount = newCount - lastUnreadCount;
+                showBrowserNotification(
+                    'New Message' + (newMsgCount > 1 ? 's' : ''),
+                    newMsgCount + ' new message' + (newMsgCount > 1 ? 's' : '') + ' in your inbox',
+                    'message',
+                    { id: 'unread-' + newCount, url: '/inbox' }
+                );
+            }
+            if (!isNaN(newCount)) {
+                lastUnreadCount = newCount;
+            }
+        }
+
+        // Handle new-message events (JSON array of new messages).
+        if (eventType === 'new-message') {
+            try {
+                const messages = JSON.parse(rawData);
+                if (!Array.isArray(messages) || messages.length === 0) {
+                    return;
+                }
+
+                // Check for genuinely new messages (not already in DOM).
+                const newMessages = messages.filter(msg => !knownMessageIds.has(msg.id));
+
+                if (newMessages.length === 0) {
+                    console.log('All messages already in DOM, skipping refresh');
+                    return;
+                }
+
+                console.log('Found', newMessages.length, 'new messages, triggering refresh');
+
+                // Add to known set to prevent duplicate processing.
+                newMessages.forEach(msg => knownMessageIds.add(msg.id));
+
+                // Trigger morph-based refresh of the message list.
+                const messageList = document.getElementById('message-list');
+                if (messageList) {
+                    htmx.trigger(messageList, 'refresh');
+                }
+
+                // Show browser notification for each new message.
+                newMessages.forEach(msg => {
+                    // Build notification title with sender and project.
+                    let title = msg.sender;
+                    if (msg.project) {
+                        title += ' (' + msg.project + ')';
+                    }
+
+                    // Build body with subject and preview.
+                    let body = msg.subject;
+                    if (msg.preview && msg.preview !== msg.subject) {
+                        body += '\n' + msg.preview.substring(0, 80);
+                    }
+
+                    showBrowserNotification(
+                        title,
+                        body,
+                        msg.priority === 'urgent' ? 'urgent' : 'message',
+                        { id: msg.id, url: '/thread/' + msg.thread_id, threadId: msg.thread_id }
+                    );
+                });
+
+            } catch (e) {
+                console.error('Failed to parse new-message data:', e);
+            }
+        }
+
+        // Handle explicit notification events (for non-message notifications).
+        if (eventType === 'notification') {
+            try {
+                const data = JSON.parse(rawData);
+                showBrowserNotification(
+                    data.title || 'Notification',
+                    data.body || '',
+                    data.priority === 'urgent' ? 'urgent' : 'info',
+                    { id: data.id, url: data.url || '/inbox' }
+                );
+            } catch (e) {
+                console.error('Failed to parse notification data:', e);
+            }
         }
     });
+}
+
+// Toggle desktop notifications from settings page.
+function toggleDesktopNotifications(checkbox) {
+    if (checkbox.checked) {
+        // User wants to enable notifications.
+        if (Notification.permission === 'granted') {
+            notificationsEnabled = true;
+            localStorage.setItem('notifications-enabled', 'true');
+            showToast('Notifications enabled', 'success');
+        } else if (Notification.permission === 'denied') {
+            // Browser has blocked notifications - can't enable.
+            checkbox.checked = false;
+            showToast('Notifications are blocked by browser. Please enable in browser settings.', 'warning');
+        } else {
+            // Need to request permission.
+            Notification.requestPermission().then(permission => {
+                if (permission === 'granted') {
+                    notificationsEnabled = true;
+                    localStorage.setItem('notifications-enabled', 'true');
+                    showToast('Notifications enabled!', 'success');
+                    showBrowserNotification('Notifications Enabled', 'You will now receive alerts for new messages.', 'info');
+                } else {
+                    checkbox.checked = false;
+                    localStorage.setItem('notifications-enabled', 'false');
+                    showToast('Notification permission denied', 'warning');
+                }
+            });
+        }
+    } else {
+        // User wants to disable notifications.
+        notificationsEnabled = false;
+        localStorage.setItem('notifications-enabled', 'false');
+        showToast('Notifications disabled', 'info');
+    }
+}
+
+// Test notification - sends a direct browser notification to verify setup.
+function testNotification() {
+    console.log('testNotification called, permission:', Notification.permission);
+
+    if (Notification.permission === 'denied') {
+        showToast('Notifications blocked by browser. Check browser settings.', 'error');
+        return;
+    }
+
+    if (Notification.permission === 'default') {
+        Notification.requestPermission().then(permission => {
+            if (permission === 'granted') {
+                sendTestNotification();
+            } else {
+                showToast('Notification permission denied', 'warning');
+            }
+        });
+        return;
+    }
+
+    sendTestNotification();
+}
+
+// Actually send the test notification.
+function sendTestNotification() {
+    try {
+        console.log('Creating test notification...');
+        const notification = new Notification('Subtrate Test', {
+            body: 'If you see this, notifications are working!',
+            icon: '/static/icons/message.svg',
+            requireInteraction: false
+        });
+        console.log('Test notification created:', notification);
+
+        notification.onshow = () => console.log('Notification shown');
+        notification.onerror = (e) => console.error('Notification error:', e);
+        notification.onclick = () => {
+            window.focus();
+            notification.close();
+        };
+
+        setTimeout(() => notification.close(), 5000);
+        showToast('Test notification sent!', 'success');
+    } catch (err) {
+        console.error('Failed to create test notification:', err);
+        showToast('Failed to create notification: ' + err.message, 'error');
+    }
+}
+
+// Sync the notifications toggle checkbox state on settings page.
+function syncNotificationsToggle() {
+    const toggle = document.getElementById('desktop-notifications-toggle');
+    if (!toggle) {
+        console.log('syncNotificationsToggle: toggle element not found');
+        return;
+    }
+
+    // Check user preference from localStorage.
+    const storedValue = localStorage.getItem('notifications-enabled');
+    const userEnabled = storedValue === 'true';
+    const browserAllowed = Notification.permission === 'granted';
+
+    console.log('syncNotificationsToggle:', {
+        storedValue,
+        userEnabled,
+        browserAllowed,
+        currentChecked: toggle.checked
+    });
+
+    // Show toggle based on user preference.
+    toggle.checked = userEnabled;
+
+    // Only actually enable if browser also allows.
+    notificationsEnabled = userEnabled && browserAllowed;
+
+    console.log('syncNotificationsToggle result:', {
+        toggleChecked: toggle.checked,
+        notificationsEnabled
+    });
+
+    // If user enabled but browser not granted, auto-request permission.
+    if (userEnabled && !browserAllowed && Notification.permission !== 'denied') {
+        Notification.requestPermission().then(permission => {
+            notificationsEnabled = permission === 'granted';
+        });
+    }
 }
 
 // Initialize notifications on page load.
 document.addEventListener('DOMContentLoaded', function() {
-    // Only show prompt if not previously dismissed.
-    if (!localStorage.getItem('notifications-prompt-dismissed')) {
+    console.log('DOMContentLoaded - Initial notification state:', {
+        permission: Notification.permission,
+        localStorage: localStorage.getItem('notifications-enabled'),
+        notificationsEnabled: notificationsEnabled
+    });
+
+    // Sync settings toggle if on settings page.
+    syncNotificationsToggle();
+
+    console.log('After syncNotificationsToggle:', {
+        notificationsEnabled: notificationsEnabled
+    });
+
+    // Only show prompt if not previously dismissed and notifications not explicitly disabled.
+    const userDisabled = localStorage.getItem('notifications-enabled') === 'false';
+    if (!localStorage.getItem('notifications-prompt-dismissed') && !userDisabled) {
         initNotifications();
-    } else if (Notification.permission === 'granted') {
+    } else if (Notification.permission === 'granted' && !userDisabled) {
         notificationsEnabled = true;
     }
     setupSSENotifications();
@@ -183,6 +457,11 @@ document.body.addEventListener('htmx:configRequest', function(evt) {
 document.body.addEventListener('htmx:responseError', function(evt) {
     console.error('HTMX error:', evt.detail);
     showToast('Error loading content', 'error');
+});
+
+// Re-sync notification toggle after HTMX navigation (e.g., to settings page).
+document.body.addEventListener('htmx:afterSwap', function(evt) {
+    syncNotificationsToggle();
 });
 
 // Toast notification system.
