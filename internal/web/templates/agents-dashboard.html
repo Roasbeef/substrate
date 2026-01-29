@@ -273,25 +273,23 @@
                         <button class="filter-tab active"
                                 hx-get="/api/agents/cards?filter=all"
                                 hx-target="#agents-grid"
-                                onclick="setActiveTab(this)">All</button>
+                                onclick="setAgentFilter(this, 'all')">All</button>
                         <button class="filter-tab"
                                 hx-get="/api/agents/cards?filter=active"
                                 hx-target="#agents-grid"
-                                onclick="setActiveTab(this)">Active</button>
+                                onclick="setAgentFilter(this, 'active')">Active</button>
                         <button class="filter-tab"
                                 hx-get="/api/agents/cards?filter=idle"
                                 hx-target="#agents-grid"
-                                onclick="setActiveTab(this)">Idle</button>
+                                onclick="setAgentFilter(this, 'idle')">Idle</button>
                     </div>
                 </div>
                 <div id="agents-grid"
                      class="grid grid-cols-2 gap-4 p-4 transition-opacity duration-300"
-                     hx-get="/api/agents/cards"
-                     hx-trigger="load"
-                     hx-ext="sse"
-                     sse-connect="/events/agents"
-                     sse-swap="agent-update">
-                    <!-- Agent cards loaded via HTMX with SSE updates -->
+                     data-filter="all"
+                     hx-get="/api/agents/cards?filter=all"
+                     hx-trigger="load, every 15s">
+                    <!-- Agent cards loaded via HTMX with polling (respects filter) -->
                 </div>
             </div>
         </div>
