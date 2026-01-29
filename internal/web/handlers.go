@@ -1249,6 +1249,10 @@ func (s *Server) handleAPIAgentsCards(w http.ResponseWriter, r *http.Request) {
 
 	var html strings.Builder
 	for _, agent := range agents {
+		// Skip the User agent from card display.
+		if agent.Name == UserAgentName {
+			continue
+		}
 		s.partials.ExecuteTemplate(&html, "agent-card", agent)
 	}
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
@@ -1331,7 +1335,8 @@ func (s *Server) handleSSEAgents(w http.ResponseWriter, r *http.Request) {
 	}
 
 	ctx := r.Context()
-	ticker := time.NewTicker(5 * time.Second)
+	// Use 15s interval to reduce update frequency and prevent flashing.
+	ticker := time.NewTicker(15 * time.Second)
 	defer ticker.Stop()
 
 	// Send initial agent status.
@@ -1349,29 +1354,27 @@ func (s *Server) handleSSEAgents(w http.ResponseWriter, r *http.Request) {
 
 // sendAgentStatusEvent sends an SSE event with current agent statuses.
 func (s *Server) sendAgentStatusEvent(w http.ResponseWriter, flusher http.Flusher) {
-	ctx := context.Background()
-	agents, err := s.store.Queries().ListAgents(ctx)
-	if err != nil {
-		return
-	}
+	// Get agents with full details for rendering as cards.
+	agents := s.getAgentsFromHeartbeat()
 
 	var html strings.Builder
 	for _, agent := range agents {
 		if agent.Name == UserAgentName {
 			continue
 		}
-		status := s.heartbeatMgr.ComputeStatus(&agent)
-		html.WriteString(fmt.Sprintf(
-			`<div class="flex items-center gap-2" id="agent-status-%d">
-				<span class="w-2 h-2 rounded-full %s"></span>
-				<span class="text-sm">%s</span>
-			</div>`,
-			agent.ID, statusColor(string(status)), agent.Name,
-		))
+		if err := s.partials.ExecuteTemplate(&html, "agent-card", agent); err != nil {
+			// Log but continue - don't break SSE stream.
+			continue
+		}
 	}
 
-	fmt.Fprintf(w, "event: agent-update\ndata: %s\n\n", strings.ReplaceAll(html.String(), "\n", ""))
-	flusher.Flush()
+	// Replace newlines for SSE format.
+	data := strings.ReplaceAll(html.String(), "\n", "")
+	// Only send if we have data to prevent empty updates.
+	if len(data) > 0 {
+		fmt.Fprintf(w, "event: agent-update\ndata: %s\n\n", data)
+		flusher.Flush()
+	}
 }
 
 // statusColor returns the CSS class for an agent status color.
@@ -1784,7 +1787,7 @@ func (s *Server) getAgentsFromHeartbeat() []AgentView {
 	result := make([]AgentView, len(agents))
 	for i, aws := range agents {
 		result[i] = AgentView{
-			ID:             fmt.Sprintf("agent-%d", aws.Agent.ID),
+			ID:             fmt.Sprintf("%d", aws.Agent.ID),
 			Name:           aws.Agent.Name,
 			Type:           "claude-code",
 			Status:         string(aws.Status),

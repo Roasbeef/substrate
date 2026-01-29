@@ -285,13 +285,13 @@
                     </div>
                 </div>
                 <div id="agents-grid"
-                     class="grid grid-cols-2 gap-4 p-4"
+                     class="grid grid-cols-2 gap-4 p-4 transition-opacity duration-300"
                      hx-get="/api/agents/cards"
                      hx-trigger="load"
                      hx-ext="sse"
                      sse-connect="/events/agents"
                      sse-swap="agent-update">
-                    <!-- Agent cards loaded via HTMX -->
+                    <!-- Agent cards loaded via HTMX with SSE updates -->
                 </div>
             </div>
         </div>
