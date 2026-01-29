@@ -129,6 +129,7 @@ func (s *Server) registerRoutes() {
 	s.mux.HandleFunc("/archive", s.handleArchive)
 	s.mux.HandleFunc("/agents", s.handleAgentsDashboard)
 	s.mux.HandleFunc("/sessions", s.handleSessions)
+	s.mux.HandleFunc("/settings", s.handleSettings)
 
 	// HTMX partial routes.
 	s.mux.HandleFunc("/inbox/messages", s.handleInboxMessages)

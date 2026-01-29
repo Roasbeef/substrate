@@ -955,6 +955,196 @@ func (s *Server) handleSearch(w http.ResponseWriter, r *http.Request) {
 		<script>document.getElementById('search-results').classList.remove('hidden')</script>`, len(results), query)
 }
 
+// handleSettings renders the settings page.
+func (s *Server) handleSettings(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+
+	// Get current agent list for default agent selection.
+	agents, _ := s.store.Queries().ListAgents(ctx)
+
+	// Get topics for subscription management.
+	topics, _ := s.store.Queries().ListTopics(ctx)
+
+	w.Header().Set("Content-Type", "text/html")
+	fmt.Fprintf(w, `<!DOCTYPE html>
+<html>
+<head>
+    <title>Settings - Substrate</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/htmx.org@1.9.10"></script>
+</head>
+<body class="bg-gray-50">
+    <div class="max-w-4xl mx-auto p-6">
+        <div class="mb-6">
+            <a href="/inbox" class="text-blue-600 hover:underline">← Back to Inbox</a>
+        </div>
+
+        <h1 class="text-2xl font-bold mb-6">Settings</h1>
+
+        <!-- Agent Settings -->
+        <div class="bg-white rounded-lg shadow p-6 mb-6">
+            <h2 class="text-lg font-semibold mb-4 flex items-center gap-2">
+                <svg class="w-5 h-5 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/>
+                </svg>
+                Agent Configuration
+            </h2>
+            <div class="space-y-4">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Default Agent</label>
+                    <select class="w-full md:w-1/2 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none">
+                        <option value="">Select default agent...</option>`)
+
+	for _, agent := range agents {
+		if agent.Name != UserAgentName {
+			fmt.Fprintf(w, `<option value="%d">%s</option>`, agent.ID, agent.Name)
+		}
+	}
+
+	fmt.Fprint(w, `
+                    </select>
+                    <p class="text-sm text-gray-500 mt-1">The agent used for viewing your inbox by default.</p>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Registered Agents</label>
+                    <div class="bg-gray-50 rounded-lg p-4">`)
+
+	if len(agents) == 0 {
+		fmt.Fprint(w, `<p class="text-gray-500">No agents registered yet.</p>`)
+	} else {
+		fmt.Fprint(w, `<div class="space-y-2">`)
+		for _, agent := range agents {
+			if agent.Name != UserAgentName {
+				projectStr := "No project"
+				if agent.ProjectKey.Valid {
+					projectStr = shortProject(agent.ProjectKey.String)
+				}
+				fmt.Fprintf(w, `
+                            <div class="flex items-center justify-between p-2 bg-white rounded border">
+                                <div>
+                                    <span class="font-medium">%s</span>
+                                    <span class="text-sm text-gray-500 ml-2">%s</span>
+                                </div>
+                                <button class="text-red-600 hover:text-red-700 text-sm">Remove</button>
+                            </div>`, agent.Name, projectStr)
+			}
+		}
+		fmt.Fprint(w, `</div>`)
+	}
+
+	fmt.Fprint(w, `
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Topic Subscriptions -->
+        <div class="bg-white rounded-lg shadow p-6 mb-6">
+            <h2 class="text-lg font-semibold mb-4 flex items-center gap-2">
+                <svg class="w-5 h-5 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A2 2 0 013 12V7a4 4 0 014-4z"/>
+                </svg>
+                Topic Subscriptions
+            </h2>
+            <div class="space-y-2">`)
+
+	if len(topics) == 0 {
+		fmt.Fprint(w, `<p class="text-gray-500">No topics available.</p>`)
+	} else {
+		for _, topic := range topics {
+			fmt.Fprintf(w, `
+                <div class="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                    <div class="flex items-center gap-3">
+                        <input type="checkbox" id="topic-%d" class="w-4 h-4 text-blue-600 rounded">
+                        <label for="topic-%d" class="cursor-pointer">
+                            <span class="font-medium">%s</span>
+                            <span class="text-sm text-gray-500 ml-2">(%s)</span>
+                        </label>
+                    </div>
+                </div>`, topic.ID, topic.ID, topic.Name, topic.TopicType)
+		}
+	}
+
+	fmt.Fprint(w, `
+            </div>
+        </div>
+
+        <!-- Notification Settings -->
+        <div class="bg-white rounded-lg shadow p-6 mb-6">
+            <h2 class="text-lg font-semibold mb-4 flex items-center gap-2">
+                <svg class="w-5 h-5 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"/>
+                </svg>
+                Notifications
+            </h2>
+            <div class="space-y-3">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <span class="font-medium">Email Notifications</span>
+                        <p class="text-sm text-gray-500">Receive email for urgent messages</p>
+                    </div>
+                    <label class="relative inline-flex items-center cursor-pointer">
+                        <input type="checkbox" class="sr-only peer">
+                        <div class="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
+                    </label>
+                </div>
+                <div class="flex items-center justify-between">
+                    <div>
+                        <span class="font-medium">Desktop Notifications</span>
+                        <p class="text-sm text-gray-500">Show browser notifications</p>
+                    </div>
+                    <label class="relative inline-flex items-center cursor-pointer">
+                        <input type="checkbox" class="sr-only peer" checked>
+                        <div class="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
+                    </label>
+                </div>
+                <div class="flex items-center justify-between">
+                    <div>
+                        <span class="font-medium">Sound Alerts</span>
+                        <p class="text-sm text-gray-500">Play sound for new messages</p>
+                    </div>
+                    <label class="relative inline-flex items-center cursor-pointer">
+                        <input type="checkbox" class="sr-only peer">
+                        <div class="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
+                    </label>
+                </div>
+            </div>
+        </div>
+
+        <!-- Database Info -->
+        <div class="bg-white rounded-lg shadow p-6">
+            <h2 class="text-lg font-semibold mb-4 flex items-center gap-2">
+                <svg class="w-5 h-5 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4m0 5c0 2.21-3.582 4-8 4s-8-1.79-8-4"/>
+                </svg>
+                System Information
+            </h2>
+            <div class="space-y-2 text-sm">
+                <div class="flex justify-between py-2 border-b">
+                    <span class="text-gray-600">Agents</span>
+                    <span class="font-medium">%d</span>
+                </div>
+                <div class="flex justify-between py-2 border-b">
+                    <span class="text-gray-600">Topics</span>
+                    <span class="font-medium">%d</span>
+                </div>
+                <div class="flex justify-between py-2">
+                    <span class="text-gray-600">Database</span>
+                    <span class="font-medium text-green-600">Connected</span>
+                </div>
+            </div>
+        </div>
+
+        <div class="mt-6 flex justify-end">
+            <button class="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">
+                Save Settings
+            </button>
+        </div>
+    </div>
+</body>
+</html>`, len(agents)-1, len(topics))
+}
+
 // handleThread returns the thread view partial.
 func (s *Server) handleThread(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
