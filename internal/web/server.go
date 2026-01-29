@@ -116,9 +116,19 @@ func NewServer(cfg *Config, store *db.Store) (*Server, error) {
 
 // registerRoutes sets up all HTTP routes.
 func (s *Server) registerRoutes() {
-	// Static files.
+	// Static files with no-cache headers in dev mode.
 	staticSub, _ := fs.Sub(staticFS, "static")
-	s.mux.Handle("/static/", http.StripPrefix("/static/", http.FileServer(http.FS(staticSub))))
+	staticHandler := http.StripPrefix("/static/", http.FileServer(http.FS(staticSub)))
+	noCacheStatic := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// Disable caching for JS files during development.
+		if strings.HasSuffix(r.URL.Path, ".js") {
+			w.Header().Set("Cache-Control", "no-store, no-cache, must-revalidate")
+			w.Header().Set("Pragma", "no-cache")
+			w.Header().Set("Expires", "0")
+		}
+		staticHandler.ServeHTTP(w, r)
+	})
+	s.mux.Handle("/static/", noCacheStatic)
 
 	// Page routes.
 	s.mux.HandleFunc("/", s.handleIndex)
