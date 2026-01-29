@@ -10,6 +10,7 @@ import (
 )
 
 type Querier interface {
+	CountActivitiesByAgentToday(ctx context.Context, arg CountActivitiesByAgentTodayParams) (int64, error)
 	CountArchivedByAgent(ctx context.Context, agentID int64) (int64, error)
 	CountSentByAgent(ctx context.Context, senderID int64) (int64, error)
 	CountSnoozedByAgent(ctx context.Context, agentID int64) (int64, error)
@@ -17,6 +18,7 @@ type Querier interface {
 	CountSubscribersByTopic(ctx context.Context, topicID int64) (int64, error)
 	CountUnreadByAgent(ctx context.Context, agentID int64) (int64, error)
 	CountUnreadUrgentByAgent(ctx context.Context, agentID int64) (int64, error)
+	CreateActivity(ctx context.Context, arg CreateActivityParams) (Activity, error)
 	CreateAgent(ctx context.Context, arg CreateAgentParams) (Agent, error)
 	CreateMessage(ctx context.Context, arg CreateMessageParams) (Message, error)
 	CreateMessageRecipient(ctx context.Context, arg CreateMessageRecipientParams) error
@@ -26,9 +28,11 @@ type Querier interface {
 	DeleteAgent(ctx context.Context, id int64) error
 	DeleteMessage(ctx context.Context, id int64) error
 	DeleteMessagesByTopicOlderThan(ctx context.Context, arg DeleteMessagesByTopicOlderThanParams) (int64, error)
+	DeleteOldActivities(ctx context.Context, createdAt int64) error
 	DeleteSessionIdentity(ctx context.Context, sessionID string) error
 	DeleteSubscription(ctx context.Context, arg DeleteSubscriptionParams) error
 	DeleteTopic(ctx context.Context, id int64) error
+	GetActivity(ctx context.Context, id int64) (Activity, error)
 	GetAgent(ctx context.Context, id int64) (Agent, error)
 	GetAgentByName(ctx context.Context, name string) (Agent, error)
 	GetAgentBySessionID(ctx context.Context, sessionID string) (Agent, error)
@@ -54,10 +58,14 @@ type Querier interface {
 	GetTopicByName(ctx context.Context, name string) (Topic, error)
 	GetTrashMessages(ctx context.Context, arg GetTrashMessagesParams) ([]GetTrashMessagesRow, error)
 	GetUnreadMessages(ctx context.Context, arg GetUnreadMessagesParams) ([]GetUnreadMessagesRow, error)
+	ListActivitiesByAgent(ctx context.Context, arg ListActivitiesByAgentParams) ([]Activity, error)
+	ListActivitiesByType(ctx context.Context, arg ListActivitiesByTypeParams) ([]Activity, error)
+	ListActivitiesSince(ctx context.Context, arg ListActivitiesSinceParams) ([]Activity, error)
 	ListAgents(ctx context.Context) ([]Agent, error)
 	ListAgentsByProject(ctx context.Context, projectKey sql.NullString) ([]Agent, error)
 	ListConsumerOffsetsByAgent(ctx context.Context, agentID int64) ([]ListConsumerOffsetsByAgentRow, error)
 	ListMessagesByPriority(ctx context.Context, arg ListMessagesByPriorityParams) ([]Message, error)
+	ListRecentActivities(ctx context.Context, limit int64) ([]Activity, error)
 	ListSessionIdentitiesByAgent(ctx context.Context, agentID int64) ([]SessionIdentity, error)
 	ListSubscriptionsByAgent(ctx context.Context, agentID int64) ([]Topic, error)
 	ListSubscriptionsByTopic(ctx context.Context, topicID int64) ([]Agent, error)

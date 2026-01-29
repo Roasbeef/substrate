@@ -116,3 +116,20 @@ CREATE TRIGGER IF NOT EXISTS messages_au AFTER UPDATE ON messages BEGIN
     INSERT INTO messages_fts(messages_fts, rowid, subject, body_md) VALUES('delete', old.id, old.subject, old.body_md);
     INSERT INTO messages_fts(rowid, subject, body_md) VALUES (new.id, new.subject, new.body_md);
 END;
+
+-- Activities table: Agent activity tracking for the dashboard feed.
+CREATE TABLE IF NOT EXISTS activities (
+    id INTEGER PRIMARY KEY,
+    agent_id INTEGER NOT NULL REFERENCES agents(id) ON DELETE CASCADE,
+    activity_type TEXT NOT NULL CHECK (activity_type IN (
+        'commit', 'message', 'session_start', 'session_complete',
+        'decision', 'error', 'blocker', 'heartbeat', 'task_complete'
+    )),
+    description TEXT NOT NULL,
+    metadata TEXT, -- JSON blob for additional context.
+    created_at INTEGER NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_activities_agent ON activities(agent_id);
+CREATE INDEX IF NOT EXISTS idx_activities_type ON activities(activity_type);
+CREATE INDEX IF NOT EXISTS idx_activities_created ON activities(created_at DESC);

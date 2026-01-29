@@ -8,6 +8,15 @@ import (
 	"database/sql"
 )
 
+type Activity struct {
+	ID           int64
+	AgentID      int64
+	ActivityType string
+	Description  string
+	Metadata     sql.NullString
+	CreatedAt    int64
+}
+
 type Agent struct {
 	ID               int64
 	Name             string

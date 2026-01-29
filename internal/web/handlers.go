@@ -897,7 +897,7 @@ func (s *Server) handleSearch(w http.ResponseWriter, r *http.Request) {
 	results, err := s.store.SearchMessages(ctx, query, 20)
 	if err != nil {
 		fmt.Fprintf(w, `<div class="p-4 text-red-600">Search error: %s</div>
-			<script>document.getElementById('search-results').classList.remove('hidden')</script>`)
+			<script>document.getElementById('search-results').classList.remove('hidden')</script>`, err.Error())
 		return
 	}
 
@@ -1065,7 +1065,7 @@ func (s *Server) handleSettings(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	fmt.Fprint(w, `
+	fmt.Fprintf(w, `
             </div>
         </div>
 
@@ -1318,9 +1318,32 @@ func (s *Server) handleAPIAgentsCards(w http.ResponseWriter, r *http.Request) {
 
 // handleAPIActivity returns the activity feed partial.
 func (s *Server) handleAPIActivity(w http.ResponseWriter, r *http.Request) {
-	// TODO: Implement activity tracking in database.
-	// For now, return empty activity feed.
-	var activities []ActivityView
+	ctx := r.Context()
+
+	// Fetch recent activities from database.
+	dbActivities, err := s.store.Queries().ListRecentActivities(ctx, 20)
+	if err != nil {
+		dbActivities = nil
+	}
+
+	// Convert to view models.
+	activities := make([]ActivityView, len(dbActivities))
+	for i, act := range dbActivities {
+		// Get agent name.
+		agentName := fmt.Sprintf("Agent#%d", act.AgentID)
+		if agent, err := s.store.Queries().GetAgent(ctx, act.AgentID); err == nil {
+			agentName = agent.Name
+		}
+
+		activities[i] = ActivityView{
+			ID:          fmt.Sprintf("%d", act.ID),
+			AgentID:     fmt.Sprintf("%d", act.AgentID),
+			AgentName:   agentName,
+			Type:        act.ActivityType,
+			Description: act.Description,
+			Timestamp:   time.Unix(act.CreatedAt, 0),
+		}
+	}
 
 	var html strings.Builder
 	for _, activity := range activities {
@@ -1473,10 +1496,21 @@ func (s *Server) handleAPIHeartbeat(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// If session ID provided, track it.
+	// If session ID provided, track it and record activity.
 	if req.SessionID != "" {
 		agentData, err := s.registry.GetAgentByName(ctx, req.AgentName)
 		if err == nil {
+			// Check if this is a new session.
+			existingSession := s.heartbeatMgr.GetActiveSessionID(agentData.ID)
+			if existingSession != req.SessionID {
+				// New session started.
+				_, _ = s.store.Queries().CreateActivity(ctx, sqlc.CreateActivityParams{
+					AgentID:      agentData.ID,
+					ActivityType: "session_start",
+					Description:  fmt.Sprintf("Started session %s", req.SessionID),
+					CreatedAt:    time.Now().Unix(),
+				})
+			}
 			s.heartbeatMgr.StartSession(agentData.ID, req.SessionID)
 		}
 	}
@@ -1811,6 +1845,14 @@ func (s *Server) handleMessageSend(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Failed to add recipient: "+err.Error(), http.StatusInternalServerError)
 		return
 	}
+
+	// Record activity for the message.
+	_, _ = s.store.Queries().CreateActivity(ctx, sqlc.CreateActivityParams{
+		AgentID:      senderID,
+		ActivityType: "message",
+		Description:  fmt.Sprintf("Sent message \"%s\" to %s", subject, to),
+		CreatedAt:    time.Now().Unix(),
+	})
 
 	// Return success with HX-Trigger to close modal and refresh.
 	w.Header().Set("HX-Trigger", "messageSent")

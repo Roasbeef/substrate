@@ -56,6 +56,14 @@ make unit pkg=./internal/mcp case=TestNewServer
 ### Pre-commit
 - `make pre-commit` - Run all checks (tidy, fmt, vet, lint, test)
 
+### Incremental Commits
+When working on features, make incremental commits as you complete logical units:
+1. After implementing a self-contained piece of functionality
+2. After fixing a bug
+3. Before moving to a different area of the codebase
+
+Use the session log to track progress: `/session-log --progress "description"`
+
 ### Running the Server
 The web UI is built into substrated. By default, `make run` starts in web-only mode (no MCP/stdio):
 
