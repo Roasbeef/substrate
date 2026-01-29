@@ -198,11 +198,16 @@ func (s *Server) handleInbox(w http.ResponseWriter, r *http.Request) {
 		category = "primary"
 	}
 
-	// Try to get first agent for default stats.
+	// Find first non-User agent for default stats.
 	var agentID int64
 	agents, err := s.store.Queries().ListAgents(ctx)
 	if err == nil && len(agents) > 0 {
-		agentID = agents[0].ID
+		for _, a := range agents {
+			if a.Name != UserAgentName {
+				agentID = a.ID
+				break
+			}
+		}
 	}
 
 	// Get real counts from store.
@@ -401,17 +406,22 @@ func (s *Server) handleArchive(w http.ResponseWriter, r *http.Request) {
 func (s *Server) handleInboxMessages(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 
-	// Get agent ID from query parameter, or try first registered agent.
+	// Get agent ID from query parameter, or find first non-User agent.
 	agentIDStr := r.URL.Query().Get("agent_id")
 	var agentID int64
 
 	if agentIDStr != "" {
 		fmt.Sscanf(agentIDStr, "%d", &agentID)
 	} else {
-		// Try to get first agent as default for demo purposes.
+		// Find first agent that isn't the User agent.
 		agents, err := s.store.Queries().ListAgents(ctx)
 		if err == nil && len(agents) > 0 {
-			agentID = agents[0].ID
+			for _, a := range agents {
+				if a.Name != UserAgentName {
+					agentID = a.ID
+					break
+				}
+			}
 		}
 	}
 
@@ -1310,6 +1320,117 @@ func (s *Server) handleThreadUnread(
 	// TODO: Implement unread functionality (update recipient state).
 	w.Header().Set("Content-Type", "text/html")
 	w.Write([]byte(`<div class="p-2 text-sm text-gray-500">Thread marked as unread</div>`))
+}
+
+// handleMessageSend handles sending a new message from the compose form.
+// Route: POST /api/messages/send
+func (s *Server) handleMessageSend(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	ctx := r.Context()
+
+	if err := r.ParseForm(); err != nil {
+		http.Error(w, "Invalid form data", http.StatusBadRequest)
+		return
+	}
+
+	// Accept both "to" and "recipients" field names.
+	to := r.FormValue("to")
+	if to == "" {
+		to = r.FormValue("recipients")
+	}
+	subject := r.FormValue("subject")
+	body := r.FormValue("body")
+	priority := r.FormValue("priority")
+
+	if to == "" || subject == "" || body == "" {
+		http.Error(w, "Recipients, subject, and body are required", http.StatusBadRequest)
+		return
+	}
+
+	if priority == "" {
+		priority = "normal"
+	}
+
+	// Find the recipient agent.
+	recipient, err := s.store.Queries().GetAgentByName(ctx, to)
+	if err != nil {
+		http.Error(w, "Recipient agent not found: "+to, http.StatusBadRequest)
+		return
+	}
+
+	// Use User agent as sender.
+	senderID := s.getUserAgentID(ctx)
+	if senderID == 0 {
+		http.Error(w, "Could not determine sender", http.StatusInternalServerError)
+		return
+	}
+
+	// Get or create the topic for the recipient's inbox.
+	topicName := "agent/" + to + "/inbox"
+	topic, err := s.store.Queries().GetTopicByName(ctx, topicName)
+	if err != nil {
+		// Create the topic if it doesn't exist.
+		topic, err = s.store.Queries().CreateTopic(ctx, sqlc.CreateTopicParams{
+			Name:             topicName,
+			TopicType:        "direct",
+			RetentionSeconds: sql.NullInt64{Int64: 604800, Valid: true},
+			CreatedAt:        time.Now().Unix(),
+		})
+		if err != nil {
+			http.Error(w, "Failed to create topic: "+err.Error(), http.StatusInternalServerError)
+			return
+		}
+	}
+
+	// Generate thread ID for new message.
+	threadID := fmt.Sprintf("thread-%d-%d", time.Now().UnixNano(), senderID)
+
+	// Get next log offset.
+	maxOffsetResult, err := s.store.Queries().GetMaxLogOffset(ctx, topic.ID)
+	var nextOffset int64 = 1
+	if err == nil && maxOffsetResult != nil {
+		if offset, ok := maxOffsetResult.(int64); ok {
+			nextOffset = offset + 1
+		}
+	}
+
+	// Create the message.
+	msg, err := s.store.Queries().CreateMessage(ctx, sqlc.CreateMessageParams{
+		ThreadID:  threadID,
+		TopicID:   topic.ID,
+		LogOffset: nextOffset,
+		SenderID:  senderID,
+		Subject:   subject,
+		BodyMd:    body,
+		Priority:  priority,
+		CreatedAt: time.Now().Unix(),
+	})
+	if err != nil {
+		http.Error(w, "Failed to create message: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	// Create recipient entry.
+	err = s.store.Queries().CreateMessageRecipient(ctx, sqlc.CreateMessageRecipientParams{
+		MessageID: msg.ID,
+		AgentID:   recipient.ID,
+	})
+	if err != nil {
+		http.Error(w, "Failed to add recipient: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	// Return success with HX-Trigger to close modal and refresh.
+	w.Header().Set("HX-Trigger", "messageSent")
+	w.Header().Set("Content-Type", "text/html")
+	w.Write([]byte(`<div class="p-4 bg-green-50 text-green-700 rounded-lg text-center">
+		<p class="font-medium">Message sent successfully!</p>
+		<p class="text-sm mt-1">Your message to ` + to + ` has been delivered.</p>
+	</div>`))
 }
 
 // handleMessageAction handles message actions like star, archive, snooze, trash.

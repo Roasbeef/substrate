@@ -157,6 +157,7 @@ func (s *Server) registerRoutes() {
 	s.mux.HandleFunc("/api/threads/", s.handleThreadAction)
 
 	// Message action routes.
+	s.mux.HandleFunc("/api/messages/send", s.handleMessageSend)
 	s.mux.HandleFunc("/api/messages/", s.handleMessageAction)
 
 	// SSE event streams.
