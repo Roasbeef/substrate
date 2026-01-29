@@ -134,6 +134,7 @@ type ThreadView struct {
 	TotalMessages int
 	HasPrev       bool
 	HasNext       bool
+	ShowSuccess   bool // Show success message after reply.
 }
 
 // ThreadMessage represents a message within a thread view.
@@ -1149,69 +1150,7 @@ func (s *Server) handleSettings(w http.ResponseWriter, r *http.Request) {
 func (s *Server) handleThread(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	threadID := strings.TrimPrefix(r.URL.Path, "/thread/")
-
-	// Fetch messages in this thread from database.
-	dbMessages, err := s.store.Queries().GetMessagesByThread(ctx, threadID)
-	if err != nil || len(dbMessages) == 0 {
-		// Return empty thread view if not found.
-		s.renderPartial(w, "thread-view", ThreadView{
-			ID:       threadID,
-			ThreadID: threadID,
-			Subject:  "Thread not found",
-			Messages: nil,
-		})
-		return
-	}
-
-	// Convert to thread messages.
-	threadMessages := make([]ThreadMessage, len(dbMessages))
-	subject := ""
-	for i, m := range dbMessages {
-		// Use first message subject as thread subject.
-		if i == 0 {
-			subject = m.Subject
-		}
-
-		// Get sender name.
-		senderName := fmt.Sprintf("Agent#%d", m.SenderID)
-		sender, err := s.store.Queries().GetAgent(ctx, m.SenderID)
-		if err == nil {
-			senderName = sender.Name
-		}
-
-		// Get avatar initial.
-		avatar := "?"
-		if len(senderName) > 0 {
-			avatar = strings.ToUpper(string(senderName[0]))
-		}
-
-		threadMessages[i] = ThreadMessage{
-			ID:           fmt.Sprintf("%d", m.ID),
-			SenderName:   senderName,
-			SenderAvatar: avatar,
-			Body:         m.BodyMd,
-			State:        "read", // TODO: Get actual state from recipient.
-			CreatedAt:    time.Unix(m.CreatedAt, 0),
-		}
-
-		// Check for deadline.
-		if m.DeadlineAt.Valid {
-			threadMessages[i].Deadline = time.Unix(m.DeadlineAt.Int64, 0)
-		}
-	}
-
-	thread := ThreadView{
-		ID:            threadID,
-		ThreadID:      threadID,
-		Subject:       subject,
-		Messages:      threadMessages,
-		MessageIndex:  1,
-		TotalMessages: len(threadMessages),
-		HasPrev:       false,
-		HasNext:       len(threadMessages) > 1,
-	}
-
-	s.renderPartial(w, "thread-view", thread)
+	s.renderThreadView(ctx, w, threadID, false)
 }
 
 // handleNewAgentModal returns the new agent modal partial.
@@ -1970,10 +1909,80 @@ func (s *Server) handleThreadReply(
 		return
 	}
 
-	// Return success response for HTMX - refresh the thread view.
-	w.Header().Set("HX-Trigger", "threadUpdated")
-	w.Header().Set("Content-Type", "text/html")
-	w.Write([]byte(`<div class="p-3 bg-green-50 text-green-700 rounded-lg text-sm">Reply sent successfully!</div>`))
+	// Re-render the thread view with the new message included.
+	s.renderThreadView(ctx, w, threadID, true)
+}
+
+// renderThreadView renders the thread-view partial with optional success toast.
+func (s *Server) renderThreadView(ctx context.Context, w http.ResponseWriter, threadID string, showSuccess bool) {
+	// Fetch messages in this thread from database.
+	dbMessages, err := s.store.Queries().GetMessagesByThread(ctx, threadID)
+	if err != nil || len(dbMessages) == 0 {
+		// Return empty thread view if not found.
+		s.renderPartial(w, "thread-view", ThreadView{
+			ID:       threadID,
+			ThreadID: threadID,
+			Subject:  "Thread not found",
+			Messages: nil,
+		})
+		return
+	}
+
+	// Convert to thread messages.
+	threadMessages := make([]ThreadMessage, len(dbMessages))
+	subject := ""
+	for i, m := range dbMessages {
+		// Use first message subject as thread subject.
+		if i == 0 {
+			subject = m.Subject
+		}
+
+		// Get sender name.
+		senderName := fmt.Sprintf("Agent#%d", m.SenderID)
+		sender, err := s.store.Queries().GetAgent(ctx, m.SenderID)
+		if err == nil {
+			senderName = sender.Name
+		}
+
+		// Get avatar initial.
+		avatar := "?"
+		if len(senderName) > 0 {
+			avatar = strings.ToUpper(string(senderName[0]))
+		}
+
+		threadMessages[i] = ThreadMessage{
+			ID:           fmt.Sprintf("%d", m.ID),
+			SenderName:   senderName,
+			SenderAvatar: avatar,
+			Body:         m.BodyMd,
+			State:        "read", // TODO: Get actual state from recipient.
+			CreatedAt:    time.Unix(m.CreatedAt, 0),
+		}
+
+		// Check for deadline.
+		if m.DeadlineAt.Valid {
+			threadMessages[i].Deadline = time.Unix(m.DeadlineAt.Int64, 0)
+		}
+	}
+
+	thread := ThreadView{
+		ID:            threadID,
+		ThreadID:      threadID,
+		Subject:       subject,
+		Messages:      threadMessages,
+		MessageIndex:  1,
+		TotalMessages: len(threadMessages),
+		HasPrev:       false,
+		HasNext:       len(threadMessages) > 1,
+		ShowSuccess:   showSuccess,
+	}
+
+	// Set HX-Trigger to show success toast if applicable.
+	if showSuccess {
+		w.Header().Set("HX-Trigger", `{"showToast": "Reply sent successfully!"}`)
+	}
+
+	s.renderPartial(w, "thread-view", thread)
 }
 
 // handleThreadArchive handles archiving a thread.

@@ -3,6 +3,17 @@
 <!-- Leave sidebar visible (left-64 matches sidebar width), add top margin for header -->
 <!-- pointer-events-auto re-enables clicks on this content (parent container has pointer-events-none) -->
 <div class="fixed top-14 left-64 right-0 bottom-0 bg-white z-40 flex flex-col shadow-xl pointer-events-auto">
+    {{if .ShowSuccess}}
+    <!-- Success Message -->
+    <div class="px-6 py-3 bg-green-50 border-b border-green-100 flex items-center justify-between">
+        <div class="flex items-center gap-2 text-green-700">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+            </svg>
+            <span class="text-sm font-medium">Reply sent successfully!</span>
+        </div>
+    </div>
+    {{end}}
     <!-- Top Toolbar -->
     <div class="flex items-center justify-between px-4 py-2 border-b border-gray-200">
         <div class="flex items-center gap-1">
