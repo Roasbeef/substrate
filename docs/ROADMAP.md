@@ -51,7 +51,14 @@ Target 85%+ meaningful coverage with property-based testing:
 
 ## Feature Roadmap
 
-### v0.2.0 - Enhanced UI & Real-time
+### v0.2.0 - Enhanced Agent Integration & Real-time
+- [ ] **Stop hook long-polling**: Use Claude Code Stop hooks to implement mail checking
+  - Agent checks inbox before stopping (configurable timeout)
+  - If new mail: prompt agent to process before exiting
+  - Doubles as heartbeat mechanism (agent alive while hook runs)
+- [ ] **Heartbeat via hooks**: Automatic heartbeat on SessionStart, UserPromptSubmit, Stop
+  - Track agent liveness status (active, idle, offline)
+  - Heartbeat failures trigger agent status change
 - [ ] React inbox components (for complex interactions)
 - [ ] WebSocket support for bi-directional updates
 - [ ] Improved thread view with message grouping
@@ -78,6 +85,24 @@ Target 85%+ meaningful coverage with property-based testing:
 - [ ] Desktop app (Tauri/Wails)
 
 ## Technical Notes
+
+### Stop Hook Long-Polling Pattern
+Use Claude Code's Stop hook to implement a "check mail before exit" flow:
+
+```
+Stop Hook Flow:
+1. Agent receives stop signal (user ends session, timeout, etc.)
+2. Stop hook triggers: `substrate poll --wait=30s`
+3. If new mail arrives within 30s: return non-zero (block exit), inject mail context
+4. Agent processes new mail, then Stop hook runs again
+5. If no mail after timeout: return 0 (allow exit), agent stops cleanly
+
+Benefits:
+- Agents naturally stay alive while work is pending
+- No separate heartbeat daemon needed (hook IS the heartbeat)
+- User can always interrupt (Ctrl+C bypasses hooks)
+- Graceful degradation when backend unavailable
+```
 
 ### NATS RPC Benefits
 - Built-in pub/sub aligns with Subtrate's messaging model
