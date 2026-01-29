@@ -13,7 +13,7 @@ import (
 const CreateAgent = `-- name: CreateAgent :one
 INSERT INTO agents (name, project_key, current_session_id, created_at, last_active_at)
 VALUES (?, ?, ?, ?, ?)
-RETURNING id, name, project_key, current_session_id, created_at, last_active_at
+RETURNING id, name, project_key, git_branch, current_session_id, created_at, last_active_at
 `
 
 type CreateAgentParams struct {
@@ -37,6 +37,7 @@ func (q *Queries) CreateAgent(ctx context.Context, arg CreateAgentParams) (Agent
 		&i.ID,
 		&i.Name,
 		&i.ProjectKey,
+		&i.GitBranch,
 		&i.CurrentSessionID,
 		&i.CreatedAt,
 		&i.LastActiveAt,
@@ -91,7 +92,7 @@ func (q *Queries) DeleteSessionIdentity(ctx context.Context, sessionID string) e
 }
 
 const GetAgent = `-- name: GetAgent :one
-SELECT id, name, project_key, current_session_id, created_at, last_active_at FROM agents WHERE id = ?
+SELECT id, name, project_key, git_branch, current_session_id, created_at, last_active_at FROM agents WHERE id = ?
 `
 
 func (q *Queries) GetAgent(ctx context.Context, id int64) (Agent, error) {
@@ -101,6 +102,7 @@ func (q *Queries) GetAgent(ctx context.Context, id int64) (Agent, error) {
 		&i.ID,
 		&i.Name,
 		&i.ProjectKey,
+		&i.GitBranch,
 		&i.CurrentSessionID,
 		&i.CreatedAt,
 		&i.LastActiveAt,
@@ -109,7 +111,7 @@ func (q *Queries) GetAgent(ctx context.Context, id int64) (Agent, error) {
 }
 
 const GetAgentByName = `-- name: GetAgentByName :one
-SELECT id, name, project_key, current_session_id, created_at, last_active_at FROM agents WHERE name = ?
+SELECT id, name, project_key, git_branch, current_session_id, created_at, last_active_at FROM agents WHERE name = ?
 `
 
 func (q *Queries) GetAgentByName(ctx context.Context, name string) (Agent, error) {
@@ -119,6 +121,7 @@ func (q *Queries) GetAgentByName(ctx context.Context, name string) (Agent, error
 		&i.ID,
 		&i.Name,
 		&i.ProjectKey,
+		&i.GitBranch,
 		&i.CurrentSessionID,
 		&i.CreatedAt,
 		&i.LastActiveAt,
@@ -127,7 +130,7 @@ func (q *Queries) GetAgentByName(ctx context.Context, name string) (Agent, error
 }
 
 const GetAgentBySessionID = `-- name: GetAgentBySessionID :one
-SELECT a.id, a.name, a.project_key, a.current_session_id, a.created_at, a.last_active_at FROM agents a
+SELECT a.id, a.name, a.project_key, a.git_branch, a.current_session_id, a.created_at, a.last_active_at FROM agents a
 JOIN session_identities si ON a.id = si.agent_id
 WHERE si.session_id = ?
 `
@@ -139,6 +142,7 @@ func (q *Queries) GetAgentBySessionID(ctx context.Context, sessionID string) (Ag
 		&i.ID,
 		&i.Name,
 		&i.ProjectKey,
+		&i.GitBranch,
 		&i.CurrentSessionID,
 		&i.CreatedAt,
 		&i.LastActiveAt,
@@ -147,7 +151,7 @@ func (q *Queries) GetAgentBySessionID(ctx context.Context, sessionID string) (Ag
 }
 
 const GetSessionIdentity = `-- name: GetSessionIdentity :one
-SELECT session_id, agent_id, project_key, created_at, last_active_at FROM session_identities WHERE session_id = ?
+SELECT session_id, agent_id, project_key, git_branch, created_at, last_active_at FROM session_identities WHERE session_id = ?
 `
 
 func (q *Queries) GetSessionIdentity(ctx context.Context, sessionID string) (SessionIdentity, error) {
@@ -157,6 +161,7 @@ func (q *Queries) GetSessionIdentity(ctx context.Context, sessionID string) (Ses
 		&i.SessionID,
 		&i.AgentID,
 		&i.ProjectKey,
+		&i.GitBranch,
 		&i.CreatedAt,
 		&i.LastActiveAt,
 	)
@@ -164,7 +169,7 @@ func (q *Queries) GetSessionIdentity(ctx context.Context, sessionID string) (Ses
 }
 
 const GetSessionIdentityByProject = `-- name: GetSessionIdentityByProject :one
-SELECT session_id, agent_id, project_key, created_at, last_active_at FROM session_identities WHERE project_key = ? ORDER BY last_active_at DESC LIMIT 1
+SELECT session_id, agent_id, project_key, git_branch, created_at, last_active_at FROM session_identities WHERE project_key = ? ORDER BY last_active_at DESC LIMIT 1
 `
 
 func (q *Queries) GetSessionIdentityByProject(ctx context.Context, projectKey sql.NullString) (SessionIdentity, error) {
@@ -174,6 +179,7 @@ func (q *Queries) GetSessionIdentityByProject(ctx context.Context, projectKey sq
 		&i.SessionID,
 		&i.AgentID,
 		&i.ProjectKey,
+		&i.GitBranch,
 		&i.CreatedAt,
 		&i.LastActiveAt,
 	)
@@ -181,7 +187,7 @@ func (q *Queries) GetSessionIdentityByProject(ctx context.Context, projectKey sq
 }
 
 const ListAgents = `-- name: ListAgents :many
-SELECT id, name, project_key, current_session_id, created_at, last_active_at FROM agents ORDER BY last_active_at DESC
+SELECT id, name, project_key, git_branch, current_session_id, created_at, last_active_at FROM agents ORDER BY last_active_at DESC
 `
 
 func (q *Queries) ListAgents(ctx context.Context) ([]Agent, error) {
@@ -197,6 +203,7 @@ func (q *Queries) ListAgents(ctx context.Context) ([]Agent, error) {
 			&i.ID,
 			&i.Name,
 			&i.ProjectKey,
+			&i.GitBranch,
 			&i.CurrentSessionID,
 			&i.CreatedAt,
 			&i.LastActiveAt,
@@ -215,7 +222,7 @@ func (q *Queries) ListAgents(ctx context.Context) ([]Agent, error) {
 }
 
 const ListAgentsByProject = `-- name: ListAgentsByProject :many
-SELECT id, name, project_key, current_session_id, created_at, last_active_at FROM agents WHERE project_key = ? ORDER BY last_active_at DESC
+SELECT id, name, project_key, git_branch, current_session_id, created_at, last_active_at FROM agents WHERE project_key = ? ORDER BY last_active_at DESC
 `
 
 func (q *Queries) ListAgentsByProject(ctx context.Context, projectKey sql.NullString) ([]Agent, error) {
@@ -231,6 +238,7 @@ func (q *Queries) ListAgentsByProject(ctx context.Context, projectKey sql.NullSt
 			&i.ID,
 			&i.Name,
 			&i.ProjectKey,
+			&i.GitBranch,
 			&i.CurrentSessionID,
 			&i.CreatedAt,
 			&i.LastActiveAt,
@@ -249,7 +257,7 @@ func (q *Queries) ListAgentsByProject(ctx context.Context, projectKey sql.NullSt
 }
 
 const ListSessionIdentitiesByAgent = `-- name: ListSessionIdentitiesByAgent :many
-SELECT session_id, agent_id, project_key, created_at, last_active_at FROM session_identities WHERE agent_id = ? ORDER BY last_active_at DESC
+SELECT session_id, agent_id, project_key, git_branch, created_at, last_active_at FROM session_identities WHERE agent_id = ? ORDER BY last_active_at DESC
 `
 
 func (q *Queries) ListSessionIdentitiesByAgent(ctx context.Context, agentID int64) ([]SessionIdentity, error) {
@@ -265,6 +273,7 @@ func (q *Queries) ListSessionIdentitiesByAgent(ctx context.Context, agentID int6
 			&i.SessionID,
 			&i.AgentID,
 			&i.ProjectKey,
+			&i.GitBranch,
 			&i.CreatedAt,
 			&i.LastActiveAt,
 		); err != nil {

@@ -83,6 +83,8 @@ type AgentView struct {
 	Status         string // "active", "busy", "idle", "offline"
 	Description    string
 	Tags           []string
+	ProjectKey     string // Full project path.
+	GitBranch      string // Current git branch.
 	LastActivityAt time.Time
 	LastAction     string
 	CurrentSession *SessionView
@@ -778,6 +780,8 @@ func (s *Server) getAgentsFromHeartbeat() []AgentView {
 			Name:           aws.Agent.Name,
 			Type:           "claude-code",
 			Status:         string(aws.Status),
+			ProjectKey:     aws.Agent.ProjectKey.String,
+			GitBranch:      aws.Agent.GitBranch.String,
 			LastActivityAt: aws.LastActive,
 		}
 
@@ -790,4 +794,148 @@ func (s *Server) getAgentsFromHeartbeat() []AgentView {
 	}
 
 	return result
+}
+
+// handleThreadAction handles thread actions like reply, archive, trash, unread.
+// Routes: POST /api/threads/{thread_id}/{action}
+func (s *Server) handleThreadAction(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	// Parse path: /api/threads/{thread_id}/{action}
+	path := strings.TrimPrefix(r.URL.Path, "/api/threads/")
+	parts := strings.Split(path, "/")
+	if len(parts) < 2 {
+		http.Error(w, "Invalid path", http.StatusBadRequest)
+		return
+	}
+
+	threadID := parts[0]
+	action := parts[1]
+
+	ctx := context.Background()
+
+	switch action {
+	case "reply":
+		s.handleThreadReply(ctx, w, r, threadID)
+	case "archive":
+		s.handleThreadArchive(ctx, w, r, threadID)
+	case "trash":
+		s.handleThreadTrash(ctx, w, r, threadID)
+	case "unread":
+		s.handleThreadUnread(ctx, w, r, threadID)
+	default:
+		http.Error(w, "Unknown action", http.StatusBadRequest)
+	}
+}
+
+// handleThreadReply handles replying to a thread.
+func (s *Server) handleThreadReply(
+	ctx context.Context, w http.ResponseWriter, r *http.Request, threadID string,
+) {
+	// Parse form data.
+	if err := r.ParseForm(); err != nil {
+		http.Error(w, "Invalid form data", http.StatusBadRequest)
+		return
+	}
+
+	body := r.FormValue("body")
+	if body == "" {
+		http.Error(w, "Reply body required", http.StatusBadRequest)
+		return
+	}
+
+	// Get the original thread to find the topic and participants.
+	messages, err := s.store.Queries().GetMessagesByThread(ctx, threadID)
+	if err != nil || len(messages) == 0 {
+		http.Error(w, "Thread not found", http.StatusNotFound)
+		return
+	}
+
+	// Get the first message to find the topic.
+	firstMsg := messages[0]
+
+	// Determine sender: if provided in form, use that; otherwise use the
+	// first agent that isn't the original sender (i.e., the recipient).
+	senderName := r.FormValue("sender")
+	var senderID int64
+	if senderName != "" {
+		sender, err := s.store.Queries().GetAgentByName(ctx, senderName)
+		if err == nil {
+			senderID = sender.ID
+		}
+	}
+	// Fallback: list agents and pick one that's not the original sender.
+	if senderID == 0 {
+		agents, _ := s.store.Queries().ListAgents(ctx)
+		for _, a := range agents {
+			if a.ID != firstMsg.SenderID {
+				senderID = a.ID
+				break
+			}
+		}
+	}
+	if senderID == 0 {
+		http.Error(w, "Could not determine reply sender", http.StatusInternalServerError)
+		return
+	}
+
+	// Get the next log offset for this topic.
+	maxOffsetResult, err := s.store.Queries().GetMaxLogOffset(ctx, firstMsg.TopicID)
+	var nextOffset int64 = 0
+	if err == nil && maxOffsetResult != nil {
+		if offset, ok := maxOffsetResult.(int64); ok {
+			nextOffset = offset + 1
+		}
+	}
+
+	// Create the reply message.
+	_, err = s.store.Queries().CreateMessage(ctx, sqlc.CreateMessageParams{
+		ThreadID:  threadID,
+		TopicID:   firstMsg.TopicID,
+		LogOffset: nextOffset,
+		SenderID:  senderID,
+		Subject:   "Re: " + firstMsg.Subject,
+		BodyMd:    body,
+		Priority:  "normal",
+		CreatedAt: time.Now().Unix(),
+	})
+	if err != nil {
+		http.Error(w, "Failed to send reply: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	// Return success response for HTMX - refresh the thread view.
+	w.Header().Set("HX-Trigger", "threadUpdated")
+	w.Header().Set("Content-Type", "text/html")
+	w.Write([]byte(`<div class="p-3 bg-green-50 text-green-700 rounded-lg text-sm">Reply sent successfully!</div>`))
+}
+
+// handleThreadArchive handles archiving a thread.
+func (s *Server) handleThreadArchive(
+	ctx context.Context, w http.ResponseWriter, r *http.Request, threadID string,
+) {
+	// TODO: Implement archive functionality (update message state).
+	w.Header().Set("Content-Type", "text/html")
+	w.Write([]byte(`<div class="p-2 text-sm text-gray-500">Thread archived</div>`))
+}
+
+// handleThreadTrash handles trashing a thread.
+func (s *Server) handleThreadTrash(
+	ctx context.Context, w http.ResponseWriter, r *http.Request, threadID string,
+) {
+	// TODO: Implement trash functionality (update message state).
+	w.Header().Set("Content-Type", "text/html")
+	w.Write([]byte(`<div class="p-2 text-sm text-gray-500">Thread moved to trash</div>`))
+}
+
+// handleThreadUnread handles marking a thread as unread.
+func (s *Server) handleThreadUnread(
+	ctx context.Context, w http.ResponseWriter, r *http.Request, threadID string,
+) {
+	// TODO: Implement unread functionality (update recipient state).
+	w.Header().Set("Content-Type", "text/html")
+	w.Write([]byte(`<div class="p-2 text-sm text-gray-500">Thread marked as unread</div>`))
 }

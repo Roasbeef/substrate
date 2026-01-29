@@ -12,6 +12,7 @@ type Agent struct {
 	ID               int64
 	Name             string
 	ProjectKey       sql.NullString
+	GitBranch        sql.NullString
 	CurrentSessionID sql.NullString
 	CreatedAt        int64
 	LastActiveAt     int64
@@ -56,6 +57,7 @@ type SessionIdentity struct {
 	SessionID    string
 	AgentID      int64
 	ProjectKey   sql.NullString
+	GitBranch    sql.NullString
 	CreatedAt    int64
 	LastActiveAt int64
 }

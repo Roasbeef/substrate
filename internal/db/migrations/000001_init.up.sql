@@ -3,6 +3,7 @@ CREATE TABLE IF NOT EXISTS agents (
     id INTEGER PRIMARY KEY,
     name TEXT UNIQUE NOT NULL,
     project_key TEXT,
+    git_branch TEXT,
     current_session_id TEXT,
     created_at INTEGER NOT NULL,
     last_active_at INTEGER NOT NULL
@@ -86,6 +87,7 @@ CREATE TABLE IF NOT EXISTS session_identities (
     session_id TEXT PRIMARY KEY,
     agent_id INTEGER NOT NULL REFERENCES agents(id) ON DELETE CASCADE,
     project_key TEXT,
+    git_branch TEXT,
     created_at INTEGER NOT NULL,
     last_active_at INTEGER NOT NULL
 );

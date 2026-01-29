@@ -26,12 +26,8 @@ build-cli:
 build-daemon:
 	go build -o substrated ./cmd/substrated
 
-.PHONY: build-web
-build-web:
-	go build -o subtrate-web ./cmd/subtrate-web
-
 .PHONY: build-all
-build-all: build-cli build-daemon build-web
+build-all: build-cli build-daemon
 
 .PHONY: install
 install:
@@ -136,25 +132,25 @@ migrate-down:
 # Clean
 .PHONY: clean
 clean:
-	rm -f substrate substrated subtrate-web
+	rm -f substrate substrated
 	rm -f coverage.out coverage.html
 
-# Web server
+# Web server (runs via substrated daemon in web-only mode)
 WEB_PORT ?= 8080
 
 .PHONY: run-web
-run-web: build-web
-	./subtrate-web -addr :$(WEB_PORT)
+run-web: build-daemon
+	./substrated -web-only -web :$(WEB_PORT)
 
 .PHONY: run-web-dev
 run-web-dev:
-	go run ./cmd/subtrate-web -addr :$(WEB_PORT)
+	go run ./cmd/substrated -web-only -web :$(WEB_PORT)
 
-# Start web server in background.
+# Start web server in background (via substrated in web-only mode).
 .PHONY: start
-start: build-web
-	@echo "Starting web server on port $(WEB_PORT)..."
-	@./subtrate-web -addr :$(WEB_PORT) &
+start: build-daemon
+	@echo "Starting Substrate web server on port $(WEB_PORT)..."
+	@./substrated -web-only -web :$(WEB_PORT) &
 	@sleep 1
 	@echo "Server started. PID: $$(lsof -ti :$(WEB_PORT))"
 
@@ -168,9 +164,9 @@ stop:
 
 # Restart web server (stop, rebuild, start).
 .PHONY: restart
-restart: stop build-web
-	@echo "Starting web server on port $(WEB_PORT)..."
-	@./subtrate-web -addr :$(WEB_PORT) &
+restart: stop build-daemon
+	@echo "Starting Substrate web server on port $(WEB_PORT)..."
+	@./substrated -web-only -web :$(WEB_PORT) &
 	@sleep 1
 	@echo "Server restarted. PID: $$(lsof -ti :$(WEB_PORT))"
 
@@ -222,9 +218,8 @@ help:
 	@echo "Build targets:"
 	@echo "  build          Build all packages (default)"
 	@echo "  build-cli      Build CLI binary (./substrate)"
-	@echo "  build-daemon   Build daemon binary (./substrated)"
-	@echo "  build-web      Build web server binary (./subtrate-web)"
-	@echo "  build-all      Build all binaries"
+	@echo "  build-daemon   Build daemon binary (./substrated with web UI)"
+	@echo "  build-all      Build all binaries (CLI + daemon)"
 	@echo "  install        Install binaries to GOPATH/bin"
 	@echo "  quick          Quick build check (compile only)"
 	@echo ""
@@ -260,12 +255,12 @@ help:
 	@echo "  tidy           Run go mod tidy"
 	@echo "  tidy-check     Check if go mod tidy would change anything"
 	@echo ""
-	@echo "Web server:"
-	@echo "  run-web        Build and run web server (default port 8080)"
-	@echo "  run-web-dev    Run web server without building (for development)"
-	@echo "  start          Build and start web server in background"
-	@echo "  stop           Stop running web server"
-	@echo "  restart        Stop, rebuild, and start web server"
+	@echo "Web server (runs via substrated daemon):"
+	@echo "  run-web        Build and run daemon with web UI (default port 8080)"
+	@echo "  run-web-dev    Run daemon with web UI without building (for dev)"
+	@echo "  start          Build and start daemon in background"
+	@echo "  stop           Stop running daemon"
+	@echo "  restart        Stop, rebuild, and start daemon"
 	@echo "                 Usage: make restart WEB_PORT=8081"
 	@echo ""
 	@echo "Development:"

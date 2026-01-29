@@ -7,10 +7,11 @@
 Subtrate is a central command center for managing Claude Code agents with mail/messaging, pub/sub, threaded conversations, and log-based queue semantics.
 
 **Key Components:**
-- **substrated** (`cmd/substrated`) - MCP daemon server for agent communication
+- **substrated** (`cmd/substrated`) - MCP daemon server with integrated web UI
 - **substrate** (`cmd/substrate`) - Command-line interface for mail operations
 - **Mail Service** (`internal/mail`) - Core messaging with actor pattern
 - **Agent Registry** (`internal/agent`) - Agent identity and registration
+- **Web UI** (`internal/web`) - HTMX-based web interface served by substrated
 
 ## Essential Commands
 
@@ -54,6 +55,27 @@ make unit pkg=./internal/mcp case=TestNewServer
 
 ### Pre-commit
 - `make pre-commit` - Run all checks (tidy, fmt, vet, lint, test)
+
+### Running the Web Server
+The web UI is built into substrated. Run with:
+```bash
+# Build and run (foreground)
+make run-web
+
+# Development mode (auto-rebuild on changes)
+make run-web-dev
+
+# Background mode
+make start
+
+# Stop background server
+make stop
+
+# Custom port
+make run-web WEB_PORT=8081
+```
+
+Access the UI at `http://localhost:8080` (or custom port).
 
 ## Code Style Quick Reference
 

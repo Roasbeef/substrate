@@ -20,6 +20,7 @@ func main() {
 	var (
 		dbPath  = flag.String("db", "~/.subtrate/subtrate.db", "Path to SQLite database")
 		webAddr = flag.String("web", ":8080", "Web server address (empty to disable)")
+		webOnly = flag.Bool("web-only", false, "Run only the web server (no MCP)")
 	)
 	flag.Parse()
 
@@ -48,8 +49,11 @@ func main() {
 	// Get the underlying store for services.
 	store := sqliteStore.Store
 
-	// Create the MCP server.
-	mcpServer := mcp.NewServer(store)
+	// Create the MCP server (unless web-only mode).
+	var mcpServer *mcp.Server
+	if !*webOnly {
+		mcpServer = mcp.NewServer(store)
+	}
 
 	// Set up signal handling for graceful shutdown.
 	ctx, cancel := context.WithCancel(context.Background())
@@ -88,9 +92,15 @@ func main() {
 		}()
 	}
 
-	// Run the MCP server on stdio transport.
-	log.Println("Starting substrated MCP server...")
-	if err := mcpServer.Run(ctx, &sdkmcp.StdioTransport{}); err != nil {
-		log.Fatalf("Server error: %v", err)
+	// Run the MCP server on stdio transport, unless web-only mode.
+	if *webOnly {
+		log.Println("Running in web-only mode (no MCP server)")
+		// Block until signal received.
+		<-ctx.Done()
+	} else {
+		log.Println("Starting substrated MCP server...")
+		if err := mcpServer.Run(ctx, &sdkmcp.StdioTransport{}); err != nil {
+			log.Fatalf("Server error: %v", err)
+		}
 	}
 }

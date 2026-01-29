@@ -2,6 +2,7 @@
 package web
 
 import (
+	"bytes"
 	"context"
 	"embed"
 	"fmt"
@@ -9,10 +10,14 @@ import (
 	"io/fs"
 	"log"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/roasbeef/subtrate/internal/agent"
 	"github.com/roasbeef/subtrate/internal/db"
+	"github.com/yuin/goldmark"
+	"github.com/yuin/goldmark/extension"
+	"github.com/yuin/goldmark/renderer/html"
 )
 
 //go:embed templates/*.html templates/partials/*.html
@@ -69,6 +74,7 @@ func NewServer(cfg *Config, store *db.Store) (*Server, error) {
 		"timeSection":    timeSection,
 		"truncate":       truncate,
 		"markdown":       markdownToHTML,
+		"shortProject":   shortProject,
 	}
 
 	// Parse shared partials.
@@ -132,6 +138,9 @@ func (s *Server) registerRoutes() {
 	s.mux.HandleFunc("/api/sessions/active", s.handleAPIActiveSessions)
 	s.mux.HandleFunc("/api/heartbeat", s.handleAPIHeartbeat)
 	s.mux.HandleFunc("/api/agents/status", s.handleAPIAgentsStatus)
+
+	// Thread action routes.
+	s.mux.HandleFunc("/api/threads/", s.handleThreadAction)
 
 	// SSE event streams.
 	s.mux.HandleFunc("/events/agents", s.handleSSEAgents)
@@ -255,11 +264,37 @@ func truncate(s string, maxLen int) string {
 	return s[:maxLen-3] + "..."
 }
 
-// markdownToHTML converts markdown to HTML (simplified).
+// shortProject extracts the last 2 path segments from a project path.
+// e.g., "/Users/foo/gocode/src/github.com/roasbeef/subtrate" -> "roasbeef/subtrate"
+func shortProject(path string) string {
+	if path == "" {
+		return ""
+	}
+	parts := strings.Split(strings.TrimSuffix(path, "/"), "/")
+	if len(parts) >= 2 {
+		return parts[len(parts)-2] + "/" + parts[len(parts)-1]
+	}
+	if len(parts) == 1 {
+		return parts[0]
+	}
+	return path
+}
+
+// markdownToHTML converts markdown to HTML using goldmark.
 func markdownToHTML(s string) template.HTML {
-	// For now, just escape and return as-is.
-	// TODO: Add proper markdown parsing.
-	return template.HTML(template.HTMLEscapeString(s))
+	md := goldmark.New(
+		goldmark.WithExtensions(extension.GFM),
+		goldmark.WithRendererOptions(
+			html.WithHardWraps(),
+			html.WithXHTML(),
+		),
+	)
+	var buf bytes.Buffer
+	if err := md.Convert([]byte(s), &buf); err != nil {
+		// Fallback to escaped text on error.
+		return template.HTML(template.HTMLEscapeString(s))
+	}
+	return template.HTML(buf.String())
 }
 
 // timeSection returns a section label for grouping messages by time period.
