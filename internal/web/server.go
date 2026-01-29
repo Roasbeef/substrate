@@ -138,6 +138,7 @@ func (s *Server) registerRoutes() {
 	s.mux.HandleFunc("/archive/messages", s.handleArchivedMessages)
 	s.mux.HandleFunc("/compose", s.handleCompose)
 	s.mux.HandleFunc("/thread/", s.handleThread)
+	s.mux.HandleFunc("/topic/", s.handleTopicView)
 	s.mux.HandleFunc("/agents/new", s.handleNewAgentModal)
 	s.mux.HandleFunc("/agents/", s.handleAgentAction) // Catch-all for /agents/{id}, /agents/{id}/message, etc.
 	s.mux.HandleFunc("/sessions/new", s.handleNewSessionModal)

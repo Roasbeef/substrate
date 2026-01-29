@@ -757,6 +757,129 @@ func (s *Server) handleCompose(w http.ResponseWriter, r *http.Request) {
 	s.renderPartial(w, "compose-modal", nil)
 }
 
+// TopicViewData holds data for the topic view page.
+type TopicViewData struct {
+	TopicName   string
+	TopicType   string
+	Messages    []MessageView
+	Subscribers []AgentView
+}
+
+// handleTopicView renders the topic view page showing messages in a topic.
+func (s *Server) handleTopicView(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	topicName := strings.TrimPrefix(r.URL.Path, "/topic/")
+
+	// Get topic info.
+	topic, err := s.store.Queries().GetTopicByName(ctx, topicName)
+	if err != nil {
+		http.Error(w, "Topic not found: "+topicName, http.StatusNotFound)
+		return
+	}
+
+	// Get messages in this topic.
+	dbMessages, err := s.store.Queries().GetMessagesByTopic(ctx, topic.ID)
+	if err != nil {
+		dbMessages = nil
+	}
+
+	// Convert to message views.
+	messages := make([]MessageView, len(dbMessages))
+	for i, m := range dbMessages {
+		senderName := fmt.Sprintf("Agent#%d", m.SenderID)
+		sender, err := s.store.Queries().GetAgent(ctx, m.SenderID)
+		if err == nil {
+			senderName = sender.Name
+		}
+
+		messages[i] = MessageView{
+			ID:             fmt.Sprintf("%d", m.ID),
+			ThreadID:       m.ThreadID,
+			SenderName:     senderName,
+			SenderInitials: getInitials(senderName),
+			Subject:        m.Subject,
+			Body:           m.BodyMd,
+			State:          "read",
+			IsImportant:    m.Priority == "urgent",
+			CreatedAt:      time.Unix(m.CreatedAt, 0),
+		}
+	}
+
+	// Get subscribers.
+	subs, _ := s.store.Queries().ListSubscriptionsByTopic(ctx, topic.ID)
+	subscribers := make([]AgentView, len(subs))
+	for i, sub := range subs {
+		subscribers[i] = AgentView{
+			ID:   fmt.Sprintf("%d", sub.ID),
+			Name: sub.Name,
+		}
+	}
+
+	_ = TopicViewData{
+		TopicName:   topicName,
+		TopicType:   topic.TopicType,
+		Messages:    messages,
+		Subscribers: subscribers,
+	}
+
+	// Render inline HTML for now (could create a template later).
+	w.Header().Set("Content-Type", "text/html")
+	fmt.Fprintf(w, `<!DOCTYPE html>
+<html>
+<head>
+    <title>%s - Substrate</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-50">
+    <div class="max-w-4xl mx-auto p-6">
+        <div class="mb-6">
+            <a href="/inbox" class="text-blue-600 hover:underline">← Back to Inbox</a>
+        </div>
+        <div class="bg-white rounded-lg shadow p-6">
+            <div class="flex items-center justify-between mb-4">
+                <div>
+                    <h1 class="text-2xl font-bold">%s</h1>
+                    <p class="text-gray-500">Type: %s</p>
+                </div>
+                <span class="px-3 py-1 bg-blue-100 text-blue-700 rounded-full text-sm">%d messages</span>
+            </div>
+            <div class="border-t pt-4">
+                <h2 class="font-semibold mb-2">Subscribers (%d)</h2>
+                <div class="flex flex-wrap gap-2 mb-4">`, topicName, topicName, topic.TopicType, len(messages), len(subscribers))
+
+	for _, sub := range subscribers {
+		fmt.Fprintf(w, `<span class="px-2 py-1 bg-gray-100 rounded text-sm">%s</span>`, sub.Name)
+	}
+
+	fmt.Fprintf(w, `</div>
+            </div>
+            <div class="border-t pt-4">
+                <h2 class="font-semibold mb-2">Messages</h2>
+                <div class="space-y-3">`)
+
+	if len(messages) == 0 {
+		fmt.Fprintf(w, `<p class="text-gray-500">No messages in this topic yet.</p>`)
+	} else {
+		for _, msg := range messages {
+			fmt.Fprintf(w, `<div class="p-3 border rounded hover:bg-gray-50">
+                    <div class="flex justify-between">
+                        <span class="font-medium">%s</span>
+                        <span class="text-gray-500 text-sm">%s</span>
+                    </div>
+                    <div class="font-medium">%s</div>
+                    <div class="text-gray-600 text-sm truncate">%s</div>
+                </div>`, msg.SenderName, msg.CreatedAt.Format("Jan 2, 3:04 PM"), msg.Subject, truncate(msg.Body, 100))
+		}
+	}
+
+	fmt.Fprintf(w, `</div>
+            </div>
+        </div>
+    </div>
+</body>
+</html>`)
+}
+
 // handleThread returns the thread view partial.
 func (s *Server) handleThread(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
