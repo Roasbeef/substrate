@@ -135,16 +135,26 @@ clean:
 	rm -f substrate substrated
 	rm -f coverage.out coverage.html
 
-# Web server (runs via substrated daemon in web-only mode)
+# Server execution
 WEB_PORT ?= 8080
 
+# Default run target: web-only mode (no MCP/stdio)
+.PHONY: run
+run: build-daemon
+	./substrated --web-only --web :$(WEB_PORT)
+
+# Run with MCP support (for Claude Code integration via stdio)
+.PHONY: run-mcp
+run-mcp: build-daemon
+	./substrated --web :$(WEB_PORT)
+
+# Aliases for backwards compatibility
 .PHONY: run-web
-run-web: build-daemon
-	./substrated -web-only -web :$(WEB_PORT)
+run-web: run
 
 .PHONY: run-web-dev
 run-web-dev:
-	go run ./cmd/substrated -web-only -web :$(WEB_PORT)
+	go run ./cmd/substrated --web-only --web :$(WEB_PORT)
 
 # Start web server in background (via substrated in web-only mode).
 .PHONY: start
@@ -255,12 +265,13 @@ help:
 	@echo "  tidy           Run go mod tidy"
 	@echo "  tidy-check     Check if go mod tidy would change anything"
 	@echo ""
-	@echo "Web server (runs via substrated daemon):"
-	@echo "  run-web        Build and run daemon with web UI (default port 8080)"
-	@echo "  run-web-dev    Run daemon with web UI without building (for dev)"
-	@echo "  start          Build and start daemon in background"
-	@echo "  stop           Stop running daemon"
-	@echo "  restart        Stop, rebuild, and start daemon"
+	@echo "Server execution:"
+	@echo "  run            Build and run in web-only mode (default, port 8080)"
+	@echo "  run-mcp        Build and run with MCP support (for Claude Code)"
+	@echo "  run-web-dev    Run in web-only mode without building (for dev)"
+	@echo "  start          Build and start in background"
+	@echo "  stop           Stop running server"
+	@echo "  restart        Stop, rebuild, and start server"
 	@echo "                 Usage: make restart WEB_PORT=8081"
 	@echo ""
 	@echo "Development:"

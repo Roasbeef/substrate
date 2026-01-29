@@ -10,6 +10,54 @@ import (
 	"database/sql"
 )
 
+const CountArchivedByAgent = `-- name: CountArchivedByAgent :one
+SELECT COUNT(*) FROM message_recipients
+WHERE agent_id = ? AND state = 'archived'
+`
+
+func (q *Queries) CountArchivedByAgent(ctx context.Context, agentID int64) (int64, error) {
+	row := q.db.QueryRowContext(ctx, CountArchivedByAgent, agentID)
+	var count int64
+	err := row.Scan(&count)
+	return count, err
+}
+
+const CountSentByAgent = `-- name: CountSentByAgent :one
+SELECT COUNT(*) FROM messages
+WHERE sender_id = ?
+`
+
+func (q *Queries) CountSentByAgent(ctx context.Context, senderID int64) (int64, error) {
+	row := q.db.QueryRowContext(ctx, CountSentByAgent, senderID)
+	var count int64
+	err := row.Scan(&count)
+	return count, err
+}
+
+const CountSnoozedByAgent = `-- name: CountSnoozedByAgent :one
+SELECT COUNT(*) FROM message_recipients
+WHERE agent_id = ? AND state = 'snoozed'
+`
+
+func (q *Queries) CountSnoozedByAgent(ctx context.Context, agentID int64) (int64, error) {
+	row := q.db.QueryRowContext(ctx, CountSnoozedByAgent, agentID)
+	var count int64
+	err := row.Scan(&count)
+	return count, err
+}
+
+const CountStarredByAgent = `-- name: CountStarredByAgent :one
+SELECT COUNT(*) FROM message_recipients
+WHERE agent_id = ? AND state = 'starred'
+`
+
+func (q *Queries) CountStarredByAgent(ctx context.Context, agentID int64) (int64, error) {
+	row := q.db.QueryRowContext(ctx, CountStarredByAgent, agentID)
+	var count int64
+	err := row.Scan(&count)
+	return count, err
+}
+
 const CountUnreadByAgent = `-- name: CountUnreadByAgent :one
 SELECT COUNT(*) FROM message_recipients
 WHERE agent_id = ? AND state = 'unread'
@@ -441,6 +489,125 @@ func (q *Queries) GetMessagesSinceOffset(ctx context.Context, arg GetMessagesSin
 			&i.DeadlineAt,
 			&i.Attachments,
 			&i.CreatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const GetSentMessages = `-- name: GetSentMessages :many
+SELECT id, thread_id, topic_id, log_offset, sender_id, subject, body_md, priority, deadline_at, attachments, created_at FROM messages
+WHERE sender_id = ?
+ORDER BY created_at DESC
+LIMIT ?
+`
+
+type GetSentMessagesParams struct {
+	SenderID int64
+	Limit    int64
+}
+
+func (q *Queries) GetSentMessages(ctx context.Context, arg GetSentMessagesParams) ([]Message, error) {
+	rows, err := q.db.QueryContext(ctx, GetSentMessages, arg.SenderID, arg.Limit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []Message
+	for rows.Next() {
+		var i Message
+		if err := rows.Scan(
+			&i.ID,
+			&i.ThreadID,
+			&i.TopicID,
+			&i.LogOffset,
+			&i.SenderID,
+			&i.Subject,
+			&i.BodyMd,
+			&i.Priority,
+			&i.DeadlineAt,
+			&i.Attachments,
+			&i.CreatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const GetSnoozedMessages = `-- name: GetSnoozedMessages :many
+SELECT m.id, m.thread_id, m.topic_id, m.log_offset, m.sender_id, m.subject, m.body_md, m.priority, m.deadline_at, m.attachments, m.created_at, mr.state, mr.snoozed_until, mr.read_at, mr.acked_at
+FROM messages m
+JOIN message_recipients mr ON m.id = mr.message_id
+WHERE mr.agent_id = ?
+    AND mr.state = 'snoozed'
+ORDER BY mr.snoozed_until ASC
+LIMIT ?
+`
+
+type GetSnoozedMessagesParams struct {
+	AgentID int64
+	Limit   int64
+}
+
+type GetSnoozedMessagesRow struct {
+	ID           int64
+	ThreadID     string
+	TopicID      int64
+	LogOffset    int64
+	SenderID     int64
+	Subject      string
+	BodyMd       string
+	Priority     string
+	DeadlineAt   sql.NullInt64
+	Attachments  sql.NullString
+	CreatedAt    int64
+	State        string
+	SnoozedUntil sql.NullInt64
+	ReadAt       sql.NullInt64
+	AckedAt      sql.NullInt64
+}
+
+func (q *Queries) GetSnoozedMessages(ctx context.Context, arg GetSnoozedMessagesParams) ([]GetSnoozedMessagesRow, error) {
+	rows, err := q.db.QueryContext(ctx, GetSnoozedMessages, arg.AgentID, arg.Limit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []GetSnoozedMessagesRow
+	for rows.Next() {
+		var i GetSnoozedMessagesRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.ThreadID,
+			&i.TopicID,
+			&i.LogOffset,
+			&i.SenderID,
+			&i.Subject,
+			&i.BodyMd,
+			&i.Priority,
+			&i.DeadlineAt,
+			&i.Attachments,
+			&i.CreatedAt,
+			&i.State,
+			&i.SnoozedUntil,
+			&i.ReadAt,
+			&i.AckedAt,
 		); err != nil {
 			return nil, err
 		}

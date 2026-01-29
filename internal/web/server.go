@@ -118,11 +118,19 @@ func (s *Server) registerRoutes() {
 	// Page routes.
 	s.mux.HandleFunc("/", s.handleIndex)
 	s.mux.HandleFunc("/inbox", s.handleInbox)
+	s.mux.HandleFunc("/starred", s.handleStarred)
+	s.mux.HandleFunc("/snoozed", s.handleSnoozed)
+	s.mux.HandleFunc("/sent", s.handleSent)
+	s.mux.HandleFunc("/archive", s.handleArchive)
 	s.mux.HandleFunc("/agents", s.handleAgentsDashboard)
 	s.mux.HandleFunc("/sessions", s.handleSessions)
 
 	// HTMX partial routes.
 	s.mux.HandleFunc("/inbox/messages", s.handleInboxMessages)
+	s.mux.HandleFunc("/starred/messages", s.handleStarredMessages)
+	s.mux.HandleFunc("/snoozed/messages", s.handleSnoozedMessages)
+	s.mux.HandleFunc("/sent/messages", s.handleSentMessages)
+	s.mux.HandleFunc("/archive/messages", s.handleArchivedMessages)
 	s.mux.HandleFunc("/compose", s.handleCompose)
 	s.mux.HandleFunc("/thread/", s.handleThread)
 	s.mux.HandleFunc("/agents/new", s.handleNewAgentModal)
@@ -141,6 +149,9 @@ func (s *Server) registerRoutes() {
 
 	// Thread action routes.
 	s.mux.HandleFunc("/api/threads/", s.handleThreadAction)
+
+	// Message action routes.
+	s.mux.HandleFunc("/api/messages/", s.handleMessageAction)
 
 	// SSE event streams.
 	s.mux.HandleFunc("/events/agents", s.handleSSEAgents)

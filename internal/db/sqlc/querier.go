@@ -10,6 +10,10 @@ import (
 )
 
 type Querier interface {
+	CountArchivedByAgent(ctx context.Context, agentID int64) (int64, error)
+	CountSentByAgent(ctx context.Context, senderID int64) (int64, error)
+	CountSnoozedByAgent(ctx context.Context, agentID int64) (int64, error)
+	CountStarredByAgent(ctx context.Context, agentID int64) (int64, error)
 	CountSubscribersByTopic(ctx context.Context, topicID int64) (int64, error)
 	CountUnreadByAgent(ctx context.Context, agentID int64) (int64, error)
 	CountUnreadUrgentByAgent(ctx context.Context, agentID int64) (int64, error)
@@ -39,8 +43,10 @@ type Querier interface {
 	GetMessagesSinceOffset(ctx context.Context, arg GetMessagesSinceOffsetParams) ([]Message, error)
 	GetOrCreateAgentInboxTopic(ctx context.Context, arg GetOrCreateAgentInboxTopicParams) (Topic, error)
 	GetOrCreateTopic(ctx context.Context, arg GetOrCreateTopicParams) (Topic, error)
+	GetSentMessages(ctx context.Context, arg GetSentMessagesParams) ([]Message, error)
 	GetSessionIdentity(ctx context.Context, sessionID string) (SessionIdentity, error)
 	GetSessionIdentityByProject(ctx context.Context, projectKey sql.NullString) (SessionIdentity, error)
+	GetSnoozedMessages(ctx context.Context, arg GetSnoozedMessagesParams) ([]GetSnoozedMessagesRow, error)
 	GetSnoozedMessagesReadyToWake(ctx context.Context, snoozedUntil sql.NullInt64) ([]GetSnoozedMessagesReadyToWakeRow, error)
 	GetStarredMessages(ctx context.Context, arg GetStarredMessagesParams) ([]GetStarredMessagesRow, error)
 	GetSubscription(ctx context.Context, arg GetSubscriptionParams) (Subscription, error)

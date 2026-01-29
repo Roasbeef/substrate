@@ -56,26 +56,39 @@ make unit pkg=./internal/mcp case=TestNewServer
 ### Pre-commit
 - `make pre-commit` - Run all checks (tidy, fmt, vet, lint, test)
 
-### Running the Web Server
-The web UI is built into substrated. Run with:
-```bash
-# Build and run (foreground)
-make run-web
+### Running the Server
+The web UI is built into substrated. By default, `make run` starts in web-only mode (no MCP/stdio):
 
-# Development mode (auto-rebuild on changes)
+```bash
+# Build and run in web-only mode (foreground, default)
+make run
+
+# Run with MCP support (for Claude Code integration, uses stdio)
+make run-mcp
+
+# Development mode (no rebuild)
 make run-web-dev
 
-# Background mode
+# Background mode (web-only)
 make start
 
 # Stop background server
 make stop
 
+# Restart (stop + rebuild + start)
+make restart
+
 # Custom port
-make run-web WEB_PORT=8081
+make run WEB_PORT=8081
+make start WEB_PORT=8081
 ```
 
 Access the UI at `http://localhost:8080` (or custom port).
+
+**When to use each:**
+- `make run` - Default for development/testing the web UI
+- `make run-mcp` - When testing Claude Code integration (reads from stdin)
+- `make start/stop/restart` - For background execution during development
 
 ## Code Style Quick Reference
 

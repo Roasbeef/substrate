@@ -2,6 +2,7 @@ package web
 
 import (
 	"context"
+	"database/sql"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -18,6 +19,9 @@ type PageData struct {
 	ActiveNav   string
 	UnreadCount int
 	Category    string
+
+	// MessagesEndpoint is the HTMX endpoint for loading messages.
+	MessagesEndpoint string
 
 	// Page-specific stats (use the one that applies).
 	Stats      *InboxStats
@@ -219,10 +223,11 @@ func (s *Server) handleInbox(w http.ResponseWriter, r *http.Request) {
 	pageSize := 50
 
 	data := PageData{
-		Title:       "Inbox",
-		ActiveNav:   "inbox",
-		UnreadCount: int(unreadCount),
-		Category:    category,
+		Title:            "Inbox",
+		ActiveNav:        "inbox",
+		UnreadCount:      int(unreadCount),
+		Category:         category,
+		MessagesEndpoint: "/inbox/messages",
 		Stats: &InboxStats{
 			Unread:       int(unreadCount),
 			Starred:      0, // TODO: Add starred count query.
@@ -273,6 +278,126 @@ func (s *Server) handleAgentsDashboard(w http.ResponseWriter, r *http.Request) {
 func (s *Server) handleSessions(w http.ResponseWriter, r *http.Request) {
 	// Redirect to agents dashboard which shows active sessions.
 	http.Redirect(w, r, "/agents", http.StatusTemporaryRedirect)
+}
+
+// handleStarred renders the starred messages page.
+func (s *Server) handleStarred(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+
+	// Get first agent as default.
+	var agentID int64
+	agents, err := s.store.Queries().ListAgents(ctx)
+	if err == nil && len(agents) > 0 {
+		agentID = agents[0].ID
+	}
+
+	// Get starred count.
+	var starredCount int64
+	if agentID > 0 {
+		starredCount, _ = s.store.Queries().CountStarredByAgent(ctx, agentID)
+	}
+
+	data := PageData{
+		Title:            "Starred",
+		ActiveNav:        "starred",
+		UnreadCount:      int(starredCount),
+		MessagesEndpoint: "/starred/messages",
+		Stats: &InboxStats{
+			Starred: int(starredCount),
+		},
+	}
+
+	s.render(w, "inbox.html", data)
+}
+
+// handleSnoozed renders the snoozed messages page.
+func (s *Server) handleSnoozed(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+
+	// Get first agent as default.
+	var agentID int64
+	agents, err := s.store.Queries().ListAgents(ctx)
+	if err == nil && len(agents) > 0 {
+		agentID = agents[0].ID
+	}
+
+	// Get snoozed count.
+	var snoozedCount int64
+	if agentID > 0 {
+		snoozedCount, _ = s.store.Queries().CountSnoozedByAgent(ctx, agentID)
+	}
+
+	data := PageData{
+		Title:            "Snoozed",
+		ActiveNav:        "snoozed",
+		MessagesEndpoint: "/snoozed/messages",
+		UnreadCount:      int(snoozedCount),
+		Stats: &InboxStats{
+			Snoozed: int(snoozedCount),
+		},
+	}
+
+	s.render(w, "inbox.html", data)
+}
+
+// handleSent renders the sent messages page.
+func (s *Server) handleSent(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+
+	// Get first agent as default.
+	var agentID int64
+	agents, err := s.store.Queries().ListAgents(ctx)
+	if err == nil && len(agents) > 0 {
+		agentID = agents[0].ID
+	}
+
+	// Get sent count.
+	var sentCount int64
+	if agentID > 0 {
+		sentCount, _ = s.store.Queries().CountSentByAgent(ctx, agentID)
+	}
+
+	data := PageData{
+		Title:            "Sent",
+		ActiveNav:        "sent",
+		MessagesEndpoint: "/sent/messages",
+		UnreadCount:      int(sentCount),
+		Stats: &InboxStats{
+			PrimaryCount: int(sentCount),
+		},
+	}
+
+	s.render(w, "inbox.html", data)
+}
+
+// handleArchive renders the archived messages page.
+func (s *Server) handleArchive(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+
+	// Get first agent as default.
+	var agentID int64
+	agents, err := s.store.Queries().ListAgents(ctx)
+	if err == nil && len(agents) > 0 {
+		agentID = agents[0].ID
+	}
+
+	// Get archived count.
+	var archivedCount int64
+	if agentID > 0 {
+		archivedCount, _ = s.store.Queries().CountArchivedByAgent(ctx, agentID)
+	}
+
+	data := PageData{
+		Title:            "Archive",
+		ActiveNav:        "archive",
+		MessagesEndpoint: "/archive/messages",
+		UnreadCount:      int(archivedCount),
+		Stats: &InboxStats{
+			PrimaryCount: int(archivedCount),
+		},
+	}
+
+	s.render(w, "inbox.html", data)
 }
 
 // handleInboxMessages returns the message list partial.
@@ -362,6 +487,264 @@ func getInitials(name string) string {
 		return strings.ToUpper(parts[0])
 	}
 	return strings.ToUpper(string(parts[0][0]) + string(parts[1][0]))
+}
+
+// handleStarredMessages returns the starred message list partial.
+func (s *Server) handleStarredMessages(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+
+	// Get agent ID from query or use first agent.
+	agentIDStr := r.URL.Query().Get("agent_id")
+	var agentID int64
+
+	if agentIDStr != "" {
+		fmt.Sscanf(agentIDStr, "%d", &agentID)
+	} else {
+		agents, err := s.store.Queries().ListAgents(ctx)
+		if err == nil && len(agents) > 0 {
+			agentID = agents[0].ID
+		}
+	}
+
+	if agentID == 0 {
+		s.renderPartial(w, "message-list", MessagesListData{Messages: nil})
+		return
+	}
+
+	// Fetch starred messages.
+	dbMessages, err := s.store.Queries().GetStarredMessages(ctx, sqlc.GetStarredMessagesParams{
+		AgentID: agentID,
+		Limit:   50,
+	})
+	if err != nil {
+		s.renderPartial(w, "message-list", MessagesListData{Messages: nil})
+		return
+	}
+
+	messages := s.convertStarredToView(ctx, dbMessages)
+	s.renderPartial(w, "message-list", MessagesListData{Messages: messages})
+}
+
+// handleSnoozedMessages returns the snoozed message list partial.
+func (s *Server) handleSnoozedMessages(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+
+	// Get agent ID from query or use first agent.
+	agentIDStr := r.URL.Query().Get("agent_id")
+	var agentID int64
+
+	if agentIDStr != "" {
+		fmt.Sscanf(agentIDStr, "%d", &agentID)
+	} else {
+		agents, err := s.store.Queries().ListAgents(ctx)
+		if err == nil && len(agents) > 0 {
+			agentID = agents[0].ID
+		}
+	}
+
+	if agentID == 0 {
+		s.renderPartial(w, "message-list", MessagesListData{Messages: nil})
+		return
+	}
+
+	// Fetch snoozed messages.
+	dbMessages, err := s.store.Queries().GetSnoozedMessages(ctx, sqlc.GetSnoozedMessagesParams{
+		AgentID: agentID,
+		Limit:   50,
+	})
+	if err != nil {
+		s.renderPartial(w, "message-list", MessagesListData{Messages: nil})
+		return
+	}
+
+	messages := s.convertSnoozedToView(ctx, dbMessages)
+	s.renderPartial(w, "message-list", MessagesListData{Messages: messages})
+}
+
+// handleSentMessages returns the sent message list partial.
+func (s *Server) handleSentMessages(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+
+	// Get agent ID from query or use first agent.
+	agentIDStr := r.URL.Query().Get("agent_id")
+	var agentID int64
+
+	if agentIDStr != "" {
+		fmt.Sscanf(agentIDStr, "%d", &agentID)
+	} else {
+		agents, err := s.store.Queries().ListAgents(ctx)
+		if err == nil && len(agents) > 0 {
+			agentID = agents[0].ID
+		}
+	}
+
+	if agentID == 0 {
+		s.renderPartial(w, "message-list", MessagesListData{Messages: nil})
+		return
+	}
+
+	// Fetch sent messages.
+	dbMessages, err := s.store.Queries().GetSentMessages(ctx, sqlc.GetSentMessagesParams{
+		SenderID: agentID,
+		Limit:    50,
+	})
+	if err != nil {
+		s.renderPartial(w, "message-list", MessagesListData{Messages: nil})
+		return
+	}
+
+	messages := s.convertSentMessagesToView(ctx, dbMessages)
+	s.renderPartial(w, "message-list", MessagesListData{Messages: messages})
+}
+
+// handleArchivedMessages returns the archived message list partial.
+func (s *Server) handleArchivedMessages(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+
+	// Get agent ID from query or use first agent.
+	agentIDStr := r.URL.Query().Get("agent_id")
+	var agentID int64
+
+	if agentIDStr != "" {
+		fmt.Sscanf(agentIDStr, "%d", &agentID)
+	} else {
+		agents, err := s.store.Queries().ListAgents(ctx)
+		if err == nil && len(agents) > 0 {
+			agentID = agents[0].ID
+		}
+	}
+
+	if agentID == 0 {
+		s.renderPartial(w, "message-list", MessagesListData{Messages: nil})
+		return
+	}
+
+	// Fetch archived messages.
+	dbMessages, err := s.store.Queries().GetArchivedMessages(ctx, sqlc.GetArchivedMessagesParams{
+		AgentID: agentID,
+		Limit:   50,
+	})
+	if err != nil {
+		s.renderPartial(w, "message-list", MessagesListData{Messages: nil})
+		return
+	}
+
+	messages := s.convertArchivedToView(ctx, dbMessages)
+	s.renderPartial(w, "message-list", MessagesListData{Messages: messages})
+}
+
+// convertStarredToView converts starred messages to view models.
+func (s *Server) convertStarredToView(
+	ctx context.Context, dbMessages []sqlc.GetStarredMessagesRow,
+) []MessageView {
+	messages := make([]MessageView, len(dbMessages))
+	for i, m := range dbMessages {
+		senderName := fmt.Sprintf("Agent#%d", m.SenderID)
+		sender, err := s.store.Queries().GetAgent(ctx, m.SenderID)
+		if err == nil {
+			senderName = sender.Name
+		}
+
+		messages[i] = MessageView{
+			ID:             fmt.Sprintf("%d", m.ID),
+			ThreadID:       m.ThreadID,
+			SenderName:     senderName,
+			SenderInitials: getInitials(senderName),
+			Subject:        m.Subject,
+			Body:           m.BodyMd,
+			State:          m.State,
+			IsStarred:      true,
+			IsImportant:    m.Priority == "urgent",
+			IsAgent:        true,
+			CreatedAt:      time.Unix(m.CreatedAt, 0),
+		}
+	}
+	return messages
+}
+
+// convertSnoozedToView converts snoozed messages to view models.
+func (s *Server) convertSnoozedToView(
+	ctx context.Context, dbMessages []sqlc.GetSnoozedMessagesRow,
+) []MessageView {
+	messages := make([]MessageView, len(dbMessages))
+	for i, m := range dbMessages {
+		senderName := fmt.Sprintf("Agent#%d", m.SenderID)
+		sender, err := s.store.Queries().GetAgent(ctx, m.SenderID)
+		if err == nil {
+			senderName = sender.Name
+		}
+
+		messages[i] = MessageView{
+			ID:             fmt.Sprintf("%d", m.ID),
+			ThreadID:       m.ThreadID,
+			SenderName:     senderName,
+			SenderInitials: getInitials(senderName),
+			Subject:        m.Subject,
+			Body:           m.BodyMd,
+			State:          m.State,
+			IsStarred:      false,
+			IsImportant:    m.Priority == "urgent",
+			IsAgent:        true,
+			CreatedAt:      time.Unix(m.CreatedAt, 0),
+		}
+	}
+	return messages
+}
+
+// convertArchivedToView converts archived messages to view models.
+func (s *Server) convertArchivedToView(
+	ctx context.Context, dbMessages []sqlc.GetArchivedMessagesRow,
+) []MessageView {
+	messages := make([]MessageView, len(dbMessages))
+	for i, m := range dbMessages {
+		senderName := fmt.Sprintf("Agent#%d", m.SenderID)
+		sender, err := s.store.Queries().GetAgent(ctx, m.SenderID)
+		if err == nil {
+			senderName = sender.Name
+		}
+
+		messages[i] = MessageView{
+			ID:             fmt.Sprintf("%d", m.ID),
+			ThreadID:       m.ThreadID,
+			SenderName:     senderName,
+			SenderInitials: getInitials(senderName),
+			Subject:        m.Subject,
+			Body:           m.BodyMd,
+			State:          m.State,
+			IsStarred:      false,
+			IsImportant:    m.Priority == "urgent",
+			IsAgent:        true,
+			CreatedAt:      time.Unix(m.CreatedAt, 0),
+		}
+	}
+	return messages
+}
+
+// convertSentMessagesToView converts sent messages to view models.
+func (s *Server) convertSentMessagesToView(
+	ctx context.Context, dbMessages []sqlc.Message,
+) []MessageView {
+	messages := make([]MessageView, len(dbMessages))
+	for i, m := range dbMessages {
+		senderName := fmt.Sprintf("Agent#%d", m.SenderID)
+		sender, err := s.store.Queries().GetAgent(ctx, m.SenderID)
+		if err == nil {
+			senderName = sender.Name
+		}
+
+		messages[i] = MessageView{
+			ID:             fmt.Sprintf("%d", m.ID),
+			ThreadID:       m.ThreadID,
+			SenderName:     senderName,
+			SenderInitials: getInitials(senderName),
+			Subject:        m.Subject,
+			Body:           m.BodyMd,
+			State:          "sent",
+			IsAgent:        true,
+			CreatedAt:      time.Unix(m.CreatedAt, 0),
+		}
+	}
+	return messages
 }
 
 // handleCompose returns the compose modal partial.
@@ -938,4 +1321,288 @@ func (s *Server) handleThreadUnread(
 	// TODO: Implement unread functionality (update recipient state).
 	w.Header().Set("Content-Type", "text/html")
 	w.Write([]byte(`<div class="p-2 text-sm text-gray-500">Thread marked as unread</div>`))
+}
+
+// handleMessageAction handles message actions like star, archive, snooze, trash.
+// Routes: POST /api/messages/{message_id}/{action}
+func (s *Server) handleMessageAction(w http.ResponseWriter, r *http.Request) {
+	// Parse path: /api/messages/{message_id}/{action}
+	path := strings.TrimPrefix(r.URL.Path, "/api/messages/")
+	parts := strings.Split(path, "/")
+	if len(parts) < 2 {
+		http.Error(w, "Invalid path", http.StatusBadRequest)
+		return
+	}
+
+	messageIDStr := parts[0]
+	action := parts[1]
+
+	var messageID int64
+	if _, err := fmt.Sscanf(messageIDStr, "%d", &messageID); err != nil {
+		http.Error(w, "Invalid message ID", http.StatusBadRequest)
+		return
+	}
+
+	ctx := r.Context()
+
+	// Get the first agent as the default recipient (for demo purposes).
+	agents, err := s.store.Queries().ListAgents(ctx)
+	if err != nil || len(agents) == 0 {
+		http.Error(w, "No agents found", http.StatusInternalServerError)
+		return
+	}
+	agentID := agents[0].ID
+
+	switch action {
+	case "star":
+		s.handleMessageStar(ctx, w, r, messageID, agentID)
+	case "archive":
+		s.handleMessageArchive(ctx, w, r, messageID, agentID)
+	case "snooze-menu":
+		s.handleMessageSnoozeMenu(ctx, w, r, messageID)
+	case "snooze":
+		s.handleMessageSnooze(ctx, w, r, messageID, agentID)
+	case "trash":
+		s.handleMessageTrash(ctx, w, r, messageID, agentID)
+	case "ack":
+		s.handleMessageAck(ctx, w, r, messageID, agentID)
+	default:
+		http.Error(w, "Unknown action: "+action, http.StatusBadRequest)
+	}
+}
+
+// handleMessageStar toggles the star status of a message.
+func (s *Server) handleMessageStar(
+	ctx context.Context, w http.ResponseWriter, r *http.Request,
+	messageID, agentID int64,
+) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	// Get current state.
+	recipient, err := s.store.Queries().GetMessageRecipient(ctx, sqlc.GetMessageRecipientParams{
+		MessageID: messageID,
+		AgentID:   agentID,
+	})
+	if err != nil {
+		http.Error(w, "Message not found", http.StatusNotFound)
+		return
+	}
+
+	// Toggle star state.
+	newState := "starred"
+	if recipient.State == "starred" {
+		newState = "read"
+	}
+
+	err = s.store.Queries().UpdateRecipientState(ctx, sqlc.UpdateRecipientStateParams{
+		State:     newState,
+		Column2:   newState,
+		ReadAt:    sql.NullInt64{Int64: time.Now().Unix(), Valid: true},
+		MessageID: messageID,
+		AgentID:   agentID,
+	})
+	if err != nil {
+		http.Error(w, "Failed to update state", http.StatusInternalServerError)
+		return
+	}
+
+	// Return updated star button.
+	isStarred := newState == "starred"
+	starClass := "text-gray-400"
+	if isStarred {
+		starClass = "text-yellow-400"
+	}
+
+	w.Header().Set("Content-Type", "text/html")
+	fmt.Fprintf(w, `<button class="star-btn p-1 rounded hover:bg-gray-100 %s"
+		hx-post="/api/messages/%d/star"
+		hx-swap="outerHTML">
+		<svg class="w-5 h-5" fill="%s" stroke="currentColor" viewBox="0 0 24 24">
+			<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+				d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z"/>
+		</svg>
+	</button>`, starClass, messageID, map[bool]string{true: "currentColor", false: "none"}[isStarred])
+}
+
+// handleMessageArchive archives a message.
+func (s *Server) handleMessageArchive(
+	ctx context.Context, w http.ResponseWriter, r *http.Request,
+	messageID, agentID int64,
+) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	err := s.store.Queries().UpdateRecipientState(ctx, sqlc.UpdateRecipientStateParams{
+		State:     "archived",
+		Column2:   "archived",
+		ReadAt:    sql.NullInt64{Int64: time.Now().Unix(), Valid: true},
+		MessageID: messageID,
+		AgentID:   agentID,
+	})
+	if err != nil {
+		http.Error(w, "Failed to archive message", http.StatusInternalServerError)
+		return
+	}
+
+	// Return empty response to remove the message from the list.
+	w.Header().Set("HX-Trigger", "messageArchived")
+	w.Header().Set("Content-Type", "text/html")
+	w.Write([]byte(""))
+}
+
+// handleMessageSnoozeMenu returns the snooze options menu as a modal overlay.
+func (s *Server) handleMessageSnoozeMenu(
+	ctx context.Context, w http.ResponseWriter, r *http.Request,
+	messageID int64,
+) {
+	w.Header().Set("Content-Type", "text/html")
+	// Render a modal overlay with the snooze menu.
+	// The backdrop click closes the modal. Snooze buttons use htmx to post and then
+	// trigger a custom event to close the modal after the request completes.
+	fmt.Fprintf(w, `<div id="snooze-modal" class="fixed inset-0 z-50 flex items-center justify-center pointer-events-auto" onclick="if(event.target === this) this.remove()">
+	<!-- Backdrop -->
+	<div class="absolute inset-0 bg-black/20"></div>
+	<!-- Menu -->
+	<div class="relative bg-white rounded-lg shadow-xl border border-gray-200 py-2 min-w-[200px]">
+		<div class="px-4 py-2 border-b border-gray-100">
+			<h3 class="text-sm font-medium text-gray-900">Snooze until...</h3>
+		</div>
+		<button class="w-full px-4 py-2 text-left text-sm hover:bg-gray-100 flex items-center gap-3"
+			hx-post="/api/messages/%d/snooze?duration=1h"
+			hx-target="#message-%d"
+			hx-swap="outerHTML"
+			hx-on::after-request="document.getElementById('snooze-modal')?.remove()">
+			<svg class="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+				<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/>
+			</svg>
+			1 hour
+		</button>
+		<button class="w-full px-4 py-2 text-left text-sm hover:bg-gray-100 flex items-center gap-3"
+			hx-post="/api/messages/%d/snooze?duration=4h"
+			hx-target="#message-%d"
+			hx-swap="outerHTML"
+			hx-on::after-request="document.getElementById('snooze-modal')?.remove()">
+			<svg class="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+				<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/>
+			</svg>
+			4 hours
+		</button>
+		<button class="w-full px-4 py-2 text-left text-sm hover:bg-gray-100 flex items-center gap-3"
+			hx-post="/api/messages/%d/snooze?duration=24h"
+			hx-target="#message-%d"
+			hx-swap="outerHTML"
+			hx-on::after-request="document.getElementById('snooze-modal')?.remove()">
+			<svg class="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+				<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z"/>
+			</svg>
+			Tomorrow
+		</button>
+		<button class="w-full px-4 py-2 text-left text-sm hover:bg-gray-100 flex items-center gap-3"
+			hx-post="/api/messages/%d/snooze?duration=168h"
+			hx-target="#message-%d"
+			hx-swap="outerHTML"
+			hx-on::after-request="document.getElementById('snooze-modal')?.remove()">
+			<svg class="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+				<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/>
+			</svg>
+			Next week
+		</button>
+	</div>
+</div>`, messageID, messageID, messageID, messageID, messageID, messageID, messageID, messageID)
+}
+
+// handleMessageSnooze snoozes a message for the specified duration.
+func (s *Server) handleMessageSnooze(
+	ctx context.Context, w http.ResponseWriter, r *http.Request,
+	messageID, agentID int64,
+) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	durationStr := r.URL.Query().Get("duration")
+	if durationStr == "" {
+		durationStr = "1h"
+	}
+
+	duration, err := time.ParseDuration(durationStr)
+	if err != nil {
+		http.Error(w, "Invalid duration", http.StatusBadRequest)
+		return
+	}
+
+	snoozedUntil := time.Now().Add(duration).Unix()
+
+	err = s.store.Queries().UpdateRecipientSnoozed(ctx, sqlc.UpdateRecipientSnoozedParams{
+		SnoozedUntil: sql.NullInt64{Int64: snoozedUntil, Valid: true},
+		MessageID:    messageID,
+		AgentID:      agentID,
+	})
+	if err != nil {
+		http.Error(w, "Failed to snooze message", http.StatusInternalServerError)
+		return
+	}
+
+	// Return empty response to remove the message from the list.
+	w.Header().Set("HX-Trigger", "messageSnoozed")
+	w.Header().Set("Content-Type", "text/html")
+	w.Write([]byte(""))
+}
+
+// handleMessageTrash moves a message to trash.
+func (s *Server) handleMessageTrash(
+	ctx context.Context, w http.ResponseWriter, r *http.Request,
+	messageID, agentID int64,
+) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	err := s.store.Queries().UpdateRecipientState(ctx, sqlc.UpdateRecipientStateParams{
+		State:     "trash",
+		Column2:   "trash",
+		ReadAt:    sql.NullInt64{Int64: time.Now().Unix(), Valid: true},
+		MessageID: messageID,
+		AgentID:   agentID,
+	})
+	if err != nil {
+		http.Error(w, "Failed to trash message", http.StatusInternalServerError)
+		return
+	}
+
+	// Return empty response to remove the message from the list.
+	w.Header().Set("HX-Trigger", "messageTrashed")
+	w.Header().Set("Content-Type", "text/html")
+	w.Write([]byte(""))
+}
+
+// handleMessageAck acknowledges a message.
+func (s *Server) handleMessageAck(
+	ctx context.Context, w http.ResponseWriter, r *http.Request,
+	messageID, agentID int64,
+) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	err := s.store.Queries().UpdateRecipientAcked(ctx, sqlc.UpdateRecipientAckedParams{
+		AckedAt:   sql.NullInt64{Int64: time.Now().Unix(), Valid: true},
+		MessageID: messageID,
+		AgentID:   agentID,
+	})
+	if err != nil {
+		http.Error(w, "Failed to acknowledge message", http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "text/html")
+	w.Write([]byte(`<span class="text-green-600 text-sm">Acknowledged</span>`))
 }

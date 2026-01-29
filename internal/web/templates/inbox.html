@@ -2,7 +2,7 @@
 {{template "layout" .}}
 {{end}}
 
-{{define "title"}}Inbox - Substrate{{end}}
+{{define "title"}}{{.Title}} - Substrate{{end}}
 
 {{define "head"}}
 <style>
@@ -365,13 +365,13 @@
     <div class="inbox-card mb-6">
         <div class="flex items-center justify-between px-6 py-4">
             <div>
-                <h1 class="text-xl font-medium text-gray-900">Inbox</h1>
-                <p class="text-sm text-gray-500 mt-0.5">Messages from agents and topics</p>
+                <h1 class="text-xl font-medium text-gray-900">{{.Title}}</h1>
+                <p class="text-sm text-gray-500 mt-0.5">{{if eq .ActiveNav "inbox"}}Messages from agents and topics{{else if eq .ActiveNav "starred"}}Your starred messages{{else if eq .ActiveNav "snoozed"}}Messages snoozed for later{{else if eq .ActiveNav "sent"}}Messages you've sent{{else if eq .ActiveNav "archive"}}Archived messages{{else}}Messages from agents and topics{{end}}</p>
             </div>
             <div class="flex items-center gap-3">
                 <button class="flex items-center gap-2 px-4 py-2 text-gray-700 text-sm font-medium rounded-lg
                                border border-gray-300 hover:bg-gray-50 transition-all"
-                        hx-get="/inbox/messages"
+                        hx-get="{{if .MessagesEndpoint}}{{.MessagesEndpoint}}{{else}}/inbox/messages{{end}}"
                         hx-target="#message-list"
                         hx-swap="innerHTML">
                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
@@ -502,7 +502,7 @@
 
         <!-- Message List -->
         <div id="message-list"
-             hx-get="/inbox/messages{{if .Category}}?category={{.Category}}{{end}}"
+             hx-get="{{if .MessagesEndpoint}}{{.MessagesEndpoint}}{{else}}/inbox/messages{{end}}{{if .Category}}?category={{.Category}}{{end}}"
              hx-trigger="load"
              hx-swap="innerHTML">
             <div class="p-8 text-center text-gray-500">

@@ -86,6 +86,15 @@ WHERE mr.agent_id = ?
 ORDER BY m.created_at DESC
 LIMIT ?;
 
+-- name: GetSnoozedMessages :many
+SELECT m.*, mr.state, mr.snoozed_until, mr.read_at, mr.acked_at
+FROM messages m
+JOIN message_recipients mr ON m.id = mr.message_id
+WHERE mr.agent_id = ?
+    AND mr.state = 'snoozed'
+ORDER BY mr.snoozed_until ASC
+LIMIT ?;
+
 -- name: GetSnoozedMessagesReadyToWake :many
 SELECT m.*, mr.agent_id as recipient_agent_id
 FROM messages m
@@ -125,6 +134,28 @@ WHERE agent_id = ? AND state = 'unread';
 SELECT COUNT(*) FROM message_recipients mr
 JOIN messages m ON mr.message_id = m.id
 WHERE mr.agent_id = ? AND mr.state = 'unread' AND m.priority = 'urgent';
+
+-- name: GetSentMessages :many
+SELECT * FROM messages
+WHERE sender_id = ?
+ORDER BY created_at DESC
+LIMIT ?;
+
+-- name: CountStarredByAgent :one
+SELECT COUNT(*) FROM message_recipients
+WHERE agent_id = ? AND state = 'starred';
+
+-- name: CountSnoozedByAgent :one
+SELECT COUNT(*) FROM message_recipients
+WHERE agent_id = ? AND state = 'snoozed';
+
+-- name: CountArchivedByAgent :one
+SELECT COUNT(*) FROM message_recipients
+WHERE agent_id = ? AND state = 'archived';
+
+-- name: CountSentByAgent :one
+SELECT COUNT(*) FROM messages
+WHERE sender_id = ?;
 
 -- Note: Full-text search queries using FTS5 are handled manually in Go code
 -- since sqlc doesn't fully support FTS5 virtual tables.
