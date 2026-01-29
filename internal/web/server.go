@@ -15,6 +15,7 @@ import (
 
 	"github.com/roasbeef/subtrate/internal/agent"
 	"github.com/roasbeef/subtrate/internal/db"
+	"github.com/roasbeef/subtrate/internal/db/sqlc"
 	"github.com/yuin/goldmark"
 	"github.com/yuin/goldmark/extension"
 	"github.com/yuin/goldmark/renderer/html"
@@ -26,6 +27,9 @@ var templatesFS embed.FS
 //go:embed static/css/*.css static/js/*.js
 var staticFS embed.FS
 
+// UserAgentName is the name of the agent used for human-sent messages.
+const UserAgentName = "User"
+
 // Server is the HTTP server for the Subtrate web UI.
 type Server struct {
 	store        *db.Store
@@ -36,6 +40,7 @@ type Server struct {
 	mux          *http.ServeMux
 	srv          *http.Server
 	addr         string
+	userAgentID  int64 // Cached ID for the User agent.
 }
 
 // Config holds configuration for the web server.
@@ -134,6 +139,7 @@ func (s *Server) registerRoutes() {
 	s.mux.HandleFunc("/compose", s.handleCompose)
 	s.mux.HandleFunc("/thread/", s.handleThread)
 	s.mux.HandleFunc("/agents/new", s.handleNewAgentModal)
+	s.mux.HandleFunc("/agents/", s.handleAgentAction) // Catch-all for /agents/{id}, /agents/{id}/message, etc.
 	s.mux.HandleFunc("/sessions/new", s.handleNewSessionModal)
 
 	// API routes (return HTML partials for HTMX).
@@ -179,6 +185,41 @@ func (s *Server) Shutdown(ctx context.Context) error {
 		return s.srv.Shutdown(ctx)
 	}
 	return nil
+}
+
+// ensureUserAgent ensures the User agent exists and caches its ID.
+func (s *Server) ensureUserAgent(ctx context.Context) error {
+	// Try to get existing User agent.
+	agent, err := s.store.Queries().GetAgentByName(ctx, UserAgentName)
+	if err == nil {
+		s.userAgentID = agent.ID
+		return nil
+	}
+
+	// Create the User agent.
+	agent, err = s.store.Queries().CreateAgent(ctx, sqlc.CreateAgentParams{
+		Name:         UserAgentName,
+		CreatedAt:    time.Now().Unix(),
+		LastActiveAt: time.Now().Unix(),
+	})
+	if err != nil {
+		return fmt.Errorf("failed to create User agent: %w", err)
+	}
+
+	s.userAgentID = agent.ID
+	log.Printf("Created User agent with ID %d", s.userAgentID)
+	return nil
+}
+
+// getUserAgentID returns the cached User agent ID, initializing if needed.
+func (s *Server) getUserAgentID(ctx context.Context) int64 {
+	if s.userAgentID == 0 {
+		if err := s.ensureUserAgent(ctx); err != nil {
+			log.Printf("Warning: failed to ensure User agent: %v", err)
+			return 0
+		}
+	}
+	return s.userAgentID
 }
 
 // Template helper functions.

@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"strconv"
 	"strings"
 	"time"
 
@@ -344,12 +345,8 @@ func (s *Server) handleSnoozed(w http.ResponseWriter, r *http.Request) {
 func (s *Server) handleSent(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 
-	// Get first agent as default.
-	var agentID int64
-	agents, err := s.store.Queries().ListAgents(ctx)
-	if err == nil && len(agents) > 0 {
-		agentID = agents[0].ID
-	}
+	// Use User agent for sent messages (human-sent messages from UI).
+	agentID := s.getUserAgentID(ctx)
 
 	// Get sent count.
 	var sentCount int64
@@ -565,17 +562,15 @@ func (s *Server) handleSnoozedMessages(w http.ResponseWriter, r *http.Request) {
 func (s *Server) handleSentMessages(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 
-	// Get agent ID from query or use first agent.
+	// Get agent ID from query, or default to User agent for human-sent msgs.
 	agentIDStr := r.URL.Query().Get("agent_id")
 	var agentID int64
 
 	if agentIDStr != "" {
 		fmt.Sscanf(agentIDStr, "%d", &agentID)
 	} else {
-		agents, err := s.store.Queries().ListAgents(ctx)
-		if err == nil && len(agents) > 0 {
-			agentID = agents[0].ID
-		}
+		// Default to User agent for the Sent page.
+		agentID = s.getUserAgentID(ctx)
 	}
 
 	if agentID == 0 {
@@ -1241,7 +1236,7 @@ func (s *Server) handleThreadReply(
 	firstMsg := messages[0]
 
 	// Determine sender: if provided in form, use that; otherwise use the
-	// first agent that isn't the original sender (i.e., the recipient).
+	// User agent (for human-sent messages from UI).
 	senderName := r.FormValue("sender")
 	var senderID int64
 	if senderName != "" {
@@ -1250,15 +1245,9 @@ func (s *Server) handleThreadReply(
 			senderID = sender.ID
 		}
 	}
-	// Fallback: list agents and pick one that's not the original sender.
+	// Fallback: use the User agent for UI-sent messages.
 	if senderID == 0 {
-		agents, _ := s.store.Queries().ListAgents(ctx)
-		for _, a := range agents {
-			if a.ID != firstMsg.SenderID {
-				senderID = a.ID
-				break
-			}
-		}
+		senderID = s.getUserAgentID(ctx)
 	}
 	if senderID == 0 {
 		http.Error(w, "Could not determine reply sender", http.StatusInternalServerError)
@@ -1605,4 +1594,284 @@ func (s *Server) handleMessageAck(
 
 	w.Header().Set("Content-Type", "text/html")
 	w.Write([]byte(`<span class="text-green-600 text-sm">Acknowledged</span>`))
+}
+
+// handleAgentAction routes agent action requests to the appropriate handler.
+// Handles: /agents/{id}, /agents/{id}/message, /agents/{id}/session.
+func (s *Server) handleAgentAction(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+
+	// Parse path: /agents/{id} or /agents/{id}/{action}
+	path := strings.TrimPrefix(r.URL.Path, "/agents/")
+	parts := strings.Split(path, "/")
+
+	if len(parts) == 0 || parts[0] == "" {
+		http.Error(w, "Agent ID required", http.StatusBadRequest)
+		return
+	}
+
+	agentID, err := strconv.ParseInt(parts[0], 10, 64)
+	if err != nil {
+		http.Error(w, "Invalid agent ID", http.StatusBadRequest)
+		return
+	}
+
+	// Determine action (default is view details).
+	action := ""
+	if len(parts) > 1 {
+		action = parts[1]
+	}
+
+	switch action {
+	case "":
+		s.handleAgentDetails(ctx, w, r, agentID)
+	case "message":
+		s.handleAgentMessage(ctx, w, r, agentID)
+	case "session":
+		s.handleAgentSession(ctx, w, r, agentID)
+	default:
+		http.Error(w, "Unknown action: "+action, http.StatusBadRequest)
+	}
+}
+
+// handleAgentDetails shows the agent details modal.
+func (s *Server) handleAgentDetails(
+	ctx context.Context, w http.ResponseWriter, r *http.Request,
+	agentID int64,
+) {
+	// Get agent from database.
+	agent, err := s.store.Queries().GetAgent(ctx, agentID)
+	if err != nil {
+		http.Error(w, "Agent not found", http.StatusNotFound)
+		return
+	}
+
+	// Render agent details modal.
+	w.Header().Set("Content-Type", "text/html")
+	fmt.Fprintf(w, `<div class="fixed inset-0 z-50 flex items-center justify-center pointer-events-auto" onclick="if(event.target === this) this.remove()">
+	<div class="absolute inset-0 bg-black/50"></div>
+	<div class="relative bg-white rounded-xl shadow-2xl w-full max-w-lg mx-4 overflow-hidden">
+		<div class="flex items-center justify-between px-6 py-4 border-b border-gray-200 bg-gradient-to-r from-blue-50 to-indigo-50">
+			<div class="flex items-center gap-3">
+				<div class="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center">
+					<span class="text-blue-600 font-semibold">%s</span>
+				</div>
+				<div>
+					<h2 class="text-lg font-semibold text-gray-900">%s</h2>
+					<p class="text-sm text-gray-500">Agent Details</p>
+				</div>
+			</div>
+			<button onclick="this.closest('.fixed').remove()" class="p-1 text-gray-400 hover:text-gray-600 rounded">
+				<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+					<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+				</svg>
+			</button>
+		</div>
+		<div class="px-6 py-4 space-y-4">
+			<div>
+				<label class="text-xs font-medium text-gray-500 uppercase">Name</label>
+				<p class="text-sm text-gray-900">%s</p>
+			</div>
+			<div>
+				<label class="text-xs font-medium text-gray-500 uppercase">Project</label>
+				<p class="text-sm text-gray-900 font-mono">%s</p>
+			</div>
+			<div>
+				<label class="text-xs font-medium text-gray-500 uppercase">Created</label>
+				<p class="text-sm text-gray-900">%s</p>
+			</div>
+			<div>
+				<label class="text-xs font-medium text-gray-500 uppercase">Last Active</label>
+				<p class="text-sm text-gray-900">%s</p>
+			</div>
+		</div>
+		<div class="flex items-center justify-end gap-3 px-6 py-4 bg-gray-50 border-t border-gray-200">
+			<button onclick="this.closest('.fixed').remove()" class="px-4 py-2 text-gray-700 hover:bg-gray-100 rounded-lg">
+				Close
+			</button>
+			<button class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+				hx-get="/agents/%d/message"
+				hx-target="#modal-container"
+				hx-swap="innerHTML"
+				onclick="this.closest('.fixed').remove()">
+				Send Message
+			</button>
+		</div>
+	</div>
+</div>`,
+		string(agent.Name[0]),
+		agent.Name,
+		agent.Name,
+		agent.ProjectKey.String,
+		time.Unix(agent.CreatedAt, 0).Format("Jan 2, 2006 3:04 PM"),
+		time.Unix(agent.LastActiveAt, 0).Format("Jan 2, 2006 3:04 PM"),
+		agentID,
+	)
+}
+
+// handleAgentMessage shows the message agent modal.
+func (s *Server) handleAgentMessage(
+	ctx context.Context, w http.ResponseWriter, r *http.Request,
+	agentID int64,
+) {
+	// Get agent from database.
+	agent, err := s.store.Queries().GetAgent(ctx, agentID)
+	if err != nil {
+		http.Error(w, "Agent not found", http.StatusNotFound)
+		return
+	}
+
+	// Render message modal.
+	w.Header().Set("Content-Type", "text/html")
+	fmt.Fprintf(w, `<div class="fixed inset-0 z-50 flex items-center justify-center pointer-events-auto" onclick="if(event.target === this) this.remove()">
+	<div class="absolute inset-0 bg-black/50"></div>
+	<div class="relative bg-white rounded-xl shadow-2xl w-full max-w-2xl mx-4 overflow-hidden">
+		<div class="flex items-center justify-between px-6 py-4 border-b border-gray-200 bg-gradient-to-r from-blue-50 to-indigo-50">
+			<div class="flex items-center gap-3">
+				<div class="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center">
+					<svg class="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+						<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z"/>
+					</svg>
+				</div>
+				<div>
+					<h2 class="text-lg font-semibold text-gray-900">Message %s</h2>
+					<p class="text-sm text-gray-500">Send a direct message to this agent</p>
+				</div>
+			</div>
+			<button onclick="this.closest('.fixed').remove()" class="p-1 text-gray-400 hover:text-gray-600 rounded">
+				<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+					<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+				</svg>
+			</button>
+		</div>
+		<form hx-post="/api/messages/send" hx-target="#modal-container" hx-swap="innerHTML">
+			<input type="hidden" name="to_agent_id" value="%d">
+			<div class="px-6 py-4 space-y-4">
+				<div>
+					<label for="subject" class="block text-sm font-medium text-gray-700 mb-1">Subject</label>
+					<input type="text" id="subject" name="subject" required
+						class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
+						placeholder="What's this about?">
+				</div>
+				<div>
+					<label for="body" class="block text-sm font-medium text-gray-700 mb-1">Message</label>
+					<textarea id="body" name="body" required rows="6"
+						class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none resize-none"
+						placeholder="Write your message..."></textarea>
+				</div>
+				<div>
+					<label for="priority" class="block text-sm font-medium text-gray-700 mb-1">Priority</label>
+					<select id="priority" name="priority"
+						class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none">
+						<option value="normal">Normal</option>
+						<option value="urgent">Urgent</option>
+						<option value="low">Low</option>
+					</select>
+				</div>
+			</div>
+			<div class="flex items-center justify-end gap-3 px-6 py-4 bg-gray-50 border-t border-gray-200">
+				<button type="button" onclick="this.closest('.fixed').remove()" class="px-4 py-2 text-gray-700 hover:bg-gray-100 rounded-lg">
+					Cancel
+				</button>
+				<button type="submit" class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 flex items-center gap-2">
+					<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+						<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"/>
+					</svg>
+					Send Message
+				</button>
+			</div>
+		</form>
+	</div>
+</div>`, agent.Name, agentID)
+}
+
+// handleAgentSession shows the start session modal for an agent.
+func (s *Server) handleAgentSession(
+	ctx context.Context, w http.ResponseWriter, r *http.Request,
+	agentID int64,
+) {
+	// Get agent from database.
+	agent, err := s.store.Queries().GetAgent(ctx, agentID)
+	if err != nil {
+		http.Error(w, "Agent not found", http.StatusNotFound)
+		return
+	}
+
+	// Render session modal.
+	w.Header().Set("Content-Type", "text/html")
+	fmt.Fprintf(w, `<div class="fixed inset-0 z-50 flex items-center justify-center pointer-events-auto" onclick="if(event.target === this) this.remove()">
+	<div class="absolute inset-0 bg-black/50"></div>
+	<div class="relative bg-white rounded-xl shadow-2xl w-full max-w-2xl mx-4 overflow-hidden">
+		<div class="flex items-center justify-between px-6 py-4 border-b border-gray-200 bg-gradient-to-r from-green-50 to-blue-50">
+			<div class="flex items-center gap-3">
+				<div class="w-10 h-10 bg-green-100 rounded-full flex items-center justify-center">
+					<svg class="w-5 h-5 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+						<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z"/>
+						<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+					</svg>
+				</div>
+				<div>
+					<h2 class="text-lg font-semibold text-gray-900">Start Session with %s</h2>
+					<p class="text-sm text-gray-500">Kick off a new work session</p>
+				</div>
+			</div>
+			<button onclick="this.closest('.fixed').remove()" class="p-1 text-gray-400 hover:text-gray-600 rounded">
+				<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+					<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+				</svg>
+			</button>
+		</div>
+		<form hx-post="/api/sessions" hx-target="#modal-container" hx-swap="innerHTML">
+			<input type="hidden" name="agent_id" value="%d">
+			<div class="px-6 py-4 space-y-4">
+				<div>
+					<label for="goal" class="block text-sm font-medium text-gray-700 mb-1">Goal / Task Description</label>
+					<textarea id="goal" name="goal" required rows="3"
+						class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 outline-none resize-none"
+						placeholder="Describe what you want the agent to accomplish..."></textarea>
+				</div>
+				<div>
+					<label for="work_dir" class="block text-sm font-medium text-gray-700 mb-1">
+						Working Directory <span class="text-gray-400">(optional)</span>
+					</label>
+					<input type="text" id="work_dir" name="work_dir"
+						class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 outline-none font-mono text-sm"
+						placeholder="%s"
+						value="%s">
+				</div>
+				<div class="grid grid-cols-2 gap-4">
+					<div>
+						<label for="git_branch" class="block text-sm font-medium text-gray-700 mb-1">
+							Git Branch <span class="text-gray-400">(optional)</span>
+						</label>
+						<input type="text" id="git_branch" name="git_branch"
+							class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 outline-none font-mono text-sm"
+							placeholder="feature/my-feature">
+					</div>
+					<div>
+						<label for="priority" class="block text-sm font-medium text-gray-700 mb-1">Priority</label>
+						<select id="priority" name="priority"
+							class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 outline-none">
+							<option value="normal">Normal</option>
+							<option value="high">High</option>
+							<option value="urgent">Urgent</option>
+							<option value="low">Low</option>
+						</select>
+					</div>
+				</div>
+			</div>
+			<div class="flex items-center justify-end gap-3 px-6 py-4 bg-gray-50 border-t border-gray-200">
+				<button type="button" onclick="this.closest('.fixed').remove()" class="px-4 py-2 text-gray-700 hover:bg-gray-100 rounded-lg">
+					Cancel
+				</button>
+				<button type="submit" class="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 flex items-center gap-2">
+					<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+						<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z"/>
+					</svg>
+					Start Session
+				</button>
+			</div>
+		</form>
+	</div>
+</div>`, agent.Name, agentID, agent.ProjectKey.String, agent.ProjectKey.String)
 }
