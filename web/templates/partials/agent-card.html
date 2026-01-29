@@ -1,0 +1,99 @@
+{{define "agent-card"}}
+<div id="agent-{{.ID}}" class="agent-card border border-gray-200 rounded-lg p-4 hover:border-blue-300 hover:shadow-md transition-all">
+    <!-- Header: Name + Status -->
+    <div class="flex items-start justify-between mb-3">
+        <div class="flex items-center gap-2">
+            <!-- Status indicator -->
+            <span class="relative flex h-3 w-3">
+                {{if eq .Status "active"}}
+                <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
+                <span class="relative inline-flex rounded-full h-3 w-3 bg-green-500"></span>
+                {{else if eq .Status "busy"}}
+                <span class="animate-pulse absolute inline-flex h-full w-full rounded-full bg-yellow-400 opacity-75"></span>
+                <span class="relative inline-flex rounded-full h-3 w-3 bg-yellow-500"></span>
+                {{else}}
+                <span class="relative inline-flex rounded-full h-3 w-3 bg-gray-300"></span>
+                {{end}}
+            </span>
+            <h3 class="font-medium text-gray-900">{{.Name}}</h3>
+        </div>
+        <!-- Quick Actions -->
+        <div class="flex items-center gap-1">
+            <button class="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded"
+                    hx-get="/agents/{{.ID}}/message"
+                    hx-target="#modal-container"
+                    title="Message Agent">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                          d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"/>
+                </svg>
+            </button>
+            <button class="p-1.5 text-gray-400 hover:text-green-600 hover:bg-green-50 rounded"
+                    hx-get="/agents/{{.ID}}/session"
+                    hx-target="#modal-container"
+                    title="Start Session">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                          d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z"/>
+                </svg>
+            </button>
+            <button class="p-1.5 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded"
+                    hx-get="/agents/{{.ID}}"
+                    hx-target="#modal-container"
+                    title="View Details">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                          d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                </svg>
+            </button>
+        </div>
+    </div>
+
+    <!-- Current Task / Session Info -->
+    {{if .CurrentSession}}
+    <div class="mb-3 p-2 bg-blue-50 rounded-md">
+        <div class="flex items-center gap-2 text-sm">
+            <svg class="w-4 h-4 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                      d="M13 10V3L4 14h7v7l9-11h-7z"/>
+            </svg>
+            <span class="text-blue-800 font-medium truncate">{{.CurrentSession.Goal}}</span>
+        </div>
+        <!-- Progress bar -->
+        <div class="mt-2">
+            <div class="flex items-center justify-between text-xs text-blue-600 mb-1">
+                <span>Progress</span>
+                <span>{{.CurrentSession.ProgressPct}}%</span>
+            </div>
+            <div class="w-full bg-blue-200 rounded-full h-1.5">
+                <div class="bg-blue-600 h-1.5 rounded-full transition-all" style="width: {{.CurrentSession.ProgressPct}}%"></div>
+            </div>
+        </div>
+    </div>
+    {{else}}
+    <div class="mb-3 p-2 bg-gray-50 rounded-md text-sm text-gray-500 italic">
+        No active session
+    </div>
+    {{end}}
+
+    <!-- Recent Activity -->
+    <div class="text-xs text-gray-500">
+        <div class="flex items-center justify-between">
+            <span>Last activity</span>
+            <span class="text-gray-700">{{formatTimeAgo .LastActivityAt}}</span>
+        </div>
+        {{if .LastAction}}
+        <p class="mt-1 text-gray-600 truncate">{{.LastAction}}</p>
+        {{end}}
+    </div>
+
+    <!-- Tags / Capabilities -->
+    {{if .Tags}}
+    <div class="mt-3 flex flex-wrap gap-1">
+        {{range .Tags}}
+        <span class="px-2 py-0.5 bg-gray-100 text-gray-600 text-xs rounded-full">{{.}}</span>
+        {{end}}
+    </div>
+    {{end}}
+</div>
+{{end}}

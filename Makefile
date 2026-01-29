@@ -1,0 +1,217 @@
+# Subtrate Makefile
+# Common commands for building, testing, and development
+
+# Default target
+.DEFAULT_GOAL := build
+
+# SQLite FTS5 requires CGO with specific flags.
+# Export these so all go commands in this Makefile use them.
+export CGO_ENABLED := 1
+export CGO_CFLAGS := -DSQLITE_ENABLE_FTS5
+
+# Variables
+PKG := ./...
+TIMEOUT := 5m
+
+# Build targets
+.PHONY: build
+build:
+	go build $(PKG)
+
+.PHONY: build-cli
+build-cli:
+	go build -o bin/substrate ./cmd/substrate
+
+.PHONY: build-daemon
+build-daemon:
+	go build -o bin/substrated ./cmd/substrated
+
+.PHONY: build-web
+build-web:
+	go build -o bin/subtrate-web ./cmd/subtrate-web
+
+.PHONY: build-all
+build-all: build-cli build-daemon build-web
+
+.PHONY: install
+install:
+	go install ./cmd/substrate
+	go install ./cmd/substrated
+
+# Testing targets
+.PHONY: test
+test:
+	go test -v $(PKG)
+
+.PHONY: test-cover
+test-cover:
+	go test -cover $(PKG)
+
+.PHONY: test-cover-html
+test-cover-html:
+	go test -coverprofile=coverage.out $(PKG)
+	go tool cover -html=coverage.out -o coverage.html
+	@echo "Coverage report: coverage.html"
+
+# Single package testing
+# Usage: make unit pkg=./internal/mail case=TestService_SendMail
+.PHONY: unit
+unit:
+ifdef case
+	go test -v -timeout $(TIMEOUT) -run $(case) $(pkg)
+else
+	go test -v -timeout $(TIMEOUT) $(pkg)
+endif
+
+# Run a specific test with verbose output
+# Usage: make run-test test=TestThreadFSM_UnreadToRead pkg=./internal/mail
+.PHONY: run-test
+run-test:
+	go test -v -timeout $(TIMEOUT) -run $(test) $(pkg)
+
+# Code generation
+.PHONY: sqlc
+sqlc:
+	sqlc generate
+
+.PHONY: sqlc-docker
+sqlc-docker:
+	docker run --rm -v $$(pwd):/src -w /src sqlc/sqlc generate
+
+.PHONY: proto
+proto:
+	cd internal/api/grpc && ./gen_protos.sh
+
+.PHONY: proto-check
+proto-check:
+	@command -v protoc >/dev/null 2>&1 || (echo "Error: protoc not found. Install with: brew install protobuf" && exit 1)
+	@command -v protoc-gen-go >/dev/null 2>&1 || (echo "Error: protoc-gen-go not found. Install with: go install google.golang.org/protobuf/cmd/protoc-gen-go@latest" && exit 1)
+	@command -v protoc-gen-go-grpc >/dev/null 2>&1 || (echo "Error: protoc-gen-go-grpc not found. Install with: go install google.golang.org/grpc/cmd/protoc-gen-go-grpc@latest" && exit 1)
+	@echo "All proto tools are installed."
+
+.PHONY: proto-install
+proto-install:
+	@echo "Installing protobuf compiler and Go plugins..."
+	brew install protobuf || true
+	go install google.golang.org/protobuf/cmd/protoc-gen-go@latest
+	go install google.golang.org/grpc/cmd/protoc-gen-go-grpc@latest
+	@echo "Done. Tools installed to GOPATH/bin."
+
+.PHONY: gen
+gen: sqlc proto
+	@echo "All code generation complete."
+
+# Code quality
+.PHONY: lint
+lint:
+	golangci-lint run
+
+.PHONY: fmt
+fmt:
+	go fmt $(PKG)
+	gofumpt -w .
+
+.PHONY: vet
+vet:
+	go vet $(PKG)
+
+.PHONY: tidy
+tidy:
+	go mod tidy
+
+.PHONY: tidy-check
+tidy-check:
+	go mod tidy
+	git diff --exit-code go.mod go.sum
+
+# Database
+.PHONY: migrate-up
+migrate-up:
+	@echo "Run migrations manually with: sqlite3 path/to/db.sqlite < internal/db/migrations/000001_init.up.sql"
+
+.PHONY: migrate-down
+migrate-down:
+	@echo "Run migrations manually with: sqlite3 path/to/db.sqlite < internal/db/migrations/000001_init.down.sql"
+
+# Clean
+.PHONY: clean
+clean:
+	rm -rf bin/
+	rm -f coverage.out coverage.html
+
+# Web server
+WEB_PORT ?= 8080
+
+.PHONY: run-web
+run-web: build-web
+	./bin/subtrate-web -addr :$(WEB_PORT)
+
+.PHONY: run-web-dev
+run-web-dev:
+	go run ./cmd/subtrate-web -addr :$(WEB_PORT)
+
+# Development helpers
+.PHONY: check
+check: fmt vet lint test
+
+.PHONY: pre-commit
+pre-commit: tidy fmt vet lint test-cover
+	@echo "All pre-commit checks passed!"
+
+# Quick build check (just compile, no tests)
+.PHONY: quick
+quick:
+	go build $(PKG)
+	@echo "Build successful!"
+
+# Help
+.PHONY: help
+help:
+	@echo "Subtrate Makefile"
+	@echo ""
+	@echo "Build targets:"
+	@echo "  build          Build all packages (default)"
+	@echo "  build-cli      Build CLI binary to bin/substrate"
+	@echo "  build-daemon   Build daemon binary to bin/substrated"
+	@echo "  build-web      Build web server binary to bin/subtrate-web"
+	@echo "  build-all      Build all binaries"
+	@echo "  install        Install binaries to GOPATH/bin"
+	@echo "  quick          Quick build check (compile only)"
+	@echo ""
+	@echo "Testing targets:"
+	@echo "  test           Run all tests with verbose output"
+	@echo "  test-cover     Run tests with coverage summary"
+	@echo "  test-cover-html Generate HTML coverage report"
+	@echo "  unit           Run tests for a single package"
+	@echo "                 Usage: make unit pkg=./internal/mail"
+	@echo "                 Usage: make unit pkg=./internal/mail case=TestService"
+	@echo "  run-test       Run a specific test"
+	@echo "                 Usage: make run-test test=TestThreadFSM pkg=./internal/mail"
+	@echo ""
+	@echo "Code generation:"
+	@echo "  sqlc           Generate sqlc code (requires sqlc installed)"
+	@echo "  sqlc-docker    Generate sqlc code via Docker"
+	@echo "  proto          Generate gRPC code from protos"
+	@echo "  proto-check    Verify proto tools are installed"
+	@echo "  proto-install  Install protoc and Go plugins"
+	@echo "  gen            Run all code generation (sqlc + proto)"
+	@echo ""
+	@echo "Code quality:"
+	@echo "  lint           Run golangci-lint"
+	@echo "  fmt            Format Go code"
+	@echo "  vet            Run go vet"
+	@echo "  tidy           Run go mod tidy"
+	@echo "  tidy-check     Check if go mod tidy would change anything"
+	@echo ""
+	@echo "Web server:"
+	@echo "  run-web        Build and run web server (default port 8080)"
+	@echo "  run-web-dev    Run web server without building (for development)"
+	@echo "                 Usage: make run-web WEB_PORT=3000"
+	@echo ""
+	@echo "Development:"
+	@echo "  check          Run fmt, vet, lint, and tests"
+	@echo "  pre-commit     Run all pre-commit checks"
+	@echo "  clean          Remove build artifacts"
+	@echo ""
+	@echo "Note: CGO_CFLAGS for SQLite FTS5 is set automatically by this Makefile."
+	@echo "      You don't need to set it manually when using make commands."

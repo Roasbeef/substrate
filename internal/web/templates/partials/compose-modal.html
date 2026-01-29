@@ -1,0 +1,104 @@
+{{define "compose-modal"}}
+<!-- Compose Modal Overlay -->
+<div class="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-end justify-end p-4"
+     onclick="if(event.target === this) this.innerHTML = ''">
+    <div class="bg-white rounded-lg shadow-xl w-full max-w-2xl flex flex-col"
+         onclick="event.stopPropagation()">
+        <!-- Compose Header -->
+        <div class="px-4 py-3 bg-gray-800 text-white rounded-t-lg flex items-center justify-between">
+            <span class="font-medium">New Message</span>
+            <div class="flex items-center gap-2">
+                <button class="p-1 hover:bg-gray-700 rounded"
+                        onclick="document.getElementById('modal-container').innerHTML = ''"
+                        title="Close">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                    </svg>
+                </button>
+            </div>
+        </div>
+
+        <!-- Compose Form -->
+        <form hx-post="/api/messages/send"
+              hx-target="#modal-container"
+              hx-swap="innerHTML"
+              class="flex flex-col flex-1">
+
+            <!-- Recipients -->
+            <div class="px-4 py-2 border-b border-gray-200 flex items-center">
+                <label class="w-16 text-sm text-gray-500">To:</label>
+                <input type="text"
+                       name="recipients"
+                       class="flex-1 px-2 py-1 focus:outline-none"
+                       placeholder="Agent name or topic"
+                       hx-get="/api/autocomplete/recipients"
+                       hx-trigger="keyup changed delay:300ms"
+                       hx-target="#recipient-suggestions"
+                       autocomplete="off">
+            </div>
+            <div id="recipient-suggestions" class="relative"></div>
+
+            <!-- Subject -->
+            <div class="px-4 py-2 border-b border-gray-200 flex items-center">
+                <label class="w-16 text-sm text-gray-500">Subject:</label>
+                <input type="text"
+                       name="subject"
+                       class="flex-1 px-2 py-1 focus:outline-none"
+                       placeholder="Subject"
+                       required>
+            </div>
+
+            <!-- Body -->
+            <div class="flex-1 p-4">
+                <textarea name="body"
+                          rows="12"
+                          class="w-full h-full resize-none focus:outline-none"
+                          placeholder="Write your message... (Markdown supported)"></textarea>
+            </div>
+
+            <!-- Footer Actions -->
+            <div class="px-4 py-3 border-t border-gray-200 flex items-center justify-between">
+                <div class="flex items-center gap-4">
+                    <!-- Priority Select -->
+                    <select name="priority" class="px-3 py-1.5 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500">
+                        <option value="normal">Normal Priority</option>
+                        <option value="urgent">Urgent</option>
+                        <option value="low">Low Priority</option>
+                    </select>
+
+                    <!-- Deadline -->
+                    <div class="flex items-center gap-2">
+                        <label class="text-sm text-gray-500">Deadline:</label>
+                        <input type="datetime-local"
+                               name="deadline"
+                               class="px-2 py-1 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500">
+                    </div>
+
+                    <!-- Attachment Button -->
+                    <button type="button" class="p-2 text-gray-500 hover:bg-gray-100 rounded" title="Attach file">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                  d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13"/>
+                        </svg>
+                    </button>
+                </div>
+
+                <div class="flex items-center gap-2">
+                    <button type="button"
+                            class="px-4 py-2 text-gray-600 hover:bg-gray-100 rounded-lg"
+                            onclick="document.getElementById('modal-container').innerHTML = ''">
+                        Discard
+                    </button>
+                    <button type="submit"
+                            class="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center gap-2">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"/>
+                        </svg>
+                        Send
+                    </button>
+                </div>
+            </div>
+        </form>
+    </div>
+</div>
+{{end}}

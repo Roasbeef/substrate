@@ -1,0 +1,27 @@
+{{define "agents-list"}}
+{{if .Agents}}
+<ul class="space-y-1">
+    {{range .Agents}}
+    <li>
+        <a href="/agent/{{.Name}}"
+           class="flex items-center gap-3 px-4 py-2 text-gray-700 rounded-lg hover:bg-gray-100
+                  {{if eq $.ActiveAgent .Name}}bg-blue-50 text-blue-700 font-medium{{end}}">
+            <!-- Agent avatar -->
+            <div class="w-6 h-6 rounded-full bg-gradient-to-br from-green-400 to-blue-500 flex items-center justify-center text-white text-xs font-medium">
+                {{slice .Name 0 1}}
+            </div>
+            <span class="truncate">{{.Name}}</span>
+            <!-- Online status -->
+            {{if .IsOnline}}
+            <span class="ml-auto w-2 h-2 bg-green-500 rounded-full" title="Online"></span>
+            {{else}}
+            <span class="ml-auto w-2 h-2 bg-gray-300 rounded-full" title="Offline"></span>
+            {{end}}
+        </a>
+    </li>
+    {{end}}
+</ul>
+{{else}}
+<p class="px-4 py-2 text-sm text-gray-500">No agents registered</p>
+{{end}}
+{{end}}

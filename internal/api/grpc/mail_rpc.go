@@ -1,0 +1,499 @@
+package subtraterpc
+
+import (
+	"context"
+	"fmt"
+	"time"
+
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
+
+	"github.com/roasbeef/subtrate/internal/mail"
+)
+
+// SendMail sends a new message to one or more recipients.
+func (s *Server) SendMail(ctx context.Context, req *SendMailRequest) (*SendMailResponse, error) {
+	if req.SenderId == 0 {
+		return nil, status.Error(codes.InvalidArgument, "sender_id is required")
+	}
+	if len(req.RecipientNames) == 0 && req.TopicName == "" {
+		return nil, status.Error(codes.InvalidArgument, "recipient_names or topic_name is required")
+	}
+	if req.Subject == "" {
+		return nil, status.Error(codes.InvalidArgument, "subject is required")
+	}
+
+	// Convert priority.
+	priority := mail.PriorityNormal
+	switch req.Priority {
+	case Priority_PRIORITY_LOW:
+		priority = mail.PriorityLow
+	case Priority_PRIORITY_URGENT:
+		priority = mail.PriorityUrgent
+	}
+
+	// Build send request.
+	var deadline *time.Time
+	if req.DeadlineAt > 0 {
+		t := time.Unix(req.DeadlineAt, 0)
+		deadline = &t
+	}
+
+	sendReq := mail.SendMailRequest{
+		SenderID:       req.SenderId,
+		RecipientNames: req.RecipientNames,
+		TopicName:      req.TopicName,
+		ThreadID:       req.ThreadId,
+		Subject:        req.Subject,
+		Body:           req.Body,
+		Priority:       priority,
+		Deadline:       deadline,
+		Attachments:    req.AttachmentsJson,
+	}
+
+	resp, err := s.mailSvc.Send(ctx, sendReq)
+	if err != nil {
+		return nil, status.Errorf(codes.Internal, "failed to send mail: %v", err)
+	}
+
+	return &SendMailResponse{
+		MessageId: resp.MessageID,
+		ThreadId:  resp.ThreadID,
+	}, nil
+}
+
+// FetchInbox retrieves messages from an agent's inbox.
+func (s *Server) FetchInbox(ctx context.Context, req *FetchInboxRequest) (*FetchInboxResponse, error) {
+	if req.AgentId == 0 {
+		return nil, status.Error(codes.InvalidArgument, "agent_id is required")
+	}
+
+	limit := 50
+	if req.Limit > 0 {
+		limit = int(req.Limit)
+	}
+
+	// Convert state filter.
+	var stateFilter *string
+	if req.StateFilter != MessageState_STATE_UNSPECIFIED {
+		state := stateToString(req.StateFilter)
+		stateFilter = &state
+	}
+
+	msgs, err := s.mailSvc.FetchInbox(ctx, mail.FetchInboxRequest{
+		AgentID:     req.AgentId,
+		Limit:       limit,
+		UnreadOnly:  req.UnreadOnly,
+		StateFilter: stateFilter,
+	})
+	if err != nil {
+		return nil, status.Errorf(codes.Internal, "failed to fetch inbox: %v", err)
+	}
+
+	return &FetchInboxResponse{
+		Messages: convertMessages(msgs),
+	}, nil
+}
+
+// ReadMessage retrieves a single message by ID and marks it as read.
+func (s *Server) ReadMessage(ctx context.Context, req *ReadMessageRequest) (*ReadMessageResponse, error) {
+	if req.AgentId == 0 {
+		return nil, status.Error(codes.InvalidArgument, "agent_id is required")
+	}
+	if req.MessageId == 0 {
+		return nil, status.Error(codes.InvalidArgument, "message_id is required")
+	}
+
+	msg, err := s.mailSvc.ReadMessage(ctx, req.AgentId, req.MessageId)
+	if err != nil {
+		return nil, status.Errorf(codes.Internal, "failed to read message: %v", err)
+	}
+
+	return &ReadMessageResponse{
+		Message: convertMessage(msg),
+	}, nil
+}
+
+// ReadThread retrieves all messages in a thread.
+func (s *Server) ReadThread(ctx context.Context, req *ReadThreadRequest) (*ReadThreadResponse, error) {
+	if req.AgentId == 0 {
+		return nil, status.Error(codes.InvalidArgument, "agent_id is required")
+	}
+	if req.ThreadId == "" {
+		return nil, status.Error(codes.InvalidArgument, "thread_id is required")
+	}
+
+	msgs, err := s.mailSvc.ReadThread(ctx, req.AgentId, req.ThreadId)
+	if err != nil {
+		return nil, status.Errorf(codes.Internal, "failed to read thread: %v", err)
+	}
+
+	return &ReadThreadResponse{
+		Messages: convertMessages(msgs),
+	}, nil
+}
+
+// UpdateState changes the state of a message.
+func (s *Server) UpdateState(ctx context.Context, req *UpdateStateRequest) (*UpdateStateResponse, error) {
+	if req.AgentId == 0 {
+		return nil, status.Error(codes.InvalidArgument, "agent_id is required")
+	}
+	if req.MessageId == 0 {
+		return nil, status.Error(codes.InvalidArgument, "message_id is required")
+	}
+	if req.NewState == MessageState_STATE_UNSPECIFIED {
+		return nil, status.Error(codes.InvalidArgument, "new_state is required")
+	}
+
+	newState := stateToString(req.NewState)
+	var snoozedUntil *time.Time
+	if req.NewState == MessageState_STATE_SNOOZED {
+		if req.SnoozedUntil == 0 {
+			return nil, status.Error(codes.InvalidArgument, "snoozed_until is required for STATE_SNOOZED")
+		}
+		t := time.Unix(req.SnoozedUntil, 0)
+		snoozedUntil = &t
+	}
+
+	err := s.mailSvc.UpdateState(ctx, mail.UpdateStateRequest{
+		AgentID:      req.AgentId,
+		MessageID:    req.MessageId,
+		NewState:     newState,
+		SnoozedUntil: snoozedUntil,
+	})
+	if err != nil {
+		return nil, status.Errorf(codes.Internal, "failed to update state: %v", err)
+	}
+
+	return &UpdateStateResponse{Success: true}, nil
+}
+
+// AckMessage acknowledges receipt of a message.
+func (s *Server) AckMessage(ctx context.Context, req *AckMessageRequest) (*AckMessageResponse, error) {
+	if req.AgentId == 0 {
+		return nil, status.Error(codes.InvalidArgument, "agent_id is required")
+	}
+	if req.MessageId == 0 {
+		return nil, status.Error(codes.InvalidArgument, "message_id is required")
+	}
+
+	err := s.mailSvc.AckMessage(ctx, req.AgentId, req.MessageId)
+	if err != nil {
+		return nil, status.Errorf(codes.Internal, "failed to ack message: %v", err)
+	}
+
+	return &AckMessageResponse{Success: true}, nil
+}
+
+// GetStatus returns the mail status for an agent.
+func (s *Server) GetStatus(ctx context.Context, req *GetStatusRequest) (*GetStatusResponse, error) {
+	if req.AgentId == 0 {
+		return nil, status.Error(codes.InvalidArgument, "agent_id is required")
+	}
+
+	stat, err := s.mailSvc.GetStatus(ctx, req.AgentId)
+	if err != nil {
+		return nil, status.Errorf(codes.Internal, "failed to get status: %v", err)
+	}
+
+	return &GetStatusResponse{
+		AgentId:      stat.AgentID,
+		AgentName:    stat.AgentName,
+		UnreadCount:  stat.UnreadCount,
+		UrgentCount:  stat.UrgentCount,
+		StarredCount: stat.StarredCount,
+		SnoozedCount: stat.SnoozedCount,
+	}, nil
+}
+
+// PollChanges checks for new messages since given offsets.
+func (s *Server) PollChanges(ctx context.Context, req *PollChangesRequest) (*PollChangesResponse, error) {
+	if req.AgentId == 0 {
+		return nil, status.Error(codes.InvalidArgument, "agent_id is required")
+	}
+
+	resp, err := s.mailSvc.PollChanges(ctx, mail.PollChangesRequest{
+		AgentID:      req.AgentId,
+		SinceOffsets: req.SinceOffsets,
+	})
+	if err != nil {
+		return nil, status.Errorf(codes.Internal, "failed to poll changes: %v", err)
+	}
+
+	return &PollChangesResponse{
+		NewMessages: convertMessages(resp.NewMessages),
+		NewOffsets:  resp.NewOffsets,
+	}, nil
+}
+
+// SubscribeInbox creates a stream of new inbox messages using the actor-based
+// notification hub for event-driven delivery.
+func (s *Server) SubscribeInbox(req *SubscribeInboxRequest, stream Mail_SubscribeInboxServer) error {
+	if req.AgentId == 0 {
+		return status.Error(codes.InvalidArgument, "agent_id is required")
+	}
+
+	// Create a buffered channel for message delivery.
+	msgCh := make(chan mail.InboxMessage, 100)
+
+	// Generate a unique subscriber ID for this stream.
+	subscriberID := fmt.Sprintf("grpc-stream-%d-%d", req.AgentId, time.Now().UnixNano())
+
+	// Subscribe to the notification hub.
+	ctx := stream.Context()
+	subFuture := s.notificationHub.Ask(ctx, mail.SubscribeAgentMsg{
+		AgentID:      req.AgentId,
+		SubscriberID: subscriberID,
+		DeliveryChan: msgCh,
+	})
+
+	subResp := subFuture.Await(ctx)
+	if _, err := subResp.Unpack(); err != nil {
+		return status.Errorf(codes.Internal, "failed to subscribe: %v", err)
+	}
+
+	// Ensure we unsubscribe when the stream ends.
+	defer func() {
+		// Use a background context for cleanup since stream context may be cancelled.
+		cleanupCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+
+		unsubFuture := s.notificationHub.Ask(cleanupCtx, mail.UnsubscribeAgentMsg{
+			AgentID:      req.AgentId,
+			SubscriberID: subscriberID,
+		})
+		unsubFuture.Await(cleanupCtx)
+		close(msgCh)
+	}()
+
+	// Stream messages to the client.
+	for {
+		select {
+		case <-stream.Context().Done():
+			return stream.Context().Err()
+		case <-s.quit:
+			return status.Error(codes.Unavailable, "server shutting down")
+		case msg, ok := <-msgCh:
+			if !ok {
+				return nil
+			}
+			if err := stream.Send(convertMessage(&msg)); err != nil {
+				return err
+			}
+		}
+	}
+}
+
+// Publish sends a message to a pub/sub topic.
+func (s *Server) Publish(ctx context.Context, req *PublishRequest) (*PublishResponse, error) {
+	if req.SenderId == 0 {
+		return nil, status.Error(codes.InvalidArgument, "sender_id is required")
+	}
+	if req.TopicName == "" {
+		return nil, status.Error(codes.InvalidArgument, "topic_name is required")
+	}
+
+	// Convert priority.
+	priority := mail.PriorityNormal
+	switch req.Priority {
+	case Priority_PRIORITY_LOW:
+		priority = mail.PriorityLow
+	case Priority_PRIORITY_URGENT:
+		priority = mail.PriorityUrgent
+	}
+
+	resp, err := s.mailSvc.Publish(ctx, mail.PublishRequest{
+		SenderID:  req.SenderId,
+		TopicName: req.TopicName,
+		Subject:   req.Subject,
+		Body:      req.Body,
+		Priority:  priority,
+	})
+	if err != nil {
+		return nil, status.Errorf(codes.Internal, "failed to publish: %v", err)
+	}
+
+	return &PublishResponse{
+		MessageId:       resp.MessageID,
+		RecipientsCount: int32(resp.RecipientsCount),
+	}, nil
+}
+
+// Subscribe subscribes an agent to a topic.
+func (s *Server) Subscribe(ctx context.Context, req *SubscribeRequest) (*SubscribeResponse, error) {
+	if req.AgentId == 0 {
+		return nil, status.Error(codes.InvalidArgument, "agent_id is required")
+	}
+	if req.TopicName == "" {
+		return nil, status.Error(codes.InvalidArgument, "topic_name is required")
+	}
+
+	topicID, err := s.mailSvc.Subscribe(ctx, req.AgentId, req.TopicName)
+	if err != nil {
+		return nil, status.Errorf(codes.Internal, "failed to subscribe: %v", err)
+	}
+
+	return &SubscribeResponse{
+		Success: true,
+		TopicId: topicID,
+	}, nil
+}
+
+// Unsubscribe removes an agent's subscription to a topic.
+func (s *Server) Unsubscribe(ctx context.Context, req *UnsubscribeRequest) (*UnsubscribeResponse, error) {
+	if req.AgentId == 0 {
+		return nil, status.Error(codes.InvalidArgument, "agent_id is required")
+	}
+	if req.TopicName == "" {
+		return nil, status.Error(codes.InvalidArgument, "topic_name is required")
+	}
+
+	err := s.mailSvc.Unsubscribe(ctx, req.AgentId, req.TopicName)
+	if err != nil {
+		return nil, status.Errorf(codes.Internal, "failed to unsubscribe: %v", err)
+	}
+
+	return &UnsubscribeResponse{Success: true}, nil
+}
+
+// ListTopics lists available topics.
+func (s *Server) ListTopics(ctx context.Context, req *ListTopicsRequest) (*ListTopicsResponse, error) {
+	topics, err := s.mailSvc.ListTopics(ctx, mail.ListTopicsRequest{
+		AgentID:        req.AgentId,
+		SubscribedOnly: req.SubscribedOnly,
+	})
+	if err != nil {
+		return nil, status.Errorf(codes.Internal, "failed to list topics: %v", err)
+	}
+
+	protoTopics := make([]*Topic, len(topics))
+	for i, t := range topics {
+		protoTopics[i] = &Topic{
+			Id:        t.ID,
+			Name:      t.Name,
+			TopicType: t.TopicType,
+			CreatedAt: t.CreatedAt.Unix(),
+		}
+	}
+
+	return &ListTopicsResponse{Topics: protoTopics}, nil
+}
+
+// Search performs full-text search across messages.
+func (s *Server) Search(ctx context.Context, req *SearchRequest) (*SearchResponse, error) {
+	if req.AgentId == 0 {
+		return nil, status.Error(codes.InvalidArgument, "agent_id is required")
+	}
+	if req.Query == "" {
+		return nil, status.Error(codes.InvalidArgument, "query is required")
+	}
+
+	limit := int32(50)
+	if req.Limit > 0 {
+		limit = req.Limit
+	}
+
+	results, err := s.mailSvc.Search(ctx, mail.SearchRequest{
+		AgentID: req.AgentId,
+		Query:   req.Query,
+		TopicID: req.TopicId,
+		Limit:   limit,
+	})
+	if err != nil {
+		return nil, status.Errorf(codes.Internal, "failed to search: %v", err)
+	}
+
+	return &SearchResponse{
+		Results: convertMessages(results),
+	}, nil
+}
+
+// Helper functions.
+
+func stateToString(s MessageState) string {
+	switch s {
+	case MessageState_STATE_UNREAD:
+		return "unread"
+	case MessageState_STATE_READ:
+		return "read"
+	case MessageState_STATE_STARRED:
+		return "starred"
+	case MessageState_STATE_SNOOZED:
+		return "snoozed"
+	case MessageState_STATE_ARCHIVED:
+		return "archived"
+	case MessageState_STATE_TRASH:
+		return "trash"
+	default:
+		return "unread"
+	}
+}
+
+func stringToState(s string) MessageState {
+	switch s {
+	case "unread":
+		return MessageState_STATE_UNREAD
+	case "read":
+		return MessageState_STATE_READ
+	case "starred":
+		return MessageState_STATE_STARRED
+	case "snoozed":
+		return MessageState_STATE_SNOOZED
+	case "archived":
+		return MessageState_STATE_ARCHIVED
+	case "trash":
+		return MessageState_STATE_TRASH
+	default:
+		return MessageState_STATE_UNREAD
+	}
+}
+
+func convertMessage(m *mail.InboxMessage) *InboxMessage {
+	if m == nil {
+		return nil
+	}
+
+	state := stringToState(m.State)
+	priority := Priority_PRIORITY_NORMAL
+	switch m.Priority {
+	case mail.PriorityLow:
+		priority = Priority_PRIORITY_LOW
+	case mail.PriorityUrgent:
+		priority = Priority_PRIORITY_URGENT
+	}
+
+	return &InboxMessage{
+		Id:           m.ID,
+		ThreadId:     m.ThreadID,
+		TopicId:      m.TopicID,
+		SenderId:     m.SenderID,
+		SenderName:   m.SenderName,
+		Subject:      m.Subject,
+		Body:         m.Body,
+		Priority:     priority,
+		State:        state,
+		CreatedAt:    m.CreatedAt.Unix(),
+		DeadlineAt:   timeToUnix(m.Deadline),
+		SnoozedUntil: timeToUnix(m.SnoozedUntil),
+		ReadAt:       timeToUnix(m.ReadAt),
+		AckedAt:      timeToUnix(m.AckedAt),
+	}
+}
+
+func convertMessages(msgs []mail.InboxMessage) []*InboxMessage {
+	result := make([]*InboxMessage, len(msgs))
+	for i := range msgs {
+		result[i] = convertMessage(&msgs[i])
+	}
+	return result
+}
+
+func timeToUnix(t *time.Time) int64 {
+	if t == nil || t.IsZero() {
+		return 0
+	}
+	return t.Unix()
+}
+
+// Ensure we implement the interface.
+var _ MailServer = (*Server)(nil)

@@ -1,0 +1,349 @@
+syntax = "proto3";
+
+package subtraterpc;
+
+option go_package = "github.com/roasbeef/subtrate/internal/api/grpc/subtraterpc";
+
+// Mail is the main RPC service for the Subtrate mail system. It provides
+// methods for sending, receiving, and managing messages between agents.
+service Mail {
+    // SendMail sends a new message to one or more recipients.
+    rpc SendMail (SendMailRequest) returns (SendMailResponse);
+
+    // FetchInbox retrieves messages from an agent's inbox.
+    rpc FetchInbox (FetchInboxRequest) returns (FetchInboxResponse);
+
+    // ReadMessage retrieves a single message by ID and marks it as read.
+    rpc ReadMessage (ReadMessageRequest) returns (ReadMessageResponse);
+
+    // ReadThread retrieves all messages in a thread.
+    rpc ReadThread (ReadThreadRequest) returns (ReadThreadResponse);
+
+    // UpdateState changes the state of a message (star, snooze, archive, trash).
+    rpc UpdateState (UpdateStateRequest) returns (UpdateStateResponse);
+
+    // AckMessage acknowledges receipt of a message with a deadline.
+    rpc AckMessage (AckMessageRequest) returns (AckMessageResponse);
+
+    // GetStatus returns the mail status for an agent.
+    rpc GetStatus (GetStatusRequest) returns (GetStatusResponse);
+
+    // PollChanges checks for new messages since given offsets.
+    rpc PollChanges (PollChangesRequest) returns (PollChangesResponse);
+
+    // SubscribeInbox creates a stream of new inbox messages.
+    rpc SubscribeInbox (SubscribeInboxRequest) returns (stream InboxMessage);
+
+    // Publish sends a message to a pub/sub topic.
+    rpc Publish (PublishRequest) returns (PublishResponse);
+
+    // Subscribe subscribes an agent to a topic.
+    rpc Subscribe (SubscribeRequest) returns (SubscribeResponse);
+
+    // Unsubscribe removes an agent's subscription to a topic.
+    rpc Unsubscribe (UnsubscribeRequest) returns (UnsubscribeResponse);
+
+    // ListTopics lists available topics.
+    rpc ListTopics (ListTopicsRequest) returns (ListTopicsResponse);
+
+    // Search performs full-text search across messages.
+    rpc Search (SearchRequest) returns (SearchResponse);
+}
+
+// Agent is the RPC service for managing agent identities.
+service Agent {
+    // RegisterAgent creates a new agent with the given name.
+    rpc RegisterAgent (RegisterAgentRequest) returns (RegisterAgentResponse);
+
+    // GetAgent retrieves an agent by ID or name.
+    rpc GetAgent (GetAgentRequest) returns (GetAgentResponse);
+
+    // ListAgents lists all registered agents.
+    rpc ListAgents (ListAgentsRequest) returns (ListAgentsResponse);
+
+    // EnsureIdentity creates or retrieves an agent identity for a session.
+    rpc EnsureIdentity (EnsureIdentityRequest) returns (EnsureIdentityResponse);
+
+    // SaveIdentity persists an agent's current state.
+    rpc SaveIdentity (SaveIdentityRequest) returns (SaveIdentityResponse);
+}
+
+// Priority represents message priority levels.
+enum Priority {
+    PRIORITY_UNSPECIFIED = 0;
+    PRIORITY_LOW = 1;
+    PRIORITY_NORMAL = 2;
+    PRIORITY_URGENT = 3;
+}
+
+// MessageState represents the state of a message for a recipient.
+enum MessageState {
+    STATE_UNSPECIFIED = 0;
+    STATE_UNREAD = 1;
+    STATE_READ = 2;
+    STATE_STARRED = 3;
+    STATE_SNOOZED = 4;
+    STATE_ARCHIVED = 5;
+    STATE_TRASH = 6;
+}
+
+// InboxMessage represents a message in an agent's inbox.
+message InboxMessage {
+    int64 id = 1;
+    string thread_id = 2;
+    int64 topic_id = 3;
+    int64 sender_id = 4;
+    string sender_name = 5;
+    string subject = 6;
+    string body = 7;
+    Priority priority = 8;
+    MessageState state = 9;
+    int64 created_at = 10;      // Unix timestamp
+    int64 deadline_at = 11;     // Unix timestamp, 0 if no deadline
+    int64 snoozed_until = 12;   // Unix timestamp, 0 if not snoozed
+    int64 read_at = 13;         // Unix timestamp, 0 if unread
+    int64 acked_at = 14;        // Unix timestamp, 0 if not acked
+}
+
+// SendMailRequest is the request for SendMail.
+message SendMailRequest {
+    int64 sender_id = 1;
+    repeated string recipient_names = 2;
+    string topic_name = 3;          // For pub/sub, mutually exclusive with recipients
+    string thread_id = 4;           // Optional, for replies
+    string subject = 5;
+    string body = 6;
+    Priority priority = 7;
+    int64 deadline_at = 8;          // Unix timestamp, 0 for no deadline
+    string attachments_json = 9;    // JSON string of attachments
+}
+
+// SendMailResponse is the response for SendMail.
+message SendMailResponse {
+    int64 message_id = 1;
+    string thread_id = 2;
+}
+
+// FetchInboxRequest is the request for FetchInbox.
+message FetchInboxRequest {
+    int64 agent_id = 1;
+    int32 limit = 2;            // Maximum messages to return
+    bool unread_only = 3;       // Only return unread messages
+    MessageState state_filter = 4;  // Filter by state
+}
+
+// FetchInboxResponse is the response for FetchInbox.
+message FetchInboxResponse {
+    repeated InboxMessage messages = 1;
+}
+
+// ReadMessageRequest is the request for ReadMessage.
+message ReadMessageRequest {
+    int64 agent_id = 1;
+    int64 message_id = 2;
+}
+
+// ReadMessageResponse is the response for ReadMessage.
+message ReadMessageResponse {
+    InboxMessage message = 1;
+}
+
+// ReadThreadRequest is the request for ReadThread.
+message ReadThreadRequest {
+    int64 agent_id = 1;
+    string thread_id = 2;
+}
+
+// ReadThreadResponse is the response for ReadThread.
+message ReadThreadResponse {
+    repeated InboxMessage messages = 1;
+}
+
+// UpdateStateRequest is the request for UpdateState.
+message UpdateStateRequest {
+    int64 agent_id = 1;
+    int64 message_id = 2;
+    MessageState new_state = 3;
+    int64 snoozed_until = 4;    // Required for STATE_SNOOZED
+}
+
+// UpdateStateResponse is the response for UpdateState.
+message UpdateStateResponse {
+    bool success = 1;
+}
+
+// AckMessageRequest is the request for AckMessage.
+message AckMessageRequest {
+    int64 agent_id = 1;
+    int64 message_id = 2;
+}
+
+// AckMessageResponse is the response for AckMessage.
+message AckMessageResponse {
+    bool success = 1;
+}
+
+// GetStatusRequest is the request for GetStatus.
+message GetStatusRequest {
+    int64 agent_id = 1;
+}
+
+// GetStatusResponse is the response for GetStatus.
+message GetStatusResponse {
+    int64 agent_id = 1;
+    string agent_name = 2;
+    int64 unread_count = 3;
+    int64 urgent_count = 4;
+    int64 starred_count = 5;
+    int64 snoozed_count = 6;
+}
+
+// PollChangesRequest is the request for PollChanges.
+message PollChangesRequest {
+    int64 agent_id = 1;
+    map<int64, int64> since_offsets = 2;    // topic_id -> last_offset
+}
+
+// PollChangesResponse is the response for PollChanges.
+message PollChangesResponse {
+    repeated InboxMessage new_messages = 1;
+    map<int64, int64> new_offsets = 2;      // topic_id -> new_offset
+}
+
+// SubscribeInboxRequest is the request for SubscribeInbox streaming.
+message SubscribeInboxRequest {
+    int64 agent_id = 1;
+}
+
+// PublishRequest is the request for Publish.
+message PublishRequest {
+    int64 sender_id = 1;
+    string topic_name = 2;
+    string subject = 3;
+    string body = 4;
+    Priority priority = 5;
+}
+
+// PublishResponse is the response for Publish.
+message PublishResponse {
+    int64 message_id = 1;
+    int32 recipients_count = 2;
+}
+
+// SubscribeRequest is the request for Subscribe.
+message SubscribeRequest {
+    int64 agent_id = 1;
+    string topic_name = 2;
+}
+
+// SubscribeResponse is the response for Subscribe.
+message SubscribeResponse {
+    bool success = 1;
+    int64 topic_id = 2;
+}
+
+// UnsubscribeRequest is the request for Unsubscribe.
+message UnsubscribeRequest {
+    int64 agent_id = 1;
+    string topic_name = 2;
+}
+
+// UnsubscribeResponse is the response for Unsubscribe.
+message UnsubscribeResponse {
+    bool success = 1;
+}
+
+// Topic represents a pub/sub topic.
+message Topic {
+    int64 id = 1;
+    string name = 2;
+    string topic_type = 3;      // "direct", "broadcast", "queue"
+    int64 created_at = 4;
+}
+
+// ListTopicsRequest is the request for ListTopics.
+message ListTopicsRequest {
+    int64 agent_id = 1;         // If set, only show subscribed topics
+    bool subscribed_only = 2;
+}
+
+// ListTopicsResponse is the response for ListTopics.
+message ListTopicsResponse {
+    repeated Topic topics = 1;
+}
+
+// SearchRequest is the request for Search.
+message SearchRequest {
+    int64 agent_id = 1;
+    string query = 2;
+    int64 topic_id = 3;         // Optional, filter by topic
+    int32 limit = 4;
+}
+
+// SearchResponse is the response for Search.
+message SearchResponse {
+    repeated InboxMessage results = 1;
+}
+
+// RegisterAgentRequest is the request for RegisterAgent.
+message RegisterAgentRequest {
+    string name = 1;
+    string project_key = 2;     // Optional project binding
+}
+
+// RegisterAgentResponse is the response for RegisterAgent.
+message RegisterAgentResponse {
+    int64 agent_id = 1;
+    string name = 2;
+}
+
+// GetAgentRequest is the request for GetAgent.
+message GetAgentRequest {
+    int64 agent_id = 1;         // Use ID or name
+    string name = 2;
+}
+
+// GetAgentResponse is the response for GetAgent.
+message GetAgentResponse {
+    int64 id = 1;
+    string name = 2;
+    string project_key = 3;
+    string current_session_id = 4;
+    int64 created_at = 5;
+    int64 last_active_at = 6;
+}
+
+// ListAgentsRequest is the request for ListAgents.
+message ListAgentsRequest {
+    int32 limit = 1;
+}
+
+// ListAgentsResponse is the response for ListAgents.
+message ListAgentsResponse {
+    repeated GetAgentResponse agents = 1;
+}
+
+// EnsureIdentityRequest is the request for EnsureIdentity.
+message EnsureIdentityRequest {
+    string session_id = 1;
+    string project_dir = 2;
+}
+
+// EnsureIdentityResponse is the response for EnsureIdentity.
+message EnsureIdentityResponse {
+    int64 agent_id = 1;
+    string agent_name = 2;
+    bool created = 3;           // True if a new agent was created
+}
+
+// SaveIdentityRequest is the request for SaveIdentity.
+message SaveIdentityRequest {
+    string session_id = 1;
+    int64 agent_id = 2;
+    map<int64, int64> consumer_offsets = 3;     // topic_id -> offset
+}
+
+// SaveIdentityResponse is the response for SaveIdentity.
+message SaveIdentityResponse {
+    bool success = 1;
+}

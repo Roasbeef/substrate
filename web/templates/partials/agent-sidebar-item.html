@@ -1,0 +1,38 @@
+{{define "agent-sidebar-item"}}
+<a href="/agents/{{.ID}}"
+   id="sidebar-agent-{{.ID}}"
+   class="flex items-center gap-3 px-4 py-2 rounded-lg hover:bg-gray-100 group
+          {{if eq .ID $.CurrentAgentID}}bg-blue-50 text-blue-700{{else}}text-gray-700{{end}}">
+    <!-- Status dot -->
+    <span class="relative flex h-2 w-2 flex-shrink-0">
+        {{if eq .Status "active"}}
+        <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
+        <span class="relative inline-flex rounded-full h-2 w-2 bg-green-500"></span>
+        {{else if eq .Status "busy"}}
+        <span class="relative inline-flex rounded-full h-2 w-2 bg-yellow-500"></span>
+        {{else}}
+        <span class="relative inline-flex rounded-full h-2 w-2 bg-gray-300"></span>
+        {{end}}
+    </span>
+
+    <!-- Agent name -->
+    <span class="flex-1 truncate text-sm">{{.Name}}</span>
+
+    <!-- Progress indicator (if active session) -->
+    {{if .CurrentSession}}
+    <span class="text-xs text-gray-400 group-hover:hidden">{{.CurrentSession.ProgressPct}}%</span>
+    {{end}}
+
+    <!-- Quick message button (shows on hover) -->
+    <button class="hidden group-hover:flex p-1 text-gray-400 hover:text-blue-600 rounded"
+            hx-get="/agents/{{.ID}}/message"
+            hx-target="#modal-container"
+            onclick="event.preventDefault(); event.stopPropagation();"
+            title="Quick message">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                  d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"/>
+        </svg>
+    </button>
+</a>
+{{end}}

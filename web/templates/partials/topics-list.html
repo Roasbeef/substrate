@@ -1,0 +1,39 @@
+{{define "topics-list"}}
+{{if .Topics}}
+<ul class="space-y-1">
+    {{range .Topics}}
+    <li>
+        <a href="/topic/{{.Name}}"
+           class="flex items-center gap-3 px-4 py-2 text-gray-700 rounded-lg hover:bg-gray-100
+                  {{if eq $.ActiveTopic .Name}}bg-blue-50 text-blue-700 font-medium{{end}}">
+            <!-- Topic type icon -->
+            {{if eq .TopicType "broadcast"}}
+            <svg class="w-5 h-5 text-purple-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                      d="M11 5.882V19.24a1.76 1.76 0 01-3.417.592l-2.147-6.15M18 13a3 3 0 100-6M5.436 13.683A4.001 4.001 0 017 6h1.832c4.1 0 7.625-1.234 9.168-3v14c-1.543-1.766-5.067-3-9.168-3H7a3.988 3.988 0 01-1.564-.317z"/>
+            </svg>
+            {{else if eq .TopicType "queue"}}
+            <svg class="w-5 h-5 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                      d="M4 6h16M4 10h16M4 14h16M4 18h16"/>
+            </svg>
+            {{else}}
+            <svg class="w-5 h-5 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                      d="M7 20l4-16m2 16l4-16M6 9h14M4 15h14"/>
+            </svg>
+            {{end}}
+            <span class="truncate">{{.Name}}</span>
+            {{if .UnreadCount}}
+            <span class="ml-auto bg-gray-200 text-gray-700 text-xs px-2 py-0.5 rounded-full">
+                {{.UnreadCount}}
+            </span>
+            {{end}}
+        </a>
+    </li>
+    {{end}}
+</ul>
+{{else}}
+<p class="px-4 py-2 text-sm text-gray-500">No subscriptions</p>
+{{end}}
+{{end}}

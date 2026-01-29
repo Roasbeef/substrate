@@ -1,0 +1,276 @@
+// Package web provides the HTTP server and handlers for the Subtrate web UI.
+package web
+
+import (
+	"context"
+	"embed"
+	"fmt"
+	"html/template"
+	"io/fs"
+	"log"
+	"net/http"
+	"time"
+
+	"github.com/roasbeef/subtrate/internal/db"
+)
+
+//go:embed templates/*.html templates/partials/*.html
+var templatesFS embed.FS
+
+//go:embed static/css/*.css static/js/*.js
+var staticFS embed.FS
+
+// Server is the HTTP server for the Subtrate web UI.
+type Server struct {
+	store     *db.Store
+	templates map[string]*template.Template // Page-specific template sets.
+	partials  *template.Template            // Shared partials.
+	mux       *http.ServeMux
+	srv       *http.Server
+	addr      string
+}
+
+// Config holds configuration for the web server.
+type Config struct {
+	Addr string
+}
+
+// DefaultConfig returns the default server configuration.
+func DefaultConfig() *Config {
+	return &Config{
+		Addr: ":8080",
+	}
+}
+
+// NewServer creates a new web server.
+func NewServer(cfg *Config, store *db.Store) (*Server, error) {
+	s := &Server{
+		store:     store,
+		templates: make(map[string]*template.Template),
+		mux:       http.NewServeMux(),
+		addr:      cfg.Addr,
+	}
+
+	// Common template functions.
+	funcMap := template.FuncMap{
+		"formatTime":     formatTime,
+		"formatTimeAgo":  formatTimeAgo,
+		"formatDateTime": formatDateTime,
+		"formatDuration": formatDuration,
+		"formatDeadline": formatDeadline,
+		"timeSection":    timeSection,
+		"truncate":       truncate,
+		"markdown":       markdownToHTML,
+	}
+
+	// Parse shared partials.
+	partials, err := template.New("").Funcs(funcMap).ParseFS(
+		templatesFS,
+		"templates/partials/*.html",
+	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse partials: %w", err)
+	}
+	s.partials = partials
+
+	// Parse each page template separately (with layout and partials).
+	// This avoids conflicts between pages defining the same block names.
+	pages := []string{"inbox.html", "agents-dashboard.html"}
+	for _, page := range pages {
+		// Clone partials and add layout + page template.
+		tmpl, err := template.Must(partials.Clone()).ParseFS(
+			templatesFS,
+			"templates/layout.html",
+			"templates/"+page,
+		)
+		if err != nil {
+			return nil, fmt.Errorf("failed to parse template %s: %w", page, err)
+		}
+		s.templates[page] = tmpl
+	}
+
+	// Register routes.
+	s.registerRoutes()
+
+	return s, nil
+}
+
+// registerRoutes sets up all HTTP routes.
+func (s *Server) registerRoutes() {
+	// Static files.
+	staticSub, _ := fs.Sub(staticFS, "static")
+	s.mux.Handle("/static/", http.StripPrefix("/static/", http.FileServer(http.FS(staticSub))))
+
+	// Page routes.
+	s.mux.HandleFunc("/", s.handleIndex)
+	s.mux.HandleFunc("/inbox", s.handleInbox)
+	s.mux.HandleFunc("/agents", s.handleAgentsDashboard)
+	s.mux.HandleFunc("/sessions", s.handleSessions)
+
+	// HTMX partial routes.
+	s.mux.HandleFunc("/inbox/messages", s.handleInboxMessages)
+	s.mux.HandleFunc("/compose", s.handleCompose)
+	s.mux.HandleFunc("/thread/", s.handleThread)
+	s.mux.HandleFunc("/agents/new", s.handleNewAgentModal)
+	s.mux.HandleFunc("/sessions/new", s.handleNewSessionModal)
+
+	// API routes (return HTML partials for HTMX).
+	s.mux.HandleFunc("/api/status", s.handleAPIStatus)
+	s.mux.HandleFunc("/api/topics", s.handleAPITopics)
+	s.mux.HandleFunc("/api/agents", s.handleAPIAgents)
+	s.mux.HandleFunc("/api/agents/sidebar", s.handleAPIAgentsSidebar)
+	s.mux.HandleFunc("/api/agents/cards", s.handleAPIAgentsCards)
+	s.mux.HandleFunc("/api/activity", s.handleAPIActivity)
+	s.mux.HandleFunc("/api/sessions/active", s.handleAPIActiveSessions)
+
+	// SSE event streams.
+	s.mux.HandleFunc("/events/agents", s.handleSSEAgents)
+	s.mux.HandleFunc("/events/activity", s.handleSSEActivity)
+}
+
+// Start starts the HTTP server.
+func (s *Server) Start() error {
+	s.srv = &http.Server{
+		Addr:         s.addr,
+		Handler:      s.mux,
+		ReadTimeout:  15 * time.Second,
+		WriteTimeout: 15 * time.Second,
+		IdleTimeout:  60 * time.Second,
+	}
+
+	log.Printf("Starting web server on %s", s.addr)
+	return s.srv.ListenAndServe()
+}
+
+// Shutdown gracefully shuts down the server.
+func (s *Server) Shutdown(ctx context.Context) error {
+	if s.srv != nil {
+		return s.srv.Shutdown(ctx)
+	}
+	return nil
+}
+
+// Template helper functions.
+
+// formatTime formats a time for display.
+func formatTime(t time.Time) string {
+	now := time.Now()
+	if t.Year() == now.Year() && t.YearDay() == now.YearDay() {
+		return t.Format("3:04 PM")
+	}
+	if t.Year() == now.Year() {
+		return t.Format("Jan 2")
+	}
+	return t.Format("Jan 2, 2006")
+}
+
+// formatDateTime formats a time with date and time.
+func formatDateTime(t time.Time) string {
+	now := time.Now()
+	if t.Year() == now.Year() && t.YearDay() == now.YearDay() {
+		return "Today at " + t.Format("3:04 PM")
+	}
+	if t.Year() == now.Year() {
+		return t.Format("Jan 2 at 3:04 PM")
+	}
+	return t.Format("Jan 2, 2006 at 3:04 PM")
+}
+
+// formatTimeAgo formats a time as a relative duration.
+func formatTimeAgo(t time.Time) string {
+	d := time.Since(t)
+	switch {
+	case d < time.Minute:
+		return "just now"
+	case d < time.Hour:
+		m := int(d.Minutes())
+		if m == 1 {
+			return "1 min ago"
+		}
+		return fmt.Sprintf("%d mins ago", m)
+	case d < 24*time.Hour:
+		h := int(d.Hours())
+		if h == 1 {
+			return "1 hour ago"
+		}
+		return fmt.Sprintf("%d hours ago", h)
+	case d < 7*24*time.Hour:
+		days := int(d.Hours() / 24)
+		if days == 1 {
+			return "yesterday"
+		}
+		return fmt.Sprintf("%d days ago", days)
+	default:
+		return t.Format("Jan 2")
+	}
+}
+
+// formatDeadline formats a deadline time.
+func formatDeadline(t time.Time) string {
+	if t.IsZero() {
+		return "No deadline"
+	}
+	now := time.Now()
+	if t.Before(now) {
+		return "Overdue"
+	}
+	d := t.Sub(now)
+	if d < time.Hour {
+		return fmt.Sprintf("in %d minutes", int(d.Minutes()))
+	}
+	if d < 24*time.Hour {
+		return fmt.Sprintf("in %d hours", int(d.Hours()))
+	}
+	return t.Format("Jan 2 at 3:04 PM")
+}
+
+// formatDuration formats a duration since a start time.
+func formatDuration(start time.Time) string {
+	d := time.Since(start)
+	if d < time.Hour {
+		return fmt.Sprintf("%dm", int(d.Minutes()))
+	}
+	if d < 24*time.Hour {
+		return fmt.Sprintf("%dh %dm", int(d.Hours()), int(d.Minutes())%60)
+	}
+	return fmt.Sprintf("%dd %dh", int(d.Hours())/24, int(d.Hours())%24)
+}
+
+// truncate truncates a string to a maximum length.
+func truncate(s string, maxLen int) string {
+	if len(s) <= maxLen {
+		return s
+	}
+	return s[:maxLen-3] + "..."
+}
+
+// markdownToHTML converts markdown to HTML (simplified).
+func markdownToHTML(s string) template.HTML {
+	// For now, just escape and return as-is.
+	// TODO: Add proper markdown parsing.
+	return template.HTML(template.HTMLEscapeString(s))
+}
+
+// timeSection returns a section label for grouping messages by time period.
+// Used for Google Inbox-style time grouping (Today, Yesterday, This Week, Earlier).
+func timeSection(t time.Time) string {
+	now := time.Now()
+	today := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, now.Location())
+	yesterday := today.AddDate(0, 0, -1)
+	weekAgo := today.AddDate(0, 0, -7)
+
+	if t.After(today) || t.Equal(today) {
+		return "Today"
+	}
+	if t.After(yesterday) || t.Equal(yesterday) {
+		return "Yesterday"
+	}
+	if t.After(weekAgo) {
+		return "This Week"
+	}
+	// For older messages, show the month.
+	if t.Year() == now.Year() {
+		return t.Format("January")
+	}
+	return t.Format("January 2006")
+}

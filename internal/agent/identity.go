@@ -1,0 +1,425 @@
+package agent
+
+import (
+	"context"
+	"database/sql"
+	"encoding/json"
+	"fmt"
+	"os"
+	"path/filepath"
+	"time"
+
+	"github.com/roasbeef/subtrate/internal/db"
+	"github.com/roasbeef/subtrate/internal/db/sqlc"
+)
+
+// IdentityManager handles agent identity persistence for Claude Code sessions.
+// It maintains mappings between Claude sessions and Subtrate agents, allowing
+// agents to maintain identity across session restarts and compactions.
+type IdentityManager struct {
+	store       *db.Store
+	registry    *Registry
+	identityDir string
+}
+
+// IdentityFile represents the JSON structure stored in identity files.
+type IdentityFile struct {
+	SessionID       string            `json:"session_id"`
+	AgentName       string            `json:"agent_name"`
+	AgentID         int64             `json:"agent_id"`
+	ProjectKey      string            `json:"project_key,omitempty"`
+	CreatedAt       time.Time         `json:"created_at"`
+	LastActiveAt    time.Time         `json:"last_active_at"`
+	ConsumerOffsets map[string]int64  `json:"consumer_offsets,omitempty"`
+}
+
+// NewIdentityManager creates a new identity manager.
+func NewIdentityManager(store *db.Store, registry *Registry) (*IdentityManager,
+	error) {
+
+	// Get home directory for identity storage.
+	home, err := os.UserHomeDir()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get home directory: %w", err)
+	}
+
+	identityDir := filepath.Join(home, ".subtrate", "identities")
+
+	// Ensure directory structure exists.
+	dirs := []string{
+		filepath.Join(identityDir, "by-session"),
+		filepath.Join(identityDir, "by-project"),
+	}
+	for _, dir := range dirs {
+		if err := os.MkdirAll(dir, 0700); err != nil {
+			return nil, fmt.Errorf("failed to create dir %s: %w",
+				dir, err)
+		}
+	}
+
+	return &IdentityManager{
+		store:       store,
+		registry:    registry,
+		identityDir: identityDir,
+	}, nil
+}
+
+// EnsureIdentity ensures an agent identity exists for the given session. If
+// no identity exists, it creates a new agent with a memorable name.
+func (m *IdentityManager) EnsureIdentity(ctx context.Context, sessionID string,
+	projectKey string) (*IdentityFile, error) {
+
+	// Try to restore existing identity.
+	identity, err := m.RestoreIdentity(ctx, sessionID)
+	if err == nil {
+		// Update last active time.
+		identity.LastActiveAt = time.Now()
+		if err := m.saveIdentityFile(identity); err != nil {
+			return nil, err
+		}
+		return identity, nil
+	}
+
+	// Try to find an identity for this project.
+	if projectKey != "" {
+		identity, err = m.GetProjectDefaultIdentity(ctx, projectKey)
+		if err == nil {
+			// Associate this session with the existing agent.
+			identity.SessionID = sessionID
+			identity.LastActiveAt = time.Now()
+			if err := m.saveIdentityFile(identity); err != nil {
+				return nil, err
+			}
+			if err := m.saveSessionDB(ctx, identity); err != nil {
+				return nil, err
+			}
+			return identity, nil
+		}
+	}
+
+	// Create a new agent with a memorable name.
+	name, err := m.registry.EnsureUniqueAgentName(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to generate agent name: %w", err)
+	}
+
+	agent, err := m.registry.RegisterAgent(ctx, name, projectKey)
+	if err != nil {
+		return nil, fmt.Errorf("failed to register agent: %w", err)
+	}
+
+	// Create identity file.
+	identity = &IdentityFile{
+		SessionID:       sessionID,
+		AgentName:       agent.Name,
+		AgentID:         agent.ID,
+		ProjectKey:      projectKey,
+		CreatedAt:       time.Now(),
+		LastActiveAt:    time.Now(),
+		ConsumerOffsets: make(map[string]int64),
+	}
+
+	if err := m.saveIdentityFile(identity); err != nil {
+		return nil, err
+	}
+
+	if err := m.saveSessionDB(ctx, identity); err != nil {
+		return nil, err
+	}
+
+	// Set as project default if this is a new project.
+	if projectKey != "" {
+		if err := m.SetProjectDefault(ctx, projectKey, agent.Name); err != nil {
+			// Non-fatal, log but continue.
+			fmt.Printf("Warning: failed to set project default: %v\n",
+				err)
+		}
+	}
+
+	return identity, nil
+}
+
+// RestoreIdentity restores an agent identity from the session ID.
+func (m *IdentityManager) RestoreIdentity(ctx context.Context,
+	sessionID string) (*IdentityFile, error) {
+
+	// First try file-based storage.
+	filePath := filepath.Join(
+		m.identityDir, "by-session", sessionID+".json",
+	)
+
+	data, err := os.ReadFile(filePath)
+	if err == nil {
+		var identity IdentityFile
+		if err := json.Unmarshal(data, &identity); err != nil {
+			return nil, fmt.Errorf("failed to parse identity: %w",
+				err)
+		}
+
+		// Verify agent still exists in database.
+		_, err = m.registry.GetAgent(ctx, identity.AgentID)
+		if err != nil {
+			return nil, fmt.Errorf("agent no longer exists: %w",
+				err)
+		}
+
+		return &identity, nil
+	}
+
+	// Try database.
+	session, err := m.store.Queries().GetSessionIdentity(ctx, sessionID)
+	if err != nil {
+		return nil, fmt.Errorf("session not found: %w", err)
+	}
+
+	agent, err := m.registry.GetAgent(ctx, session.AgentID)
+	if err != nil {
+		return nil, fmt.Errorf("agent not found: %w", err)
+	}
+
+	identity := &IdentityFile{
+		SessionID:       sessionID,
+		AgentName:       agent.Name,
+		AgentID:         agent.ID,
+		CreatedAt:       time.Unix(session.CreatedAt, 0),
+		LastActiveAt:    time.Unix(session.LastActiveAt, 0),
+		ConsumerOffsets: make(map[string]int64),
+	}
+
+	if session.ProjectKey.Valid {
+		identity.ProjectKey = session.ProjectKey.String
+	}
+
+	// Load consumer offsets.
+	offsets, err := m.store.Queries().ListConsumerOffsetsByAgent(
+		ctx, agent.ID,
+	)
+	if err == nil {
+		for _, offset := range offsets {
+			identity.ConsumerOffsets[offset.TopicName] = offset.LastOffset
+		}
+	}
+
+	return identity, nil
+}
+
+// SaveIdentity persists the current identity state (including offsets).
+func (m *IdentityManager) SaveIdentity(ctx context.Context,
+	identity *IdentityFile) error {
+
+	identity.LastActiveAt = time.Now()
+
+	if err := m.saveIdentityFile(identity); err != nil {
+		return err
+	}
+
+	if err := m.saveSessionDB(ctx, identity); err != nil {
+		return err
+	}
+
+	// Save consumer offsets.
+	for topicName, offset := range identity.ConsumerOffsets {
+		topic, err := m.store.Queries().GetTopicByName(ctx, topicName)
+		if err != nil {
+			continue
+		}
+
+		err = m.store.Queries().UpsertConsumerOffset(
+			ctx, sqlc.UpsertConsumerOffsetParams{
+				AgentID:    identity.AgentID,
+				TopicID:    topic.ID,
+				LastOffset: offset,
+				UpdatedAt:  time.Now().Unix(),
+			},
+		)
+		if err != nil {
+			return fmt.Errorf("failed to save offset: %w", err)
+		}
+	}
+
+	return nil
+}
+
+// GetProjectDefaultIdentity returns the default agent for a project.
+func (m *IdentityManager) GetProjectDefaultIdentity(ctx context.Context,
+	projectKey string) (*IdentityFile, error) {
+
+	// Try file-based storage first.
+	hash := hashProjectKey(projectKey)
+	filePath := filepath.Join(
+		m.identityDir, "by-project", hash+".json",
+	)
+
+	data, err := os.ReadFile(filePath)
+	if err == nil {
+		var identity IdentityFile
+		if err := json.Unmarshal(data, &identity); err != nil {
+			return nil, fmt.Errorf("failed to parse identity: %w",
+				err)
+		}
+
+		// Verify agent still exists.
+		_, err = m.registry.GetAgent(ctx, identity.AgentID)
+		if err != nil {
+			return nil, fmt.Errorf("agent no longer exists: %w",
+				err)
+		}
+
+		return &identity, nil
+	}
+
+	// Try database.
+	session, err := m.store.Queries().GetSessionIdentityByProject(
+		ctx, sql.NullString{String: projectKey, Valid: true},
+	)
+	if err != nil {
+		return nil, fmt.Errorf("no default for project: %w", err)
+	}
+
+	agent, err := m.registry.GetAgent(ctx, session.AgentID)
+	if err != nil {
+		return nil, fmt.Errorf("agent not found: %w", err)
+	}
+
+	return &IdentityFile{
+		SessionID:       session.SessionID,
+		AgentName:       agent.Name,
+		AgentID:         agent.ID,
+		ProjectKey:      projectKey,
+		CreatedAt:       time.Unix(session.CreatedAt, 0),
+		LastActiveAt:    time.Unix(session.LastActiveAt, 0),
+		ConsumerOffsets: make(map[string]int64),
+	}, nil
+}
+
+// SetProjectDefault sets the default agent for a project.
+func (m *IdentityManager) SetProjectDefault(ctx context.Context,
+	projectKey string, agentName string) error {
+
+	agent, err := m.registry.GetAgentByName(ctx, agentName)
+	if err != nil {
+		return fmt.Errorf("agent not found: %w", err)
+	}
+
+	identity := &IdentityFile{
+		AgentName:       agent.Name,
+		AgentID:         agent.ID,
+		ProjectKey:      projectKey,
+		CreatedAt:       time.Now(),
+		LastActiveAt:    time.Now(),
+		ConsumerOffsets: make(map[string]int64),
+	}
+
+	// Save to project file.
+	hash := hashProjectKey(projectKey)
+	filePath := filepath.Join(
+		m.identityDir, "by-project", hash+".json",
+	)
+
+	data, err := json.MarshalIndent(identity, "", "  ")
+	if err != nil {
+		return fmt.Errorf("failed to marshal identity: %w", err)
+	}
+
+	if err := os.WriteFile(filePath, data, 0600); err != nil {
+		return fmt.Errorf("failed to write identity file: %w", err)
+	}
+
+	return nil
+}
+
+// CurrentIdentity returns the current agent identity for output.
+func (m *IdentityManager) CurrentIdentity(ctx context.Context,
+	sessionID string) (*IdentityFile, error) {
+
+	return m.RestoreIdentity(ctx, sessionID)
+}
+
+// ListIdentities returns all known identities.
+func (m *IdentityManager) ListIdentities(ctx context.Context) ([]IdentityFile,
+	error) {
+
+	var identities []IdentityFile
+
+	// Read from by-session directory.
+	sessionDir := filepath.Join(m.identityDir, "by-session")
+	entries, err := os.ReadDir(sessionDir)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read identity dir: %w", err)
+	}
+
+	for _, entry := range entries {
+		if entry.IsDir() || filepath.Ext(entry.Name()) != ".json" {
+			continue
+		}
+
+		filePath := filepath.Join(sessionDir, entry.Name())
+		data, err := os.ReadFile(filePath)
+		if err != nil {
+			continue
+		}
+
+		var identity IdentityFile
+		if err := json.Unmarshal(data, &identity); err != nil {
+			continue
+		}
+
+		identities = append(identities, identity)
+	}
+
+	return identities, nil
+}
+
+// saveIdentityFile writes an identity to the file system.
+func (m *IdentityManager) saveIdentityFile(identity *IdentityFile) error {
+	if identity.SessionID == "" {
+		return nil
+	}
+
+	filePath := filepath.Join(
+		m.identityDir, "by-session", identity.SessionID+".json",
+	)
+
+	data, err := json.MarshalIndent(identity, "", "  ")
+	if err != nil {
+		return fmt.Errorf("failed to marshal identity: %w", err)
+	}
+
+	if err := os.WriteFile(filePath, data, 0600); err != nil {
+		return fmt.Errorf("failed to write identity file: %w", err)
+	}
+
+	return nil
+}
+
+// saveSessionDB saves the session identity to the database.
+func (m *IdentityManager) saveSessionDB(ctx context.Context,
+	identity *IdentityFile) error {
+
+	if identity.SessionID == "" {
+		return nil
+	}
+
+	return m.store.Queries().CreateSessionIdentity(
+		ctx, sqlc.CreateSessionIdentityParams{
+			SessionID: identity.SessionID,
+			AgentID:   identity.AgentID,
+			ProjectKey: sql.NullString{
+				String: identity.ProjectKey,
+				Valid:  identity.ProjectKey != "",
+			},
+			CreatedAt:    identity.CreatedAt.Unix(),
+			LastActiveAt: identity.LastActiveAt.Unix(),
+		},
+	)
+}
+
+// hashProjectKey creates a filesystem-safe hash of a project path.
+func hashProjectKey(projectKey string) string {
+	// Simple hash for filesystem safety.
+	h := uint32(0)
+	for _, c := range projectKey {
+		h = h*31 + uint32(c)
+	}
+	return fmt.Sprintf("%08x", h)
+}

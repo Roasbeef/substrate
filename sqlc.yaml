@@ -1,0 +1,11 @@
+version: "2"
+sql:
+  - engine: "sqlite"
+    schema: "internal/db/migrations"
+    queries: "internal/db/queries"
+    gen:
+      go:
+        out: internal/db/sqlc
+        package: sqlc
+        emit_interface: true
+        emit_exported_queries: true

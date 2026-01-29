@@ -1,0 +1,164 @@
+{{template "layout.html" .}}
+
+{{define "title"}}Agents Dashboard - Subtrate{{end}}
+
+{{define "content"}}
+<div class="p-6 bg-gray-100 min-h-screen">
+    <!-- Header with actions -->
+    <div class="flex items-center justify-between mb-6">
+        <div>
+            <h1 class="text-2xl font-semibold text-gray-900">Agent Dashboard</h1>
+            <p class="text-gray-500 mt-1">Monitor and manage your Claude agents</p>
+        </div>
+        <div class="flex items-center gap-3">
+            <!-- New Agent Button -->
+            <button class="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg
+                           hover:bg-blue-700 shadow-sm transition-colors"
+                    hx-get="/agents/new"
+                    hx-target="#modal-container">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
+                </svg>
+                New Agent
+            </button>
+            <!-- Kick Off Session -->
+            <button class="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg
+                           hover:bg-green-700 shadow-sm transition-colors"
+                    hx-get="/sessions/new"
+                    hx-target="#modal-container">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                          d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z"/>
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                          d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                </svg>
+                Start Session
+            </button>
+        </div>
+    </div>
+
+    <!-- Stats Overview -->
+    <div class="grid grid-cols-4 gap-4 mb-6">
+        <div class="bg-white rounded-lg p-4 shadow-sm border border-gray-200">
+            <div class="flex items-center justify-between">
+                <div>
+                    <p class="text-sm text-gray-500">Active Agents</p>
+                    <p class="text-2xl font-semibold text-gray-900" id="stat-active">{{.Stats.ActiveAgents}}</p>
+                </div>
+                <div class="w-10 h-10 bg-green-100 rounded-full flex items-center justify-center">
+                    <span class="w-3 h-3 bg-green-500 rounded-full animate-pulse"></span>
+                </div>
+            </div>
+        </div>
+        <div class="bg-white rounded-lg p-4 shadow-sm border border-gray-200">
+            <div class="flex items-center justify-between">
+                <div>
+                    <p class="text-sm text-gray-500">Running Sessions</p>
+                    <p class="text-2xl font-semibold text-gray-900" id="stat-sessions">{{.Stats.RunningSessions}}</p>
+                </div>
+                <div class="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center">
+                    <svg class="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                              d="M13 10V3L4 14h7v7l9-11h-7z"/>
+                    </svg>
+                </div>
+            </div>
+        </div>
+        <div class="bg-white rounded-lg p-4 shadow-sm border border-gray-200">
+            <div class="flex items-center justify-between">
+                <div>
+                    <p class="text-sm text-gray-500">Pending Messages</p>
+                    <p class="text-2xl font-semibold text-gray-900" id="stat-pending">{{.Stats.PendingMessages}}</p>
+                </div>
+                <div class="w-10 h-10 bg-yellow-100 rounded-full flex items-center justify-center">
+                    <svg class="w-5 h-5 text-yellow-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                              d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/>
+                    </svg>
+                </div>
+            </div>
+        </div>
+        <div class="bg-white rounded-lg p-4 shadow-sm border border-gray-200">
+            <div class="flex items-center justify-between">
+                <div>
+                    <p class="text-sm text-gray-500">Completed Today</p>
+                    <p class="text-2xl font-semibold text-gray-900" id="stat-completed">{{.Stats.CompletedToday}}</p>
+                </div>
+                <div class="w-10 h-10 bg-purple-100 rounded-full flex items-center justify-center">
+                    <svg class="w-5 h-5 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                              d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                    </svg>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Main Grid: Agents + Activity Feed -->
+    <div class="grid grid-cols-3 gap-6">
+        <!-- Agents List (2 columns) -->
+        <div class="col-span-2">
+            <div class="bg-white rounded-lg shadow-sm border border-gray-200">
+                <div class="flex items-center justify-between px-4 py-3 border-b border-gray-200">
+                    <h2 class="font-semibold text-gray-900">Agents</h2>
+                    <div class="flex items-center gap-2">
+                        <button class="px-3 py-1 text-sm rounded-full bg-gray-100 text-gray-700 hover:bg-gray-200"
+                                hx-get="/api/agents/cards?filter=all"
+                                hx-target="#agents-grid">All</button>
+                        <button class="px-3 py-1 text-sm rounded-full text-gray-500 hover:bg-gray-100"
+                                hx-get="/api/agents/cards?filter=active"
+                                hx-target="#agents-grid">Active</button>
+                        <button class="px-3 py-1 text-sm rounded-full text-gray-500 hover:bg-gray-100"
+                                hx-get="/api/agents/cards?filter=idle"
+                                hx-target="#agents-grid">Idle</button>
+                    </div>
+                </div>
+                <div id="agents-grid"
+                     class="grid grid-cols-2 gap-4 p-4"
+                     hx-get="/api/agents/cards"
+                     hx-trigger="load"
+                     hx-ext="sse"
+                     sse-connect="/events/agents"
+                     sse-swap="agent-update">
+                    <!-- Agent cards loaded via HTMX -->
+                </div>
+            </div>
+        </div>
+
+        <!-- Activity Feed (1 column) -->
+        <div class="col-span-1">
+            <div class="bg-white rounded-lg shadow-sm border border-gray-200 h-full">
+                <div class="flex items-center justify-between px-4 py-3 border-b border-gray-200">
+                    <h2 class="font-semibold text-gray-900">Activity Feed</h2>
+                    <span class="text-xs text-gray-400">Live</span>
+                </div>
+                <div id="activity-feed"
+                     class="overflow-y-auto max-h-96"
+                     hx-get="/api/activity"
+                     hx-trigger="load"
+                     hx-ext="sse"
+                     sse-connect="/events/activity"
+                     sse-swap="activity-update:beforeend">
+                    <!-- Activity items loaded via HTMX with SSE updates -->
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Active Sessions Section -->
+    <div class="mt-6">
+        <div class="bg-white rounded-lg shadow-sm border border-gray-200">
+            <div class="flex items-center justify-between px-4 py-3 border-b border-gray-200">
+                <h2 class="font-semibold text-gray-900">Active Sessions</h2>
+                <a href="/sessions" class="text-sm text-blue-600 hover:text-blue-700">View All</a>
+            </div>
+            <div id="sessions-list"
+                 class="divide-y divide-gray-100"
+                 hx-get="/api/sessions/active"
+                 hx-trigger="load, every 30s">
+                <!-- Active sessions loaded via HTMX -->
+            </div>
+        </div>
+    </div>
+</div>
+{{end}}
