@@ -10,26 +10,22 @@
 # Output (stdout JSON):
 #   decision: "block" to prevent stopping, null/omit to allow
 #   reason: Message shown to Claude when blocked
+#
+# Behavior: Continuously blocks exit until ALL tasks are completed.
+# The agent must complete all tasks before being allowed to stop.
 
 # Read hook input from stdin.
 input=$(cat)
 
 # Extract session_id from hook input.
 SESSION_ID=$(echo "$input" | jq -r '.session_id // empty' 2>/dev/null)
-STOP_HOOK_ACTIVE=$(echo "$input" | jq -r '.stop_hook_active // false' 2>/dev/null)
 
-# If no session_id, allow stop.
+# If no session_id, allow stop (can't find tasks).
 if [ -z "$SESSION_ID" ]; then
     exit 0
 fi
 
 TASKS_DIR="$HOME/.claude/tasks/$SESSION_ID"
-
-# If stop_hook_active is true, we already blocked once and Claude processed.
-# Allow exit this time to prevent infinite loop.
-if [ "$STOP_HOOK_ACTIVE" = "true" ]; then
-    exit 0
-fi
 
 # If no tasks directory, allow stop.
 if [ ! -d "$TASKS_DIR" ]; then
@@ -59,11 +55,11 @@ for task_file in "$TASKS_DIR"/*.json; do
 done
 
 if [ $incomplete -gt 0 ]; then
-    # Block stopping - output JSON with decision and reason.
+    # Block stopping - keep blocking until ALL tasks are complete.
     cat << EOF
 {
   "decision": "block",
-  "reason": "$incomplete incomplete task(s): $incomplete_list. Complete remaining tasks before stopping session."
+  "reason": "$incomplete incomplete task(s): $incomplete_list. Complete ALL tasks before stopping."
 }
 EOF
     exit 0
