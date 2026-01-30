@@ -19,20 +19,21 @@ import (
 const _ = grpc.SupportPackageIsVersion9
 
 const (
-	Mail_SendMail_FullMethodName       = "/subtraterpc.Mail/SendMail"
-	Mail_FetchInbox_FullMethodName     = "/subtraterpc.Mail/FetchInbox"
-	Mail_ReadMessage_FullMethodName    = "/subtraterpc.Mail/ReadMessage"
-	Mail_ReadThread_FullMethodName     = "/subtraterpc.Mail/ReadThread"
-	Mail_UpdateState_FullMethodName    = "/subtraterpc.Mail/UpdateState"
-	Mail_AckMessage_FullMethodName     = "/subtraterpc.Mail/AckMessage"
-	Mail_GetStatus_FullMethodName      = "/subtraterpc.Mail/GetStatus"
-	Mail_PollChanges_FullMethodName    = "/subtraterpc.Mail/PollChanges"
-	Mail_SubscribeInbox_FullMethodName = "/subtraterpc.Mail/SubscribeInbox"
-	Mail_Publish_FullMethodName        = "/subtraterpc.Mail/Publish"
-	Mail_Subscribe_FullMethodName      = "/subtraterpc.Mail/Subscribe"
-	Mail_Unsubscribe_FullMethodName    = "/subtraterpc.Mail/Unsubscribe"
-	Mail_ListTopics_FullMethodName     = "/subtraterpc.Mail/ListTopics"
-	Mail_Search_FullMethodName         = "/subtraterpc.Mail/Search"
+	Mail_SendMail_FullMethodName           = "/subtraterpc.Mail/SendMail"
+	Mail_FetchInbox_FullMethodName         = "/subtraterpc.Mail/FetchInbox"
+	Mail_ReadMessage_FullMethodName        = "/subtraterpc.Mail/ReadMessage"
+	Mail_ReadThread_FullMethodName         = "/subtraterpc.Mail/ReadThread"
+	Mail_UpdateState_FullMethodName        = "/subtraterpc.Mail/UpdateState"
+	Mail_AckMessage_FullMethodName         = "/subtraterpc.Mail/AckMessage"
+	Mail_GetStatus_FullMethodName          = "/subtraterpc.Mail/GetStatus"
+	Mail_PollChanges_FullMethodName        = "/subtraterpc.Mail/PollChanges"
+	Mail_SubscribeInbox_FullMethodName     = "/subtraterpc.Mail/SubscribeInbox"
+	Mail_Publish_FullMethodName            = "/subtraterpc.Mail/Publish"
+	Mail_Subscribe_FullMethodName          = "/subtraterpc.Mail/Subscribe"
+	Mail_Unsubscribe_FullMethodName        = "/subtraterpc.Mail/Unsubscribe"
+	Mail_ListTopics_FullMethodName         = "/subtraterpc.Mail/ListTopics"
+	Mail_Search_FullMethodName             = "/subtraterpc.Mail/Search"
+	Mail_HasUnackedStatusTo_FullMethodName = "/subtraterpc.Mail/HasUnackedStatusTo"
 )
 
 // MailClient is the client API for Mail service.
@@ -70,6 +71,9 @@ type MailClient interface {
 	ListTopics(ctx context.Context, in *ListTopicsRequest, opts ...grpc.CallOption) (*ListTopicsResponse, error)
 	// Search performs full-text search across messages.
 	Search(ctx context.Context, in *SearchRequest, opts ...grpc.CallOption) (*SearchResponse, error)
+	// HasUnackedStatusTo checks if there are unacked status messages from
+	// sender to recipient. Used for deduplication in status-update command.
+	HasUnackedStatusTo(ctx context.Context, in *HasUnackedStatusToRequest, opts ...grpc.CallOption) (*HasUnackedStatusToResponse, error)
 }
 
 type mailClient struct {
@@ -229,6 +233,16 @@ func (c *mailClient) Search(ctx context.Context, in *SearchRequest, opts ...grpc
 	return out, nil
 }
 
+func (c *mailClient) HasUnackedStatusTo(ctx context.Context, in *HasUnackedStatusToRequest, opts ...grpc.CallOption) (*HasUnackedStatusToResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(HasUnackedStatusToResponse)
+	err := c.cc.Invoke(ctx, Mail_HasUnackedStatusTo_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // MailServer is the server API for Mail service.
 // All implementations must embed UnimplementedMailServer
 // for forward compatibility.
@@ -264,6 +278,9 @@ type MailServer interface {
 	ListTopics(context.Context, *ListTopicsRequest) (*ListTopicsResponse, error)
 	// Search performs full-text search across messages.
 	Search(context.Context, *SearchRequest) (*SearchResponse, error)
+	// HasUnackedStatusTo checks if there are unacked status messages from
+	// sender to recipient. Used for deduplication in status-update command.
+	HasUnackedStatusTo(context.Context, *HasUnackedStatusToRequest) (*HasUnackedStatusToResponse, error)
 	mustEmbedUnimplementedMailServer()
 }
 
@@ -315,6 +332,9 @@ func (UnimplementedMailServer) ListTopics(context.Context, *ListTopicsRequest) (
 }
 func (UnimplementedMailServer) Search(context.Context, *SearchRequest) (*SearchResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method Search not implemented")
+}
+func (UnimplementedMailServer) HasUnackedStatusTo(context.Context, *HasUnackedStatusToRequest) (*HasUnackedStatusToResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method HasUnackedStatusTo not implemented")
 }
 func (UnimplementedMailServer) mustEmbedUnimplementedMailServer() {}
 func (UnimplementedMailServer) testEmbeddedByValue()              {}
@@ -582,6 +602,24 @@ func _Mail_Search_Handler(srv interface{}, ctx context.Context, dec func(interfa
 	return interceptor(ctx, in, info, handler)
 }
 
+func _Mail_HasUnackedStatusTo_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(HasUnackedStatusToRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(MailServer).HasUnackedStatusTo(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Mail_HasUnackedStatusTo_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(MailServer).HasUnackedStatusTo(ctx, req.(*HasUnackedStatusToRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // Mail_ServiceDesc is the grpc.ServiceDesc for Mail service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -640,6 +678,10 @@ var Mail_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "Search",
 			Handler:    _Mail_Search_Handler,
+		},
+		{
+			MethodName: "HasUnackedStatusTo",
+			Handler:    _Mail_HasUnackedStatusTo_Handler,
 		},
 	},
 	Streams: []grpc.StreamDesc{

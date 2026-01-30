@@ -428,12 +428,18 @@ func (c *Client) GetStatus(ctx context.Context, agentID int64) (*mail.AgentStatu
 func (c *Client) HasUnackedStatusTo(
 	ctx context.Context, senderID, recipientID int64,
 ) (bool, error) {
-	// Note: gRPC mode not implemented - fall back to direct mode logic.
-	// This is acceptable since status-update is typically run locally.
+
 	if c.mode == ModeGRPC {
-		// For gRPC, we'd need to add a new RPC. For now, return false
-		// to allow sending (skip deduplication in gRPC mode).
-		return false, nil
+		resp, err := c.mailClient.HasUnackedStatusTo(
+			ctx, &subtraterpc.HasUnackedStatusToRequest{
+				SenderId:    senderID,
+				RecipientId: recipientID,
+			},
+		)
+		if err != nil {
+			return false, err
+		}
+		return resp.HasPending, nil
 	}
 
 	count, err := c.store.Queries().HasUnackedStatusToAgent(

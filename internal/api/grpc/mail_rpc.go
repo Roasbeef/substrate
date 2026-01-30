@@ -9,6 +9,7 @@ import (
 	"google.golang.org/grpc/status"
 
 	"github.com/roasbeef/subtrate/internal/agent"
+	"github.com/roasbeef/subtrate/internal/db/sqlc"
 	"github.com/roasbeef/subtrate/internal/mail"
 )
 
@@ -406,6 +407,38 @@ func (s *Server) Search(ctx context.Context, req *SearchRequest) (*SearchRespons
 
 	return &SearchResponse{
 		Results: convertMessages(results),
+	}, nil
+}
+
+// HasUnackedStatusTo checks if there are unacked status messages from sender
+// to recipient. Used for deduplication in status-update command.
+func (s *Server) HasUnackedStatusTo(
+	ctx context.Context, req *HasUnackedStatusToRequest,
+) (*HasUnackedStatusToResponse, error) {
+
+	if req.SenderId == 0 {
+		return nil, status.Error(codes.InvalidArgument, "sender_id is required")
+	}
+	if req.RecipientId == 0 {
+		return nil, status.Error(
+			codes.InvalidArgument, "recipient_id is required",
+		)
+	}
+
+	count, err := s.store.Queries().HasUnackedStatusToAgent(
+		ctx, sqlc.HasUnackedStatusToAgentParams{
+			SenderID: req.SenderId,
+			AgentID:  req.RecipientId,
+		},
+	)
+	if err != nil {
+		return nil, status.Errorf(
+			codes.Internal, "failed to check status messages: %v", err,
+		)
+	}
+
+	return &HasUnackedStatusToResponse{
+		HasPending: count > 0,
 	}, nil
 }
 

@@ -48,6 +48,10 @@ service Mail {
 
     // Search performs full-text search across messages.
     rpc Search (SearchRequest) returns (SearchResponse);
+
+    // HasUnackedStatusTo checks if there are unacked status messages from
+    // sender to recipient. Used for deduplication in status-update command.
+    rpc HasUnackedStatusTo (HasUnackedStatusToRequest) returns (HasUnackedStatusToResponse);
 }
 
 // Agent is the RPC service for managing agent identities.
@@ -283,6 +287,17 @@ message SearchRequest {
 // SearchResponse is the response for Search.
 message SearchResponse {
     repeated InboxMessage results = 1;
+}
+
+// HasUnackedStatusToRequest is the request for HasUnackedStatusTo.
+message HasUnackedStatusToRequest {
+    int64 sender_id = 1;
+    int64 recipient_id = 2;
+}
+
+// HasUnackedStatusToResponse is the response for HasUnackedStatusTo.
+message HasUnackedStatusToResponse {
+    bool has_pending = 1;
 }
 
 // RegisterAgentRequest is the request for RegisterAgent.

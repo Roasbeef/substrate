@@ -1865,6 +1865,104 @@ func (x *SearchResponse) GetResults() []*InboxMessage {
 	return nil
 }
 
+// HasUnackedStatusToRequest is the request for HasUnackedStatusTo.
+type HasUnackedStatusToRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	SenderId      int64                  `protobuf:"varint,1,opt,name=sender_id,json=senderId,proto3" json:"sender_id,omitempty"`
+	RecipientId   int64                  `protobuf:"varint,2,opt,name=recipient_id,json=recipientId,proto3" json:"recipient_id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *HasUnackedStatusToRequest) Reset() {
+	*x = HasUnackedStatusToRequest{}
+	mi := &file_mail_proto_msgTypes[29]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *HasUnackedStatusToRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*HasUnackedStatusToRequest) ProtoMessage() {}
+
+func (x *HasUnackedStatusToRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_mail_proto_msgTypes[29]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use HasUnackedStatusToRequest.ProtoReflect.Descriptor instead.
+func (*HasUnackedStatusToRequest) Descriptor() ([]byte, []int) {
+	return file_mail_proto_rawDescGZIP(), []int{29}
+}
+
+func (x *HasUnackedStatusToRequest) GetSenderId() int64 {
+	if x != nil {
+		return x.SenderId
+	}
+	return 0
+}
+
+func (x *HasUnackedStatusToRequest) GetRecipientId() int64 {
+	if x != nil {
+		return x.RecipientId
+	}
+	return 0
+}
+
+// HasUnackedStatusToResponse is the response for HasUnackedStatusTo.
+type HasUnackedStatusToResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	HasPending    bool                   `protobuf:"varint,1,opt,name=has_pending,json=hasPending,proto3" json:"has_pending,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *HasUnackedStatusToResponse) Reset() {
+	*x = HasUnackedStatusToResponse{}
+	mi := &file_mail_proto_msgTypes[30]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *HasUnackedStatusToResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*HasUnackedStatusToResponse) ProtoMessage() {}
+
+func (x *HasUnackedStatusToResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_mail_proto_msgTypes[30]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use HasUnackedStatusToResponse.ProtoReflect.Descriptor instead.
+func (*HasUnackedStatusToResponse) Descriptor() ([]byte, []int) {
+	return file_mail_proto_rawDescGZIP(), []int{30}
+}
+
+func (x *HasUnackedStatusToResponse) GetHasPending() bool {
+	if x != nil {
+		return x.HasPending
+	}
+	return false
+}
+
 // RegisterAgentRequest is the request for RegisterAgent.
 type RegisterAgentRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
@@ -1876,7 +1974,7 @@ type RegisterAgentRequest struct {
 
 func (x *RegisterAgentRequest) Reset() {
 	*x = RegisterAgentRequest{}
-	mi := &file_mail_proto_msgTypes[29]
+	mi := &file_mail_proto_msgTypes[31]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1888,7 +1986,7 @@ func (x *RegisterAgentRequest) String() string {
 func (*RegisterAgentRequest) ProtoMessage() {}
 
 func (x *RegisterAgentRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_mail_proto_msgTypes[29]
+	mi := &file_mail_proto_msgTypes[31]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1901,7 +1999,7 @@ func (x *RegisterAgentRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RegisterAgentRequest.ProtoReflect.Descriptor instead.
 func (*RegisterAgentRequest) Descriptor() ([]byte, []int) {
-	return file_mail_proto_rawDescGZIP(), []int{29}
+	return file_mail_proto_rawDescGZIP(), []int{31}
 }
 
 func (x *RegisterAgentRequest) GetName() string {
@@ -1929,7 +2027,7 @@ type RegisterAgentResponse struct {
 
 func (x *RegisterAgentResponse) Reset() {
 	*x = RegisterAgentResponse{}
-	mi := &file_mail_proto_msgTypes[30]
+	mi := &file_mail_proto_msgTypes[32]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1941,7 +2039,7 @@ func (x *RegisterAgentResponse) String() string {
 func (*RegisterAgentResponse) ProtoMessage() {}
 
 func (x *RegisterAgentResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_mail_proto_msgTypes[30]
+	mi := &file_mail_proto_msgTypes[32]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1954,7 +2052,7 @@ func (x *RegisterAgentResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RegisterAgentResponse.ProtoReflect.Descriptor instead.
 func (*RegisterAgentResponse) Descriptor() ([]byte, []int) {
-	return file_mail_proto_rawDescGZIP(), []int{30}
+	return file_mail_proto_rawDescGZIP(), []int{32}
 }
 
 func (x *RegisterAgentResponse) GetAgentId() int64 {
@@ -1982,7 +2080,7 @@ type GetAgentRequest struct {
 
 func (x *GetAgentRequest) Reset() {
 	*x = GetAgentRequest{}
-	mi := &file_mail_proto_msgTypes[31]
+	mi := &file_mail_proto_msgTypes[33]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1994,7 +2092,7 @@ func (x *GetAgentRequest) String() string {
 func (*GetAgentRequest) ProtoMessage() {}
 
 func (x *GetAgentRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_mail_proto_msgTypes[31]
+	mi := &file_mail_proto_msgTypes[33]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2007,7 +2105,7 @@ func (x *GetAgentRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetAgentRequest.ProtoReflect.Descriptor instead.
 func (*GetAgentRequest) Descriptor() ([]byte, []int) {
-	return file_mail_proto_rawDescGZIP(), []int{31}
+	return file_mail_proto_rawDescGZIP(), []int{33}
 }
 
 func (x *GetAgentRequest) GetAgentId() int64 {
@@ -2039,7 +2137,7 @@ type GetAgentResponse struct {
 
 func (x *GetAgentResponse) Reset() {
 	*x = GetAgentResponse{}
-	mi := &file_mail_proto_msgTypes[32]
+	mi := &file_mail_proto_msgTypes[34]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2051,7 +2149,7 @@ func (x *GetAgentResponse) String() string {
 func (*GetAgentResponse) ProtoMessage() {}
 
 func (x *GetAgentResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_mail_proto_msgTypes[32]
+	mi := &file_mail_proto_msgTypes[34]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2064,7 +2162,7 @@ func (x *GetAgentResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetAgentResponse.ProtoReflect.Descriptor instead.
 func (*GetAgentResponse) Descriptor() ([]byte, []int) {
-	return file_mail_proto_rawDescGZIP(), []int{32}
+	return file_mail_proto_rawDescGZIP(), []int{34}
 }
 
 func (x *GetAgentResponse) GetId() int64 {
@@ -2119,7 +2217,7 @@ type ListAgentsRequest struct {
 
 func (x *ListAgentsRequest) Reset() {
 	*x = ListAgentsRequest{}
-	mi := &file_mail_proto_msgTypes[33]
+	mi := &file_mail_proto_msgTypes[35]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2131,7 +2229,7 @@ func (x *ListAgentsRequest) String() string {
 func (*ListAgentsRequest) ProtoMessage() {}
 
 func (x *ListAgentsRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_mail_proto_msgTypes[33]
+	mi := &file_mail_proto_msgTypes[35]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2144,7 +2242,7 @@ func (x *ListAgentsRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListAgentsRequest.ProtoReflect.Descriptor instead.
 func (*ListAgentsRequest) Descriptor() ([]byte, []int) {
-	return file_mail_proto_rawDescGZIP(), []int{33}
+	return file_mail_proto_rawDescGZIP(), []int{35}
 }
 
 func (x *ListAgentsRequest) GetLimit() int32 {
@@ -2164,7 +2262,7 @@ type ListAgentsResponse struct {
 
 func (x *ListAgentsResponse) Reset() {
 	*x = ListAgentsResponse{}
-	mi := &file_mail_proto_msgTypes[34]
+	mi := &file_mail_proto_msgTypes[36]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2176,7 +2274,7 @@ func (x *ListAgentsResponse) String() string {
 func (*ListAgentsResponse) ProtoMessage() {}
 
 func (x *ListAgentsResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_mail_proto_msgTypes[34]
+	mi := &file_mail_proto_msgTypes[36]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2189,7 +2287,7 @@ func (x *ListAgentsResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListAgentsResponse.ProtoReflect.Descriptor instead.
 func (*ListAgentsResponse) Descriptor() ([]byte, []int) {
-	return file_mail_proto_rawDescGZIP(), []int{34}
+	return file_mail_proto_rawDescGZIP(), []int{36}
 }
 
 func (x *ListAgentsResponse) GetAgents() []*GetAgentResponse {
@@ -2210,7 +2308,7 @@ type EnsureIdentityRequest struct {
 
 func (x *EnsureIdentityRequest) Reset() {
 	*x = EnsureIdentityRequest{}
-	mi := &file_mail_proto_msgTypes[35]
+	mi := &file_mail_proto_msgTypes[37]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2222,7 +2320,7 @@ func (x *EnsureIdentityRequest) String() string {
 func (*EnsureIdentityRequest) ProtoMessage() {}
 
 func (x *EnsureIdentityRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_mail_proto_msgTypes[35]
+	mi := &file_mail_proto_msgTypes[37]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2235,7 +2333,7 @@ func (x *EnsureIdentityRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use EnsureIdentityRequest.ProtoReflect.Descriptor instead.
 func (*EnsureIdentityRequest) Descriptor() ([]byte, []int) {
-	return file_mail_proto_rawDescGZIP(), []int{35}
+	return file_mail_proto_rawDescGZIP(), []int{37}
 }
 
 func (x *EnsureIdentityRequest) GetSessionId() string {
@@ -2264,7 +2362,7 @@ type EnsureIdentityResponse struct {
 
 func (x *EnsureIdentityResponse) Reset() {
 	*x = EnsureIdentityResponse{}
-	mi := &file_mail_proto_msgTypes[36]
+	mi := &file_mail_proto_msgTypes[38]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2276,7 +2374,7 @@ func (x *EnsureIdentityResponse) String() string {
 func (*EnsureIdentityResponse) ProtoMessage() {}
 
 func (x *EnsureIdentityResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_mail_proto_msgTypes[36]
+	mi := &file_mail_proto_msgTypes[38]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2289,7 +2387,7 @@ func (x *EnsureIdentityResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use EnsureIdentityResponse.ProtoReflect.Descriptor instead.
 func (*EnsureIdentityResponse) Descriptor() ([]byte, []int) {
-	return file_mail_proto_rawDescGZIP(), []int{36}
+	return file_mail_proto_rawDescGZIP(), []int{38}
 }
 
 func (x *EnsureIdentityResponse) GetAgentId() int64 {
@@ -2325,7 +2423,7 @@ type SaveIdentityRequest struct {
 
 func (x *SaveIdentityRequest) Reset() {
 	*x = SaveIdentityRequest{}
-	mi := &file_mail_proto_msgTypes[37]
+	mi := &file_mail_proto_msgTypes[39]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2337,7 +2435,7 @@ func (x *SaveIdentityRequest) String() string {
 func (*SaveIdentityRequest) ProtoMessage() {}
 
 func (x *SaveIdentityRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_mail_proto_msgTypes[37]
+	mi := &file_mail_proto_msgTypes[39]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2350,7 +2448,7 @@ func (x *SaveIdentityRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SaveIdentityRequest.ProtoReflect.Descriptor instead.
 func (*SaveIdentityRequest) Descriptor() ([]byte, []int) {
-	return file_mail_proto_rawDescGZIP(), []int{37}
+	return file_mail_proto_rawDescGZIP(), []int{39}
 }
 
 func (x *SaveIdentityRequest) GetSessionId() string {
@@ -2384,7 +2482,7 @@ type SaveIdentityResponse struct {
 
 func (x *SaveIdentityResponse) Reset() {
 	*x = SaveIdentityResponse{}
-	mi := &file_mail_proto_msgTypes[38]
+	mi := &file_mail_proto_msgTypes[40]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2396,7 +2494,7 @@ func (x *SaveIdentityResponse) String() string {
 func (*SaveIdentityResponse) ProtoMessage() {}
 
 func (x *SaveIdentityResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_mail_proto_msgTypes[38]
+	mi := &file_mail_proto_msgTypes[40]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2409,7 +2507,7 @@ func (x *SaveIdentityResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SaveIdentityResponse.ProtoReflect.Descriptor instead.
 func (*SaveIdentityResponse) Descriptor() ([]byte, []int) {
-	return file_mail_proto_rawDescGZIP(), []int{38}
+	return file_mail_proto_rawDescGZIP(), []int{40}
 }
 
 func (x *SaveIdentityResponse) GetSuccess() bool {
@@ -2560,7 +2658,13 @@ const file_mail_proto_rawDesc = "" +
 	"\btopic_id\x18\x03 \x01(\x03R\atopicId\x12\x14\n" +
 	"\x05limit\x18\x04 \x01(\x05R\x05limit\"E\n" +
 	"\x0eSearchResponse\x123\n" +
-	"\aresults\x18\x01 \x03(\v2\x19.subtraterpc.InboxMessageR\aresults\"K\n" +
+	"\aresults\x18\x01 \x03(\v2\x19.subtraterpc.InboxMessageR\aresults\"[\n" +
+	"\x19HasUnackedStatusToRequest\x12\x1b\n" +
+	"\tsender_id\x18\x01 \x01(\x03R\bsenderId\x12!\n" +
+	"\frecipient_id\x18\x02 \x01(\x03R\vrecipientId\"=\n" +
+	"\x1aHasUnackedStatusToResponse\x12\x1f\n" +
+	"\vhas_pending\x18\x01 \x01(\bR\n" +
+	"hasPending\"K\n" +
 	"\x14RegisterAgentRequest\x12\x12\n" +
 	"\x04name\x18\x01 \x01(\tR\x04name\x12\x1f\n" +
 	"\vproject_key\x18\x02 \x01(\tR\n" +
@@ -2617,7 +2721,7 @@ const file_mail_proto_rawDesc = "" +
 	"\rSTATE_STARRED\x10\x03\x12\x11\n" +
 	"\rSTATE_SNOOZED\x10\x04\x12\x12\n" +
 	"\x0eSTATE_ARCHIVED\x10\x05\x12\x0f\n" +
-	"\vSTATE_TRASH\x10\x062\xc7\b\n" +
+	"\vSTATE_TRASH\x10\x062\xae\t\n" +
 	"\x04Mail\x12G\n" +
 	"\bSendMail\x12\x1c.subtraterpc.SendMailRequest\x1a\x1d.subtraterpc.SendMailResponse\x12M\n" +
 	"\n" +
@@ -2636,7 +2740,8 @@ const file_mail_proto_rawDesc = "" +
 	"\vUnsubscribe\x12\x1f.subtraterpc.UnsubscribeRequest\x1a .subtraterpc.UnsubscribeResponse\x12M\n" +
 	"\n" +
 	"ListTopics\x12\x1e.subtraterpc.ListTopicsRequest\x1a\x1f.subtraterpc.ListTopicsResponse\x12A\n" +
-	"\x06Search\x12\x1a.subtraterpc.SearchRequest\x1a\x1b.subtraterpc.SearchResponse2\xa7\x03\n" +
+	"\x06Search\x12\x1a.subtraterpc.SearchRequest\x1a\x1b.subtraterpc.SearchResponse\x12e\n" +
+	"\x12HasUnackedStatusTo\x12&.subtraterpc.HasUnackedStatusToRequest\x1a'.subtraterpc.HasUnackedStatusToResponse2\xa7\x03\n" +
 	"\x05Agent\x12V\n" +
 	"\rRegisterAgent\x12!.subtraterpc.RegisterAgentRequest\x1a\".subtraterpc.RegisterAgentResponse\x12G\n" +
 	"\bGetAgent\x12\x1c.subtraterpc.GetAgentRequest\x1a\x1d.subtraterpc.GetAgentResponse\x12M\n" +
@@ -2658,52 +2763,54 @@ func file_mail_proto_rawDescGZIP() []byte {
 }
 
 var file_mail_proto_enumTypes = make([]protoimpl.EnumInfo, 2)
-var file_mail_proto_msgTypes = make([]protoimpl.MessageInfo, 42)
+var file_mail_proto_msgTypes = make([]protoimpl.MessageInfo, 44)
 var file_mail_proto_goTypes = []any{
-	(Priority)(0),                  // 0: subtraterpc.Priority
-	(MessageState)(0),              // 1: subtraterpc.MessageState
-	(*InboxMessage)(nil),           // 2: subtraterpc.InboxMessage
-	(*SendMailRequest)(nil),        // 3: subtraterpc.SendMailRequest
-	(*SendMailResponse)(nil),       // 4: subtraterpc.SendMailResponse
-	(*FetchInboxRequest)(nil),      // 5: subtraterpc.FetchInboxRequest
-	(*FetchInboxResponse)(nil),     // 6: subtraterpc.FetchInboxResponse
-	(*ReadMessageRequest)(nil),     // 7: subtraterpc.ReadMessageRequest
-	(*ReadMessageResponse)(nil),    // 8: subtraterpc.ReadMessageResponse
-	(*ReadThreadRequest)(nil),      // 9: subtraterpc.ReadThreadRequest
-	(*ReadThreadResponse)(nil),     // 10: subtraterpc.ReadThreadResponse
-	(*UpdateStateRequest)(nil),     // 11: subtraterpc.UpdateStateRequest
-	(*UpdateStateResponse)(nil),    // 12: subtraterpc.UpdateStateResponse
-	(*AckMessageRequest)(nil),      // 13: subtraterpc.AckMessageRequest
-	(*AckMessageResponse)(nil),     // 14: subtraterpc.AckMessageResponse
-	(*GetStatusRequest)(nil),       // 15: subtraterpc.GetStatusRequest
-	(*GetStatusResponse)(nil),      // 16: subtraterpc.GetStatusResponse
-	(*PollChangesRequest)(nil),     // 17: subtraterpc.PollChangesRequest
-	(*PollChangesResponse)(nil),    // 18: subtraterpc.PollChangesResponse
-	(*SubscribeInboxRequest)(nil),  // 19: subtraterpc.SubscribeInboxRequest
-	(*PublishRequest)(nil),         // 20: subtraterpc.PublishRequest
-	(*PublishResponse)(nil),        // 21: subtraterpc.PublishResponse
-	(*SubscribeRequest)(nil),       // 22: subtraterpc.SubscribeRequest
-	(*SubscribeResponse)(nil),      // 23: subtraterpc.SubscribeResponse
-	(*UnsubscribeRequest)(nil),     // 24: subtraterpc.UnsubscribeRequest
-	(*UnsubscribeResponse)(nil),    // 25: subtraterpc.UnsubscribeResponse
-	(*Topic)(nil),                  // 26: subtraterpc.Topic
-	(*ListTopicsRequest)(nil),      // 27: subtraterpc.ListTopicsRequest
-	(*ListTopicsResponse)(nil),     // 28: subtraterpc.ListTopicsResponse
-	(*SearchRequest)(nil),          // 29: subtraterpc.SearchRequest
-	(*SearchResponse)(nil),         // 30: subtraterpc.SearchResponse
-	(*RegisterAgentRequest)(nil),   // 31: subtraterpc.RegisterAgentRequest
-	(*RegisterAgentResponse)(nil),  // 32: subtraterpc.RegisterAgentResponse
-	(*GetAgentRequest)(nil),        // 33: subtraterpc.GetAgentRequest
-	(*GetAgentResponse)(nil),       // 34: subtraterpc.GetAgentResponse
-	(*ListAgentsRequest)(nil),      // 35: subtraterpc.ListAgentsRequest
-	(*ListAgentsResponse)(nil),     // 36: subtraterpc.ListAgentsResponse
-	(*EnsureIdentityRequest)(nil),  // 37: subtraterpc.EnsureIdentityRequest
-	(*EnsureIdentityResponse)(nil), // 38: subtraterpc.EnsureIdentityResponse
-	(*SaveIdentityRequest)(nil),    // 39: subtraterpc.SaveIdentityRequest
-	(*SaveIdentityResponse)(nil),   // 40: subtraterpc.SaveIdentityResponse
-	nil,                            // 41: subtraterpc.PollChangesRequest.SinceOffsetsEntry
-	nil,                            // 42: subtraterpc.PollChangesResponse.NewOffsetsEntry
-	nil,                            // 43: subtraterpc.SaveIdentityRequest.ConsumerOffsetsEntry
+	(Priority)(0),                      // 0: subtraterpc.Priority
+	(MessageState)(0),                  // 1: subtraterpc.MessageState
+	(*InboxMessage)(nil),               // 2: subtraterpc.InboxMessage
+	(*SendMailRequest)(nil),            // 3: subtraterpc.SendMailRequest
+	(*SendMailResponse)(nil),           // 4: subtraterpc.SendMailResponse
+	(*FetchInboxRequest)(nil),          // 5: subtraterpc.FetchInboxRequest
+	(*FetchInboxResponse)(nil),         // 6: subtraterpc.FetchInboxResponse
+	(*ReadMessageRequest)(nil),         // 7: subtraterpc.ReadMessageRequest
+	(*ReadMessageResponse)(nil),        // 8: subtraterpc.ReadMessageResponse
+	(*ReadThreadRequest)(nil),          // 9: subtraterpc.ReadThreadRequest
+	(*ReadThreadResponse)(nil),         // 10: subtraterpc.ReadThreadResponse
+	(*UpdateStateRequest)(nil),         // 11: subtraterpc.UpdateStateRequest
+	(*UpdateStateResponse)(nil),        // 12: subtraterpc.UpdateStateResponse
+	(*AckMessageRequest)(nil),          // 13: subtraterpc.AckMessageRequest
+	(*AckMessageResponse)(nil),         // 14: subtraterpc.AckMessageResponse
+	(*GetStatusRequest)(nil),           // 15: subtraterpc.GetStatusRequest
+	(*GetStatusResponse)(nil),          // 16: subtraterpc.GetStatusResponse
+	(*PollChangesRequest)(nil),         // 17: subtraterpc.PollChangesRequest
+	(*PollChangesResponse)(nil),        // 18: subtraterpc.PollChangesResponse
+	(*SubscribeInboxRequest)(nil),      // 19: subtraterpc.SubscribeInboxRequest
+	(*PublishRequest)(nil),             // 20: subtraterpc.PublishRequest
+	(*PublishResponse)(nil),            // 21: subtraterpc.PublishResponse
+	(*SubscribeRequest)(nil),           // 22: subtraterpc.SubscribeRequest
+	(*SubscribeResponse)(nil),          // 23: subtraterpc.SubscribeResponse
+	(*UnsubscribeRequest)(nil),         // 24: subtraterpc.UnsubscribeRequest
+	(*UnsubscribeResponse)(nil),        // 25: subtraterpc.UnsubscribeResponse
+	(*Topic)(nil),                      // 26: subtraterpc.Topic
+	(*ListTopicsRequest)(nil),          // 27: subtraterpc.ListTopicsRequest
+	(*ListTopicsResponse)(nil),         // 28: subtraterpc.ListTopicsResponse
+	(*SearchRequest)(nil),              // 29: subtraterpc.SearchRequest
+	(*SearchResponse)(nil),             // 30: subtraterpc.SearchResponse
+	(*HasUnackedStatusToRequest)(nil),  // 31: subtraterpc.HasUnackedStatusToRequest
+	(*HasUnackedStatusToResponse)(nil), // 32: subtraterpc.HasUnackedStatusToResponse
+	(*RegisterAgentRequest)(nil),       // 33: subtraterpc.RegisterAgentRequest
+	(*RegisterAgentResponse)(nil),      // 34: subtraterpc.RegisterAgentResponse
+	(*GetAgentRequest)(nil),            // 35: subtraterpc.GetAgentRequest
+	(*GetAgentResponse)(nil),           // 36: subtraterpc.GetAgentResponse
+	(*ListAgentsRequest)(nil),          // 37: subtraterpc.ListAgentsRequest
+	(*ListAgentsResponse)(nil),         // 38: subtraterpc.ListAgentsResponse
+	(*EnsureIdentityRequest)(nil),      // 39: subtraterpc.EnsureIdentityRequest
+	(*EnsureIdentityResponse)(nil),     // 40: subtraterpc.EnsureIdentityResponse
+	(*SaveIdentityRequest)(nil),        // 41: subtraterpc.SaveIdentityRequest
+	(*SaveIdentityResponse)(nil),       // 42: subtraterpc.SaveIdentityResponse
+	nil,                                // 43: subtraterpc.PollChangesRequest.SinceOffsetsEntry
+	nil,                                // 44: subtraterpc.PollChangesResponse.NewOffsetsEntry
+	nil,                                // 45: subtraterpc.SaveIdentityRequest.ConsumerOffsetsEntry
 }
 var file_mail_proto_depIdxs = []int32{
 	0,  // 0: subtraterpc.InboxMessage.priority:type_name -> subtraterpc.Priority
@@ -2714,14 +2821,14 @@ var file_mail_proto_depIdxs = []int32{
 	2,  // 5: subtraterpc.ReadMessageResponse.message:type_name -> subtraterpc.InboxMessage
 	2,  // 6: subtraterpc.ReadThreadResponse.messages:type_name -> subtraterpc.InboxMessage
 	1,  // 7: subtraterpc.UpdateStateRequest.new_state:type_name -> subtraterpc.MessageState
-	41, // 8: subtraterpc.PollChangesRequest.since_offsets:type_name -> subtraterpc.PollChangesRequest.SinceOffsetsEntry
+	43, // 8: subtraterpc.PollChangesRequest.since_offsets:type_name -> subtraterpc.PollChangesRequest.SinceOffsetsEntry
 	2,  // 9: subtraterpc.PollChangesResponse.new_messages:type_name -> subtraterpc.InboxMessage
-	42, // 10: subtraterpc.PollChangesResponse.new_offsets:type_name -> subtraterpc.PollChangesResponse.NewOffsetsEntry
+	44, // 10: subtraterpc.PollChangesResponse.new_offsets:type_name -> subtraterpc.PollChangesResponse.NewOffsetsEntry
 	0,  // 11: subtraterpc.PublishRequest.priority:type_name -> subtraterpc.Priority
 	26, // 12: subtraterpc.ListTopicsResponse.topics:type_name -> subtraterpc.Topic
 	2,  // 13: subtraterpc.SearchResponse.results:type_name -> subtraterpc.InboxMessage
-	34, // 14: subtraterpc.ListAgentsResponse.agents:type_name -> subtraterpc.GetAgentResponse
-	43, // 15: subtraterpc.SaveIdentityRequest.consumer_offsets:type_name -> subtraterpc.SaveIdentityRequest.ConsumerOffsetsEntry
+	36, // 14: subtraterpc.ListAgentsResponse.agents:type_name -> subtraterpc.GetAgentResponse
+	45, // 15: subtraterpc.SaveIdentityRequest.consumer_offsets:type_name -> subtraterpc.SaveIdentityRequest.ConsumerOffsetsEntry
 	3,  // 16: subtraterpc.Mail.SendMail:input_type -> subtraterpc.SendMailRequest
 	5,  // 17: subtraterpc.Mail.FetchInbox:input_type -> subtraterpc.FetchInboxRequest
 	7,  // 18: subtraterpc.Mail.ReadMessage:input_type -> subtraterpc.ReadMessageRequest
@@ -2736,32 +2843,34 @@ var file_mail_proto_depIdxs = []int32{
 	24, // 27: subtraterpc.Mail.Unsubscribe:input_type -> subtraterpc.UnsubscribeRequest
 	27, // 28: subtraterpc.Mail.ListTopics:input_type -> subtraterpc.ListTopicsRequest
 	29, // 29: subtraterpc.Mail.Search:input_type -> subtraterpc.SearchRequest
-	31, // 30: subtraterpc.Agent.RegisterAgent:input_type -> subtraterpc.RegisterAgentRequest
-	33, // 31: subtraterpc.Agent.GetAgent:input_type -> subtraterpc.GetAgentRequest
-	35, // 32: subtraterpc.Agent.ListAgents:input_type -> subtraterpc.ListAgentsRequest
-	37, // 33: subtraterpc.Agent.EnsureIdentity:input_type -> subtraterpc.EnsureIdentityRequest
-	39, // 34: subtraterpc.Agent.SaveIdentity:input_type -> subtraterpc.SaveIdentityRequest
-	4,  // 35: subtraterpc.Mail.SendMail:output_type -> subtraterpc.SendMailResponse
-	6,  // 36: subtraterpc.Mail.FetchInbox:output_type -> subtraterpc.FetchInboxResponse
-	8,  // 37: subtraterpc.Mail.ReadMessage:output_type -> subtraterpc.ReadMessageResponse
-	10, // 38: subtraterpc.Mail.ReadThread:output_type -> subtraterpc.ReadThreadResponse
-	12, // 39: subtraterpc.Mail.UpdateState:output_type -> subtraterpc.UpdateStateResponse
-	14, // 40: subtraterpc.Mail.AckMessage:output_type -> subtraterpc.AckMessageResponse
-	16, // 41: subtraterpc.Mail.GetStatus:output_type -> subtraterpc.GetStatusResponse
-	18, // 42: subtraterpc.Mail.PollChanges:output_type -> subtraterpc.PollChangesResponse
-	2,  // 43: subtraterpc.Mail.SubscribeInbox:output_type -> subtraterpc.InboxMessage
-	21, // 44: subtraterpc.Mail.Publish:output_type -> subtraterpc.PublishResponse
-	23, // 45: subtraterpc.Mail.Subscribe:output_type -> subtraterpc.SubscribeResponse
-	25, // 46: subtraterpc.Mail.Unsubscribe:output_type -> subtraterpc.UnsubscribeResponse
-	28, // 47: subtraterpc.Mail.ListTopics:output_type -> subtraterpc.ListTopicsResponse
-	30, // 48: subtraterpc.Mail.Search:output_type -> subtraterpc.SearchResponse
-	32, // 49: subtraterpc.Agent.RegisterAgent:output_type -> subtraterpc.RegisterAgentResponse
-	34, // 50: subtraterpc.Agent.GetAgent:output_type -> subtraterpc.GetAgentResponse
-	36, // 51: subtraterpc.Agent.ListAgents:output_type -> subtraterpc.ListAgentsResponse
-	38, // 52: subtraterpc.Agent.EnsureIdentity:output_type -> subtraterpc.EnsureIdentityResponse
-	40, // 53: subtraterpc.Agent.SaveIdentity:output_type -> subtraterpc.SaveIdentityResponse
-	35, // [35:54] is the sub-list for method output_type
-	16, // [16:35] is the sub-list for method input_type
+	31, // 30: subtraterpc.Mail.HasUnackedStatusTo:input_type -> subtraterpc.HasUnackedStatusToRequest
+	33, // 31: subtraterpc.Agent.RegisterAgent:input_type -> subtraterpc.RegisterAgentRequest
+	35, // 32: subtraterpc.Agent.GetAgent:input_type -> subtraterpc.GetAgentRequest
+	37, // 33: subtraterpc.Agent.ListAgents:input_type -> subtraterpc.ListAgentsRequest
+	39, // 34: subtraterpc.Agent.EnsureIdentity:input_type -> subtraterpc.EnsureIdentityRequest
+	41, // 35: subtraterpc.Agent.SaveIdentity:input_type -> subtraterpc.SaveIdentityRequest
+	4,  // 36: subtraterpc.Mail.SendMail:output_type -> subtraterpc.SendMailResponse
+	6,  // 37: subtraterpc.Mail.FetchInbox:output_type -> subtraterpc.FetchInboxResponse
+	8,  // 38: subtraterpc.Mail.ReadMessage:output_type -> subtraterpc.ReadMessageResponse
+	10, // 39: subtraterpc.Mail.ReadThread:output_type -> subtraterpc.ReadThreadResponse
+	12, // 40: subtraterpc.Mail.UpdateState:output_type -> subtraterpc.UpdateStateResponse
+	14, // 41: subtraterpc.Mail.AckMessage:output_type -> subtraterpc.AckMessageResponse
+	16, // 42: subtraterpc.Mail.GetStatus:output_type -> subtraterpc.GetStatusResponse
+	18, // 43: subtraterpc.Mail.PollChanges:output_type -> subtraterpc.PollChangesResponse
+	2,  // 44: subtraterpc.Mail.SubscribeInbox:output_type -> subtraterpc.InboxMessage
+	21, // 45: subtraterpc.Mail.Publish:output_type -> subtraterpc.PublishResponse
+	23, // 46: subtraterpc.Mail.Subscribe:output_type -> subtraterpc.SubscribeResponse
+	25, // 47: subtraterpc.Mail.Unsubscribe:output_type -> subtraterpc.UnsubscribeResponse
+	28, // 48: subtraterpc.Mail.ListTopics:output_type -> subtraterpc.ListTopicsResponse
+	30, // 49: subtraterpc.Mail.Search:output_type -> subtraterpc.SearchResponse
+	32, // 50: subtraterpc.Mail.HasUnackedStatusTo:output_type -> subtraterpc.HasUnackedStatusToResponse
+	34, // 51: subtraterpc.Agent.RegisterAgent:output_type -> subtraterpc.RegisterAgentResponse
+	36, // 52: subtraterpc.Agent.GetAgent:output_type -> subtraterpc.GetAgentResponse
+	38, // 53: subtraterpc.Agent.ListAgents:output_type -> subtraterpc.ListAgentsResponse
+	40, // 54: subtraterpc.Agent.EnsureIdentity:output_type -> subtraterpc.EnsureIdentityResponse
+	42, // 55: subtraterpc.Agent.SaveIdentity:output_type -> subtraterpc.SaveIdentityResponse
+	36, // [36:56] is the sub-list for method output_type
+	16, // [16:36] is the sub-list for method input_type
 	16, // [16:16] is the sub-list for extension type_name
 	16, // [16:16] is the sub-list for extension extendee
 	0,  // [0:16] is the sub-list for field type_name
@@ -2778,7 +2887,7 @@ func file_mail_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_mail_proto_rawDesc), len(file_mail_proto_rawDesc)),
 			NumEnums:      2,
-			NumMessages:   42,
+			NumMessages:   44,
 			NumExtensions: 0,
 			NumServices:   2,
 		},
