@@ -7,8 +7,25 @@
 #
 # Output format: plain text for context injection (quiet if no messages)
 
+# Read hook input from stdin to get session_id.
+input=$(cat)
+session_id=$(echo "$input" | jq -r '.session_id // empty')
+
+# Try CLAUDE_SESSION_ID env var as fallback.
+if [ -z "$session_id" ]; then
+    session_id="$CLAUDE_SESSION_ID"
+fi
+
 # Send heartbeat (best effort, silent).
-substrate heartbeat --format context 2>/dev/null || true
+if [ -n "$session_id" ]; then
+    substrate heartbeat --session-id "$session_id" --format context 2>/dev/null || true
+else
+    substrate heartbeat --format context 2>/dev/null || true
+fi
 
 # Check for new mail and inject as context if any.
-substrate poll --quiet --format context 2>/dev/null || true
+if [ -n "$session_id" ]; then
+    substrate poll --session-id "$session_id" --quiet --format context 2>/dev/null || true
+else
+    substrate poll --quiet --format context 2>/dev/null || true
+fi
