@@ -8,6 +8,7 @@ import (
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
+	"github.com/roasbeef/subtrate/internal/agent"
 	"github.com/roasbeef/subtrate/internal/mail"
 )
 
@@ -495,5 +496,127 @@ func timeToUnix(t *time.Time) int64 {
 	return t.Unix()
 }
 
-// Ensure we implement the interface.
+// Ensure we implement the interfaces.
 var _ MailServer = (*Server)(nil)
+var _ AgentServer = (*Server)(nil)
+
+// =============================================================================
+// Agent RPCs
+// =============================================================================
+
+// ListAgents lists all registered agents.
+func (s *Server) ListAgents(ctx context.Context, req *ListAgentsRequest) (*ListAgentsResponse, error) {
+	agents, err := s.store.Queries().ListAgents(ctx)
+	if err != nil {
+		return nil, status.Errorf(codes.Internal, "failed to list agents: %v", err)
+	}
+
+	resp := &ListAgentsResponse{
+		Agents: make([]*GetAgentResponse, len(agents)),
+	}
+	for i, a := range agents {
+		resp.Agents[i] = &GetAgentResponse{
+			Id:        a.ID,
+			Name:      a.Name,
+			CreatedAt: a.CreatedAt,
+		}
+	}
+
+	return resp, nil
+}
+
+// RegisterAgent creates a new agent with the given name.
+func (s *Server) RegisterAgent(ctx context.Context, req *RegisterAgentRequest) (*RegisterAgentResponse, error) {
+	if req.Name == "" {
+		return nil, status.Error(codes.InvalidArgument, "name is required")
+	}
+
+	agent, err := s.agentReg.RegisterAgent(ctx, req.Name, req.ProjectKey)
+	if err != nil {
+		return nil, status.Errorf(codes.Internal, "failed to register agent: %v", err)
+	}
+
+	return &RegisterAgentResponse{
+		AgentId: agent.ID,
+		Name:    agent.Name,
+	}, nil
+}
+
+// GetAgent retrieves an agent by ID or name.
+func (s *Server) GetAgent(ctx context.Context, req *GetAgentRequest) (*GetAgentResponse, error) {
+	if req.AgentId != 0 {
+		a, err := s.store.Queries().GetAgent(ctx, req.AgentId)
+		if err != nil {
+			return nil, status.Errorf(codes.NotFound, "agent not found: %v", err)
+		}
+		return &GetAgentResponse{
+			Id:        a.ID,
+			Name:      a.Name,
+			CreatedAt: a.CreatedAt,
+		}, nil
+	}
+
+	if req.Name != "" {
+		a, err := s.store.Queries().GetAgentByName(ctx, req.Name)
+		if err != nil {
+			return nil, status.Errorf(codes.NotFound, "agent not found: %v", err)
+		}
+		return &GetAgentResponse{
+			Id:        a.ID,
+			Name:      a.Name,
+			CreatedAt: a.CreatedAt,
+		}, nil
+	}
+
+	return nil, status.Error(codes.InvalidArgument, "agent_id or name is required")
+}
+
+// EnsureIdentity creates or retrieves an agent identity for a session.
+func (s *Server) EnsureIdentity(ctx context.Context, req *EnsureIdentityRequest) (*EnsureIdentityResponse, error) {
+	if req.SessionId == "" {
+		return nil, status.Error(codes.InvalidArgument, "session_id is required")
+	}
+
+	identity, err := s.identityMgr.EnsureIdentity(ctx, req.SessionId, req.ProjectDir)
+	if err != nil {
+		return nil, status.Errorf(codes.Internal, "failed to ensure identity: %v", err)
+	}
+
+	return &EnsureIdentityResponse{
+		AgentId:   identity.AgentID,
+		AgentName: identity.AgentName,
+		Created:   identity.CreatedAt.After(identity.LastActiveAt.Add(-1 * time.Second)),
+	}, nil
+}
+
+// SaveIdentity persists an agent's current state.
+func (s *Server) SaveIdentity(ctx context.Context, req *SaveIdentityRequest) (*SaveIdentityResponse, error) {
+	if req.SessionId == "" {
+		return nil, status.Error(codes.InvalidArgument, "session_id is required")
+	}
+
+	// Convert consumer offsets from topic IDs to topic names.
+	offsets := make(map[string]int64)
+	for topicID, offset := range req.ConsumerOffsets {
+		topic, err := s.store.Queries().GetTopic(ctx, topicID)
+		if err != nil {
+			// Skip topics that don't exist.
+			continue
+		}
+		offsets[topic.Name] = offset
+	}
+
+	// Construct an IdentityFile from the request.
+	identity := &agent.IdentityFile{
+		SessionID:       req.SessionId,
+		AgentID:         req.AgentId,
+		ConsumerOffsets: offsets,
+	}
+
+	err := s.identityMgr.SaveIdentity(ctx, identity)
+	if err != nil {
+		return nil, status.Errorf(codes.Internal, "failed to save identity: %v", err)
+	}
+
+	return &SaveIdentityResponse{Success: true}, nil
+}
