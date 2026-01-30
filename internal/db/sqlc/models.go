@@ -35,17 +35,18 @@ type ConsumerOffset struct {
 }
 
 type Message struct {
-	ID          int64
-	ThreadID    string
-	TopicID     int64
-	LogOffset   int64
-	SenderID    int64
-	Subject     string
-	BodyMd      string
-	Priority    string
-	DeadlineAt  sql.NullInt64
-	Attachments sql.NullString
-	CreatedAt   int64
+	ID              int64
+	ThreadID        string
+	TopicID         int64
+	LogOffset       int64
+	SenderID        int64
+	Subject         string
+	BodyMd          string
+	Priority        string
+	DeadlineAt      sql.NullInt64
+	Attachments     sql.NullString
+	CreatedAt       int64
+	DeletedBySender int64
 }
 
 type MessageRecipient struct {

@@ -48,7 +48,7 @@ WHERE message_id = ? AND agent_id = ?;
 SELECT * FROM message_recipients
 WHERE message_id = ?;
 
--- name: UpdateRecipientState :exec
+-- name: UpdateRecipientState :execrows
 UPDATE message_recipients
 SET state = ?, read_at = CASE WHEN ? = 'read' THEN ? ELSE read_at END
 WHERE message_id = ? AND agent_id = ?;
@@ -150,9 +150,12 @@ WHERE mr.agent_id = ? AND mr.state = 'unread' AND m.priority = 'urgent';
 
 -- name: GetSentMessages :many
 SELECT * FROM messages
-WHERE sender_id = ?
+WHERE sender_id = ? AND deleted_by_sender = 0
 ORDER BY created_at DESC
 LIMIT ?;
+
+-- name: MarkMessageDeletedBySender :exec
+UPDATE messages SET deleted_by_sender = 1 WHERE id = ? AND sender_id = ?;
 
 -- name: CountStarredByAgent :one
 SELECT COUNT(*) FROM message_recipients
@@ -168,7 +171,7 @@ WHERE agent_id = ? AND state = 'archived';
 
 -- name: CountSentByAgent :one
 SELECT COUNT(*) FROM messages
-WHERE sender_id = ?;
+WHERE sender_id = ? AND deleted_by_sender = 0;
 
 -- Note: Full-text search queries using FTS5 are handled manually in Go code
 -- since sqlc doesn't fully support FTS5 virtual tables.

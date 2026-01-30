@@ -150,6 +150,13 @@ The mail service uses actor patterns from darepo-client:
 3. Run `make sqlc` to regenerate
 4. **Never edit** files in `internal/db/sqlc/` directly
 
+### Adding Database Migrations
+When adding a new migration:
+1. Create `internal/db/migrations/NNNNNN_name.up.sql` and `.down.sql`
+2. **CRITICAL**: Update `LatestMigrationVersion` in `internal/db/migrations.go`
+3. The migration system auto-applies on server start and creates backups
+4. Never manually ALTER tables via sqlite3 CLI - always use migration files
+
 ### Query Files Location
 - `internal/db/queries/agents.sql` - Agent and session queries
 - `internal/db/queries/topics.sql` - Topic and subscription queries

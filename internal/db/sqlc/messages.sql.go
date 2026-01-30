@@ -24,7 +24,7 @@ func (q *Queries) CountArchivedByAgent(ctx context.Context, agentID int64) (int6
 
 const CountSentByAgent = `-- name: CountSentByAgent :one
 SELECT COUNT(*) FROM messages
-WHERE sender_id = ?
+WHERE sender_id = ? AND deleted_by_sender = 0
 `
 
 func (q *Queries) CountSentByAgent(ctx context.Context, senderID int64) (int64, error) {
@@ -88,7 +88,7 @@ INSERT INTO messages (
     thread_id, topic_id, log_offset, sender_id, subject, body_md,
     priority, deadline_at, attachments, created_at
 ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-RETURNING id, thread_id, topic_id, log_offset, sender_id, subject, body_md, priority, deadline_at, attachments, created_at
+RETURNING id, thread_id, topic_id, log_offset, sender_id, subject, body_md, priority, deadline_at, attachments, created_at, deleted_by_sender
 `
 
 type CreateMessageParams struct {
@@ -130,6 +130,7 @@ func (q *Queries) CreateMessage(ctx context.Context, arg CreateMessageParams) (M
 		&i.DeadlineAt,
 		&i.Attachments,
 		&i.CreatedAt,
+		&i.DeletedBySender,
 	)
 	return i, err
 }
@@ -176,7 +177,7 @@ func (q *Queries) DeleteMessagesByTopicOlderThan(ctx context.Context, arg Delete
 }
 
 const GetAllInboxMessages = `-- name: GetAllInboxMessages :many
-SELECT m.id, m.thread_id, m.topic_id, m.log_offset, m.sender_id, m.subject, m.body_md, m.priority, m.deadline_at, m.attachments, m.created_at, mr.state, mr.snoozed_until, mr.read_at, mr.acked_at, mr.agent_id as recipient_agent_id
+SELECT m.id, m.thread_id, m.topic_id, m.log_offset, m.sender_id, m.subject, m.body_md, m.priority, m.deadline_at, m.attachments, m.created_at, m.deleted_by_sender, mr.state, mr.snoozed_until, mr.read_at, mr.acked_at, mr.agent_id as recipient_agent_id
 FROM messages m
 JOIN message_recipients mr ON m.id = mr.message_id
 WHERE mr.state NOT IN ('archived', 'trash')
@@ -196,6 +197,7 @@ type GetAllInboxMessagesRow struct {
 	DeadlineAt       sql.NullInt64
 	Attachments      sql.NullString
 	CreatedAt        int64
+	DeletedBySender  int64
 	State            string
 	SnoozedUntil     sql.NullInt64
 	ReadAt           sql.NullInt64
@@ -225,6 +227,7 @@ func (q *Queries) GetAllInboxMessages(ctx context.Context, limit int64) ([]GetAl
 			&i.DeadlineAt,
 			&i.Attachments,
 			&i.CreatedAt,
+			&i.DeletedBySender,
 			&i.State,
 			&i.SnoozedUntil,
 			&i.ReadAt,
@@ -245,7 +248,7 @@ func (q *Queries) GetAllInboxMessages(ctx context.Context, limit int64) ([]GetAl
 }
 
 const GetArchivedMessages = `-- name: GetArchivedMessages :many
-SELECT m.id, m.thread_id, m.topic_id, m.log_offset, m.sender_id, m.subject, m.body_md, m.priority, m.deadline_at, m.attachments, m.created_at, mr.state, mr.snoozed_until, mr.read_at, mr.acked_at
+SELECT m.id, m.thread_id, m.topic_id, m.log_offset, m.sender_id, m.subject, m.body_md, m.priority, m.deadline_at, m.attachments, m.created_at, m.deleted_by_sender, mr.state, mr.snoozed_until, mr.read_at, mr.acked_at
 FROM messages m
 JOIN message_recipients mr ON m.id = mr.message_id
 WHERE mr.agent_id = ?
@@ -260,21 +263,22 @@ type GetArchivedMessagesParams struct {
 }
 
 type GetArchivedMessagesRow struct {
-	ID           int64
-	ThreadID     string
-	TopicID      int64
-	LogOffset    int64
-	SenderID     int64
-	Subject      string
-	BodyMd       string
-	Priority     string
-	DeadlineAt   sql.NullInt64
-	Attachments  sql.NullString
-	CreatedAt    int64
-	State        string
-	SnoozedUntil sql.NullInt64
-	ReadAt       sql.NullInt64
-	AckedAt      sql.NullInt64
+	ID              int64
+	ThreadID        string
+	TopicID         int64
+	LogOffset       int64
+	SenderID        int64
+	Subject         string
+	BodyMd          string
+	Priority        string
+	DeadlineAt      sql.NullInt64
+	Attachments     sql.NullString
+	CreatedAt       int64
+	DeletedBySender int64
+	State           string
+	SnoozedUntil    sql.NullInt64
+	ReadAt          sql.NullInt64
+	AckedAt         sql.NullInt64
 }
 
 func (q *Queries) GetArchivedMessages(ctx context.Context, arg GetArchivedMessagesParams) ([]GetArchivedMessagesRow, error) {
@@ -298,6 +302,7 @@ func (q *Queries) GetArchivedMessages(ctx context.Context, arg GetArchivedMessag
 			&i.DeadlineAt,
 			&i.Attachments,
 			&i.CreatedAt,
+			&i.DeletedBySender,
 			&i.State,
 			&i.SnoozedUntil,
 			&i.ReadAt,
@@ -317,7 +322,7 @@ func (q *Queries) GetArchivedMessages(ctx context.Context, arg GetArchivedMessag
 }
 
 const GetInboxMessages = `-- name: GetInboxMessages :many
-SELECT m.id, m.thread_id, m.topic_id, m.log_offset, m.sender_id, m.subject, m.body_md, m.priority, m.deadline_at, m.attachments, m.created_at, mr.state, mr.snoozed_until, mr.read_at, mr.acked_at
+SELECT m.id, m.thread_id, m.topic_id, m.log_offset, m.sender_id, m.subject, m.body_md, m.priority, m.deadline_at, m.attachments, m.created_at, m.deleted_by_sender, mr.state, mr.snoozed_until, mr.read_at, mr.acked_at
 FROM messages m
 JOIN message_recipients mr ON m.id = mr.message_id
 WHERE mr.agent_id = ?
@@ -332,21 +337,22 @@ type GetInboxMessagesParams struct {
 }
 
 type GetInboxMessagesRow struct {
-	ID           int64
-	ThreadID     string
-	TopicID      int64
-	LogOffset    int64
-	SenderID     int64
-	Subject      string
-	BodyMd       string
-	Priority     string
-	DeadlineAt   sql.NullInt64
-	Attachments  sql.NullString
-	CreatedAt    int64
-	State        string
-	SnoozedUntil sql.NullInt64
-	ReadAt       sql.NullInt64
-	AckedAt      sql.NullInt64
+	ID              int64
+	ThreadID        string
+	TopicID         int64
+	LogOffset       int64
+	SenderID        int64
+	Subject         string
+	BodyMd          string
+	Priority        string
+	DeadlineAt      sql.NullInt64
+	Attachments     sql.NullString
+	CreatedAt       int64
+	DeletedBySender int64
+	State           string
+	SnoozedUntil    sql.NullInt64
+	ReadAt          sql.NullInt64
+	AckedAt         sql.NullInt64
 }
 
 func (q *Queries) GetInboxMessages(ctx context.Context, arg GetInboxMessagesParams) ([]GetInboxMessagesRow, error) {
@@ -370,6 +376,7 @@ func (q *Queries) GetInboxMessages(ctx context.Context, arg GetInboxMessagesPara
 			&i.DeadlineAt,
 			&i.Attachments,
 			&i.CreatedAt,
+			&i.DeletedBySender,
 			&i.State,
 			&i.SnoozedUntil,
 			&i.ReadAt,
@@ -400,7 +407,7 @@ func (q *Queries) GetMaxLogOffset(ctx context.Context, topicID int64) (interface
 }
 
 const GetMessage = `-- name: GetMessage :one
-SELECT id, thread_id, topic_id, log_offset, sender_id, subject, body_md, priority, deadline_at, attachments, created_at FROM messages WHERE id = ?
+SELECT id, thread_id, topic_id, log_offset, sender_id, subject, body_md, priority, deadline_at, attachments, created_at, deleted_by_sender FROM messages WHERE id = ?
 `
 
 func (q *Queries) GetMessage(ctx context.Context, id int64) (Message, error) {
@@ -418,6 +425,7 @@ func (q *Queries) GetMessage(ctx context.Context, id int64) (Message, error) {
 		&i.DeadlineAt,
 		&i.Attachments,
 		&i.CreatedAt,
+		&i.DeletedBySender,
 	)
 	return i, err
 }
@@ -482,7 +490,7 @@ func (q *Queries) GetMessageRecipients(ctx context.Context, messageID int64) ([]
 }
 
 const GetMessagesByThread = `-- name: GetMessagesByThread :many
-SELECT id, thread_id, topic_id, log_offset, sender_id, subject, body_md, priority, deadline_at, attachments, created_at FROM messages WHERE thread_id = ? ORDER BY created_at ASC
+SELECT id, thread_id, topic_id, log_offset, sender_id, subject, body_md, priority, deadline_at, attachments, created_at, deleted_by_sender FROM messages WHERE thread_id = ? ORDER BY created_at ASC
 `
 
 func (q *Queries) GetMessagesByThread(ctx context.Context, threadID string) ([]Message, error) {
@@ -506,6 +514,7 @@ func (q *Queries) GetMessagesByThread(ctx context.Context, threadID string) ([]M
 			&i.DeadlineAt,
 			&i.Attachments,
 			&i.CreatedAt,
+			&i.DeletedBySender,
 		); err != nil {
 			return nil, err
 		}
@@ -521,7 +530,7 @@ func (q *Queries) GetMessagesByThread(ctx context.Context, threadID string) ([]M
 }
 
 const GetMessagesByTopic = `-- name: GetMessagesByTopic :many
-SELECT id, thread_id, topic_id, log_offset, sender_id, subject, body_md, priority, deadline_at, attachments, created_at FROM messages WHERE topic_id = ? ORDER BY log_offset ASC
+SELECT id, thread_id, topic_id, log_offset, sender_id, subject, body_md, priority, deadline_at, attachments, created_at, deleted_by_sender FROM messages WHERE topic_id = ? ORDER BY log_offset ASC
 `
 
 func (q *Queries) GetMessagesByTopic(ctx context.Context, topicID int64) ([]Message, error) {
@@ -545,6 +554,7 @@ func (q *Queries) GetMessagesByTopic(ctx context.Context, topicID int64) ([]Mess
 			&i.DeadlineAt,
 			&i.Attachments,
 			&i.CreatedAt,
+			&i.DeletedBySender,
 		); err != nil {
 			return nil, err
 		}
@@ -560,7 +570,7 @@ func (q *Queries) GetMessagesByTopic(ctx context.Context, topicID int64) ([]Mess
 }
 
 const GetMessagesSinceOffset = `-- name: GetMessagesSinceOffset :many
-SELECT id, thread_id, topic_id, log_offset, sender_id, subject, body_md, priority, deadline_at, attachments, created_at FROM messages
+SELECT id, thread_id, topic_id, log_offset, sender_id, subject, body_md, priority, deadline_at, attachments, created_at, deleted_by_sender FROM messages
 WHERE topic_id = ? AND log_offset > ?
 ORDER BY log_offset ASC
 LIMIT ?
@@ -593,6 +603,7 @@ func (q *Queries) GetMessagesSinceOffset(ctx context.Context, arg GetMessagesSin
 			&i.DeadlineAt,
 			&i.Attachments,
 			&i.CreatedAt,
+			&i.DeletedBySender,
 		); err != nil {
 			return nil, err
 		}
@@ -608,8 +619,8 @@ func (q *Queries) GetMessagesSinceOffset(ctx context.Context, arg GetMessagesSin
 }
 
 const GetSentMessages = `-- name: GetSentMessages :many
-SELECT id, thread_id, topic_id, log_offset, sender_id, subject, body_md, priority, deadline_at, attachments, created_at FROM messages
-WHERE sender_id = ?
+SELECT id, thread_id, topic_id, log_offset, sender_id, subject, body_md, priority, deadline_at, attachments, created_at, deleted_by_sender FROM messages
+WHERE sender_id = ? AND deleted_by_sender = 0
 ORDER BY created_at DESC
 LIMIT ?
 `
@@ -640,6 +651,7 @@ func (q *Queries) GetSentMessages(ctx context.Context, arg GetSentMessagesParams
 			&i.DeadlineAt,
 			&i.Attachments,
 			&i.CreatedAt,
+			&i.DeletedBySender,
 		); err != nil {
 			return nil, err
 		}
@@ -655,7 +667,7 @@ func (q *Queries) GetSentMessages(ctx context.Context, arg GetSentMessagesParams
 }
 
 const GetSnoozedMessages = `-- name: GetSnoozedMessages :many
-SELECT m.id, m.thread_id, m.topic_id, m.log_offset, m.sender_id, m.subject, m.body_md, m.priority, m.deadline_at, m.attachments, m.created_at, mr.state, mr.snoozed_until, mr.read_at, mr.acked_at
+SELECT m.id, m.thread_id, m.topic_id, m.log_offset, m.sender_id, m.subject, m.body_md, m.priority, m.deadline_at, m.attachments, m.created_at, m.deleted_by_sender, mr.state, mr.snoozed_until, mr.read_at, mr.acked_at
 FROM messages m
 JOIN message_recipients mr ON m.id = mr.message_id
 WHERE mr.agent_id = ?
@@ -670,21 +682,22 @@ type GetSnoozedMessagesParams struct {
 }
 
 type GetSnoozedMessagesRow struct {
-	ID           int64
-	ThreadID     string
-	TopicID      int64
-	LogOffset    int64
-	SenderID     int64
-	Subject      string
-	BodyMd       string
-	Priority     string
-	DeadlineAt   sql.NullInt64
-	Attachments  sql.NullString
-	CreatedAt    int64
-	State        string
-	SnoozedUntil sql.NullInt64
-	ReadAt       sql.NullInt64
-	AckedAt      sql.NullInt64
+	ID              int64
+	ThreadID        string
+	TopicID         int64
+	LogOffset       int64
+	SenderID        int64
+	Subject         string
+	BodyMd          string
+	Priority        string
+	DeadlineAt      sql.NullInt64
+	Attachments     sql.NullString
+	CreatedAt       int64
+	DeletedBySender int64
+	State           string
+	SnoozedUntil    sql.NullInt64
+	ReadAt          sql.NullInt64
+	AckedAt         sql.NullInt64
 }
 
 func (q *Queries) GetSnoozedMessages(ctx context.Context, arg GetSnoozedMessagesParams) ([]GetSnoozedMessagesRow, error) {
@@ -708,6 +721,7 @@ func (q *Queries) GetSnoozedMessages(ctx context.Context, arg GetSnoozedMessages
 			&i.DeadlineAt,
 			&i.Attachments,
 			&i.CreatedAt,
+			&i.DeletedBySender,
 			&i.State,
 			&i.SnoozedUntil,
 			&i.ReadAt,
@@ -727,7 +741,7 @@ func (q *Queries) GetSnoozedMessages(ctx context.Context, arg GetSnoozedMessages
 }
 
 const GetSnoozedMessagesReadyToWake = `-- name: GetSnoozedMessagesReadyToWake :many
-SELECT m.id, m.thread_id, m.topic_id, m.log_offset, m.sender_id, m.subject, m.body_md, m.priority, m.deadline_at, m.attachments, m.created_at, mr.agent_id as recipient_agent_id
+SELECT m.id, m.thread_id, m.topic_id, m.log_offset, m.sender_id, m.subject, m.body_md, m.priority, m.deadline_at, m.attachments, m.created_at, m.deleted_by_sender, mr.agent_id as recipient_agent_id
 FROM messages m
 JOIN message_recipients mr ON m.id = mr.message_id
 WHERE mr.state = 'snoozed'
@@ -747,6 +761,7 @@ type GetSnoozedMessagesReadyToWakeRow struct {
 	DeadlineAt       sql.NullInt64
 	Attachments      sql.NullString
 	CreatedAt        int64
+	DeletedBySender  int64
 	RecipientAgentID int64
 }
 
@@ -771,6 +786,7 @@ func (q *Queries) GetSnoozedMessagesReadyToWake(ctx context.Context, snoozedUnti
 			&i.DeadlineAt,
 			&i.Attachments,
 			&i.CreatedAt,
+			&i.DeletedBySender,
 			&i.RecipientAgentID,
 		); err != nil {
 			return nil, err
@@ -787,7 +803,7 @@ func (q *Queries) GetSnoozedMessagesReadyToWake(ctx context.Context, snoozedUnti
 }
 
 const GetStarredMessages = `-- name: GetStarredMessages :many
-SELECT m.id, m.thread_id, m.topic_id, m.log_offset, m.sender_id, m.subject, m.body_md, m.priority, m.deadline_at, m.attachments, m.created_at, mr.state, mr.snoozed_until, mr.read_at, mr.acked_at
+SELECT m.id, m.thread_id, m.topic_id, m.log_offset, m.sender_id, m.subject, m.body_md, m.priority, m.deadline_at, m.attachments, m.created_at, m.deleted_by_sender, mr.state, mr.snoozed_until, mr.read_at, mr.acked_at
 FROM messages m
 JOIN message_recipients mr ON m.id = mr.message_id
 WHERE mr.agent_id = ?
@@ -802,21 +818,22 @@ type GetStarredMessagesParams struct {
 }
 
 type GetStarredMessagesRow struct {
-	ID           int64
-	ThreadID     string
-	TopicID      int64
-	LogOffset    int64
-	SenderID     int64
-	Subject      string
-	BodyMd       string
-	Priority     string
-	DeadlineAt   sql.NullInt64
-	Attachments  sql.NullString
-	CreatedAt    int64
-	State        string
-	SnoozedUntil sql.NullInt64
-	ReadAt       sql.NullInt64
-	AckedAt      sql.NullInt64
+	ID              int64
+	ThreadID        string
+	TopicID         int64
+	LogOffset       int64
+	SenderID        int64
+	Subject         string
+	BodyMd          string
+	Priority        string
+	DeadlineAt      sql.NullInt64
+	Attachments     sql.NullString
+	CreatedAt       int64
+	DeletedBySender int64
+	State           string
+	SnoozedUntil    sql.NullInt64
+	ReadAt          sql.NullInt64
+	AckedAt         sql.NullInt64
 }
 
 func (q *Queries) GetStarredMessages(ctx context.Context, arg GetStarredMessagesParams) ([]GetStarredMessagesRow, error) {
@@ -840,6 +857,7 @@ func (q *Queries) GetStarredMessages(ctx context.Context, arg GetStarredMessages
 			&i.DeadlineAt,
 			&i.Attachments,
 			&i.CreatedAt,
+			&i.DeletedBySender,
 			&i.State,
 			&i.SnoozedUntil,
 			&i.ReadAt,
@@ -859,7 +877,7 @@ func (q *Queries) GetStarredMessages(ctx context.Context, arg GetStarredMessages
 }
 
 const GetTrashMessages = `-- name: GetTrashMessages :many
-SELECT m.id, m.thread_id, m.topic_id, m.log_offset, m.sender_id, m.subject, m.body_md, m.priority, m.deadline_at, m.attachments, m.created_at, mr.state, mr.snoozed_until, mr.read_at, mr.acked_at
+SELECT m.id, m.thread_id, m.topic_id, m.log_offset, m.sender_id, m.subject, m.body_md, m.priority, m.deadline_at, m.attachments, m.created_at, m.deleted_by_sender, mr.state, mr.snoozed_until, mr.read_at, mr.acked_at
 FROM messages m
 JOIN message_recipients mr ON m.id = mr.message_id
 WHERE mr.agent_id = ?
@@ -874,21 +892,22 @@ type GetTrashMessagesParams struct {
 }
 
 type GetTrashMessagesRow struct {
-	ID           int64
-	ThreadID     string
-	TopicID      int64
-	LogOffset    int64
-	SenderID     int64
-	Subject      string
-	BodyMd       string
-	Priority     string
-	DeadlineAt   sql.NullInt64
-	Attachments  sql.NullString
-	CreatedAt    int64
-	State        string
-	SnoozedUntil sql.NullInt64
-	ReadAt       sql.NullInt64
-	AckedAt      sql.NullInt64
+	ID              int64
+	ThreadID        string
+	TopicID         int64
+	LogOffset       int64
+	SenderID        int64
+	Subject         string
+	BodyMd          string
+	Priority        string
+	DeadlineAt      sql.NullInt64
+	Attachments     sql.NullString
+	CreatedAt       int64
+	DeletedBySender int64
+	State           string
+	SnoozedUntil    sql.NullInt64
+	ReadAt          sql.NullInt64
+	AckedAt         sql.NullInt64
 }
 
 func (q *Queries) GetTrashMessages(ctx context.Context, arg GetTrashMessagesParams) ([]GetTrashMessagesRow, error) {
@@ -912,6 +931,7 @@ func (q *Queries) GetTrashMessages(ctx context.Context, arg GetTrashMessagesPara
 			&i.DeadlineAt,
 			&i.Attachments,
 			&i.CreatedAt,
+			&i.DeletedBySender,
 			&i.State,
 			&i.SnoozedUntil,
 			&i.ReadAt,
@@ -931,7 +951,7 @@ func (q *Queries) GetTrashMessages(ctx context.Context, arg GetTrashMessagesPara
 }
 
 const GetUnreadMessages = `-- name: GetUnreadMessages :many
-SELECT m.id, m.thread_id, m.topic_id, m.log_offset, m.sender_id, m.subject, m.body_md, m.priority, m.deadline_at, m.attachments, m.created_at, mr.state, mr.snoozed_until, mr.read_at, mr.acked_at
+SELECT m.id, m.thread_id, m.topic_id, m.log_offset, m.sender_id, m.subject, m.body_md, m.priority, m.deadline_at, m.attachments, m.created_at, m.deleted_by_sender, mr.state, mr.snoozed_until, mr.read_at, mr.acked_at
 FROM messages m
 JOIN message_recipients mr ON m.id = mr.message_id
 WHERE mr.agent_id = ?
@@ -946,21 +966,22 @@ type GetUnreadMessagesParams struct {
 }
 
 type GetUnreadMessagesRow struct {
-	ID           int64
-	ThreadID     string
-	TopicID      int64
-	LogOffset    int64
-	SenderID     int64
-	Subject      string
-	BodyMd       string
-	Priority     string
-	DeadlineAt   sql.NullInt64
-	Attachments  sql.NullString
-	CreatedAt    int64
-	State        string
-	SnoozedUntil sql.NullInt64
-	ReadAt       sql.NullInt64
-	AckedAt      sql.NullInt64
+	ID              int64
+	ThreadID        string
+	TopicID         int64
+	LogOffset       int64
+	SenderID        int64
+	Subject         string
+	BodyMd          string
+	Priority        string
+	DeadlineAt      sql.NullInt64
+	Attachments     sql.NullString
+	CreatedAt       int64
+	DeletedBySender int64
+	State           string
+	SnoozedUntil    sql.NullInt64
+	ReadAt          sql.NullInt64
+	AckedAt         sql.NullInt64
 }
 
 func (q *Queries) GetUnreadMessages(ctx context.Context, arg GetUnreadMessagesParams) ([]GetUnreadMessagesRow, error) {
@@ -984,6 +1005,7 @@ func (q *Queries) GetUnreadMessages(ctx context.Context, arg GetUnreadMessagesPa
 			&i.DeadlineAt,
 			&i.Attachments,
 			&i.CreatedAt,
+			&i.DeletedBySender,
 			&i.State,
 			&i.SnoozedUntil,
 			&i.ReadAt,
@@ -1003,7 +1025,7 @@ func (q *Queries) GetUnreadMessages(ctx context.Context, arg GetUnreadMessagesPa
 }
 
 const ListMessagesByPriority = `-- name: ListMessagesByPriority :many
-SELECT m.id, m.thread_id, m.topic_id, m.log_offset, m.sender_id, m.subject, m.body_md, m.priority, m.deadline_at, m.attachments, m.created_at FROM messages m
+SELECT m.id, m.thread_id, m.topic_id, m.log_offset, m.sender_id, m.subject, m.body_md, m.priority, m.deadline_at, m.attachments, m.created_at, m.deleted_by_sender FROM messages m
 JOIN message_recipients mr ON m.id = mr.message_id
 WHERE mr.agent_id = ? AND m.priority = ?
 ORDER BY m.created_at DESC
@@ -1037,6 +1059,7 @@ func (q *Queries) ListMessagesByPriority(ctx context.Context, arg ListMessagesBy
 			&i.DeadlineAt,
 			&i.Attachments,
 			&i.CreatedAt,
+			&i.DeletedBySender,
 		); err != nil {
 			return nil, err
 		}
@@ -1049,6 +1072,20 @@ func (q *Queries) ListMessagesByPriority(ctx context.Context, arg ListMessagesBy
 		return nil, err
 	}
 	return items, nil
+}
+
+const MarkMessageDeletedBySender = `-- name: MarkMessageDeletedBySender :exec
+UPDATE messages SET deleted_by_sender = 1 WHERE id = ? AND sender_id = ?
+`
+
+type MarkMessageDeletedBySenderParams struct {
+	ID       int64
+	SenderID int64
+}
+
+func (q *Queries) MarkMessageDeletedBySender(ctx context.Context, arg MarkMessageDeletedBySenderParams) error {
+	_, err := q.db.ExecContext(ctx, MarkMessageDeletedBySender, arg.ID, arg.SenderID)
+	return err
 }
 
 const UpdateRecipientAcked = `-- name: UpdateRecipientAcked :exec
@@ -1085,7 +1122,7 @@ func (q *Queries) UpdateRecipientSnoozed(ctx context.Context, arg UpdateRecipien
 	return err
 }
 
-const UpdateRecipientState = `-- name: UpdateRecipientState :exec
+const UpdateRecipientState = `-- name: UpdateRecipientState :execrows
 UPDATE message_recipients
 SET state = ?, read_at = CASE WHEN ? = 'read' THEN ? ELSE read_at END
 WHERE message_id = ? AND agent_id = ?
@@ -1099,15 +1136,18 @@ type UpdateRecipientStateParams struct {
 	AgentID   int64
 }
 
-func (q *Queries) UpdateRecipientState(ctx context.Context, arg UpdateRecipientStateParams) error {
-	_, err := q.db.ExecContext(ctx, UpdateRecipientState,
+func (q *Queries) UpdateRecipientState(ctx context.Context, arg UpdateRecipientStateParams) (int64, error) {
+	result, err := q.db.ExecContext(ctx, UpdateRecipientState,
 		arg.State,
 		arg.Column2,
 		arg.ReadAt,
 		arg.MessageID,
 		arg.AgentID,
 	)
-	return err
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected()
 }
 
 const WakeSnoozedMessages = `-- name: WakeSnoozedMessages :execrows

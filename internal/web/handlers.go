@@ -196,6 +196,33 @@ type MessagesListData struct {
 	Messages []MessageView
 }
 
+// buildAgentSwitcherItems creates the agent switcher dropdown items.
+// currentAgentID is the currently selected agent (0 for Global view).
+func (s *Server) buildAgentSwitcherItems(
+	ctx context.Context, currentAgentID int64,
+) []AgentSwitcherItem {
+	agents, err := s.store.Queries().ListAgents(ctx)
+	if err != nil {
+		agents = nil
+	}
+
+	items := make([]AgentSwitcherItem, 0, len(agents)+1)
+	// Add "Global" option first.
+	items = append(items, AgentSwitcherItem{
+		ID:       0,
+		Name:     "Global",
+		IsActive: currentAgentID == 0,
+	})
+	for _, a := range agents {
+		items = append(items, AgentSwitcherItem{
+			ID:       a.ID,
+			Name:     a.Name,
+			IsActive: a.ID == currentAgentID,
+		})
+	}
+	return items
+}
+
 // handleIndex redirects to the inbox.
 func (s *Server) handleIndex(w http.ResponseWriter, r *http.Request) {
 	if r.URL.Path != "/" {
@@ -349,9 +376,13 @@ func (s *Server) handleAgentsDashboard(w http.ResponseWriter, r *http.Request) {
 		activeAgents = counts.Active + counts.Busy
 	}
 
+	// Build agent switcher items.
+	agentSwitcherItems := s.buildAgentSwitcherItems(ctx, 0)
+
 	data := PageData{
 		Title:     "Agent Dashboard",
 		ActiveNav: "agents",
+		AllAgents: agentSwitcherItems,
 		AgentStats: &DashboardStats{
 			ActiveAgents:    activeAgents,
 			RunningSessions: 0, // TODO: Track sessions in database.
@@ -2492,7 +2523,7 @@ func (s *Server) handleMessageStar(
 		newState = "read"
 	}
 
-	err = s.store.Queries().UpdateRecipientState(ctx, sqlc.UpdateRecipientStateParams{
+	_, err = s.store.Queries().UpdateRecipientState(ctx, sqlc.UpdateRecipientStateParams{
 		State:     newState,
 		Column2:   newState,
 		ReadAt:    sql.NullInt64{Int64: time.Now().Unix(), Valid: true},
@@ -2532,7 +2563,7 @@ func (s *Server) handleMessageArchive(
 		return
 	}
 
-	err := s.store.Queries().UpdateRecipientState(ctx, sqlc.UpdateRecipientStateParams{
+	_, err := s.store.Queries().UpdateRecipientState(ctx, sqlc.UpdateRecipientStateParams{
 		State:     "archived",
 		Column2:   "archived",
 		ReadAt:    sql.NullInt64{Int64: time.Now().Unix(), Valid: true},
@@ -2651,6 +2682,8 @@ func (s *Server) handleMessageSnooze(
 }
 
 // handleMessageTrash moves a message to trash.
+// For sent messages (where the agent is the sender), marks deleted_by_sender.
+// For received messages (where the agent is a recipient), updates recipient state.
 func (s *Server) handleMessageTrash(
 	ctx context.Context, w http.ResponseWriter, r *http.Request,
 	messageID, agentID int64,
@@ -2660,7 +2693,35 @@ func (s *Server) handleMessageTrash(
 		return
 	}
 
-	err := s.store.Queries().UpdateRecipientState(ctx, sqlc.UpdateRecipientStateParams{
+	// Get the message to check sender.
+	msg, err := s.store.Queries().GetMessage(ctx, messageID)
+	if err != nil {
+		http.Error(w, "Message not found", http.StatusNotFound)
+		return
+	}
+
+	// Check the Referer to see if we're on the Sent page.
+	referer := r.Header.Get("Referer")
+	onSentPage := strings.Contains(referer, "/sent")
+
+	// If on Sent page OR if the agentID matches the sender, delete from sender's perspective.
+	if onSentPage || msg.SenderID == agentID {
+		err = s.store.Queries().MarkMessageDeletedBySender(ctx, sqlc.MarkMessageDeletedBySenderParams{
+			ID:       messageID,
+			SenderID: msg.SenderID,
+		})
+		if err != nil {
+			http.Error(w, "Failed to delete sent message", http.StatusInternalServerError)
+			return
+		}
+		w.Header().Set("HX-Trigger", "messageTrashed")
+		w.Header().Set("Content-Type", "text/html")
+		w.Write([]byte(""))
+		return
+	}
+
+	// Otherwise, update recipient state.
+	_, err = s.store.Queries().UpdateRecipientState(ctx, sqlc.UpdateRecipientStateParams{
 		State:     "trash",
 		Column2:   "trash",
 		ReadAt:    sql.NullInt64{Int64: time.Now().Unix(), Valid: true},

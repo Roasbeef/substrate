@@ -321,7 +321,7 @@ func (s *Service) handleReadMessage(ctx context.Context,
 	// Mark as read if currently unread.
 	if recipient.State == "unread" {
 		now := time.Now().Unix()
-		err = s.store.Queries().UpdateRecipientState(
+		_, err = s.store.Queries().UpdateRecipientState(
 			ctx, sqlc.UpdateRecipientStateParams{
 				State:     "read",
 				Column2:   "read",
@@ -406,7 +406,7 @@ func (s *Service) handleUpdateState(ctx context.Context,
 		}
 	} else {
 		now := time.Now().Unix()
-		err := s.store.Queries().UpdateRecipientState(
+		_, err := s.store.Queries().UpdateRecipientState(
 			ctx, sqlc.UpdateRecipientStateParams{
 				State:     req.NewState,
 				Column2:   req.NewState,

@@ -74,11 +74,12 @@ type Querier interface {
 	ListSubscriptionsByTopic(ctx context.Context, topicID int64) ([]Agent, error)
 	ListTopics(ctx context.Context) ([]Topic, error)
 	ListTopicsByType(ctx context.Context, topicType string) ([]Topic, error)
+	MarkMessageDeletedBySender(ctx context.Context, arg MarkMessageDeletedBySenderParams) error
 	UpdateAgentLastActive(ctx context.Context, arg UpdateAgentLastActiveParams) error
 	UpdateAgentSession(ctx context.Context, arg UpdateAgentSessionParams) error
 	UpdateRecipientAcked(ctx context.Context, arg UpdateRecipientAckedParams) error
 	UpdateRecipientSnoozed(ctx context.Context, arg UpdateRecipientSnoozedParams) error
-	UpdateRecipientState(ctx context.Context, arg UpdateRecipientStateParams) error
+	UpdateRecipientState(ctx context.Context, arg UpdateRecipientStateParams) (int64, error)
 	UpdateSessionIdentityLastActive(ctx context.Context, arg UpdateSessionIdentityLastActiveParams) error
 	UpdateTopicRetention(ctx context.Context, arg UpdateTopicRetentionParams) error
 	UpsertConsumerOffset(ctx context.Context, arg UpsertConsumerOffsetParams) error
