@@ -51,6 +51,16 @@ Target 85%+ meaningful coverage with property-based testing:
 
 ## Feature Roadmap
 
+### Skills & Automation
+
+- [ ] **QA Tester Skill**: Create or find a skill that performs manual QA testing
+  - Navigate through UI pages and features
+  - Verify functionality works as expected
+  - Create Tasks for bugs/issues discovered
+  - Track test coverage of features
+  - Generate test reports with screenshots
+  - Could use Playwright MCP for browser automation
+
 ### v0.2.0 - Enhanced Agent Integration & Real-time
 - [ ] **Stop hook long-polling**: Use Claude Code Stop hooks to implement mail checking
   - Agent checks inbox before stopping (configurable timeout)
