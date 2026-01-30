@@ -18,15 +18,21 @@
 input=$(cat)
 session_id=$(echo "$input" | jq -r '.session_id // empty')
 
+# Build session ID args if available (critical for agent identity resolution).
+session_args=""
+if [ -n "$session_id" ]; then
+    session_args="--session-id $session_id"
+fi
+
 # ============================================================================
 # Step 1: Quick mail check
 # ============================================================================
 
 # Record heartbeat (best effort)
-substrate heartbeat --format context 2>/dev/null || true
+substrate heartbeat $session_args --format context 2>/dev/null || true
 
 # Quick (non-blocking) check for mail
-quick_result=$(substrate poll --format hook --quiet 2>/dev/null || echo '{"decision": null}')
+quick_result=$(substrate poll $session_args --format hook --quiet 2>/dev/null || echo '{"decision": null}')
 quick_decision=$(echo "$quick_result" | jq -r '.decision // empty')
 
 if [ "$quick_decision" = "block" ]; then
@@ -105,5 +111,5 @@ fi
 # No mail, no tasks - do a longer poll to keep agent alive
 # --always-block ensures we output block decision even with no messages.
 # This keeps the agent alive indefinitely, continuously checking for work.
-substrate poll --wait=55s --format hook --always-block 2>/dev/null || \
-    echo '{"decision": "block", "reason": "Error checking mail. Agent staying alive."}'
+substrate poll $session_args --wait=55s --format hook --always-block 2>/dev/null || \
+    echo '{"decision": "block", "reason": "Error resolving agent identity. Agent staying alive."}'

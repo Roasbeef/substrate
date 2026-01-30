@@ -10,9 +10,16 @@
 #
 # Output format: JSON for SubagentStop hook decision
 
-# Read hook input from stdin to check stop_hook_active.
+# Read hook input from stdin to check stop_hook_active and session_id.
 input=$(cat)
 stop_hook_active=$(echo "$input" | jq -r '.stop_hook_active // false')
+session_id=$(echo "$input" | jq -r '.session_id // empty')
+
+# Build session ID args if available.
+session_args=""
+if [ -n "$session_id" ]; then
+    session_args="--session-id $session_id"
+fi
 
 # If we already blocked once and Claude processed messages, allow exit.
 # stop_hook_active=true means Claude is trying to stop after our previous block.
@@ -23,4 +30,4 @@ fi
 
 # First stop - quick check for messages (no long-polling).
 # Block only if there are pending messages.
-substrate poll --format hook 2>/dev/null || echo '{"decision": null}'
+substrate poll $session_args --format hook 2>/dev/null || echo '{"decision": null}'
