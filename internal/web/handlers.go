@@ -466,20 +466,79 @@ func (s *Server) handleSnoozed(w http.ResponseWriter, r *http.Request) {
 func (s *Server) handleSent(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 
-	// Use User agent for sent messages (human-sent messages from UI).
-	agentID := s.getUserAgentID(ctx)
+	// Get all agents for the switcher dropdown.
+	agents, err := s.store.Queries().ListAgents(ctx)
+	if err != nil {
+		agents = nil
+	}
+
+	// Determine which agent's sent messages to show.
+	agentIDStr := r.URL.Query().Get("agent_id")
+	var currentAgentID int64
+	var currentAgentName string
+
+	if agentIDStr == "all" || agentIDStr == "0" {
+		// Global view - show all sent messages.
+		currentAgentID = 0
+		currentAgentName = "Global"
+	} else if agentIDStr != "" {
+		// Specific agent requested.
+		fmt.Sscanf(agentIDStr, "%d", &currentAgentID)
+		for _, a := range agents {
+			if a.ID == currentAgentID {
+				currentAgentName = a.Name
+				break
+			}
+		}
+	} else {
+		// Default: show all sent (Global view).
+		currentAgentID = 0
+		currentAgentName = "Global"
+	}
+
+	// Build agent switcher items.
+	agentSwitcherItems := make([]AgentSwitcherItem, 0, len(agents)+1)
+	agentSwitcherItems = append(agentSwitcherItems, AgentSwitcherItem{
+		ID:       0,
+		Name:     "Global",
+		IsActive: currentAgentID == 0,
+	})
+	for _, a := range agents {
+		agentSwitcherItems = append(agentSwitcherItems, AgentSwitcherItem{
+			ID:       a.ID,
+			Name:     a.Name,
+			IsActive: a.ID == currentAgentID,
+		})
+	}
 
 	// Get sent count.
 	var sentCount int64
-	if agentID > 0 {
-		sentCount, _ = s.store.Queries().CountSentByAgent(ctx, agentID)
+	if currentAgentID > 0 {
+		sentCount, _ = s.store.Queries().CountSentByAgent(ctx, currentAgentID)
+	} else {
+		// Global view - sum across all agents.
+		for _, a := range agents {
+			cnt, _ := s.store.Queries().CountSentByAgent(ctx, a.ID)
+			sentCount += cnt
+		}
+	}
+
+	// Build endpoint with agent_id parameter.
+	endpoint := "/sent/messages"
+	if currentAgentID > 0 {
+		endpoint = fmt.Sprintf("/sent/messages?agent_id=%d", currentAgentID)
+	} else {
+		endpoint = "/sent/messages?agent_id=0"
 	}
 
 	data := PageData{
 		Title:            "Sent",
 		ActiveNav:        "sent",
-		MessagesEndpoint: "/sent/messages",
+		MessagesEndpoint: endpoint,
 		UnreadCount:      int(sentCount),
+		CurrentAgentID:   currentAgentID,
+		CurrentAgentName: currentAgentName,
+		AllAgents:        agentSwitcherItems,
 		Stats: &InboxStats{
 			PrimaryCount: int(sentCount),
 		},
@@ -732,33 +791,48 @@ func (s *Server) handleSnoozedMessages(w http.ResponseWriter, r *http.Request) {
 func (s *Server) handleSentMessages(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 
-	// Get agent ID from query, or default to User agent for human-sent msgs.
+	// Check if global view is requested.
 	agentIDStr := r.URL.Query().Get("agent_id")
-	var agentID int64
+	isGlobal := agentIDStr == "all" || agentIDStr == "0"
 
-	if agentIDStr != "" {
-		fmt.Sscanf(agentIDStr, "%d", &agentID)
+	var messages []MessageView
+
+	if isGlobal {
+		// Global view: get all sent messages across all agents.
+		dbMessages, err := s.store.Queries().GetAllSentMessages(ctx, 50)
+		if err != nil {
+			s.renderPartial(w, "message-list", MessagesListData{Messages: nil})
+			return
+		}
+		messages = s.convertAllSentMessagesToView(dbMessages)
 	} else {
-		// Default to User agent for the Sent page.
-		agentID = s.getUserAgentID(ctx)
+		// Agent-specific view.
+		var agentID int64
+		if agentIDStr != "" {
+			fmt.Sscanf(agentIDStr, "%d", &agentID)
+		} else {
+			// Default to User agent for the Sent page.
+			agentID = s.getUserAgentID(ctx)
+		}
+
+		if agentID == 0 {
+			s.renderPartial(w, "message-list", MessagesListData{Messages: nil})
+			return
+		}
+
+		dbMessages, err := s.store.Queries().GetSentMessages(
+			ctx, sqlc.GetSentMessagesParams{
+				SenderID: agentID,
+				Limit:    50,
+			},
+		)
+		if err != nil {
+			s.renderPartial(w, "message-list", MessagesListData{Messages: nil})
+			return
+		}
+		messages = s.convertSentMessagesToView(ctx, dbMessages)
 	}
 
-	if agentID == 0 {
-		s.renderPartial(w, "message-list", MessagesListData{Messages: nil})
-		return
-	}
-
-	// Fetch sent messages.
-	dbMessages, err := s.store.Queries().GetSentMessages(ctx, sqlc.GetSentMessagesParams{
-		SenderID: agentID,
-		Limit:    50,
-	})
-	if err != nil {
-		s.renderPartial(w, "message-list", MessagesListData{Messages: nil})
-		return
-	}
-
-	messages := s.convertSentMessagesToView(ctx, dbMessages)
 	s.renderPartial(w, "message-list", MessagesListData{Messages: messages})
 }
 
@@ -902,6 +976,28 @@ func (s *Server) convertSentMessagesToView(
 			ThreadID:       m.ThreadID,
 			SenderName:     senderName,
 			SenderInitials: getInitials(senderName),
+			Subject:        m.Subject,
+			Body:           m.BodyMd,
+			State:          "sent",
+			IsAgent:        true,
+			CreatedAt:      time.Unix(m.CreatedAt, 0),
+		}
+	}
+	return messages
+}
+
+// convertAllSentMessagesToView converts global sent messages to view models.
+// The sender name is already included in the query result.
+func (s *Server) convertAllSentMessagesToView(
+	dbMessages []sqlc.GetAllSentMessagesRow,
+) []MessageView {
+	messages := make([]MessageView, len(dbMessages))
+	for i, m := range dbMessages {
+		messages[i] = MessageView{
+			ID:             fmt.Sprintf("%d", m.ID),
+			ThreadID:       m.ThreadID,
+			SenderName:     m.SenderName,
+			SenderInitials: getInitials(m.SenderName),
 			Subject:        m.Subject,
 			Body:           m.BodyMd,
 			State:          "sent",

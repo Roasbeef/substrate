@@ -247,6 +247,69 @@ func (q *Queries) GetAllInboxMessages(ctx context.Context, limit int64) ([]GetAl
 	return items, nil
 }
 
+const GetAllSentMessages = `-- name: GetAllSentMessages :many
+SELECT m.id, m.thread_id, m.topic_id, m.log_offset, m.sender_id, m.subject, m.body_md, m.priority, m.deadline_at, m.attachments, m.created_at, m.deleted_by_sender, a.name as sender_name
+FROM messages m
+JOIN agents a ON m.sender_id = a.id
+WHERE m.deleted_by_sender = 0
+ORDER BY m.created_at DESC
+LIMIT ?
+`
+
+type GetAllSentMessagesRow struct {
+	ID              int64
+	ThreadID        string
+	TopicID         int64
+	LogOffset       int64
+	SenderID        int64
+	Subject         string
+	BodyMd          string
+	Priority        string
+	DeadlineAt      sql.NullInt64
+	Attachments     sql.NullString
+	CreatedAt       int64
+	DeletedBySender int64
+	SenderName      string
+}
+
+// Global sent view: all sent messages across all agents.
+func (q *Queries) GetAllSentMessages(ctx context.Context, limit int64) ([]GetAllSentMessagesRow, error) {
+	rows, err := q.db.QueryContext(ctx, GetAllSentMessages, limit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []GetAllSentMessagesRow
+	for rows.Next() {
+		var i GetAllSentMessagesRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.ThreadID,
+			&i.TopicID,
+			&i.LogOffset,
+			&i.SenderID,
+			&i.Subject,
+			&i.BodyMd,
+			&i.Priority,
+			&i.DeadlineAt,
+			&i.Attachments,
+			&i.CreatedAt,
+			&i.DeletedBySender,
+			&i.SenderName,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const GetArchivedMessages = `-- name: GetArchivedMessages :many
 SELECT m.id, m.thread_id, m.topic_id, m.log_offset, m.sender_id, m.subject, m.body_md, m.priority, m.deadline_at, m.attachments, m.created_at, m.deleted_by_sender, mr.state, mr.snoozed_until, mr.read_at, mr.acked_at
 FROM messages m

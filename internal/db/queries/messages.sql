@@ -154,6 +154,15 @@ WHERE sender_id = ? AND deleted_by_sender = 0
 ORDER BY created_at DESC
 LIMIT ?;
 
+-- name: GetAllSentMessages :many
+-- Global sent view: all sent messages across all agents.
+SELECT m.*, a.name as sender_name
+FROM messages m
+JOIN agents a ON m.sender_id = a.id
+WHERE m.deleted_by_sender = 0
+ORDER BY m.created_at DESC
+LIMIT ?;
+
 -- name: MarkMessageDeletedBySender :exec
 UPDATE messages SET deleted_by_sender = 1 WHERE id = ? AND sender_id = ?;
 
