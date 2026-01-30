@@ -486,14 +486,65 @@ func (s *Service) handleGetStatus(ctx context.Context,
 	return response
 }
 
-// handlePollChanges processes a PollChangesRequest.
+// handlePollChanges processes a PollChangesRequest. It checks both direct
+// inbox messages (unread) and subscribed topic messages.
 func (s *Service) handlePollChanges(ctx context.Context,
 	req PollChangesRequest) PollChangesResponse {
 
 	var response PollChangesResponse
 	response.NewOffsets = make(map[int64]int64)
 
-	// Get subscribed topics.
+	// First, check for unread direct messages in the agent's inbox.
+	unreadMsgs, err := s.store.Queries().GetUnreadMessages(
+		ctx, sqlc.GetUnreadMessagesParams{
+			AgentID: req.AgentID,
+			Limit:   100,
+		},
+	)
+	if err != nil {
+		response.Error = fmt.Errorf("failed to get unread messages: %w",
+			err)
+		return response
+	}
+
+	// Add unread direct messages to response.
+	for _, msg := range unreadMsgs {
+		inboxMsg := InboxMessage{
+			ID:        msg.ID,
+			ThreadID:  msg.ThreadID,
+			TopicID:   msg.TopicID,
+			SenderID:  msg.SenderID,
+			Subject:   msg.Subject,
+			Body:      msg.BodyMd,
+			Priority:  Priority(msg.Priority),
+			State:     msg.State,
+			CreatedAt: time.Unix(msg.CreatedAt, 0),
+		}
+
+		if msg.DeadlineAt.Valid {
+			t := time.Unix(msg.DeadlineAt.Int64, 0)
+			inboxMsg.Deadline = &t
+		}
+
+		if msg.ReadAt.Valid {
+			t := time.Unix(msg.ReadAt.Int64, 0)
+			inboxMsg.ReadAt = &t
+		}
+
+		if msg.AckedAt.Valid {
+			t := time.Unix(msg.AckedAt.Int64, 0)
+			inboxMsg.AckedAt = &t
+		}
+
+		if msg.SnoozedUntil.Valid {
+			t := time.Unix(msg.SnoozedUntil.Int64, 0)
+			inboxMsg.SnoozedUntil = &t
+		}
+
+		response.NewMessages = append(response.NewMessages, inboxMsg)
+	}
+
+	// Then check subscribed topics for new messages.
 	topics, err := s.store.Queries().ListSubscriptionsByAgent(
 		ctx, req.AgentID,
 	)
@@ -503,7 +554,7 @@ func (s *Service) handlePollChanges(ctx context.Context,
 		return response
 	}
 
-	// Poll each topic for new messages.
+	// Poll each topic for new messages since the given offset.
 	for _, topic := range topics {
 		sinceOffset := req.SinceOffsets[topic.ID]
 
