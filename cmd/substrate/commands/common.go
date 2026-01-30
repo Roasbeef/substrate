@@ -5,12 +5,24 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"os/exec"
 	"strings"
 	"time"
 
 	"github.com/roasbeef/subtrate/internal/db"
 	"github.com/roasbeef/subtrate/internal/mail"
 )
+
+// getGitBranch returns the current git branch name, or empty string if not in
+// a git repo or git is not available.
+func getGitBranch() string {
+	cmd := exec.Command("git", "rev-parse", "--abbrev-ref", "HEAD")
+	output, err := cmd.Output()
+	if err != nil {
+		return ""
+	}
+	return strings.TrimSpace(string(output))
+}
 
 // getStore opens the database and returns a store instance.
 // NOTE: This is only used as fallback when daemon is not running.
@@ -64,7 +76,8 @@ func getCurrentAgentWithClient(ctx context.Context, client *Client) (int64,
 	}
 
 	// Use identity resolution via client.
-	identity, err := client.EnsureIdentity(ctx, sessID, projDir)
+	gitBranch := getGitBranch()
+	identity, err := client.EnsureIdentity(ctx, sessID, projDir, gitBranch)
 	if err != nil {
 		return 0, "", fmt.Errorf("failed to resolve identity: %w", err)
 	}

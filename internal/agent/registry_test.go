@@ -76,7 +76,7 @@ func TestRegistry_RegisterAgent(t *testing.T) {
 	ctx := context.Background()
 
 	// Register an agent.
-	agent, err := registry.RegisterAgent(ctx, "TestAgent", "")
+	agent, err := registry.RegisterAgent(ctx, "TestAgent", "", "")
 	require.NoError(t, err)
 	require.NotNil(t, agent)
 	require.Equal(t, "TestAgent", agent.Name)
@@ -91,7 +91,7 @@ func TestRegistry_RegisterAgent_WithProject(t *testing.T) {
 	ctx := context.Background()
 
 	// Register an agent with project.
-	agent, err := registry.RegisterAgent(ctx, "ProjectAgent", "/path/to/project")
+	agent, err := registry.RegisterAgent(ctx, "ProjectAgent", "/path/to/project", "")
 	require.NoError(t, err)
 	require.NotNil(t, agent)
 	require.Equal(t, "ProjectAgent", agent.Name)
@@ -107,11 +107,11 @@ func TestRegistry_RegisterAgent_DuplicateName(t *testing.T) {
 	ctx := context.Background()
 
 	// Register first agent.
-	_, err := registry.RegisterAgent(ctx, "DuplicateAgent", "")
+	_, err := registry.RegisterAgent(ctx, "DuplicateAgent", "", "")
 	require.NoError(t, err)
 
 	// Try to register with same name - should fail.
-	_, err = registry.RegisterAgent(ctx, "DuplicateAgent", "")
+	_, err = registry.RegisterAgent(ctx, "DuplicateAgent", "", "")
 	require.Error(t, err)
 }
 
@@ -123,7 +123,7 @@ func TestRegistry_GetAgent(t *testing.T) {
 	ctx := context.Background()
 
 	// Register an agent.
-	created, err := registry.RegisterAgent(ctx, "GetAgent", "")
+	created, err := registry.RegisterAgent(ctx, "GetAgent", "", "")
 	require.NoError(t, err)
 
 	// Get by ID.
@@ -153,7 +153,7 @@ func TestRegistry_GetAgentByName(t *testing.T) {
 	ctx := context.Background()
 
 	// Register an agent.
-	created, err := registry.RegisterAgent(ctx, "NameLookupAgent", "")
+	created, err := registry.RegisterAgent(ctx, "NameLookupAgent", "", "")
 	require.NoError(t, err)
 
 	// Get by name.
@@ -183,7 +183,7 @@ func TestRegistry_ListAgents(t *testing.T) {
 
 	// Register multiple agents.
 	for _, name := range []string{"Agent1", "Agent2", "Agent3"} {
-		_, err := registry.RegisterAgent(ctx, name, "")
+		_, err := registry.RegisterAgent(ctx, name, "", "")
 		require.NoError(t, err)
 	}
 
@@ -201,11 +201,11 @@ func TestRegistry_ListAgentsByProject(t *testing.T) {
 	ctx := context.Background()
 
 	// Register agents in different projects.
-	_, err := registry.RegisterAgent(ctx, "ProjectA1", "/project/a")
+	_, err := registry.RegisterAgent(ctx, "ProjectA1", "/project/a", "")
 	require.NoError(t, err)
-	_, err = registry.RegisterAgent(ctx, "ProjectA2", "/project/a")
+	_, err = registry.RegisterAgent(ctx, "ProjectA2", "/project/a", "")
 	require.NoError(t, err)
-	_, err = registry.RegisterAgent(ctx, "ProjectB1", "/project/b")
+	_, err = registry.RegisterAgent(ctx, "ProjectB1", "/project/b", "")
 	require.NoError(t, err)
 
 	// List agents in project A.
@@ -222,7 +222,7 @@ func TestRegistry_UpdateLastActive(t *testing.T) {
 	ctx := context.Background()
 
 	// Register an agent.
-	agent, err := registry.RegisterAgent(ctx, "ActiveAgent", "")
+	agent, err := registry.RegisterAgent(ctx, "ActiveAgent", "", "")
 	require.NoError(t, err)
 	originalLastActive := agent.LastActiveAt
 
@@ -264,7 +264,7 @@ func TestRegistry_EnsureUniqueAgentName(t *testing.T) {
 	require.NotEmpty(t, name)
 
 	// Register with that name.
-	_, err = registry.RegisterAgent(ctx, name, "")
+	_, err = registry.RegisterAgent(ctx, name, "", "")
 	require.NoError(t, err)
 
 	// Generate another unique name - should be different.

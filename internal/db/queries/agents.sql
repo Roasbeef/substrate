@@ -1,6 +1,6 @@
 -- name: CreateAgent :one
-INSERT INTO agents (name, project_key, current_session_id, created_at, last_active_at)
-VALUES (?, ?, ?, ?, ?)
+INSERT INTO agents (name, project_key, git_branch, current_session_id, created_at, last_active_at)
+VALUES (?, ?, ?, ?, ?, ?)
 RETURNING *;
 
 -- name: GetAgent :one
@@ -26,15 +26,19 @@ UPDATE agents SET last_active_at = ? WHERE id = ?;
 -- name: UpdateAgentSession :exec
 UPDATE agents SET current_session_id = ?, last_active_at = ? WHERE id = ?;
 
+-- name: UpdateAgentGitBranch :exec
+UPDATE agents SET git_branch = ?, project_key = ?, last_active_at = ? WHERE id = ?;
+
 -- name: DeleteAgent :exec
 DELETE FROM agents WHERE id = ?;
 
 -- name: CreateSessionIdentity :exec
-INSERT INTO session_identities (session_id, agent_id, project_key, created_at, last_active_at)
-VALUES (?, ?, ?, ?, ?)
+INSERT INTO session_identities (session_id, agent_id, project_key, git_branch, created_at, last_active_at)
+VALUES (?, ?, ?, ?, ?, ?)
 ON CONFLICT (session_id) DO UPDATE SET
     agent_id = excluded.agent_id,
     project_key = excluded.project_key,
+    git_branch = excluded.git_branch,
     last_active_at = excluded.last_active_at;
 
 -- name: GetSessionIdentity :one

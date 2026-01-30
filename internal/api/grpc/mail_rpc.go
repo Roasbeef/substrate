@@ -564,7 +564,8 @@ func (s *Server) RegisterAgent(ctx context.Context, req *RegisterAgentRequest) (
 		return nil, status.Error(codes.InvalidArgument, "name is required")
 	}
 
-	agent, err := s.agentReg.RegisterAgent(ctx, req.Name, req.ProjectKey)
+	// Note: git_branch is not in the proto, will be set via EnsureIdentity.
+	agent, err := s.agentReg.RegisterAgent(ctx, req.Name, req.ProjectKey, "")
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "failed to register agent: %v", err)
 	}
@@ -610,7 +611,9 @@ func (s *Server) EnsureIdentity(ctx context.Context, req *EnsureIdentityRequest)
 		return nil, status.Error(codes.InvalidArgument, "session_id is required")
 	}
 
-	identity, err := s.identityMgr.EnsureIdentity(ctx, req.SessionId, req.ProjectDir)
+	identity, err := s.identityMgr.EnsureIdentity(
+		ctx, req.SessionId, req.ProjectDir, req.GitBranch,
+	)
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "failed to ensure identity: %v", err)
 	}

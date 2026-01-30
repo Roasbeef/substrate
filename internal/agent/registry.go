@@ -23,7 +23,7 @@ func NewRegistry(store *db.Store) *Registry {
 
 // RegisterAgent creates a new agent with the given name.
 func (r *Registry) RegisterAgent(ctx context.Context, name string,
-	projectKey string) (*sqlc.Agent, error) {
+	projectKey string, gitBranch string) (*sqlc.Agent, error) {
 
 	now := time.Now().Unix()
 
@@ -33,6 +33,10 @@ func (r *Registry) RegisterAgent(ctx context.Context, name string,
 			ProjectKey: sql.NullString{
 				String: projectKey,
 				Valid:  projectKey != "",
+			},
+			GitBranch: sql.NullString{
+				String: gitBranch,
+				Valid:  gitBranch != "",
 			},
 			CreatedAt:    now,
 			LastActiveAt: now,

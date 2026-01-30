@@ -63,7 +63,10 @@ func runAgentRegister(cmd *cobra.Command, args []string) error {
 	}
 
 	// RegisterAgent handles name generation if empty.
-	agentID, agentNameResult, err := client.RegisterAgent(ctx, name, registerProject)
+	gitBranch := getGitBranch()
+	agentID, agentNameResult, err := client.RegisterAgent(
+		ctx, name, registerProject, gitBranch,
+	)
 	if err != nil {
 		return fmt.Errorf("failed to register agent: %w", err)
 	}

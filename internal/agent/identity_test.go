@@ -77,7 +77,7 @@ func TestIdentityManager_EnsureIdentity_NewAgent(t *testing.T) {
 	ctx := context.Background()
 
 	// Ensure identity for a new session.
-	identity, err := mgr.EnsureIdentity(ctx, "test-session-1", "")
+	identity, err := mgr.EnsureIdentity(ctx, "test-session-1", "", "")
 	require.NoError(t, err)
 	require.NotNil(t, identity)
 
@@ -101,7 +101,7 @@ func TestIdentityManager_EnsureIdentity_WithProject(t *testing.T) {
 
 	// Ensure identity with project key.
 	identity, err := mgr.EnsureIdentity(
-		ctx, "test-session-project", "/path/to/project",
+		ctx, "test-session-project", "/path/to/project", "",
 	)
 	require.NoError(t, err)
 	require.NotNil(t, identity)
@@ -124,14 +124,14 @@ func TestIdentityManager_EnsureIdentity_RestoresExisting(t *testing.T) {
 	ctx := context.Background()
 
 	// Create initial identity.
-	identity1, err := mgr.EnsureIdentity(ctx, "test-session-restore", "")
+	identity1, err := mgr.EnsureIdentity(ctx, "test-session-restore", "", "")
 	require.NoError(t, err)
 
 	// Wait a bit to ensure time difference.
 	time.Sleep(10 * time.Millisecond)
 
 	// Ensure identity again - should restore, not create new.
-	identity2, err := mgr.EnsureIdentity(ctx, "test-session-restore", "")
+	identity2, err := mgr.EnsureIdentity(ctx, "test-session-restore", "", "")
 	require.NoError(t, err)
 
 	require.Equal(t, identity1.AgentID, identity2.AgentID)
@@ -147,14 +147,14 @@ func TestIdentityManager_EnsureIdentity_UsesProjectDefault(t *testing.T) {
 	ctx := context.Background()
 
 	// Create an agent and set as project default.
-	agent, err := mgr.registry.RegisterAgent(ctx, "ProjectAgent", "/my/project")
+	agent, err := mgr.registry.RegisterAgent(ctx, "ProjectAgent", "/my/project", "")
 	require.NoError(t, err)
 
 	err = mgr.SetProjectDefault(ctx, "/my/project", agent.Name)
 	require.NoError(t, err)
 
 	// New session for same project should use existing agent.
-	identity, err := mgr.EnsureIdentity(ctx, "new-session-for-project", "/my/project")
+	identity, err := mgr.EnsureIdentity(ctx, "new-session-for-project", "/my/project", "")
 	require.NoError(t, err)
 
 	require.Equal(t, agent.ID, identity.AgentID)
@@ -169,7 +169,7 @@ func TestIdentityManager_RestoreIdentity_FromFile(t *testing.T) {
 	ctx := context.Background()
 
 	// Create an agent.
-	agent, err := mgr.registry.RegisterAgent(ctx, "FileRestoreAgent", "")
+	agent, err := mgr.registry.RegisterAgent(ctx, "FileRestoreAgent", "", "")
 	require.NoError(t, err)
 
 	// Write identity file directly.
@@ -204,7 +204,7 @@ func TestIdentityManager_RestoreIdentity_FromDatabase(t *testing.T) {
 	ctx := context.Background()
 
 	// Create an agent.
-	agent, err := mgr.registry.RegisterAgent(ctx, "DBRestoreAgent", "")
+	agent, err := mgr.registry.RegisterAgent(ctx, "DBRestoreAgent", "", "")
 	require.NoError(t, err)
 
 	// Insert session identity directly into database.
@@ -243,7 +243,7 @@ func TestIdentityManager_RestoreIdentity_AgentNoLongerExists(t *testing.T) {
 	ctx := context.Background()
 
 	// Create an agent.
-	agent, err := mgr.registry.RegisterAgent(ctx, "DeletedAgent", "")
+	agent, err := mgr.registry.RegisterAgent(ctx, "DeletedAgent", "", "")
 	require.NoError(t, err)
 
 	// Write identity file.
@@ -279,7 +279,7 @@ func TestIdentityManager_SaveIdentity(t *testing.T) {
 	ctx := context.Background()
 
 	// Create initial identity.
-	identity, err := mgr.EnsureIdentity(ctx, "save-session", "")
+	identity, err := mgr.EnsureIdentity(ctx, "save-session", "", "")
 	require.NoError(t, err)
 
 	// Create a topic for testing consumer offsets.
@@ -328,7 +328,7 @@ func TestIdentityManager_GetProjectDefaultIdentity_FromFile(t *testing.T) {
 	ctx := context.Background()
 
 	// Create an agent and set as project default.
-	agent, err := mgr.registry.RegisterAgent(ctx, "ProjectDefaultAgent", "")
+	agent, err := mgr.registry.RegisterAgent(ctx, "ProjectDefaultAgent", "", "")
 	require.NoError(t, err)
 
 	err = mgr.SetProjectDefault(ctx, "/project/path", agent.Name)
@@ -359,7 +359,7 @@ func TestIdentityManager_SetProjectDefault(t *testing.T) {
 	ctx := context.Background()
 
 	// Create an agent.
-	agent, err := mgr.registry.RegisterAgent(ctx, "SetDefaultAgent", "")
+	agent, err := mgr.registry.RegisterAgent(ctx, "SetDefaultAgent", "", "")
 	require.NoError(t, err)
 
 	// Set as project default.
@@ -400,7 +400,7 @@ func TestIdentityManager_CurrentIdentity(t *testing.T) {
 	ctx := context.Background()
 
 	// Create identity first.
-	identity, err := mgr.EnsureIdentity(ctx, "current-session", "")
+	identity, err := mgr.EnsureIdentity(ctx, "current-session", "", "")
 	require.NoError(t, err)
 
 	// Get current identity.
@@ -417,13 +417,13 @@ func TestIdentityManager_ListIdentities(t *testing.T) {
 	ctx := context.Background()
 
 	// Create several identities.
-	_, err := mgr.EnsureIdentity(ctx, "list-session-1", "")
+	_, err := mgr.EnsureIdentity(ctx, "list-session-1", "", "")
 	require.NoError(t, err)
 
-	_, err = mgr.EnsureIdentity(ctx, "list-session-2", "")
+	_, err = mgr.EnsureIdentity(ctx, "list-session-2", "", "")
 	require.NoError(t, err)
 
-	_, err = mgr.EnsureIdentity(ctx, "list-session-3", "/project/a")
+	_, err = mgr.EnsureIdentity(ctx, "list-session-3", "/project/a", "")
 	require.NoError(t, err)
 
 	// List all identities.
@@ -503,4 +503,67 @@ func TestIdentityManager_SaveSessionDB_EmptySessionID(t *testing.T) {
 
 	err := mgr.saveSessionDB(ctx, identity)
 	require.NoError(t, err)
+}
+
+func TestIdentityManager_EnsureIdentity_UpdatesGitBranch(t *testing.T) {
+	mgr, store, cleanup := testIdentityManager(t)
+	defer cleanup()
+
+	ctx := context.Background()
+
+	// Create initial identity without git branch.
+	identity1, err := mgr.EnsureIdentity(
+		ctx, "git-branch-session", "/project/path", "",
+	)
+	require.NoError(t, err)
+	require.Empty(t, identity1.GitBranch)
+
+	// Verify agent was created without git branch.
+	agent, err := store.Queries().GetAgent(ctx, identity1.AgentID)
+	require.NoError(t, err)
+	require.False(t, agent.GitBranch.Valid)
+
+	// Call EnsureIdentity again with git branch - should update.
+	identity2, err := mgr.EnsureIdentity(
+		ctx, "git-branch-session", "/project/path", "feature-branch",
+	)
+	require.NoError(t, err)
+	require.Equal(t, identity1.AgentID, identity2.AgentID)
+	require.Equal(t, "feature-branch", identity2.GitBranch)
+
+	// Verify agent record was updated.
+	agent, err = store.Queries().GetAgent(ctx, identity2.AgentID)
+	require.NoError(t, err)
+	require.True(t, agent.GitBranch.Valid)
+	require.Equal(t, "feature-branch", agent.GitBranch.String)
+}
+
+func TestIdentityManager_EnsureIdentity_UpdatesGitBranch_ProjectDefault(t *testing.T) {
+	mgr, store, cleanup := testIdentityManager(t)
+	defer cleanup()
+
+	ctx := context.Background()
+
+	// Create an agent and set as project default.
+	agent, err := mgr.registry.RegisterAgent(
+		ctx, "ProjectDefaultBranch", "/branch/project", "",
+	)
+	require.NoError(t, err)
+
+	err = mgr.SetProjectDefault(ctx, "/branch/project", agent.Name)
+	require.NoError(t, err)
+
+	// New session for same project should use existing agent and update branch.
+	identity, err := mgr.EnsureIdentity(
+		ctx, "new-session-branch", "/branch/project", "main",
+	)
+	require.NoError(t, err)
+	require.Equal(t, agent.ID, identity.AgentID)
+	require.Equal(t, "main", identity.GitBranch)
+
+	// Verify agent record was updated with git branch.
+	updatedAgent, err := store.Queries().GetAgent(ctx, agent.ID)
+	require.NoError(t, err)
+	require.True(t, updatedAgent.GitBranch.Valid)
+	require.Equal(t, "main", updatedAgent.GitBranch.String)
 }

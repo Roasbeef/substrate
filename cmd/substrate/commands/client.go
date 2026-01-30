@@ -165,11 +165,15 @@ func (c *Client) Mode() ClientMode {
 }
 
 // EnsureIdentity creates or retrieves an agent identity for a session.
-func (c *Client) EnsureIdentity(ctx context.Context, sessionID, projectDir string) (*agent.IdentityFile, error) {
+func (c *Client) EnsureIdentity(
+	ctx context.Context, sessionID, projectDir, gitBranch string,
+) (*agent.IdentityFile, error) {
+
 	if c.mode == ModeGRPC {
 		resp, err := c.agentClient.EnsureIdentity(ctx, &subtraterpc.EnsureIdentityRequest{
 			SessionId:  sessionID,
 			ProjectDir: projectDir,
+			GitBranch:  gitBranch,
 		})
 		if err != nil {
 			return nil, err
@@ -180,7 +184,7 @@ func (c *Client) EnsureIdentity(ctx context.Context, sessionID, projectDir strin
 		}, nil
 	}
 
-	return c.identityMgr.EnsureIdentity(ctx, sessionID, projectDir)
+	return c.identityMgr.EnsureIdentity(ctx, sessionID, projectDir, gitBranch)
 }
 
 // GetAgentByName retrieves an agent by name.
@@ -559,8 +563,13 @@ func (c *Client) Publish(ctx context.Context, senderID int64, topicName, subject
 }
 
 // RegisterAgent creates a new agent.
-func (c *Client) RegisterAgent(ctx context.Context, name, projectKey string) (int64, string, error) {
+func (c *Client) RegisterAgent(
+	ctx context.Context, name, projectKey, gitBranch string,
+) (int64, string, error) {
+
 	if c.mode == ModeGRPC {
+		// Note: gRPC RegisterAgentRequest doesn't include git_branch yet.
+		// The branch will be set on first heartbeat/identity call.
 		resp, err := c.agentClient.RegisterAgent(ctx, &subtraterpc.RegisterAgentRequest{
 			Name:       name,
 			ProjectKey: projectKey,
@@ -571,7 +580,7 @@ func (c *Client) RegisterAgent(ctx context.Context, name, projectKey string) (in
 		return resp.AgentId, resp.Name, nil
 	}
 
-	ag, err := c.registry.RegisterAgent(ctx, name, projectKey)
+	ag, err := c.registry.RegisterAgent(ctx, name, projectKey, gitBranch)
 	if err != nil {
 		return 0, "", err
 	}
@@ -639,7 +648,8 @@ func (c *Client) GetAgent(ctx context.Context, agentID int64) (*sqlc.Agent, erro
 func (c *Client) RestoreIdentity(ctx context.Context, sessionID string) (*agent.IdentityFile, error) {
 	if c.mode == ModeGRPC {
 		// Use EnsureIdentity which will restore if exists.
-		return c.EnsureIdentity(ctx, sessionID, "")
+		// Note: empty git_branch is fine for restore - existing value is kept.
+		return c.EnsureIdentity(ctx, sessionID, "", "")
 	}
 
 	return c.identityMgr.RestoreIdentity(ctx, sessionID)

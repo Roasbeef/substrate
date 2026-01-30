@@ -97,7 +97,8 @@ func runIdentityEnsure(cmd *cobra.Command, args []string) error {
 		proj = os.Getenv("CLAUDE_PROJECT_DIR")
 	}
 
-	identity, err := client.EnsureIdentity(ctx, sid, proj)
+	gitBranch := getGitBranch()
+	identity, err := client.EnsureIdentity(ctx, sid, proj, gitBranch)
 	if err != nil {
 		return fmt.Errorf("failed to ensure identity: %w", err)
 	}

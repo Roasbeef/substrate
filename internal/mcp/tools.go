@@ -621,6 +621,7 @@ func (s *Server) handlePollChanges(ctx context.Context,
 type RegisterAgentArgs struct {
 	Name       string `json:"name" jsonschema:"Name for the new agent"`
 	ProjectKey string `json:"project_key,omitempty" jsonschema:"Optional project key to bind the agent to"`
+	GitBranch  string `json:"git_branch,omitempty" jsonschema:"Optional git branch name for the agent"`
 }
 
 // RegisterAgentResult is the result of the register_agent tool.
@@ -632,7 +633,9 @@ type RegisterAgentResult struct {
 func (s *Server) handleRegisterAgent(ctx context.Context,
 	req *mcp.CallToolRequest, args RegisterAgentArgs) (*mcp.CallToolResult, RegisterAgentResult, error) {
 
-	agent, err := s.registry.RegisterAgent(ctx, args.Name, args.ProjectKey)
+	agent, err := s.registry.RegisterAgent(
+		ctx, args.Name, args.ProjectKey, args.GitBranch,
+	)
 	if err != nil {
 		return nil, RegisterAgentResult{}, fmt.Errorf("failed to register agent: %w", err)
 	}

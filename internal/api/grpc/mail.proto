@@ -342,6 +342,7 @@ message ListAgentsResponse {
 message EnsureIdentityRequest {
     string session_id = 1;
     string project_dir = 2;
+    string git_branch = 3;
 }
 
 // EnsureIdentityResponse is the response for EnsureIdentity.

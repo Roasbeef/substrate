@@ -11,14 +11,15 @@ import (
 )
 
 const CreateAgent = `-- name: CreateAgent :one
-INSERT INTO agents (name, project_key, current_session_id, created_at, last_active_at)
-VALUES (?, ?, ?, ?, ?)
+INSERT INTO agents (name, project_key, git_branch, current_session_id, created_at, last_active_at)
+VALUES (?, ?, ?, ?, ?, ?)
 RETURNING id, name, project_key, git_branch, current_session_id, created_at, last_active_at
 `
 
 type CreateAgentParams struct {
 	Name             string
 	ProjectKey       sql.NullString
+	GitBranch        sql.NullString
 	CurrentSessionID sql.NullString
 	CreatedAt        int64
 	LastActiveAt     int64
@@ -28,6 +29,7 @@ func (q *Queries) CreateAgent(ctx context.Context, arg CreateAgentParams) (Agent
 	row := q.db.QueryRowContext(ctx, CreateAgent,
 		arg.Name,
 		arg.ProjectKey,
+		arg.GitBranch,
 		arg.CurrentSessionID,
 		arg.CreatedAt,
 		arg.LastActiveAt,
@@ -46,11 +48,12 @@ func (q *Queries) CreateAgent(ctx context.Context, arg CreateAgentParams) (Agent
 }
 
 const CreateSessionIdentity = `-- name: CreateSessionIdentity :exec
-INSERT INTO session_identities (session_id, agent_id, project_key, created_at, last_active_at)
-VALUES (?, ?, ?, ?, ?)
+INSERT INTO session_identities (session_id, agent_id, project_key, git_branch, created_at, last_active_at)
+VALUES (?, ?, ?, ?, ?, ?)
 ON CONFLICT (session_id) DO UPDATE SET
     agent_id = excluded.agent_id,
     project_key = excluded.project_key,
+    git_branch = excluded.git_branch,
     last_active_at = excluded.last_active_at
 `
 
@@ -58,6 +61,7 @@ type CreateSessionIdentityParams struct {
 	SessionID    string
 	AgentID      int64
 	ProjectKey   sql.NullString
+	GitBranch    sql.NullString
 	CreatedAt    int64
 	LastActiveAt int64
 }
@@ -67,6 +71,7 @@ func (q *Queries) CreateSessionIdentity(ctx context.Context, arg CreateSessionId
 		arg.SessionID,
 		arg.AgentID,
 		arg.ProjectKey,
+		arg.GitBranch,
 		arg.CreatedAt,
 		arg.LastActiveAt,
 	)
@@ -288,6 +293,27 @@ func (q *Queries) ListSessionIdentitiesByAgent(ctx context.Context, agentID int6
 		return nil, err
 	}
 	return items, nil
+}
+
+const UpdateAgentGitBranch = `-- name: UpdateAgentGitBranch :exec
+UPDATE agents SET git_branch = ?, project_key = ?, last_active_at = ? WHERE id = ?
+`
+
+type UpdateAgentGitBranchParams struct {
+	GitBranch    sql.NullString
+	ProjectKey   sql.NullString
+	LastActiveAt int64
+	ID           int64
+}
+
+func (q *Queries) UpdateAgentGitBranch(ctx context.Context, arg UpdateAgentGitBranchParams) error {
+	_, err := q.db.ExecContext(ctx, UpdateAgentGitBranch,
+		arg.GitBranch,
+		arg.ProjectKey,
+		arg.LastActiveAt,
+		arg.ID,
+	)
+	return err
 }
 
 const UpdateAgentLastActive = `-- name: UpdateAgentLastActive :exec

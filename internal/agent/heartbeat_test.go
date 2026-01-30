@@ -130,7 +130,7 @@ func TestHeartbeatManagerWithRegistry(t *testing.T) {
 	ctx := context.Background()
 
 	// Register an agent.
-	agent, err := registry.RegisterAgent(ctx, "test-agent", "")
+	agent, err := registry.RegisterAgent(ctx, "test-agent", "", "")
 	if err != nil {
 		t.Fatalf("RegisterAgent: %v", err)
 	}
@@ -179,9 +179,9 @@ func TestListAgentsWithStatus(t *testing.T) {
 	ctx := context.Background()
 
 	// Register multiple agents.
-	agent1, _ := registry.RegisterAgent(ctx, "agent-1", "")
-	agent2, _ := registry.RegisterAgent(ctx, "agent-2", "")
-	_, _ = registry.RegisterAgent(ctx, "agent-3", "")
+	agent1, _ := registry.RegisterAgent(ctx, "agent-1", "", "")
+	agent2, _ := registry.RegisterAgent(ctx, "agent-2", "", "")
+	_, _ = registry.RegisterAgent(ctx, "agent-3", "", "")
 
 	// Update last active for agent1 (make it active).
 	hm.RecordHeartbeat(ctx, agent1.ID)
@@ -225,8 +225,8 @@ func TestGetStatusCounts(t *testing.T) {
 	ctx := context.Background()
 
 	// Register agents and set up different statuses.
-	agent1, _ := registry.RegisterAgent(ctx, "active-agent", "")
-	agent2, _ := registry.RegisterAgent(ctx, "busy-agent", "")
+	agent1, _ := registry.RegisterAgent(ctx, "active-agent", "", "")
+	agent2, _ := registry.RegisterAgent(ctx, "busy-agent", "", "")
 
 	hm.RecordHeartbeat(ctx, agent1.ID)
 	hm.RecordHeartbeat(ctx, agent2.ID)

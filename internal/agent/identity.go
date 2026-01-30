@@ -28,6 +28,7 @@ type IdentityFile struct {
 	AgentName       string            `json:"agent_name"`
 	AgentID         int64             `json:"agent_id"`
 	ProjectKey      string            `json:"project_key,omitempty"`
+	GitBranch       string            `json:"git_branch,omitempty"`
 	CreatedAt       time.Time         `json:"created_at"`
 	LastActiveAt    time.Time         `json:"last_active_at"`
 	ConsumerOffsets map[string]int64  `json:"consumer_offsets,omitempty"`
@@ -65,16 +66,26 @@ func NewIdentityManager(store *db.Store, registry *Registry) (*IdentityManager,
 }
 
 // EnsureIdentity ensures an agent identity exists for the given session. If
-// no identity exists, it creates a new agent with a memorable name.
+// no identity exists, it creates a new agent with a memorable name. If an
+// existing identity is restored, the project_key and git_branch are updated
+// to reflect the current session's context.
 func (m *IdentityManager) EnsureIdentity(ctx context.Context, sessionID string,
-	projectKey string) (*IdentityFile, error) {
+	projectKey string, gitBranch string) (*IdentityFile, error) {
 
 	// Try to restore existing identity.
 	identity, err := m.RestoreIdentity(ctx, sessionID)
 	if err == nil {
-		// Update last active time.
+		// Update identity with current context.
 		identity.LastActiveAt = time.Now()
+		if err := m.updateAgentContext(
+			ctx, identity, projectKey, gitBranch,
+		); err != nil {
+			return nil, err
+		}
 		if err := m.saveIdentityFile(identity); err != nil {
+			return nil, err
+		}
+		if err := m.saveSessionDB(ctx, identity); err != nil {
 			return nil, err
 		}
 		return identity, nil
@@ -87,6 +98,11 @@ func (m *IdentityManager) EnsureIdentity(ctx context.Context, sessionID string,
 			// Associate this session with the existing agent.
 			identity.SessionID = sessionID
 			identity.LastActiveAt = time.Now()
+			if err := m.updateAgentContext(
+				ctx, identity, projectKey, gitBranch,
+			); err != nil {
+				return nil, err
+			}
 			if err := m.saveIdentityFile(identity); err != nil {
 				return nil, err
 			}
@@ -103,7 +119,7 @@ func (m *IdentityManager) EnsureIdentity(ctx context.Context, sessionID string,
 		return nil, fmt.Errorf("failed to generate agent name: %w", err)
 	}
 
-	agent, err := m.registry.RegisterAgent(ctx, name, projectKey)
+	agent, err := m.registry.RegisterAgent(ctx, name, projectKey, gitBranch)
 	if err != nil {
 		return nil, fmt.Errorf("failed to register agent: %w", err)
 	}
@@ -114,6 +130,7 @@ func (m *IdentityManager) EnsureIdentity(ctx context.Context, sessionID string,
 		AgentName:       agent.Name,
 		AgentID:         agent.ID,
 		ProjectKey:      projectKey,
+		GitBranch:       gitBranch,
 		CreatedAt:       time.Now(),
 		LastActiveAt:    time.Now(),
 		ConsumerOffsets: make(map[string]int64),
@@ -188,6 +205,9 @@ func (m *IdentityManager) RestoreIdentity(ctx context.Context,
 
 	if session.ProjectKey.Valid {
 		identity.ProjectKey = session.ProjectKey.String
+	}
+	if session.GitBranch.Valid {
+		identity.GitBranch = session.GitBranch.String
 	}
 
 	// Load consumer offsets.
@@ -408,10 +428,52 @@ func (m *IdentityManager) saveSessionDB(ctx context.Context,
 				String: identity.ProjectKey,
 				Valid:  identity.ProjectKey != "",
 			},
+			GitBranch: sql.NullString{
+				String: identity.GitBranch,
+				Valid:  identity.GitBranch != "",
+			},
 			CreatedAt:    identity.CreatedAt.Unix(),
 			LastActiveAt: identity.LastActiveAt.Unix(),
 		},
 	)
+}
+
+// updateAgentContext updates the identity and agent record with the current
+// project context. This ensures the agent's git_branch and project_key reflect
+// the current session, which may change between sessions.
+func (m *IdentityManager) updateAgentContext(ctx context.Context,
+	identity *IdentityFile, projectKey string, gitBranch string) error {
+
+	// Update identity fields.
+	if projectKey != "" {
+		identity.ProjectKey = projectKey
+	}
+	if gitBranch != "" {
+		identity.GitBranch = gitBranch
+	}
+
+	// Update agent record in database if we have context to update.
+	if projectKey != "" || gitBranch != "" {
+		err := m.store.Queries().UpdateAgentGitBranch(
+			ctx, sqlc.UpdateAgentGitBranchParams{
+				GitBranch: sql.NullString{
+					String: identity.GitBranch,
+					Valid:  identity.GitBranch != "",
+				},
+				ProjectKey: sql.NullString{
+					String: identity.ProjectKey,
+					Valid:  identity.ProjectKey != "",
+				},
+				LastActiveAt: time.Now().Unix(),
+				ID:           identity.AgentID,
+			},
+		)
+		if err != nil {
+			return fmt.Errorf("failed to update agent context: %w", err)
+		}
+	}
+
+	return nil
 }
 
 // hashProjectKey creates a filesystem-safe hash of a project path.

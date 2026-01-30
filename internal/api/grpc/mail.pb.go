@@ -2302,6 +2302,7 @@ type EnsureIdentityRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	SessionId     string                 `protobuf:"bytes,1,opt,name=session_id,json=sessionId,proto3" json:"session_id,omitempty"`
 	ProjectDir    string                 `protobuf:"bytes,2,opt,name=project_dir,json=projectDir,proto3" json:"project_dir,omitempty"`
+	GitBranch     string                 `protobuf:"bytes,3,opt,name=git_branch,json=gitBranch,proto3" json:"git_branch,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -2346,6 +2347,13 @@ func (x *EnsureIdentityRequest) GetSessionId() string {
 func (x *EnsureIdentityRequest) GetProjectDir() string {
 	if x != nil {
 		return x.ProjectDir
+	}
+	return ""
+}
+
+func (x *EnsureIdentityRequest) GetGitBranch() string {
+	if x != nil {
+		return x.GitBranch
 	}
 	return ""
 }
@@ -2687,12 +2695,14 @@ const file_mail_proto_rawDesc = "" +
 	"\x11ListAgentsRequest\x12\x14\n" +
 	"\x05limit\x18\x01 \x01(\x05R\x05limit\"K\n" +
 	"\x12ListAgentsResponse\x125\n" +
-	"\x06agents\x18\x01 \x03(\v2\x1d.subtraterpc.GetAgentResponseR\x06agents\"W\n" +
+	"\x06agents\x18\x01 \x03(\v2\x1d.subtraterpc.GetAgentResponseR\x06agents\"v\n" +
 	"\x15EnsureIdentityRequest\x12\x1d\n" +
 	"\n" +
 	"session_id\x18\x01 \x01(\tR\tsessionId\x12\x1f\n" +
 	"\vproject_dir\x18\x02 \x01(\tR\n" +
-	"projectDir\"l\n" +
+	"projectDir\x12\x1d\n" +
+	"\n" +
+	"git_branch\x18\x03 \x01(\tR\tgitBranch\"l\n" +
 	"\x16EnsureIdentityResponse\x12\x19\n" +
 	"\bagent_id\x18\x01 \x01(\x03R\aagentId\x12\x1d\n" +
 	"\n" +

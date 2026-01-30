@@ -80,6 +80,7 @@ type Querier interface {
 	ListTopics(ctx context.Context) ([]Topic, error)
 	ListTopicsByType(ctx context.Context, topicType string) ([]Topic, error)
 	MarkMessageDeletedBySender(ctx context.Context, arg MarkMessageDeletedBySenderParams) error
+	UpdateAgentGitBranch(ctx context.Context, arg UpdateAgentGitBranchParams) error
 	UpdateAgentLastActive(ctx context.Context, arg UpdateAgentLastActiveParams) error
 	UpdateAgentSession(ctx context.Context, arg UpdateAgentSessionParams) error
 	UpdateRecipientAcked(ctx context.Context, arg UpdateRecipientAckedParams) error
