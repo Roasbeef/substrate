@@ -630,9 +630,57 @@ function closeAgentSwitcherOnOutsideClick(event) {
 }
 
 // Update the displayed agent name in the header when switching agents.
+// Also updates the checkmark in the dropdown to show the new selection.
 function switchToAgent(agentName) {
     const nameSpan = document.getElementById('current-agent-name');
     if (nameSpan) {
         nameSpan.textContent = agentName;
     }
+
+    // Update checkmarks in the dropdown.
+    const dropdown = document.getElementById('agent-switcher-dropdown');
+    if (!dropdown) return;
+
+    // Checkmark SVG template (matches server-rendered structure).
+    const checkmarkSVG = `<svg class="w-4 h-4 ml-auto text-blue-600" fill="currentColor" viewBox="0 0 20 20">
+        <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/>
+    </svg>`;
+
+    // Find all agent links in the dropdown.
+    const links = dropdown.querySelectorAll('a');
+    links.forEach(link => {
+        // Remove any existing checkmark (identified by ml-auto class which pushes it right).
+        const existingCheck = link.querySelector('svg.ml-auto');
+        if (existingCheck) {
+            existingCheck.remove();
+        }
+
+        // Remove active styling.
+        link.classList.remove('bg-blue-50', 'text-blue-700', 'font-medium');
+        link.classList.add('text-gray-700');
+
+        // Update icon color to gray.
+        const iconSvg = link.querySelector('svg');
+        if (iconSvg) {
+            iconSvg.classList.remove('text-blue-600');
+            iconSvg.classList.add('text-gray-400');
+        }
+
+        // Find the agent name in this link.
+        const nameEl = link.querySelector('span');
+        const linkAgentName = nameEl ? nameEl.textContent.trim() : '';
+
+        // If this is the selected agent, add checkmark and active styling.
+        if (linkAgentName === agentName) {
+            link.insertAdjacentHTML('beforeend', checkmarkSVG);
+            link.classList.add('bg-blue-50', 'text-blue-700', 'font-medium');
+            link.classList.remove('text-gray-700');
+            // Update icon color to blue.
+            const icon = link.querySelector('svg:not(.ml-auto)');
+            if (icon) {
+                icon.classList.remove('text-gray-400');
+                icon.classList.add('text-blue-600');
+            }
+        }
+    });
 }
