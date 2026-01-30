@@ -2395,7 +2395,7 @@ func (s *Server) handleMessageSend(w http.ResponseWriter, r *http.Request) {
 }
 
 // handleMessageAction handles message actions like star, archive, snooze, trash.
-// Routes: POST /api/messages/{message_id}/{action}
+// Routes: POST /api/messages/{message_id}/{action}?agent_id={agent_id}
 func (s *Server) handleMessageAction(w http.ResponseWriter, r *http.Request) {
 	// Parse path: /api/messages/{message_id}/{action}
 	path := strings.TrimPrefix(r.URL.Path, "/api/messages/")
@@ -2416,13 +2416,37 @@ func (s *Server) handleMessageAction(w http.ResponseWriter, r *http.Request) {
 
 	ctx := r.Context()
 
-	// Get the first agent as the default recipient (for demo purposes).
-	agents, err := s.store.Queries().ListAgents(ctx)
-	if err != nil || len(agents) == 0 {
-		http.Error(w, "No agents found", http.StatusInternalServerError)
-		return
+	// Get agent ID from query parameter, form data, or fall back to message
+	// recipient lookup.
+	var agentID int64
+	agentIDStr := r.URL.Query().Get("agent_id")
+	if agentIDStr == "" {
+		agentIDStr = r.FormValue("agent_id")
 	}
-	agentID := agents[0].ID
+
+	if agentIDStr != "" && agentIDStr != "all" && agentIDStr != "0" {
+		fmt.Sscanf(agentIDStr, "%d", &agentID)
+	}
+
+	// If no agent ID specified, look up the recipient of this message.
+	if agentID == 0 {
+		recipients, err := s.store.Queries().GetMessageRecipients(
+			ctx, messageID,
+		)
+		if err == nil && len(recipients) > 0 {
+			agentID = recipients[0].AgentID
+		}
+	}
+
+	// Final fallback: use first agent.
+	if agentID == 0 {
+		agents, err := s.store.Queries().ListAgents(ctx)
+		if err != nil || len(agents) == 0 {
+			http.Error(w, "No agents found", http.StatusInternalServerError)
+			return
+		}
+		agentID = agents[0].ID
+	}
 
 	switch action {
 	case "star":
