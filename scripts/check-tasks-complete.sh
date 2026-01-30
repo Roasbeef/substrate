@@ -2,13 +2,37 @@
 # check-tasks-complete.sh
 # Checks if all tasks for this project are completed.
 # Outputs JSON for Claude Code Stop hook decision control.
+#
+# Hook Input (stdin JSON):
+#   session_id: The current session UUID
+#   stop_hook_active: true if this is a retry after previous block
+#
+# Output (stdout JSON):
+#   decision: "block" to prevent stopping, null/omit to allow
+#   reason: Message shown to Claude when blocked
 
-# The project ID for subtrate (can be detected from cwd hash if needed).
-PROJECT_ID="8294fd83-dc5f-4027-9423-6ef8b8cb194d"
-TASKS_DIR="$HOME/.claude/tasks/$PROJECT_ID"
+# Read hook input from stdin.
+input=$(cat)
 
+# Extract session_id from hook input.
+SESSION_ID=$(echo "$input" | jq -r '.session_id // empty' 2>/dev/null)
+STOP_HOOK_ACTIVE=$(echo "$input" | jq -r '.stop_hook_active // false' 2>/dev/null)
+
+# If no session_id, allow stop.
+if [ -z "$SESSION_ID" ]; then
+    exit 0
+fi
+
+TASKS_DIR="$HOME/.claude/tasks/$SESSION_ID"
+
+# If stop_hook_active is true, we already blocked once and Claude processed.
+# Allow exit this time to prevent infinite loop.
+if [ "$STOP_HOOK_ACTIVE" = "true" ]; then
+    exit 0
+fi
+
+# If no tasks directory, allow stop.
 if [ ! -d "$TASKS_DIR" ]; then
-    # No tasks directory - allow stop (no JSON output = undefined decision).
     exit 0
 fi
 
@@ -22,7 +46,6 @@ for task_file in "$TASKS_DIR"/*.json; do
     fi
 
     status=$(jq -r '.status' "$task_file" 2>/dev/null)
-    subject=$(jq -r '.subject' "$task_file" 2>/dev/null)
     id=$(jq -r '.id' "$task_file" 2>/dev/null)
 
     if [ "$status" != "completed" ]; then
@@ -46,5 +69,5 @@ EOF
     exit 0
 fi
 
-# Allow stop - no output means undefined decision (allowed).
+# All tasks complete - allow stop.
 exit 0

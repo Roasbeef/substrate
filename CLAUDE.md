@@ -64,6 +64,15 @@ When working on features, make incremental commits as you complete logical units
 
 Use the session log to track progress: `/session-log --progress "description"`
 
+### Task Completion Integrity (CRITICAL)
+
+**NEVER mark a task as complete prematurely.** A task is only complete when ALL acceptance criteria are met and the work is fully verified.
+
+- Do NOT mark tasks complete just to bypass stop hooks or other blockers
+- If a stop hook prevents stopping, complete the remaining work or ask the user
+- Leave tasks as `in_progress` or `pending` if work remains
+- When blocked, ask the user for guidance rather than marking done
+
 ### Running the Server
 The web UI is built into substrated. By default, `make run` starts in web-only mode (no MCP/stdio):
 
