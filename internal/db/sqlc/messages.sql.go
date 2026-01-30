@@ -1087,6 +1087,29 @@ func (q *Queries) GetUnreadMessages(ctx context.Context, arg GetUnreadMessagesPa
 	return items, nil
 }
 
+const HasUnackedStatusToAgent = `-- name: HasUnackedStatusToAgent :one
+SELECT COUNT(*) FROM messages m
+JOIN message_recipients mr ON m.id = mr.message_id
+WHERE m.sender_id = ?
+  AND mr.agent_id = ?
+  AND mr.acked_at IS NULL
+  AND m.subject LIKE '[Status]%'
+`
+
+type HasUnackedStatusToAgentParams struct {
+	SenderID int64
+	AgentID  int64
+}
+
+// Check if there are any unacked status messages from sender to recipient.
+// Used for deduplication in status-update command.
+func (q *Queries) HasUnackedStatusToAgent(ctx context.Context, arg HasUnackedStatusToAgentParams) (int64, error) {
+	row := q.db.QueryRowContext(ctx, HasUnackedStatusToAgent, arg.SenderID, arg.AgentID)
+	var count int64
+	err := row.Scan(&count)
+	return count, err
+}
+
 const ListMessagesByPriority = `-- name: ListMessagesByPriority :many
 SELECT m.id, m.thread_id, m.topic_id, m.log_offset, m.sender_id, m.subject, m.body_md, m.priority, m.deadline_at, m.attachments, m.created_at, m.deleted_by_sender FROM messages m
 JOIN message_recipients mr ON m.id = mr.message_id

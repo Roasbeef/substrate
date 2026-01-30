@@ -63,6 +63,9 @@ type Querier interface {
 	GetTopicByName(ctx context.Context, name string) (Topic, error)
 	GetTrashMessages(ctx context.Context, arg GetTrashMessagesParams) ([]GetTrashMessagesRow, error)
 	GetUnreadMessages(ctx context.Context, arg GetUnreadMessagesParams) ([]GetUnreadMessagesRow, error)
+	// Check if there are any unacked status messages from sender to recipient.
+	// Used for deduplication in status-update command.
+	HasUnackedStatusToAgent(ctx context.Context, arg HasUnackedStatusToAgentParams) (int64, error)
 	ListActivitiesByAgent(ctx context.Context, arg ListActivitiesByAgentParams) ([]Activity, error)
 	ListActivitiesByType(ctx context.Context, arg ListActivitiesByTypeParams) ([]Activity, error)
 	ListActivitiesSince(ctx context.Context, arg ListActivitiesSinceParams) ([]Activity, error)

@@ -90,4 +90,5 @@ func init() {
 	rootCmd.AddCommand(topicsCmd)
 	rootCmd.AddCommand(subscribeCmd)
 	rootCmd.AddCommand(publishCmd)
+	rootCmd.AddCommand(statusUpdateCmd)
 }

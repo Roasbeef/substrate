@@ -423,6 +423,31 @@ func (c *Client) GetStatus(ctx context.Context, agentID int64) (*mail.AgentStatu
 	return &status, nil
 }
 
+// HasUnackedStatusTo checks if there are any unacked status messages from
+// sender to recipient. Used for deduplication in status-update command.
+func (c *Client) HasUnackedStatusTo(
+	ctx context.Context, senderID, recipientID int64,
+) (bool, error) {
+	// Note: gRPC mode not implemented - fall back to direct mode logic.
+	// This is acceptable since status-update is typically run locally.
+	if c.mode == ModeGRPC {
+		// For gRPC, we'd need to add a new RPC. For now, return false
+		// to allow sending (skip deduplication in gRPC mode).
+		return false, nil
+	}
+
+	count, err := c.store.Queries().HasUnackedStatusToAgent(
+		ctx, sqlc.HasUnackedStatusToAgentParams{
+			SenderID: senderID,
+			AgentID:  recipientID,
+		},
+	)
+	if err != nil {
+		return false, err
+	}
+	return count > 0, nil
+}
+
 // PollChanges checks for new messages since given offsets.
 func (c *Client) PollChanges(ctx context.Context, agentID int64, sinceOffsets map[int64]int64) ([]mail.InboxMessage, map[int64]int64, error) {
 	if c.mode == ModeGRPC {

@@ -1,6 +1,6 @@
-# Compiled binaries
-substrate
-substrated
+# Compiled binaries (in root directory only)
+/substrate
+/substrated
 subtrate-web
 bin/
 

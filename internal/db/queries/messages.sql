@@ -182,5 +182,15 @@ WHERE agent_id = ? AND state = 'archived';
 SELECT COUNT(*) FROM messages
 WHERE sender_id = ? AND deleted_by_sender = 0;
 
+-- name: HasUnackedStatusToAgent :one
+-- Check if there are any unacked status messages from sender to recipient.
+-- Used for deduplication in status-update command.
+SELECT COUNT(*) FROM messages m
+JOIN message_recipients mr ON m.id = mr.message_id
+WHERE m.sender_id = ?
+  AND mr.agent_id = ?
+  AND mr.acked_at IS NULL
+  AND m.subject LIKE '[Status]%';
+
 -- Note: Full-text search queries using FTS5 are handled manually in Go code
 -- since sqlc doesn't fully support FTS5 virtual tables.
