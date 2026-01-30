@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"time"
@@ -49,9 +50,10 @@ type PageData struct {
 
 // AgentSwitcherItem represents an agent in the switcher dropdown.
 type AgentSwitcherItem struct {
-	ID       int64
-	Name     string
-	IsActive bool
+	ID          int64
+	Name        string
+	DisplayName string // "CodeName@repo.branch" format.
+	IsActive    bool
 }
 
 // DashboardStats holds stats for the agents dashboard.
@@ -98,6 +100,7 @@ type MessageView struct {
 type AgentView struct {
 	ID             string
 	Name           string
+	DisplayName    string // "CodeName@repo.branch" format for at-a-glance ID.
 	Type           string
 	Status         string // "active", "busy", "idle", "offline"
 	Description    string
@@ -210,15 +213,20 @@ func (s *Server) buildAgentSwitcherItems(
 	items := make([]AgentSwitcherItem, 0, len(agents)+1)
 	// Add "Global" option first.
 	items = append(items, AgentSwitcherItem{
-		ID:       0,
-		Name:     "Global",
-		IsActive: currentAgentID == 0,
+		ID:          0,
+		Name:        "Global",
+		DisplayName: "Global",
+		IsActive:    currentAgentID == 0,
 	})
 	for _, a := range agents {
+		displayName := formatAgentDisplayName(
+			a.Name, a.ProjectKey.String, a.GitBranch.String,
+		)
 		items = append(items, AgentSwitcherItem{
-			ID:       a.ID,
-			Name:     a.Name,
-			IsActive: a.ID == currentAgentID,
+			ID:          a.ID,
+			Name:        a.Name,
+			DisplayName: displayName,
+			IsActive:    a.ID == currentAgentID,
 		})
 	}
 	return items
@@ -262,7 +270,9 @@ func (s *Server) handleInbox(w http.ResponseWriter, r *http.Request) {
 		fmt.Sscanf(agentIDStr, "%d", &currentAgentID)
 		for _, a := range agents {
 			if a.ID == currentAgentID {
-				currentAgentName = a.Name
+				currentAgentName = formatAgentDisplayName(
+					a.Name, a.ProjectKey.String, a.GitBranch.String,
+				)
 				break
 			}
 		}
@@ -271,7 +281,9 @@ func (s *Server) handleInbox(w http.ResponseWriter, r *http.Request) {
 		for _, a := range agents {
 			if a.Name == UserAgentName {
 				currentAgentID = a.ID
-				currentAgentName = a.Name
+				currentAgentName = formatAgentDisplayName(
+					a.Name, a.ProjectKey.String, a.GitBranch.String,
+				)
 				break
 			}
 		}
@@ -280,7 +292,9 @@ func (s *Server) handleInbox(w http.ResponseWriter, r *http.Request) {
 			for _, a := range agents {
 				if a.Name != UserAgentName {
 					currentAgentID = a.ID
-					currentAgentName = a.Name
+					currentAgentName = formatAgentDisplayName(
+						a.Name, a.ProjectKey.String, a.GitBranch.String,
+					)
 					break
 				}
 			}
@@ -291,15 +305,20 @@ func (s *Server) handleInbox(w http.ResponseWriter, r *http.Request) {
 	agentSwitcherItems := make([]AgentSwitcherItem, 0, len(agents)+1)
 	// Add "Global" option first.
 	agentSwitcherItems = append(agentSwitcherItems, AgentSwitcherItem{
-		ID:       0,
-		Name:     "Global",
-		IsActive: currentAgentID == 0,
+		ID:          0,
+		Name:        "Global",
+		DisplayName: "Global",
+		IsActive:    currentAgentID == 0,
 	})
 	for _, a := range agents {
+		displayName := formatAgentDisplayName(
+			a.Name, a.ProjectKey.String, a.GitBranch.String,
+		)
 		agentSwitcherItems = append(agentSwitcherItems, AgentSwitcherItem{
-			ID:       a.ID,
-			Name:     a.Name,
-			IsActive: a.ID == currentAgentID,
+			ID:          a.ID,
+			Name:        a.Name,
+			DisplayName: displayName,
+			IsActive:    a.ID == currentAgentID,
 		})
 	}
 
@@ -486,7 +505,9 @@ func (s *Server) handleSent(w http.ResponseWriter, r *http.Request) {
 		fmt.Sscanf(agentIDStr, "%d", &currentAgentID)
 		for _, a := range agents {
 			if a.ID == currentAgentID {
-				currentAgentName = a.Name
+				currentAgentName = formatAgentDisplayName(
+					a.Name, a.ProjectKey.String, a.GitBranch.String,
+				)
 				break
 			}
 		}
@@ -499,15 +520,20 @@ func (s *Server) handleSent(w http.ResponseWriter, r *http.Request) {
 	// Build agent switcher items.
 	agentSwitcherItems := make([]AgentSwitcherItem, 0, len(agents)+1)
 	agentSwitcherItems = append(agentSwitcherItems, AgentSwitcherItem{
-		ID:       0,
-		Name:     "Global",
-		IsActive: currentAgentID == 0,
+		ID:          0,
+		Name:        "Global",
+		DisplayName: "Global",
+		IsActive:    currentAgentID == 0,
 	})
 	for _, a := range agents {
+		displayName := formatAgentDisplayName(
+			a.Name, a.ProjectKey.String, a.GitBranch.String,
+		)
 		agentSwitcherItems = append(agentSwitcherItems, AgentSwitcherItem{
-			ID:       a.ID,
-			Name:     a.Name,
-			IsActive: a.ID == currentAgentID,
+			ID:          a.ID,
+			Name:        a.Name,
+			DisplayName: displayName,
+			IsActive:    a.ID == currentAgentID,
 		})
 	}
 
@@ -713,6 +739,23 @@ func getInitials(name string) string {
 		return strings.ToUpper(parts[0])
 	}
 	return strings.ToUpper(string(parts[0][0]) + string(parts[1][0]))
+}
+
+// formatAgentDisplayName creates "CodeName@repo.branch" format for at-a-glance
+// agent identification. Falls back to just the codename if project/branch are
+// not available.
+func formatAgentDisplayName(name, projectKey, branch string) string {
+	if projectKey == "" && branch == "" {
+		return name
+	}
+	repo := filepath.Base(projectKey)
+	if repo == "" || repo == "." {
+		return name // Just codename if no repo.
+	}
+	if branch == "" {
+		branch = "main"
+	}
+	return fmt.Sprintf("%s@%s.%s", name, repo, branch)
 }
 
 // handleStarredMessages returns the starred message list partial.
@@ -2174,9 +2217,15 @@ func (s *Server) getAgentsFromHeartbeat() []AgentView {
 
 	result := make([]AgentView, len(agents))
 	for i, aws := range agents {
+		displayName := formatAgentDisplayName(
+			aws.Agent.Name,
+			aws.Agent.ProjectKey.String,
+			aws.Agent.GitBranch.String,
+		)
 		result[i] = AgentView{
 			ID:             fmt.Sprintf("%d", aws.Agent.ID),
 			Name:           aws.Agent.Name,
+			DisplayName:    displayName,
 			Type:           "claude-code",
 			Status:         string(aws.Status),
 			ProjectKey:     aws.Agent.ProjectKey.String,
