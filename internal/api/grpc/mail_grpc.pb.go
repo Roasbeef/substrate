@@ -698,6 +698,7 @@ const (
 	Agent_RegisterAgent_FullMethodName  = "/subtraterpc.Agent/RegisterAgent"
 	Agent_GetAgent_FullMethodName       = "/subtraterpc.Agent/GetAgent"
 	Agent_ListAgents_FullMethodName     = "/subtraterpc.Agent/ListAgents"
+	Agent_DeleteAgent_FullMethodName    = "/subtraterpc.Agent/DeleteAgent"
 	Agent_EnsureIdentity_FullMethodName = "/subtraterpc.Agent/EnsureIdentity"
 	Agent_SaveIdentity_FullMethodName   = "/subtraterpc.Agent/SaveIdentity"
 )
@@ -714,6 +715,8 @@ type AgentClient interface {
 	GetAgent(ctx context.Context, in *GetAgentRequest, opts ...grpc.CallOption) (*GetAgentResponse, error)
 	// ListAgents lists all registered agents.
 	ListAgents(ctx context.Context, in *ListAgentsRequest, opts ...grpc.CallOption) (*ListAgentsResponse, error)
+	// DeleteAgent removes an agent by ID.
+	DeleteAgent(ctx context.Context, in *DeleteAgentRequest, opts ...grpc.CallOption) (*DeleteAgentResponse, error)
 	// EnsureIdentity creates or retrieves an agent identity for a session.
 	EnsureIdentity(ctx context.Context, in *EnsureIdentityRequest, opts ...grpc.CallOption) (*EnsureIdentityResponse, error)
 	// SaveIdentity persists an agent's current state.
@@ -758,6 +761,16 @@ func (c *agentClient) ListAgents(ctx context.Context, in *ListAgentsRequest, opt
 	return out, nil
 }
 
+func (c *agentClient) DeleteAgent(ctx context.Context, in *DeleteAgentRequest, opts ...grpc.CallOption) (*DeleteAgentResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(DeleteAgentResponse)
+	err := c.cc.Invoke(ctx, Agent_DeleteAgent_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 func (c *agentClient) EnsureIdentity(ctx context.Context, in *EnsureIdentityRequest, opts ...grpc.CallOption) (*EnsureIdentityResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(EnsureIdentityResponse)
@@ -790,6 +803,8 @@ type AgentServer interface {
 	GetAgent(context.Context, *GetAgentRequest) (*GetAgentResponse, error)
 	// ListAgents lists all registered agents.
 	ListAgents(context.Context, *ListAgentsRequest) (*ListAgentsResponse, error)
+	// DeleteAgent removes an agent by ID.
+	DeleteAgent(context.Context, *DeleteAgentRequest) (*DeleteAgentResponse, error)
 	// EnsureIdentity creates or retrieves an agent identity for a session.
 	EnsureIdentity(context.Context, *EnsureIdentityRequest) (*EnsureIdentityResponse, error)
 	// SaveIdentity persists an agent's current state.
@@ -812,6 +827,9 @@ func (UnimplementedAgentServer) GetAgent(context.Context, *GetAgentRequest) (*Ge
 }
 func (UnimplementedAgentServer) ListAgents(context.Context, *ListAgentsRequest) (*ListAgentsResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method ListAgents not implemented")
+}
+func (UnimplementedAgentServer) DeleteAgent(context.Context, *DeleteAgentRequest) (*DeleteAgentResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method DeleteAgent not implemented")
 }
 func (UnimplementedAgentServer) EnsureIdentity(context.Context, *EnsureIdentityRequest) (*EnsureIdentityResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method EnsureIdentity not implemented")
@@ -894,6 +912,24 @@ func _Agent_ListAgents_Handler(srv interface{}, ctx context.Context, dec func(in
 	return interceptor(ctx, in, info, handler)
 }
 
+func _Agent_DeleteAgent_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(DeleteAgentRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(AgentServer).DeleteAgent(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Agent_DeleteAgent_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(AgentServer).DeleteAgent(ctx, req.(*DeleteAgentRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 func _Agent_EnsureIdentity_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(EnsureIdentityRequest)
 	if err := dec(in); err != nil {
@@ -948,6 +984,10 @@ var Agent_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "ListAgents",
 			Handler:    _Agent_ListAgents_Handler,
+		},
+		{
+			MethodName: "DeleteAgent",
+			Handler:    _Agent_DeleteAgent_Handler,
 		},
 		{
 			MethodName: "EnsureIdentity",

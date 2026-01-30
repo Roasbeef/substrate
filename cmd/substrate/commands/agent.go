@@ -37,15 +37,28 @@ var agentWhoamiCmd = &cobra.Command{
 	RunE:  runAgentWhoami,
 }
 
+var agentDeleteCmd = &cobra.Command{
+	Use:   "delete [name]",
+	Short: "Delete an agent",
+	Long:  `Delete an agent by name. This also removes associated session identities.`,
+	Args:  cobra.ExactArgs(1),
+	RunE:  runAgentDelete,
+}
+
 var registerProject string
+var forceDelete bool
 
 func init() {
 	agentCmd.AddCommand(agentRegisterCmd)
 	agentCmd.AddCommand(agentListCmd)
 	agentCmd.AddCommand(agentWhoamiCmd)
+	agentCmd.AddCommand(agentDeleteCmd)
 
 	agentRegisterCmd.Flags().StringVar(&registerProject, "project", "",
 		"Project key to associate with the agent")
+
+	agentDeleteCmd.Flags().BoolVarP(&forceDelete, "force", "f", false,
+		"Skip confirmation prompt")
 }
 
 func runAgentRegister(cmd *cobra.Command, args []string) error {
@@ -158,6 +171,45 @@ func runAgentWhoami(cmd *cobra.Command, args []string) error {
 		return nil
 	default:
 		fmt.Printf("You are %s (ID: %d)\n", agentNameStr, agentID)
+	}
+
+	return nil
+}
+
+func runAgentDelete(cmd *cobra.Command, args []string) error {
+	ctx := context.Background()
+	agentNameToDelete := args[0]
+
+	// Prevent deleting the User agent.
+	if agentNameToDelete == "User" {
+		return fmt.Errorf("cannot delete the User agent")
+	}
+
+	client, err := getClient()
+	if err != nil {
+		return err
+	}
+	defer client.Close()
+
+	// Verify agent exists.
+	agentRow, err := client.GetAgentByName(ctx, agentNameToDelete)
+	if err != nil {
+		return fmt.Errorf("agent not found: %s", agentNameToDelete)
+	}
+
+	// Delete the agent.
+	if err := client.DeleteAgent(ctx, agentRow.ID); err != nil {
+		return fmt.Errorf("failed to delete agent: %w", err)
+	}
+
+	switch outputFormat {
+	case "json":
+		return outputJSON(map[string]any{
+			"deleted": agentNameToDelete,
+			"id":      agentRow.ID,
+		})
+	default:
+		fmt.Printf("Deleted agent: %s (ID: %d)\n", agentNameToDelete, agentRow.ID)
 	}
 
 	return nil

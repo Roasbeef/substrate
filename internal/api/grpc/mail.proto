@@ -65,6 +65,9 @@ service Agent {
     // ListAgents lists all registered agents.
     rpc ListAgents (ListAgentsRequest) returns (ListAgentsResponse);
 
+    // DeleteAgent removes an agent by ID.
+    rpc DeleteAgent (DeleteAgentRequest) returns (DeleteAgentResponse);
+
     // EnsureIdentity creates or retrieves an agent identity for a session.
     rpc EnsureIdentity (EnsureIdentityRequest) returns (EnsureIdentityResponse);
 
@@ -361,5 +364,15 @@ message SaveIdentityRequest {
 
 // SaveIdentityResponse is the response for SaveIdentity.
 message SaveIdentityResponse {
+    bool success = 1;
+}
+
+// DeleteAgentRequest is the request for DeleteAgent.
+message DeleteAgentRequest {
+    int64 id = 1;
+}
+
+// DeleteAgentResponse is the response for DeleteAgent.
+message DeleteAgentResponse {
     bool success = 1;
 }

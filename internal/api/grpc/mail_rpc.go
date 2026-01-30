@@ -558,6 +558,20 @@ func (s *Server) ListAgents(ctx context.Context, req *ListAgentsRequest) (*ListA
 	return resp, nil
 }
 
+// DeleteAgent removes an agent by ID.
+func (s *Server) DeleteAgent(ctx context.Context, req *DeleteAgentRequest) (*DeleteAgentResponse, error) {
+	if req.Id == 0 {
+		return nil, status.Error(codes.InvalidArgument, "agent id is required")
+	}
+
+	err := s.agentReg.DeleteAgent(ctx, req.Id)
+	if err != nil {
+		return nil, status.Errorf(codes.Internal, "failed to delete agent: %v", err)
+	}
+
+	return &DeleteAgentResponse{Success: true}, nil
+}
+
 // RegisterAgent creates a new agent with the given name.
 func (s *Server) RegisterAgent(ctx context.Context, req *RegisterAgentRequest) (*RegisterAgentResponse, error) {
 	if req.Name == "" {

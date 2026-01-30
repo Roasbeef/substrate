@@ -69,6 +69,13 @@ Target 85%+ meaningful coverage with property-based testing:
 - [ ] **Heartbeat via hooks**: Automatic heartbeat on SessionStart, UserPromptSubmit, Stop
   - Track agent liveness status (active, idle, offline)
   - Heartbeat failures trigger agent status change
+- [ ] **AskUserQuestion via Substrate replies**: Enable async question/answer flow through mail
+  - Agent sends question message with `question_type: ask` metadata
+  - Recipient (human or agent) replies via Substrate mail
+  - Reply injected back to original agent as AskUserQuestion response
+  - Enables async collaboration without blocking on immediate response
+  - Hook integration: poll for answer before stopping if pending questions
+  - Question timeout with optional escalation to other agents
 - [ ] React inbox components (for complex interactions)
 - [ ] WebSocket support for bi-directional updates
 - [ ] Improved thread view with message grouping
@@ -112,6 +119,39 @@ Benefits:
 - No separate heartbeat daemon needed (hook IS the heartbeat)
 - User can always interrupt (Ctrl+C bypasses hooks)
 - Graceful degradation when backend unavailable
+```
+
+### AskUserQuestion via Mail Pattern
+Enable agents to ask questions through Substrate mail and receive answers asynchronously:
+
+```
+AskUserQuestion Flow via Substrate:
+1. Agent A needs clarification, calls internal ask helper
+2. Helper sends mail to Agent B (or user) with metadata:
+   - question_type: "ask"
+   - options: ["Option 1", "Option 2", "Other"]
+   - question_id: unique ID for correlation
+3. Agent A continues work or enters polling state
+4. Recipient sees question in inbox, replies with answer
+5. Agent A's Stop hook (or poll loop) fetches reply
+6. Reply is correlated via question_id and injected as context
+7. Agent A resumes with the answer
+
+Benefits:
+- Questions don't block agent execution
+- Works across context compactions (question_id persists)
+- Human users can answer via web UI at their convenience
+- Other agents can answer if original recipient unavailable
+- Full audit trail of Q&A in message history
+
+Message Metadata Schema:
+{
+  "question_type": "ask",
+  "question_id": "uuid",
+  "options": ["opt1", "opt2"],  // optional predefined choices
+  "timeout_minutes": 30,         // optional escalation timeout
+  "fallback_agent": "AgentC"     // optional escalation target
+}
 ```
 
 ### NATS RPC Benefits

@@ -205,6 +205,18 @@ func (c *Client) GetAgentByName(ctx context.Context, name string) (*sqlc.Agent, 
 	return c.registry.GetAgentByName(ctx, name)
 }
 
+// DeleteAgent removes an agent by ID.
+func (c *Client) DeleteAgent(ctx context.Context, id int64) error {
+	if c.mode == ModeGRPC {
+		_, err := c.agentClient.DeleteAgent(
+			ctx, &subtraterpc.DeleteAgentRequest{Id: id},
+		)
+		return err
+	}
+
+	return c.registry.DeleteAgent(ctx, id)
+}
+
 // FetchInbox retrieves messages from an agent's inbox.
 func (c *Client) FetchInbox(ctx context.Context, req mail.FetchInboxRequest) ([]mail.InboxMessage, error) {
 	if c.mode == ModeGRPC {

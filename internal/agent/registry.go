@@ -112,6 +112,11 @@ func (r *Registry) UpdateLastActive(ctx context.Context, id int64) error {
 	)
 }
 
+// DeleteAgent removes an agent by ID.
+func (r *Registry) DeleteAgent(ctx context.Context, id int64) error {
+	return r.store.Queries().DeleteAgent(ctx, id)
+}
+
 // GenerateMemoableName generates a unique, memorable agent name.
 // Uses adjective + noun combination for easy recall.
 func GenerateMemoableName() string {
