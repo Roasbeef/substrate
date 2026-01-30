@@ -44,6 +44,7 @@ type Querier interface {
 	GetMaxLogOffset(ctx context.Context, topicID int64) (interface{}, error)
 	GetMessage(ctx context.Context, id int64) (Message, error)
 	GetMessageRecipient(ctx context.Context, arg GetMessageRecipientParams) (MessageRecipient, error)
+	GetMessageRecipients(ctx context.Context, messageID int64) ([]MessageRecipient, error)
 	GetMessagesByThread(ctx context.Context, threadID string) ([]Message, error)
 	GetMessagesByTopic(ctx context.Context, topicID int64) ([]Message, error)
 	GetMessagesSinceOffset(ctx context.Context, arg GetMessagesSinceOffsetParams) ([]Message, error)

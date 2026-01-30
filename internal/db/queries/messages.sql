@@ -44,6 +44,10 @@ VALUES (?, ?, 'unread');
 SELECT * FROM message_recipients
 WHERE message_id = ? AND agent_id = ?;
 
+-- name: GetMessageRecipients :many
+SELECT * FROM message_recipients
+WHERE message_id = ?;
+
 -- name: UpdateRecipientState :exec
 UPDATE message_recipients
 SET state = ?, read_at = CASE WHEN ? = 'read' THEN ? ELSE read_at END

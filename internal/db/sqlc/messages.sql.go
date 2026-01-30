@@ -446,6 +446,41 @@ func (q *Queries) GetMessageRecipient(ctx context.Context, arg GetMessageRecipie
 	return i, err
 }
 
+const GetMessageRecipients = `-- name: GetMessageRecipients :many
+SELECT message_id, agent_id, state, snoozed_until, read_at, acked_at FROM message_recipients
+WHERE message_id = ?
+`
+
+func (q *Queries) GetMessageRecipients(ctx context.Context, messageID int64) ([]MessageRecipient, error) {
+	rows, err := q.db.QueryContext(ctx, GetMessageRecipients, messageID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []MessageRecipient
+	for rows.Next() {
+		var i MessageRecipient
+		if err := rows.Scan(
+			&i.MessageID,
+			&i.AgentID,
+			&i.State,
+			&i.SnoozedUntil,
+			&i.ReadAt,
+			&i.AckedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const GetMessagesByThread = `-- name: GetMessagesByThread :many
 SELECT id, thread_id, topic_id, log_offset, sender_id, subject, body_md, priority, deadline_at, attachments, created_at FROM messages WHERE thread_id = ? ORDER BY created_at ASC
 `
