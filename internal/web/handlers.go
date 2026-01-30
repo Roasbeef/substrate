@@ -153,16 +153,17 @@ type ThreadView struct {
 
 // ThreadMessage represents a message within a thread view.
 type ThreadMessage struct {
-	ID           string
-	SenderName   string
-	SenderAvatar string
-	Body         string
-	State        string // "unread", "read", "starred"
-	TopicName    string
-	Deadline     time.Time
-	AckedAt      time.Time
-	CreatedAt    time.Time
-	IsStarred    bool
+	ID            string
+	SenderName    string
+	SenderAvatar  string
+	RecipientName string
+	Body          string
+	State         string // "unread", "read", "starred"
+	TopicName     string
+	Deadline      time.Time
+	AckedAt       time.Time
+	CreatedAt     time.Time
+	IsStarred     bool
 }
 
 // StatusView represents status data for the sidebar.
@@ -2244,13 +2245,25 @@ func (s *Server) renderThreadView(ctx context.Context, w http.ResponseWriter, th
 			avatar = strings.ToUpper(string(senderName[0]))
 		}
 
+		// Get recipient name(s) for this message.
+		recipientName := ""
+		recipients, err := s.store.Queries().GetMessageRecipients(ctx, m.ID)
+		if err == nil && len(recipients) > 0 {
+			// Get the first recipient's name.
+			recipient, err := s.store.Queries().GetAgent(ctx, recipients[0].AgentID)
+			if err == nil {
+				recipientName = recipient.Name
+			}
+		}
+
 		threadMessages[i] = ThreadMessage{
-			ID:           fmt.Sprintf("%d", m.ID),
-			SenderName:   senderName,
-			SenderAvatar: avatar,
-			Body:         m.BodyMd,
-			State:        "read", // TODO: Get actual state from recipient.
-			CreatedAt:    time.Unix(m.CreatedAt, 0),
+			ID:            fmt.Sprintf("%d", m.ID),
+			SenderName:    senderName,
+			SenderAvatar:  avatar,
+			RecipientName: recipientName,
+			Body:          m.BodyMd,
+			State:         "read", // TODO: Get actual state from recipient.
+			CreatedAt:     time.Unix(m.CreatedAt, 0),
 		}
 
 		// Check for deadline.
