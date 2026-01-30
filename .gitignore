@@ -1,0 +1,29 @@
+# Compiled binaries
+substrate
+substrated
+subtrate-web
+bin/
+
+# Database files
+*.db
+*.db.*.backup
+
+# Playwright screenshots
+.playwright-mcp/
+
+# Session files (local only)
+.sessions/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Test artifacts
+coverage.out
+coverage.html
