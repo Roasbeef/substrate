@@ -11,16 +11,20 @@ import (
 	"syscall"
 
 	sdkmcp "github.com/modelcontextprotocol/go-sdk/mcp"
+	"github.com/roasbeef/subtrate/internal/agent"
+	subtraterpc "github.com/roasbeef/subtrate/internal/api/grpc"
 	"github.com/roasbeef/subtrate/internal/db"
+	"github.com/roasbeef/subtrate/internal/mail"
 	"github.com/roasbeef/subtrate/internal/mcp"
 	"github.com/roasbeef/subtrate/internal/web"
 )
 
 func main() {
 	var (
-		dbPath  = flag.String("db", "~/.subtrate/subtrate.db", "Path to SQLite database")
-		webAddr = flag.String("web", ":8080", "Web server address (empty to disable)")
-		webOnly = flag.Bool("web-only", false, "Run only the web server (no MCP)")
+		dbPath   = flag.String("db", "~/.subtrate/subtrate.db", "Path to SQLite database")
+		webAddr  = flag.String("web", ":8080", "Web server address (empty to disable)")
+		grpcAddr = flag.String("grpc", "localhost:10009", "gRPC server address (empty to disable)")
+		webOnly  = flag.Bool("web-only", false, "Run web + gRPC servers only (no MCP stdio)")
 	)
 	flag.Parse()
 
@@ -49,6 +53,14 @@ func main() {
 	// Get the underlying store for services.
 	store := sqliteStore.Store
 
+	// Create core services.
+	mailSvc := mail.NewService(store)
+	agentReg := agent.NewRegistry(store)
+	identityMgr, err := agent.NewIdentityManager(store, agentReg)
+	if err != nil {
+		log.Fatalf("Failed to create identity manager: %v", err)
+	}
+
 	// Create the MCP server (unless web-only mode).
 	var mcpServer *mcp.Server
 	if !*webOnly {
@@ -67,6 +79,24 @@ func main() {
 		log.Println("Shutting down...")
 		cancel()
 	}()
+
+	// Start gRPC server if enabled.
+	var grpcServer *subtraterpc.Server
+	if *grpcAddr != "" {
+		grpcCfg := subtraterpc.DefaultServerConfig()
+		grpcCfg.ListenAddr = *grpcAddr
+
+		// Note: NotificationHub is nil for now - streaming RPCs won't work
+		// until we add the actor system.
+		grpcServer = subtraterpc.NewServer(
+			grpcCfg, store, mailSvc, agentReg, identityMgr, nil,
+		)
+		if err := grpcServer.Start(); err != nil {
+			log.Fatalf("Failed to start gRPC server: %v", err)
+		}
+		defer grpcServer.Stop()
+		log.Printf("gRPC server listening on %s", *grpcAddr)
+	}
 
 	// Start the web server if enabled.
 	if *webAddr != "" {
@@ -94,7 +124,7 @@ func main() {
 
 	// Run the MCP server on stdio transport, unless web-only mode.
 	if *webOnly {
-		log.Println("Running in web-only mode (no MCP server)")
+		log.Println("Running in web+gRPC mode (no MCP stdio)")
 		// Block until signal received.
 		<-ctx.Done()
 	} else {
