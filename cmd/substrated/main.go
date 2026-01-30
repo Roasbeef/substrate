@@ -10,6 +10,7 @@ import (
 	"os/signal"
 	"syscall"
 
+	"github.com/lightninglabs/darepo-client/baselib/actor"
 	sdkmcp "github.com/modelcontextprotocol/go-sdk/mcp"
 	"github.com/roasbeef/subtrate/internal/agent"
 	subtraterpc "github.com/roasbeef/subtrate/internal/api/grpc"
@@ -61,6 +62,18 @@ func main() {
 		log.Fatalf("Failed to create identity manager: %v", err)
 	}
 
+	// Create the actor system and notification hub for gRPC streaming.
+	actorSystem := actor.NewActorSystem()
+	defer actorSystem.Shutdown(context.Background())
+
+	notificationHub := actor.RegisterWithSystem(
+		actorSystem,
+		"notification-hub",
+		mail.NotificationHubKey,
+		mail.NewNotificationHub(),
+	)
+	log.Println("NotificationHub actor started")
+
 	// Create the MCP server (unless web-only mode).
 	var mcpServer *mcp.Server
 	if !*webOnly {
@@ -86,10 +99,10 @@ func main() {
 		grpcCfg := subtraterpc.DefaultServerConfig()
 		grpcCfg.ListenAddr = *grpcAddr
 
-		// Note: NotificationHub is nil for now - streaming RPCs won't work
-		// until we add the actor system.
+		// Pass the notification hub actor for gRPC streaming RPCs.
 		grpcServer = subtraterpc.NewServer(
-			grpcCfg, store, mailSvc, agentReg, identityMgr, nil,
+			grpcCfg, store, mailSvc, agentReg, identityMgr,
+			notificationHub,
 		)
 		if err := grpcServer.Start(); err != nil {
 			log.Fatalf("Failed to start gRPC server: %v", err)
