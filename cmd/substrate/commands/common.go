@@ -109,8 +109,12 @@ func formatMessage(msg mail.InboxMessage) string {
 
 	// Message summary.
 	sb.WriteString(fmt.Sprintf("#%d: %s\n", msg.ID, msg.Subject))
-	sb.WriteString(fmt.Sprintf("  From: Agent#%d | %s\n",
-		msg.SenderID, msg.CreatedAt.Format(time.RFC3339)))
+	senderDisplay := msg.SenderName
+	if senderDisplay == "" {
+		senderDisplay = fmt.Sprintf("Agent#%d", msg.SenderID)
+	}
+	sb.WriteString(fmt.Sprintf("  From: %s | %s\n",
+		senderDisplay, msg.CreatedAt.Format(time.RFC3339)))
 
 	if msg.Deadline != nil {
 		sb.WriteString(fmt.Sprintf("  Deadline: %s\n",
@@ -127,7 +131,11 @@ func formatMessageFull(msg *mail.InboxMessage) string {
 	sb.WriteString(fmt.Sprintf("Message #%d\n", msg.ID))
 	sb.WriteString(strings.Repeat("=", 60) + "\n")
 	sb.WriteString(fmt.Sprintf("Subject: %s\n", msg.Subject))
-	sb.WriteString(fmt.Sprintf("From: Agent#%d\n", msg.SenderID))
+	senderDisplay := msg.SenderName
+	if senderDisplay == "" {
+		senderDisplay = fmt.Sprintf("Agent#%d", msg.SenderID)
+	}
+	sb.WriteString(fmt.Sprintf("From: %s\n", senderDisplay))
 	sb.WriteString(fmt.Sprintf("Thread: %s\n", msg.ThreadID))
 	sb.WriteString(fmt.Sprintf("Priority: %s\n", msg.Priority))
 	sb.WriteString(fmt.Sprintf("State: %s\n", msg.State))
@@ -205,8 +213,12 @@ func formatContext(msgs []mail.InboxMessage) string {
 		if msg.Priority == mail.PriorityUrgent {
 			sb.WriteString("[URGENT] ")
 		}
-		sb.WriteString(fmt.Sprintf("From: Agent#%d - %q",
-			msg.SenderID, msg.Subject))
+		senderDisplay := msg.SenderName
+		if senderDisplay == "" {
+			senderDisplay = fmt.Sprintf("Agent#%d", msg.SenderID)
+		}
+		sb.WriteString(fmt.Sprintf("From: %s - %q",
+			senderDisplay, msg.Subject))
 		if msg.Deadline != nil {
 			remaining := time.Until(*msg.Deadline)
 			if remaining > 0 {

@@ -604,15 +604,16 @@ func (s *Service) handlePollChanges(ctx context.Context,
 // convertInboxRow converts a database row to InboxMessage.
 func convertInboxRow(r sqlc.GetInboxMessagesRow) InboxMessage {
 	msg := InboxMessage{
-		ID:        r.ID,
-		ThreadID:  r.ThreadID,
-		TopicID:   r.TopicID,
-		SenderID:  r.SenderID,
-		Subject:   r.Subject,
-		Body:      r.BodyMd,
-		Priority:  Priority(r.Priority),
-		State:     r.State,
-		CreatedAt: time.Unix(r.CreatedAt, 0),
+		ID:         r.ID,
+		ThreadID:   r.ThreadID,
+		TopicID:    r.TopicID,
+		SenderID:   r.SenderID,
+		SenderName: r.SenderName.String,
+		Subject:    r.Subject,
+		Body:       r.BodyMd,
+		Priority:   Priority(r.Priority),
+		State:      r.State,
+		CreatedAt:  time.Unix(r.CreatedAt, 0),
 	}
 
 	if r.DeadlineAt.Valid {
@@ -713,15 +714,16 @@ func (s *Service) handlePublish(ctx context.Context,
 // convertUnreadRow converts an unread row to InboxMessage.
 func convertUnreadRow(r sqlc.GetUnreadMessagesRow) InboxMessage {
 	msg := InboxMessage{
-		ID:        r.ID,
-		ThreadID:  r.ThreadID,
-		TopicID:   r.TopicID,
-		SenderID:  r.SenderID,
-		Subject:   r.Subject,
-		Body:      r.BodyMd,
-		Priority:  Priority(r.Priority),
-		State:     r.State,
-		CreatedAt: time.Unix(r.CreatedAt, 0),
+		ID:         r.ID,
+		ThreadID:   r.ThreadID,
+		TopicID:    r.TopicID,
+		SenderID:   r.SenderID,
+		SenderName: r.SenderName.String,
+		Subject:    r.Subject,
+		Body:       r.BodyMd,
+		Priority:   Priority(r.Priority),
+		State:      r.State,
+		CreatedAt:  time.Unix(r.CreatedAt, 0),
 	}
 
 	if r.DeadlineAt.Valid {

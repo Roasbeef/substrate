@@ -177,9 +177,10 @@ func (q *Queries) DeleteMessagesByTopicOlderThan(ctx context.Context, arg Delete
 }
 
 const GetAllInboxMessages = `-- name: GetAllInboxMessages :many
-SELECT m.id, m.thread_id, m.topic_id, m.log_offset, m.sender_id, m.subject, m.body_md, m.priority, m.deadline_at, m.attachments, m.created_at, m.deleted_by_sender, mr.state, mr.snoozed_until, mr.read_at, mr.acked_at, mr.agent_id as recipient_agent_id
+SELECT m.id, m.thread_id, m.topic_id, m.log_offset, m.sender_id, m.subject, m.body_md, m.priority, m.deadline_at, m.attachments, m.created_at, m.deleted_by_sender, mr.state, mr.snoozed_until, mr.read_at, mr.acked_at, mr.agent_id as recipient_agent_id, a.name as sender_name
 FROM messages m
 JOIN message_recipients mr ON m.id = mr.message_id
+LEFT JOIN agents a ON m.sender_id = a.id
 WHERE mr.state NOT IN ('archived', 'trash')
 ORDER BY m.created_at DESC
 LIMIT ?
@@ -203,6 +204,7 @@ type GetAllInboxMessagesRow struct {
 	ReadAt           sql.NullInt64
 	AckedAt          sql.NullInt64
 	RecipientAgentID int64
+	SenderName       sql.NullString
 }
 
 // Global inbox view: all messages across all agents, not archived or trashed.
@@ -233,6 +235,7 @@ func (q *Queries) GetAllInboxMessages(ctx context.Context, limit int64) ([]GetAl
 			&i.ReadAt,
 			&i.AckedAt,
 			&i.RecipientAgentID,
+			&i.SenderName,
 		); err != nil {
 			return nil, err
 		}
@@ -385,9 +388,10 @@ func (q *Queries) GetArchivedMessages(ctx context.Context, arg GetArchivedMessag
 }
 
 const GetInboxMessages = `-- name: GetInboxMessages :many
-SELECT m.id, m.thread_id, m.topic_id, m.log_offset, m.sender_id, m.subject, m.body_md, m.priority, m.deadline_at, m.attachments, m.created_at, m.deleted_by_sender, mr.state, mr.snoozed_until, mr.read_at, mr.acked_at
+SELECT m.id, m.thread_id, m.topic_id, m.log_offset, m.sender_id, m.subject, m.body_md, m.priority, m.deadline_at, m.attachments, m.created_at, m.deleted_by_sender, mr.state, mr.snoozed_until, mr.read_at, mr.acked_at, a.name as sender_name
 FROM messages m
 JOIN message_recipients mr ON m.id = mr.message_id
+LEFT JOIN agents a ON m.sender_id = a.id
 WHERE mr.agent_id = ?
     AND mr.state NOT IN ('archived', 'trash')
 ORDER BY m.created_at DESC
@@ -416,6 +420,7 @@ type GetInboxMessagesRow struct {
 	SnoozedUntil    sql.NullInt64
 	ReadAt          sql.NullInt64
 	AckedAt         sql.NullInt64
+	SenderName      sql.NullString
 }
 
 func (q *Queries) GetInboxMessages(ctx context.Context, arg GetInboxMessagesParams) ([]GetInboxMessagesRow, error) {
@@ -444,6 +449,7 @@ func (q *Queries) GetInboxMessages(ctx context.Context, arg GetInboxMessagesPara
 			&i.SnoozedUntil,
 			&i.ReadAt,
 			&i.AckedAt,
+			&i.SenderName,
 		); err != nil {
 			return nil, err
 		}
@@ -1014,9 +1020,10 @@ func (q *Queries) GetTrashMessages(ctx context.Context, arg GetTrashMessagesPara
 }
 
 const GetUnreadMessages = `-- name: GetUnreadMessages :many
-SELECT m.id, m.thread_id, m.topic_id, m.log_offset, m.sender_id, m.subject, m.body_md, m.priority, m.deadline_at, m.attachments, m.created_at, m.deleted_by_sender, mr.state, mr.snoozed_until, mr.read_at, mr.acked_at
+SELECT m.id, m.thread_id, m.topic_id, m.log_offset, m.sender_id, m.subject, m.body_md, m.priority, m.deadline_at, m.attachments, m.created_at, m.deleted_by_sender, mr.state, mr.snoozed_until, mr.read_at, mr.acked_at, a.name as sender_name
 FROM messages m
 JOIN message_recipients mr ON m.id = mr.message_id
+LEFT JOIN agents a ON m.sender_id = a.id
 WHERE mr.agent_id = ?
     AND mr.state = 'unread'
 ORDER BY m.created_at DESC
@@ -1045,6 +1052,7 @@ type GetUnreadMessagesRow struct {
 	SnoozedUntil    sql.NullInt64
 	ReadAt          sql.NullInt64
 	AckedAt         sql.NullInt64
+	SenderName      sql.NullString
 }
 
 func (q *Queries) GetUnreadMessages(ctx context.Context, arg GetUnreadMessagesParams) ([]GetUnreadMessagesRow, error) {
@@ -1073,6 +1081,7 @@ func (q *Queries) GetUnreadMessages(ctx context.Context, arg GetUnreadMessagesPa
 			&i.SnoozedUntil,
 			&i.ReadAt,
 			&i.AckedAt,
+			&i.SenderName,
 		); err != nil {
 			return nil, err
 		}

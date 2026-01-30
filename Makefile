@@ -170,6 +170,7 @@ stop:
 	@echo "Stopping web server on port $(WEB_PORT)..."
 	@-lsof -ti :$(WEB_PORT) | xargs kill 2>/dev/null || true
 	@sleep 1
+	@-lsof -ti :$(WEB_PORT) | xargs kill -9 2>/dev/null || true
 	@echo "Server stopped."
 
 # Restart web server (stop, rebuild, start).

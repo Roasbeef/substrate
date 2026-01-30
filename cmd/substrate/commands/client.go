@@ -879,15 +879,16 @@ func convertProtoMessagesToMail(msgs []*subtraterpc.InboxMessage) []mail.InboxMe
 
 func convertProtoMessageToMail(m *subtraterpc.InboxMessage) mail.InboxMessage {
 	msg := mail.InboxMessage{
-		ID:        m.Id,
-		ThreadID:  m.ThreadId,
-		TopicID:   m.TopicId,
-		SenderID:  m.SenderId,
-		Subject:   m.Subject,
-		Body:      m.Body,
-		Priority:  convertProtoToPriority(m.Priority),
-		State:     convertProtoToState(m.State),
-		CreatedAt: time.Unix(m.CreatedAt, 0),
+		ID:         m.Id,
+		ThreadID:   m.ThreadId,
+		TopicID:    m.TopicId,
+		SenderID:   m.SenderId,
+		SenderName: m.SenderName,
+		Subject:    m.Subject,
+		Body:       m.Body,
+		Priority:   convertProtoToPriority(m.Priority),
+		State:      convertProtoToState(m.State),
+		CreatedAt:  time.Unix(m.CreatedAt, 0),
 	}
 
 	if m.DeadlineAt > 0 {

@@ -251,7 +251,11 @@ func formatHookReason(msgs []mail.InboxMessage, urgentCount int) string {
 		if msg.Priority == mail.PriorityUrgent {
 			sb.WriteString("[URGENT] ")
 		}
-		sb.WriteString(fmt.Sprintf("From: Agent#%d - %q", msg.SenderID, msg.Subject))
+		senderDisplay := msg.SenderName
+		if senderDisplay == "" {
+			senderDisplay = fmt.Sprintf("Agent#%d", msg.SenderID)
+		}
+		sb.WriteString(fmt.Sprintf("From: %s - %q", senderDisplay, msg.Subject))
 		if msg.Deadline != nil {
 			remaining := time.Until(*msg.Deadline)
 			if remaining > 0 {

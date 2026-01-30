@@ -2354,7 +2354,7 @@ func (s *Server) handleThreadReply(
 	}
 
 	// Create the reply message.
-	_, err = s.store.Queries().CreateMessage(ctx, sqlc.CreateMessageParams{
+	replyMsg, err := s.store.Queries().CreateMessage(ctx, sqlc.CreateMessageParams{
 		ThreadID:  threadID,
 		TopicID:   firstMsg.TopicID,
 		LogOffset: nextOffset,
@@ -2367,6 +2367,33 @@ func (s *Server) handleThreadReply(
 	if err != nil {
 		http.Error(w, "Failed to send reply: "+err.Error(), http.StatusInternalServerError)
 		return
+	}
+
+	// Find all unique participants in the thread and deliver the reply to them.
+	participantIDs := make(map[int64]bool)
+	for _, msg := range messages {
+		if msg.SenderID != senderID {
+			participantIDs[msg.SenderID] = true
+		}
+	}
+	// Also check message_recipients for any recipients of previous messages.
+	for _, msg := range messages {
+		recipients, err := s.store.Queries().GetMessageRecipients(ctx, msg.ID)
+		if err == nil {
+			for _, r := range recipients {
+				if r.AgentID != senderID {
+					participantIDs[r.AgentID] = true
+				}
+			}
+		}
+	}
+
+	// Create recipient entries for all participants except the sender.
+	for participantID := range participantIDs {
+		_ = s.store.Queries().CreateMessageRecipient(ctx, sqlc.CreateMessageRecipientParams{
+			MessageID: replyMsg.ID,
+			AgentID:   participantID,
+		})
 	}
 
 	// Re-render the thread view with the new message included.

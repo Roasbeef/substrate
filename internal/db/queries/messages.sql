@@ -64,9 +64,10 @@ SET state = 'snoozed', snoozed_until = ?
 WHERE message_id = ? AND agent_id = ?;
 
 -- name: GetInboxMessages :many
-SELECT m.*, mr.state, mr.snoozed_until, mr.read_at, mr.acked_at
+SELECT m.*, mr.state, mr.snoozed_until, mr.read_at, mr.acked_at, a.name as sender_name
 FROM messages m
 JOIN message_recipients mr ON m.id = mr.message_id
+LEFT JOIN agents a ON m.sender_id = a.id
 WHERE mr.agent_id = ?
     AND mr.state NOT IN ('archived', 'trash')
 ORDER BY m.created_at DESC
@@ -74,17 +75,19 @@ LIMIT ?;
 
 -- name: GetAllInboxMessages :many
 -- Global inbox view: all messages across all agents, not archived or trashed.
-SELECT m.*, mr.state, mr.snoozed_until, mr.read_at, mr.acked_at, mr.agent_id as recipient_agent_id
+SELECT m.*, mr.state, mr.snoozed_until, mr.read_at, mr.acked_at, mr.agent_id as recipient_agent_id, a.name as sender_name
 FROM messages m
 JOIN message_recipients mr ON m.id = mr.message_id
+LEFT JOIN agents a ON m.sender_id = a.id
 WHERE mr.state NOT IN ('archived', 'trash')
 ORDER BY m.created_at DESC
 LIMIT ?;
 
 -- name: GetUnreadMessages :many
-SELECT m.*, mr.state, mr.snoozed_until, mr.read_at, mr.acked_at
+SELECT m.*, mr.state, mr.snoozed_until, mr.read_at, mr.acked_at, a.name as sender_name
 FROM messages m
 JOIN message_recipients mr ON m.id = mr.message_id
+LEFT JOIN agents a ON m.sender_id = a.id
 WHERE mr.agent_id = ?
     AND mr.state = 'unread'
 ORDER BY m.created_at DESC
