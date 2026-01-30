@@ -589,3 +589,50 @@ function setAgentFilter(button, filter) {
         grid.setAttribute('hx-get', '/api/agents/cards?filter=' + filter);
     }
 }
+
+// =============================================================================
+// Agent Switcher Dropdown
+// =============================================================================
+
+// Toggle the agent switcher dropdown visibility.
+function toggleAgentSwitcher() {
+    const dropdown = document.getElementById('agent-switcher-dropdown');
+    if (!dropdown) return;
+
+    dropdown.classList.toggle('hidden');
+
+    // Close on outside click.
+    if (!dropdown.classList.contains('hidden')) {
+        setTimeout(() => {
+            document.addEventListener('click', closeAgentSwitcherOnOutsideClick);
+        }, 0);
+    }
+}
+
+// Close the agent switcher dropdown.
+function closeAgentSwitcher() {
+    const dropdown = document.getElementById('agent-switcher-dropdown');
+    if (dropdown) {
+        dropdown.classList.add('hidden');
+    }
+    document.removeEventListener('click', closeAgentSwitcherOnOutsideClick);
+}
+
+// Close dropdown when clicking outside.
+function closeAgentSwitcherOnOutsideClick(event) {
+    const button = document.getElementById('agent-switcher-button');
+    const dropdown = document.getElementById('agent-switcher-dropdown');
+    if (!button || !dropdown) return;
+
+    if (!button.contains(event.target) && !dropdown.contains(event.target)) {
+        closeAgentSwitcher();
+    }
+}
+
+// Update the displayed agent name in the header when switching agents.
+function switchToAgent(agentName) {
+    const nameSpan = document.getElementById('current-agent-name');
+    if (nameSpan) {
+        nameSpan.textContent = agentName;
+    }
+}

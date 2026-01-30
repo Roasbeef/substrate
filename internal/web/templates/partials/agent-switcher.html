@@ -60,40 +60,4 @@
         {{end}}
     </div>
 </div>
-
-<script>
-function toggleAgentSwitcher() {
-    const dropdown = document.getElementById('agent-switcher-dropdown');
-    dropdown.classList.toggle('hidden');
-
-    // Close on outside click.
-    if (!dropdown.classList.contains('hidden')) {
-        setTimeout(() => {
-            document.addEventListener('click', closeAgentSwitcherOnOutsideClick);
-        }, 0);
-    }
-}
-
-function closeAgentSwitcher() {
-    const dropdown = document.getElementById('agent-switcher-dropdown');
-    dropdown.classList.add('hidden');
-    document.removeEventListener('click', closeAgentSwitcherOnOutsideClick);
-}
-
-function closeAgentSwitcherOnOutsideClick(event) {
-    const button = document.getElementById('agent-switcher-button');
-    const dropdown = document.getElementById('agent-switcher-dropdown');
-    if (!button.contains(event.target) && !dropdown.contains(event.target)) {
-        closeAgentSwitcher();
-    }
-}
-
-function switchToAgent(agentName) {
-    // Update the displayed agent name in the header.
-    const nameSpan = document.getElementById('current-agent-name');
-    if (nameSpan) {
-        nameSpan.textContent = agentName;
-    }
-}
-</script>
 {{end}}
