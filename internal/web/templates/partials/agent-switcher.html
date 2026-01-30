@@ -29,7 +29,7 @@
            hx-swap="innerHTML"
            hx-select="#main-content > *"
            hx-push-url="true"
-           onclick="closeAgentSwitcher()"
+           onclick="switchToAgent('{{.Name}}'); closeAgentSwitcher()"
            class="flex items-center gap-3 px-4 py-2 text-sm hover:bg-gray-50 {{if .IsActive}}bg-blue-50 text-blue-700 font-medium{{else}}text-gray-700{{end}}">
             {{if eq .ID 0}}
             <!-- Globe icon for Global -->
@@ -85,6 +85,14 @@ function closeAgentSwitcherOnOutsideClick(event) {
     const dropdown = document.getElementById('agent-switcher-dropdown');
     if (!button.contains(event.target) && !dropdown.contains(event.target)) {
         closeAgentSwitcher();
+    }
+}
+
+function switchToAgent(agentName) {
+    // Update the displayed agent name in the header.
+    const nameSpan = document.getElementById('current-agent-name');
+    if (nameSpan) {
+        nameSpan.textContent = agentName;
     }
 }
 </script>
