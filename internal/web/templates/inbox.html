@@ -502,7 +502,7 @@
 
         <!-- Message List - SSE triggers refresh, morph prevents flicker -->
         <div id="message-list"
-             hx-get="{{if .MessagesEndpoint}}{{.MessagesEndpoint}}{{else}}/inbox/messages{{end}}{{if .Category}}?category={{.Category}}{{end}}"
+             hx-get="{{if .MessagesEndpoint}}{{.MessagesEndpoint}}{{else}}/inbox/messages{{end}}"
              hx-trigger="load, refresh"
              hx-swap="morph:innerHTML">
             <div class="p-8 text-center text-gray-500">
