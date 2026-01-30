@@ -1,0 +1,258 @@
+package hooks
+
+import (
+	"encoding/json"
+	"fmt"
+	"os"
+	"path/filepath"
+	"slices"
+	"strings"
+)
+
+// ClaudeSettings represents the structure of ~/.claude/settings.json.
+type ClaudeSettings struct {
+	Hooks   map[string][]HookEntry `json:"hooks,omitempty"`
+	Other   map[string]any         `json:"-"` // Preserve other settings
+	rawData map[string]any         // Keep original data for merge
+}
+
+// HookEntry represents a hook configuration in settings.json.
+type HookEntry struct {
+	Matcher string          `json:"matcher"`
+	Hooks   []HookCommand   `json:"hooks"`
+}
+
+// HookCommand represents a single hook command.
+type HookCommand struct {
+	Type    string `json:"type"`
+	Command string `json:"command"`
+}
+
+// substrateHookID is used to identify Subtrate hooks in settings.json.
+const substrateHookID = "substrate"
+
+// HookDefinitions defines all Subtrate hooks to install.
+var HookDefinitions = map[string]HookEntry{
+	"SessionStart": {
+		Matcher: "",
+		Hooks: []HookCommand{{
+			Type:    "command",
+			Command: "~/.claude/hooks/substrate/session_start.sh",
+		}},
+	},
+	"UserPromptSubmit": {
+		Matcher: "",
+		Hooks: []HookCommand{{
+			Type:    "command",
+			Command: "~/.claude/hooks/substrate/user_prompt.sh",
+		}},
+	},
+	"Stop": {
+		Matcher: "",
+		Hooks: []HookCommand{{
+			Type:    "command",
+			Command: "~/.claude/hooks/substrate/stop.sh",
+		}},
+	},
+	"SubagentStop": {
+		Matcher: "",
+		Hooks: []HookCommand{{
+			Type:    "command",
+			Command: "~/.claude/hooks/substrate/subagent_stop.sh",
+		}},
+	},
+	"PreCompact": {
+		Matcher: "",
+		Hooks: []HookCommand{{
+			Type:    "command",
+			Command: "~/.claude/hooks/substrate/pre_compact.sh",
+		}},
+	},
+}
+
+// LoadSettings loads the Claude settings file.
+func LoadSettings(claudeDir string) (*ClaudeSettings, error) {
+	settingsPath := filepath.Join(claudeDir, "settings.json")
+
+	settings := &ClaudeSettings{
+		Hooks:   make(map[string][]HookEntry),
+		rawData: make(map[string]any),
+	}
+
+	data, err := os.ReadFile(settingsPath)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return settings, nil
+		}
+		return nil, fmt.Errorf("failed to read settings: %w", err)
+	}
+
+	if err := json.Unmarshal(data, &settings.rawData); err != nil {
+		return nil, fmt.Errorf("failed to parse settings: %w", err)
+	}
+
+	// Parse hooks section if present.
+	if hooksRaw, ok := settings.rawData["hooks"].(map[string]any); ok {
+		for event, entries := range hooksRaw {
+			// Each event can have an array of hook entries.
+			entriesArr, ok := entries.([]any)
+			if !ok {
+				continue
+			}
+
+			var hookEntries []HookEntry
+			for _, entryRaw := range entriesArr {
+				entryMap, ok := entryRaw.(map[string]any)
+				if !ok {
+					continue
+				}
+
+				entry := HookEntry{
+					Matcher: getStringField(entryMap, "matcher"),
+				}
+
+				// Parse hooks array within entry.
+				if hooksArr, ok := entryMap["hooks"].([]any); ok {
+					for _, hookRaw := range hooksArr {
+						hookMap, ok := hookRaw.(map[string]any)
+						if !ok {
+							continue
+						}
+						entry.Hooks = append(entry.Hooks, HookCommand{
+							Type:    getStringField(hookMap, "type"),
+							Command: getStringField(hookMap, "command"),
+						})
+					}
+				}
+
+				hookEntries = append(hookEntries, entry)
+			}
+			settings.Hooks[event] = hookEntries
+		}
+	}
+
+	return settings, nil
+}
+
+// SaveSettings saves the Claude settings file.
+func SaveSettings(claudeDir string, settings *ClaudeSettings) error {
+	settingsPath := filepath.Join(claudeDir, "settings.json")
+
+	// Merge hooks back into raw data.
+	if settings.rawData == nil {
+		settings.rawData = make(map[string]any)
+	}
+
+	// Convert hooks to raw format.
+	hooksRaw := make(map[string]any)
+	for event, entries := range settings.Hooks {
+		entriesRaw := make([]any, 0, len(entries))
+		for _, entry := range entries {
+			entryMap := map[string]any{
+				"matcher": entry.Matcher,
+			}
+
+			hooksArr := make([]any, 0, len(entry.Hooks))
+			for _, hook := range entry.Hooks {
+				hooksArr = append(hooksArr, map[string]any{
+					"type":    hook.Type,
+					"command": hook.Command,
+				})
+			}
+			entryMap["hooks"] = hooksArr
+
+			entriesRaw = append(entriesRaw, entryMap)
+		}
+		hooksRaw[event] = entriesRaw
+	}
+	settings.rawData["hooks"] = hooksRaw
+
+	data, err := json.MarshalIndent(settings.rawData, "", "  ")
+	if err != nil {
+		return fmt.Errorf("failed to marshal settings: %w", err)
+	}
+
+	// Ensure directory exists.
+	if err := os.MkdirAll(claudeDir, 0755); err != nil {
+		return fmt.Errorf("failed to create directory: %w", err)
+	}
+
+	if err := os.WriteFile(settingsPath, data, 0644); err != nil {
+		return fmt.Errorf("failed to write settings: %w", err)
+	}
+
+	return nil
+}
+
+// InstallHooks adds Subtrate hooks to the settings.
+// This appends to existing hooks rather than replacing them.
+func InstallHooks(settings *ClaudeSettings) {
+	for event, hookDef := range HookDefinitions {
+		// Check if we already have a Subtrate hook for this event.
+		entries := settings.Hooks[event]
+		alreadyInstalled := slices.ContainsFunc(entries, isSubstrateHook)
+
+		if !alreadyInstalled {
+			settings.Hooks[event] = append(entries, hookDef)
+		}
+	}
+}
+
+// UninstallHooks removes Subtrate hooks from the settings.
+func UninstallHooks(settings *ClaudeSettings) {
+	for event, entries := range settings.Hooks {
+		filtered := make([]HookEntry, 0, len(entries))
+		for _, entry := range entries {
+			if !isSubstrateHook(entry) {
+				filtered = append(filtered, entry)
+			}
+		}
+		if len(filtered) > 0 {
+			settings.Hooks[event] = filtered
+		} else {
+			delete(settings.Hooks, event)
+		}
+	}
+}
+
+// IsInstalled checks if Subtrate hooks are installed.
+func IsInstalled(settings *ClaudeSettings) bool {
+	// Check if at least the SessionStart hook is present.
+	entries, ok := settings.Hooks["SessionStart"]
+	if !ok {
+		return false
+	}
+
+	return slices.ContainsFunc(entries, isSubstrateHook)
+}
+
+// GetInstalledHookEvents returns which events have Subtrate hooks installed.
+func GetInstalledHookEvents(settings *ClaudeSettings) []string {
+	var events []string
+	for event, entries := range settings.Hooks {
+		if slices.ContainsFunc(entries, isSubstrateHook) {
+			events = append(events, event)
+		}
+	}
+	return events
+}
+
+// isSubstrateHook checks if a hook entry is a Subtrate hook.
+func isSubstrateHook(entry HookEntry) bool {
+	for _, hook := range entry.Hooks {
+		// Check if the command references our hook scripts.
+		if strings.Contains(hook.Command, "hooks/substrate/") ||
+			strings.Contains(hook.Command, substrateHookID) {
+			return true
+		}
+	}
+	return false
+}
+
+// getStringField safely gets a string field from a map.
+func getStringField(m map[string]any, key string) string {
+	if v, ok := m[key].(string); ok {
+		return v
+	}
+	return ""
+}
