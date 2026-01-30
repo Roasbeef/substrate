@@ -410,49 +410,66 @@ substrate heartbeat --format context
 - `POST /api/heartbeat` - Record agent heartbeat (JSON body: `{"agent_name": "..."}`)
 - `GET /api/agents/status` - Get status of all agents
 
-## Claude Code Hooks Configuration
+## Claude Code Hooks Integration
 
-Configure hooks in `~/.claude/settings.json` to integrate Subtrate with Claude Code sessions.
+Subtrate provides deep integration with Claude Code through hooks. Run `substrate hooks install` to set up automatic integration.
 
-### Recommended Hooks
-```json
-{
-  "hooks": {
-    "SessionStart": [
-      {
-        "matcher": "",
-        "hooks": [{
-          "type": "command",
-          "command": "substrate heartbeat --session-start --format context && substrate poll --format context --quiet"
-        }]
-      }
-    ],
-    "UserPromptSubmit": [{
-      "matcher": "",
-      "hooks": [{
-        "type": "command",
-        "command": "substrate poll --format context --quiet"
-      }]
-    }],
-    "Stop": [{
-      "hooks": [{
-        "type": "command",
-        "command": "substrate status --format context"
-      }]
-    }]
-  }
-}
+### Installation
+
+```bash
+# Install all hooks and the substrate skill
+substrate hooks install
+
+# Check installation status
+substrate hooks status
+
+# Remove hooks
+substrate hooks uninstall
 ```
 
+This installs:
+- Hook scripts to `~/.claude/hooks/substrate/`
+- Hook configuration in `~/.claude/settings.json`
+- Substrate skill to `~/.claude/skills/substrate/`
+
 ### Hook Behavior
-- **SessionStart**: Sends heartbeat + checks for new mail at session start
-- **UserPromptSubmit**: Quietly checks for new mail on each user message
-- **Stop**: Shows status summary before ending session
+
+| Hook | Trigger | Behavior |
+|------|---------|----------|
+| **SessionStart** | Session begins | Heartbeat + check inbox, inject unread messages as context |
+| **UserPromptSubmit** | User sends message | Silent heartbeat + check for new mail |
+| **Stop** | Main agent stopping | **Persistent agent pattern** - long-poll for 55s, always block to keep agent alive |
+| **SubagentStop** | Subagent stopping | One-shot check - block if messages, then allow exit |
+| **PreCompact** | Before compaction | Save identity state for restoration after compaction |
+
+### Persistent Agent Pattern
+
+The Stop hook implements a "keep alive" pattern that keeps main agents running indefinitely:
+
+1. When the agent tries to stop, the Stop hook runs
+2. It long-polls for 55s (under 60s timeout) checking for new mail
+3. If mail arrives, it blocks exit and shows the messages to Claude
+4. If no mail, it **still blocks** to keep the agent alive (heartbeat mode)
+5. User can force exit with **Ctrl+C** (bypasses all hooks)
+
+This means agents registered with Subtrate stay available continuously, waiting for work.
 
 ### Output Formats
 - `--format text` (default): Human-readable output
 - `--format json`: Machine-readable JSON
-- `--format context`: Minimal output for hook injection
+- `--format context`: Minimal output for hook context injection
+- `--format hook`: JSON for Stop/SubagentStop hook decisions
+
+### Using the Substrate Skill
+
+After installation, agents can use the `/substrate` skill for mail commands:
+
+```bash
+substrate inbox              # Check messages
+substrate status             # Show agent status
+substrate identity current   # Show your identity
+substrate send --to Agent --subject "Hi" --body "..."
+```
 
 ## JavaScript Tooling
 
