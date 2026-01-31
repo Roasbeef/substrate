@@ -577,7 +577,19 @@ func TestService_PollChanges(t *testing.T) {
 	require.Contains(t, pollResp.NewOffsets, topic.ID)
 	require.Equal(t, int64(3), pollResp.NewOffsets[topic.ID])
 
-	// Poll again from the last offset - should get no new messages.
+	// Mark all messages as read so they don't appear in next poll.
+	for _, msg := range pollResp.NewMessages {
+		readResult := svc.Receive(ctx, ReadMessageRequest{
+			AgentID:   recipient.ID,
+			MessageID: msg.ID,
+		})
+		readVal, err := readResult.Unpack()
+		require.NoError(t, err)
+		require.NoError(t, readVal.(ReadMessageResponse).Error)
+	}
+
+	// Poll again from the last offset - should get no new messages since
+	// all were read.
 	pollReq2 := PollChangesRequest{
 		AgentID:      recipient.ID,
 		SinceOffsets: pollResp.NewOffsets,

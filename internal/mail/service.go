@@ -487,12 +487,17 @@ func (s *Service) handleGetStatus(ctx context.Context,
 }
 
 // handlePollChanges processes a PollChangesRequest. It checks both direct
-// inbox messages (unread) and subscribed topic messages.
+// inbox messages (unread) and subscribed topic messages since the given
+// offsets. Messages are deduplicated by ID.
 func (s *Service) handlePollChanges(ctx context.Context,
 	req PollChangesRequest) PollChangesResponse {
 
 	var response PollChangesResponse
 	response.NewOffsets = make(map[int64]int64)
+
+	// Track seen message IDs to avoid duplicates (a message can appear
+	// in both inbox and topic subscription).
+	seenMsgIDs := make(map[int64]bool)
 
 	// First, check for unread direct messages in the agent's inbox.
 	unreadMsgs, err := s.store.Queries().GetUnreadMessages(
@@ -509,6 +514,8 @@ func (s *Service) handlePollChanges(ctx context.Context,
 
 	// Add unread direct messages to response.
 	for _, msg := range unreadMsgs {
+		seenMsgIDs[msg.ID] = true
+
 		inboxMsg := InboxMessage{
 			ID:        msg.ID,
 			ThreadID:  msg.ThreadID,
@@ -544,7 +551,7 @@ func (s *Service) handlePollChanges(ctx context.Context,
 		response.NewMessages = append(response.NewMessages, inboxMsg)
 	}
 
-	// Then check subscribed topics for new messages.
+	// Then check subscribed topics for new messages since the given offsets.
 	topics, err := s.store.Queries().ListSubscriptionsByAgent(
 		ctx, req.AgentID,
 	)
@@ -572,6 +579,17 @@ func (s *Service) handlePollChanges(ctx context.Context,
 		}
 
 		for _, msg := range msgs {
+			// Track offset even if message was already seen.
+			if msg.LogOffset > response.NewOffsets[topic.ID] {
+				response.NewOffsets[topic.ID] = msg.LogOffset
+			}
+
+			// Skip if already added from inbox.
+			if seenMsgIDs[msg.ID] {
+				continue
+			}
+			seenMsgIDs[msg.ID] = true
+
 			inboxMsg := InboxMessage{
 				ID:        msg.ID,
 				ThreadID:  msg.ThreadID,
@@ -591,10 +609,6 @@ func (s *Service) handlePollChanges(ctx context.Context,
 			response.NewMessages = append(
 				response.NewMessages, inboxMsg,
 			)
-
-			if msg.LogOffset > response.NewOffsets[topic.ID] {
-				response.NewOffsets[topic.ID] = msg.LogOffset
-			}
 		}
 	}
 

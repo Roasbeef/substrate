@@ -382,7 +382,18 @@ func TestE2E_PollChanges(t *testing.T) {
 
 	t.Logf("Poll returned %d messages, last offset: %d", len(pollResp.NewMessages), lastOffset)
 
-	// Poll with last offset - should get no new messages.
+	// Mark all messages as read so they don't appear in next poll.
+	for _, msg := range pollResp.NewMessages {
+		readResult := env.mailSvc.Receive(ctx, mail.ReadMessageRequest{
+			AgentID:   receiver.ID,
+			MessageID: msg.ID,
+		})
+		readVal, err := readResult.Unpack()
+		require.NoError(t, err)
+		require.NoError(t, readVal.(mail.ReadMessageResponse).Error)
+	}
+
+	// Poll with last offset - should get no new messages since all were read.
 	pollReq = mail.PollChangesRequest{
 		AgentID:      receiver.ID,
 		SinceOffsets: pollResp.NewOffsets,
