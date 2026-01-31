@@ -4,10 +4,14 @@
 // Browser Desktop Notifications
 // =============================================================================
 
-// Notification state.
-let notificationsEnabled = false;
-let lastNotificationTime = 0;
-const NOTIFICATION_COOLDOWN = 5000; // 5 seconds between notifications.
+// Notification state - use var to allow re-declaration if script loads twice.
+// Guard against re-initialization to preserve state across HTMX navigations.
+if (typeof window.substrateInitialized === 'undefined') {
+    window.substrateInitialized = true;
+    var notificationsEnabled = false;
+    var lastNotificationTime = 0;
+    var NOTIFICATION_COOLDOWN = 5000; // 5 seconds between notifications.
+}
 
 // Request notification permission on page load.
 function initNotifications() {
@@ -134,7 +138,17 @@ function showBrowserNotification(title, body, type = 'message', data = {}) {
 }
 
 // Track known message IDs to prevent duplicate refreshes.
-let knownMessageIds = new Set();
+// Use var to allow re-declaration if script loads twice.
+if (typeof knownMessageIds === 'undefined') {
+    var knownMessageIds = new Set();
+}
+
+// Track message IDs we've already sent notifications for (separate from DOM).
+// This prevents the race condition where message is added to DOM before the
+// new-message SSE event arrives, causing us to skip the detailed notification.
+if (typeof notifiedMessageIds === 'undefined') {
+    var notifiedMessageIds = new Set();
+}
 
 // Initialize known message IDs from the current DOM.
 function initKnownMessageIds() {
@@ -147,9 +161,14 @@ function initKnownMessageIds() {
 }
 
 // Track SSE connection state.
-let sseConnected = false;
-let sseReconnectCount = 0;
-let lastUnreadCount = -1;
+// Use var to allow re-declaration if script loads twice.
+if (typeof sseConnected === 'undefined') {
+    var sseConnected = false;
+    var sseReconnectCount = 0;
+    var lastUnreadCount = -1;
+    var lastNewMessageEventTime = 0;  // Track when we last handled new-message event.
+    var notificationEventSource = null;  // Vanilla EventSource for notifications.
+}
 
 // Listen for SSE events and show notifications.
 function setupSSENotifications() {
@@ -190,12 +209,17 @@ function setupSSENotifications() {
         sseConnected = false;
     });
 
-    // Listen for HTMX SSE messages (htmx:sseMessage is dispatched for all SSE events).
-    document.body.addEventListener('htmx:sseMessage', function(evt) {
+    // Set up a vanilla EventSource for notification events.
+    // HTMX SSE extension doesn't dispatch htmx:sseMessage for all events,
+    // so we use a separate EventSource to reliably receive new-message events.
+    setupNotificationEventSource();
+
+    // Listen for HTMX SSE messages for unread-count (htmx:sseBeforeMessage).
+    document.body.addEventListener('htmx:sseBeforeMessage', function(evt) {
         const eventType = evt.detail.type;
         const rawData = evt.detail.data;
 
-        // Debug logging disabled - uncomment for debugging SSE events:
+        // Debug logging.
         console.log('SSE event received:', eventType, 'data:', rawData, 'notificationsEnabled:', notificationsEnabled);
 
         // If unread count increased, trigger a refresh (fallback for missed new-message events).
@@ -211,14 +235,22 @@ function setupSSENotifications() {
                     htmx.trigger(messageList, 'refresh');
                 }
 
-                // Show browser notification for new messages.
-                const newMsgCount = newCount - lastUnreadCount;
-                showBrowserNotification(
-                    'New Message' + (newMsgCount > 1 ? 's' : ''),
-                    newMsgCount + ' new message' + (newMsgCount > 1 ? 's' : '') + ' in your inbox',
-                    'message',
-                    { id: 'unread-' + newCount, url: '/inbox' }
-                );
+                // Only show fallback notification if we haven't recently handled a new-message event.
+                // The new-message event provides detailed sender/subject info, so we prefer that.
+                // 500ms window accounts for SSE events arriving in same tick.
+                const timeSinceNewMessage = Date.now() - lastNewMessageEventTime;
+                if (timeSinceNewMessage > 500) {
+                    // Show generic browser notification for new messages (fallback).
+                    const newMsgCount = newCount - lastUnreadCount;
+                    showBrowserNotification(
+                        'New Message' + (newMsgCount > 1 ? 's' : ''),
+                        newMsgCount + ' new message' + (newMsgCount > 1 ? 's' : '') + ' in your inbox',
+                        'message',
+                        { id: 'unread-' + newCount, url: '/inbox' }
+                    );
+                } else {
+                    console.log('Skipping unread-count notification (new-message event handled', timeSinceNewMessage, 'ms ago)');
+                }
             }
             if (!isNaN(newCount)) {
                 lastUnreadCount = newCount;
@@ -227,6 +259,9 @@ function setupSSENotifications() {
 
         // Handle new-message events (JSON array of new messages).
         if (eventType === 'new-message') {
+            // Mark that we're handling a new-message event (used to skip unread-count fallback).
+            lastNewMessageEventTime = Date.now();
+
             try {
                 const messages = JSON.parse(rawData);
                 if (!Array.isArray(messages) || messages.length === 0) {
@@ -236,24 +271,35 @@ function setupSSENotifications() {
                 // Check for genuinely new messages (not already in DOM).
                 const newMessages = messages.filter(msg => !knownMessageIds.has(msg.id));
 
-                if (newMessages.length === 0) {
-                    console.log('All messages already in DOM, skipping refresh');
+                if (newMessages.length > 0) {
+                    console.log('Found', newMessages.length, 'new messages, triggering refresh');
+
+                    // Add to known set to prevent duplicate refreshes.
+                    newMessages.forEach(msg => knownMessageIds.add(msg.id));
+
+                    // Trigger morph-based refresh of the message list.
+                    const messageList = document.getElementById('message-list');
+                    if (messageList) {
+                        htmx.trigger(messageList, 'refresh');
+                    }
+                }
+
+                // Show browser notification for messages we haven't notified about.
+                // Use separate notifiedMessageIds set to handle race condition where
+                // message is added to DOM (via unread-count refresh) before new-message event.
+                const unnotifiedMessages = messages.filter(msg => !notifiedMessageIds.has(msg.id));
+
+                if (unnotifiedMessages.length === 0) {
+                    console.log('Already notified about all messages');
                     return;
                 }
 
-                console.log('Found', newMessages.length, 'new messages, triggering refresh');
+                console.log('Showing notifications for', unnotifiedMessages.length, 'messages');
 
-                // Add to known set to prevent duplicate processing.
-                newMessages.forEach(msg => knownMessageIds.add(msg.id));
+                unnotifiedMessages.forEach(msg => {
+                    // Mark as notified to prevent duplicates.
+                    notifiedMessageIds.add(msg.id);
 
-                // Trigger morph-based refresh of the message list.
-                const messageList = document.getElementById('message-list');
-                if (messageList) {
-                    htmx.trigger(messageList, 'refresh');
-                }
-
-                // Show browser notification for each new message.
-                newMessages.forEach(msg => {
                     // Build notification title with sender and project.
                     let title = msg.sender;
                     if (msg.project) {
@@ -270,7 +316,7 @@ function setupSSENotifications() {
                         title,
                         body,
                         msg.priority === 'urgent' ? 'urgent' : 'message',
-                        { id: msg.id, url: '/thread/' + msg.thread_id, threadId: msg.thread_id }
+                        { id: msg.id, url: '/inbox?open_thread=' + msg.thread_id, threadId: msg.thread_id }
                     );
                 });
 
@@ -296,6 +342,106 @@ function setupSSENotifications() {
     });
 }
 
+// Set up a vanilla EventSource specifically for new-message notifications.
+// This runs alongside the HTMX SSE connection to reliably catch new-message events.
+function setupNotificationEventSource() {
+    // Get agent ID from the SSE endpoint in the page (if available).
+    const sseDiv = document.querySelector('[sse-connect*="/events/inbox"]');
+    if (!sseDiv) {
+        console.log('No SSE inbox endpoint found, skipping notification EventSource');
+        return;
+    }
+
+    const sseConnect = sseDiv.getAttribute('sse-connect');
+    if (!sseConnect) return;
+
+    // Close existing connection if any.
+    if (notificationEventSource) {
+        notificationEventSource.close();
+    }
+
+    console.log('Setting up notification EventSource:', sseConnect);
+    notificationEventSource = new EventSource(sseConnect);
+
+    notificationEventSource.addEventListener('new-message', function(event) {
+        console.log('EventSource new-message received:', event.data);
+        lastNewMessageEventTime = Date.now();
+
+        try {
+            const messages = JSON.parse(event.data);
+            if (!Array.isArray(messages) || messages.length === 0) {
+                return;
+            }
+
+            // Check for genuinely new messages (not already in DOM).
+            const newMessages = messages.filter(msg => !knownMessageIds.has(msg.id));
+
+            if (newMessages.length > 0) {
+                console.log('Found', newMessages.length, 'new messages via EventSource, triggering refresh');
+
+                // Add to known set to prevent duplicate refreshes.
+                newMessages.forEach(msg => knownMessageIds.add(msg.id));
+
+                // Trigger morph-based refresh of the message list.
+                const messageList = document.getElementById('message-list');
+                if (messageList) {
+                    htmx.trigger(messageList, 'refresh');
+                }
+            }
+
+            // Show browser notification for messages we haven't notified about.
+            const unnotifiedMessages = messages.filter(msg => !notifiedMessageIds.has(msg.id));
+
+            if (unnotifiedMessages.length === 0) {
+                console.log('Already notified about all messages');
+                return;
+            }
+
+            console.log('Showing notifications for', unnotifiedMessages.length, 'messages');
+
+            unnotifiedMessages.forEach(msg => {
+                notifiedMessageIds.add(msg.id);
+
+                let title = msg.sender;
+                if (msg.project) {
+                    title += ' (' + msg.project + ')';
+                }
+
+                let body = msg.subject;
+                if (msg.preview && msg.preview !== msg.subject) {
+                    body += '\n' + msg.preview.substring(0, 80);
+                }
+
+                showBrowserNotification(
+                    title,
+                    body,
+                    msg.priority === 'urgent' ? 'urgent' : 'message',
+                    { id: msg.id, url: '/inbox?open_thread=' + msg.thread_id, threadId: msg.thread_id }
+                );
+            });
+
+        } catch (e) {
+            console.error('Failed to parse new-message data:', e);
+        }
+    });
+
+    notificationEventSource.onerror = function(event) {
+        console.log('Notification EventSource error, will auto-reconnect');
+    };
+}
+
+// Update toggle visual state (Tailwind v2 CDN doesn't support peer-checked).
+function updateToggleVisual(checkbox) {
+    const toggleDiv = checkbox.nextElementSibling;
+    if (!toggleDiv) return;
+
+    if (checkbox.checked) {
+        toggleDiv.style.backgroundColor = '#2563eb'; // blue-600
+    } else {
+        toggleDiv.style.backgroundColor = '#e5e7eb'; // gray-200
+    }
+}
+
 // Toggle desktop notifications from settings page.
 function toggleDesktopNotifications(checkbox) {
     if (checkbox.checked) {
@@ -303,10 +449,12 @@ function toggleDesktopNotifications(checkbox) {
         if (Notification.permission === 'granted') {
             notificationsEnabled = true;
             localStorage.setItem('notifications-enabled', 'true');
+            updateToggleVisual(checkbox);
             showToast('Notifications enabled', 'success');
         } else if (Notification.permission === 'denied') {
             // Browser has blocked notifications - can't enable.
             checkbox.checked = false;
+            updateToggleVisual(checkbox);
             showToast('Notifications are blocked by browser. Please enable in browser settings.', 'warning');
         } else {
             // Need to request permission.
@@ -314,10 +462,12 @@ function toggleDesktopNotifications(checkbox) {
                 if (permission === 'granted') {
                     notificationsEnabled = true;
                     localStorage.setItem('notifications-enabled', 'true');
+                    updateToggleVisual(checkbox);
                     showToast('Notifications enabled!', 'success');
                     showBrowserNotification('Notifications Enabled', 'You will now receive alerts for new messages.', 'info');
                 } else {
                     checkbox.checked = false;
+                    updateToggleVisual(checkbox);
                     localStorage.setItem('notifications-enabled', 'false');
                     showToast('Notification permission denied', 'warning');
                 }
@@ -327,6 +477,7 @@ function toggleDesktopNotifications(checkbox) {
         // User wants to disable notifications.
         notificationsEnabled = false;
         localStorage.setItem('notifications-enabled', 'false');
+        updateToggleVisual(checkbox);
         showToast('Notifications disabled', 'info');
     }
 }
@@ -384,7 +535,7 @@ function sendTestNotification() {
 function syncNotificationsToggle() {
     const toggle = document.getElementById('desktop-notifications-toggle');
     if (!toggle) {
-        console.log('syncNotificationsToggle: toggle element not found');
+        // Not on settings page - this is normal, silently return.
         return;
     }
 
@@ -402,6 +553,9 @@ function syncNotificationsToggle() {
 
     // Show toggle based on user preference.
     toggle.checked = userEnabled;
+
+    // Update visual state (Tailwind v2 CDN doesn't support peer-checked).
+    updateToggleVisual(toggle);
 
     // Only actually enable if browser also allows.
     notificationsEnabled = userEnabled && browserAllowed;
@@ -442,6 +596,25 @@ document.addEventListener('DOMContentLoaded', function() {
         notificationsEnabled = true;
     }
     setupSSENotifications();
+
+    // Check for open_thread query param and auto-open thread modal.
+    const urlParams = new URLSearchParams(window.location.search);
+    const openThread = urlParams.get('open_thread');
+    if (openThread) {
+        console.log('Auto-opening thread from URL param:', openThread);
+        // Load thread into modal container via HTMX-style fetch.
+        const modalContainer = document.getElementById('modal-container');
+        if (modalContainer) {
+            fetch('/thread/' + openThread)
+                .then(response => response.text())
+                .then(html => {
+                    modalContainer.innerHTML = html;
+                    // Clean up URL to remove the param.
+                    window.history.replaceState({}, '', window.location.pathname);
+                })
+                .catch(err => console.error('Failed to load thread:', err));
+        }
+    }
 });
 
 // =============================================================================
@@ -684,3 +857,29 @@ function switchToAgent(agentName) {
         }
     });
 }
+
+// =============================================================================
+// HTMX Custom Event Handlers
+// =============================================================================
+
+// Listen for custom HX-Trigger events from the server.
+document.body.addEventListener('showToast', function(evt) {
+    const message = evt.detail.value || evt.detail;
+    showToast(message, 'info');
+});
+
+document.body.addEventListener('closeThread', function(evt) {
+    // Close the thread view modal.
+    const modal = document.getElementById('modal-container');
+    if (modal) {
+        modal.innerHTML = '';
+    }
+});
+
+document.body.addEventListener('refreshInbox', function(evt) {
+    // Trigger a refresh of the message list.
+    const messageList = document.getElementById('message-list');
+    if (messageList) {
+        htmx.trigger(messageList, 'refresh');
+    }
+});

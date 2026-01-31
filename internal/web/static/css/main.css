@@ -326,3 +326,19 @@
 .htmx-added {
     opacity: 1;
 }
+
+/* Toggle switch styles (Tailwind v2 CDN doesn't include peer-checked variants) */
+.peer:checked ~ div {
+    background-color: #2563eb !important; /* blue-600 */
+}
+
+.peer:checked ~ div::after {
+    transform: translateX(100%);
+    border-color: white;
+}
+
+/* Focus ring for toggle */
+.peer:focus ~ div {
+    outline: none;
+    box-shadow: 0 0 0 4px rgba(147, 197, 253, 0.5); /* ring-blue-300 */
+}
