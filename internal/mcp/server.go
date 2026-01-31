@@ -7,12 +7,14 @@ import (
 	"github.com/roasbeef/subtrate/internal/agent"
 	"github.com/roasbeef/subtrate/internal/db"
 	"github.com/roasbeef/subtrate/internal/mail"
+	"github.com/roasbeef/subtrate/internal/store"
 )
 
 // Server wraps the MCP server with mail service dependencies.
 type Server struct {
 	server   *mcp.Server
-	store    *db.Store
+	dbStore  *db.Store
+	storage  store.Storage
 	mailSvc  *mail.Service
 	mailRef  mail.MailActorRef // Optional actor ref for mail operations.
 	registry *agent.Registry
@@ -29,8 +31,8 @@ type Config struct {
 }
 
 // NewServer creates a new MCP server with all mail tools registered.
-func NewServer(store *db.Store) *Server {
-	return NewServerWithConfig(Config{Store: store})
+func NewServer(dbStore *db.Store) *Server {
+	return NewServerWithConfig(Config{Store: dbStore})
 }
 
 // NewServerWithConfig creates a new MCP server with the given configuration.
@@ -40,10 +42,14 @@ func NewServerWithConfig(cfg Config) *Server {
 		Version: "0.1.0",
 	}, nil)
 
+	// Create Storage wrapper from the db.Store.
+	storage := store.FromDB(cfg.Store.DB())
+
 	s := &Server{
 		server:   mcpServer,
-		store:    cfg.Store,
-		mailSvc:  mail.NewService(cfg.Store),
+		dbStore:  cfg.Store,
+		storage:  storage,
+		mailSvc:  mail.NewService(storage),
 		mailRef:  cfg.MailActorRef,
 		registry: agent.NewRegistry(cfg.Store),
 	}
