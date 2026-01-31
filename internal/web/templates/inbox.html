@@ -517,8 +517,10 @@
 </div>
 
 <!-- SSE for real-time updates - JavaScript handles new-message events to trigger refresh -->
-<div hx-ext="sse" sse-connect="/events/inbox" class="hidden">
+<div hx-ext="sse" sse-connect="/events/inbox?agent_id={{.CurrentAgentID}}" class="hidden">
     <div sse-swap="unread-count" hx-swap="innerHTML" hx-target="#stat-unread"></div>
+    <!-- new-message events dispatch htmx:sseMessage which JS handles for notifications -->
+    <div id="sse-new-message-sink" sse-swap="new-message" hx-swap="innerHTML"></div>
 </div>
 {{end}}
 

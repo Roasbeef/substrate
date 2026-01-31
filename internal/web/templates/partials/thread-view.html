@@ -35,13 +35,6 @@
                 </svg>
             </button>
 
-            <!-- Report spam -->
-            <button class="p-2 hover:bg-gray-100 rounded-full" title="Report spam">
-                <svg class="w-5 h-5 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
-                    <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z"/>
-                </svg>
-            </button>
-
             <!-- Delete -->
             <button class="p-2 hover:bg-gray-100 rounded-full" title="Delete"
                     hx-post="/api/threads/{{.ThreadID}}/trash"
@@ -62,29 +55,6 @@
                 </svg>
             </button>
 
-            <!-- Snooze -->
-            <button class="p-2 hover:bg-gray-100 rounded-full" title="Snooze">
-                <svg class="w-5 h-5 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
-                    <path stroke-linecap="round" stroke-linejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 11-18 0 9 9 0 0118 0z"/>
-                </svg>
-            </button>
-
-            <div class="w-px h-6 bg-gray-300 mx-2"></div>
-
-            <!-- Labels -->
-            <button class="p-2 hover:bg-gray-100 rounded-full" title="Labels">
-                <svg class="w-5 h-5 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
-                    <path stroke-linecap="round" stroke-linejoin="round" d="M9.568 3H5.25A2.25 2.25 0 003 5.25v4.318c0 .597.237 1.17.659 1.591l9.581 9.581c.699.699 1.78.872 2.607.33a18.095 18.095 0 005.223-5.223c.542-.827.369-1.908-.33-2.607L11.16 3.66A2.25 2.25 0 009.568 3z"/>
-                    <path stroke-linecap="round" stroke-linejoin="round" d="M6 6h.008v.008H6V6z"/>
-                </svg>
-            </button>
-
-            <!-- More actions -->
-            <button class="p-2 hover:bg-gray-100 rounded-full" title="More">
-                <svg class="w-5 h-5 text-gray-600" fill="currentColor" viewBox="0 0 20 20">
-                    <path d="M10 6a2 2 0 110-4 2 2 0 010 4zM10 12a2 2 0 110-4 2 2 0 010 4zM10 18a2 2 0 110-4 2 2 0 010 4z"/>
-                </svg>
-            </button>
         </div>
 
         <div class="flex items-center gap-4">
