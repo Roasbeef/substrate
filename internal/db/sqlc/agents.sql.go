@@ -330,6 +330,20 @@ func (q *Queries) UpdateAgentLastActive(ctx context.Context, arg UpdateAgentLast
 	return err
 }
 
+const UpdateAgentName = `-- name: UpdateAgentName :exec
+UPDATE agents SET name = ? WHERE id = ?
+`
+
+type UpdateAgentNameParams struct {
+	Name string
+	ID   int64
+}
+
+func (q *Queries) UpdateAgentName(ctx context.Context, arg UpdateAgentNameParams) error {
+	_, err := q.db.ExecContext(ctx, UpdateAgentName, arg.Name, arg.ID)
+	return err
+}
+
 const UpdateAgentSession = `-- name: UpdateAgentSession :exec
 UPDATE agents SET current_session_id = ?, last_active_at = ? WHERE id = ?
 `

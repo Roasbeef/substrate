@@ -48,6 +48,14 @@ WHERE message_id = ? AND agent_id = ?;
 SELECT * FROM message_recipients
 WHERE message_id = ?;
 
+-- name: GetMessageRecipientsWithAgentsBulk :many
+-- Fetch recipients for multiple messages at once with agent names.
+-- Pass message IDs as a comma-separated string using sqlc.slice.
+SELECT mr.*, a.name as agent_name
+FROM message_recipients mr
+LEFT JOIN agents a ON mr.agent_id = a.id
+WHERE mr.message_id IN (sqlc.slice('message_ids'));
+
 -- name: UpdateRecipientState :execrows
 UPDATE message_recipients
 SET state = ?, read_at = CASE WHEN ? = 'read' THEN ? ELSE read_at END
@@ -82,6 +90,16 @@ LEFT JOIN agents a ON m.sender_id = a.id
 WHERE mr.state NOT IN ('archived', 'trash')
 ORDER BY m.created_at DESC
 LIMIT ?;
+
+-- name: GetAllInboxMessagesPaginated :many
+-- Global inbox view with pagination support.
+SELECT m.*, mr.state, mr.snoozed_until, mr.read_at, mr.acked_at, mr.agent_id as recipient_agent_id, a.name as sender_name
+FROM messages m
+JOIN message_recipients mr ON m.id = mr.message_id
+LEFT JOIN agents a ON m.sender_id = a.id
+WHERE mr.state NOT IN ('archived', 'trash')
+ORDER BY m.created_at DESC
+LIMIT ? OFFSET ?;
 
 -- name: GetUnreadMessages :many
 SELECT m.*, mr.state, mr.snoozed_until, mr.read_at, mr.acked_at, a.name as sender_name
@@ -209,6 +227,16 @@ WHERE agent_id = ?
 UPDATE message_recipients
 SET state = ?
 WHERE message_id IN (SELECT id FROM messages WHERE thread_id = ?);
+
+-- name: SearchMessages :many
+-- Simple LIKE-based search on subject and body. FTS5 is available but this
+-- covers basic cases. The search term should be passed with wildcards.
+SELECT m.*, a.name as sender_name
+FROM messages m
+LEFT JOIN agents a ON m.sender_id = a.id
+WHERE m.subject LIKE ? OR m.body_md LIKE ?
+ORDER BY m.created_at DESC
+LIMIT 50;
 
 -- Note: Full-text search queries using FTS5 are handled manually in Go code
 -- since sqlc doesn't fully support FTS5 virtual tables.
