@@ -2,6 +2,7 @@ package subtraterpc
 
 import (
 	"context"
+	"database/sql"
 	"fmt"
 	"time"
 
@@ -57,6 +58,25 @@ func (s *Server) SendMail(ctx context.Context, req *SendMailRequest) (*SendMailR
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "failed to send mail: %v", err)
 	}
+
+	// Record activity for the message.
+	recipientsList := ""
+	if len(req.RecipientNames) > 0 {
+		recipientsList = req.RecipientNames[0]
+		if len(req.RecipientNames) > 1 {
+			recipientsList += fmt.Sprintf(" (+%d more)", len(req.RecipientNames)-1)
+		}
+	} else if req.TopicName != "" {
+		recipientsList = req.TopicName
+	}
+	// Record activity (ignore errors - non-critical).
+	_, _ = s.store.Queries().CreateActivity(ctx, sqlc.CreateActivityParams{
+		AgentID:      req.SenderId,
+		ActivityType: "message",
+		Description:  fmt.Sprintf("Sent \"%s\" to %s", req.Subject, recipientsList),
+		Metadata:     sql.NullString{},
+		CreatedAt:    time.Now().Unix(),
+	})
 
 	return &SendMailResponse{
 		MessageId: resp.MessageID,

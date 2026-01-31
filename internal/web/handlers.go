@@ -2160,6 +2160,7 @@ func (s *Server) handleAPIHeartbeat(w http.ResponseWriter, r *http.Request) {
 					AgentID:      agentData.ID,
 					ActivityType: "session_start",
 					Description:  fmt.Sprintf("Started session %s", req.SessionID),
+					Metadata:     sql.NullString{},
 					CreatedAt:    time.Now().Unix(),
 				})
 			}
@@ -2396,6 +2397,15 @@ func (s *Server) handleThreadReply(
 		})
 	}
 
+	// Record activity for the reply.
+	_, _ = s.store.Queries().CreateActivity(ctx, sqlc.CreateActivityParams{
+		AgentID:      senderID,
+		ActivityType: "message",
+		Description:  fmt.Sprintf("Replied to thread: %s", firstMsg.Subject),
+		Metadata:     sql.NullString{},
+		CreatedAt:    time.Now().Unix(),
+	})
+
 	// Re-render the thread view with the new message included.
 	s.renderThreadView(ctx, w, threadID, true)
 }
@@ -2621,7 +2631,8 @@ func (s *Server) handleMessageSend(w http.ResponseWriter, r *http.Request) {
 	_, _ = s.store.Queries().CreateActivity(ctx, sqlc.CreateActivityParams{
 		AgentID:      senderID,
 		ActivityType: "message",
-		Description:  fmt.Sprintf("Sent message \"%s\" to %s", subject, to),
+		Description:  fmt.Sprintf("Sent \"%s\" to %s", subject, to),
+		Metadata:     sql.NullString{},
 		CreatedAt:    time.Now().Unix(),
 	})
 
