@@ -38,6 +38,8 @@ type Querier interface {
 	GetAgentBySessionID(ctx context.Context, sessionID string) (Agent, error)
 	// Global inbox view: all messages across all agents, not archived or trashed.
 	GetAllInboxMessages(ctx context.Context, limit int64) ([]GetAllInboxMessagesRow, error)
+	// Global inbox view with pagination support.
+	GetAllInboxMessagesPaginated(ctx context.Context, arg GetAllInboxMessagesPaginatedParams) ([]GetAllInboxMessagesPaginatedRow, error)
 	// Global sent view: all sent messages across all agents.
 	GetAllSentMessages(ctx context.Context, limit int64) ([]GetAllSentMessagesRow, error)
 	GetArchivedMessages(ctx context.Context, arg GetArchivedMessagesParams) ([]GetArchivedMessagesRow, error)
@@ -47,6 +49,9 @@ type Querier interface {
 	GetMessage(ctx context.Context, id int64) (Message, error)
 	GetMessageRecipient(ctx context.Context, arg GetMessageRecipientParams) (MessageRecipient, error)
 	GetMessageRecipients(ctx context.Context, messageID int64) ([]MessageRecipient, error)
+	// Fetch recipients for multiple messages at once with agent names.
+	// Pass message IDs as a comma-separated string using sqlc.slice.
+	GetMessageRecipientsWithAgentsBulk(ctx context.Context, messageIds []int64) ([]GetMessageRecipientsWithAgentsBulkRow, error)
 	GetMessagesByThread(ctx context.Context, threadID string) ([]Message, error)
 	GetMessagesByTopic(ctx context.Context, topicID int64) ([]Message, error)
 	GetMessagesSinceOffset(ctx context.Context, arg GetMessagesSinceOffsetParams) ([]Message, error)
@@ -80,8 +85,12 @@ type Querier interface {
 	ListTopics(ctx context.Context) ([]Topic, error)
 	ListTopicsByType(ctx context.Context, topicType string) ([]Topic, error)
 	MarkMessageDeletedBySender(ctx context.Context, arg MarkMessageDeletedBySenderParams) error
+	// Simple LIKE-based search on subject and body. FTS5 is available but this
+	// covers basic cases. The search term should be passed with wildcards.
+	SearchMessages(ctx context.Context, arg SearchMessagesParams) ([]SearchMessagesRow, error)
 	UpdateAgentGitBranch(ctx context.Context, arg UpdateAgentGitBranchParams) error
 	UpdateAgentLastActive(ctx context.Context, arg UpdateAgentLastActiveParams) error
+	UpdateAgentName(ctx context.Context, arg UpdateAgentNameParams) error
 	UpdateAgentSession(ctx context.Context, arg UpdateAgentSessionParams) error
 	// Update the state of all message recipients in a thread for ALL agents.
 	// Used for global view archive/trash operations.
