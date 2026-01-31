@@ -174,6 +174,9 @@ func (s *Server) registerRoutes() {
 	s.mux.HandleFunc("/api/messages/send", s.handleMessageSend)
 	s.mux.HandleFunc("/api/messages/", s.handleMessageAction)
 
+	// Autocomplete routes.
+	s.mux.HandleFunc("/api/autocomplete/recipients", s.handleAutocompleteRecipients)
+
 	// SSE event streams.
 	s.mux.HandleFunc("/events/agents", s.handleSSEAgents)
 	s.mux.HandleFunc("/events/activity", s.handleSSEActivity)

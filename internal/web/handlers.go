@@ -889,16 +889,26 @@ func (s *Server) handleSentMessages(w http.ResponseWriter, r *http.Request) {
 func (s *Server) handleArchivedMessages(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 
-	// Get agent ID from query or use first agent.
+	// Get agent ID from query param or default to User agent.
 	agentIDStr := r.URL.Query().Get("agent_id")
 	var agentID int64
 
 	if agentIDStr != "" {
 		fmt.Sscanf(agentIDStr, "%d", &agentID)
 	} else {
+		// Default to User agent for archive (human's inbox).
 		agents, err := s.store.Queries().ListAgents(ctx)
-		if err == nil && len(agents) > 0 {
-			agentID = agents[0].ID
+		if err == nil {
+			for _, a := range agents {
+				if a.Name == UserAgentName {
+					agentID = a.ID
+					break
+				}
+			}
+			// Fallback to first agent if no User agent.
+			if agentID == 0 && len(agents) > 0 {
+				agentID = agents[0].ID
+			}
 		}
 	}
 
@@ -1404,7 +1414,7 @@ func (s *Server) handleSettings(w http.ResponseWriter, r *http.Request) {
                     </div>
                     <label class="relative inline-flex items-center cursor-pointer">
                         <input type="checkbox" class="sr-only peer">
-                        <div class="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
+                        <div class="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 rounded-full peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
                     </label>
                 </div>
                 <div class="flex items-center justify-between">
@@ -1418,7 +1428,7 @@ func (s *Server) handleSettings(w http.ResponseWriter, r *http.Request) {
                         </button>
                         <label class="relative inline-flex items-center cursor-pointer">
                             <input type="checkbox" id="desktop-notifications-toggle" class="sr-only peer" onchange="toggleDesktopNotifications(this)">
-                            <div class="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
+                            <div class="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 rounded-full peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
                         </label>
                     </div>
                 </div>
@@ -1429,7 +1439,7 @@ func (s *Server) handleSettings(w http.ResponseWriter, r *http.Request) {
                     </div>
                     <label class="relative inline-flex items-center cursor-pointer">
                         <input type="checkbox" class="sr-only peer">
-                        <div class="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
+                        <div class="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 rounded-full peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
                     </label>
                 </div>
             </div>
@@ -1580,6 +1590,66 @@ func (s *Server) handleAPIAgentsCards(w http.ResponseWriter, r *http.Request) {
 		}
 		s.partials.ExecuteTemplate(&html, "agent-card", agent)
 	}
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	w.Write([]byte(html.String()))
+}
+
+// handleAutocompleteRecipients returns suggestions for the recipient field.
+// Route: GET /api/autocomplete/recipients?recipients=<search>
+func (s *Server) handleAutocompleteRecipients(w http.ResponseWriter, r *http.Request) {
+	query := strings.ToLower(r.URL.Query().Get("recipients"))
+
+	// Get all agents.
+	agents := s.getAgentsFromHeartbeat()
+
+	// Get topics for topic suggestions.
+	ctx := r.Context()
+	topics, _ := s.store.Queries().ListTopics(ctx)
+
+	var suggestions []string
+
+	// Add matching agents.
+	for _, agent := range agents {
+		name := strings.ToLower(agent.Name)
+		displayName := strings.ToLower(agent.DisplayName)
+		if query == "" || strings.Contains(name, query) ||
+			strings.Contains(displayName, query) {
+
+			suggestions = append(suggestions, agent.Name)
+		}
+	}
+
+	// Add matching topics (skip agent inbox topics since agents are shown directly).
+	for _, topic := range topics {
+		// Skip "agent/*/inbox" topics - they're redundant with agent names.
+		if strings.HasPrefix(topic.Name, "agent/") && strings.HasSuffix(topic.Name, "/inbox") {
+			continue
+		}
+		name := strings.ToLower(topic.Name)
+		if query == "" || strings.Contains(name, query) {
+			suggestions = append(suggestions, topic.Name)
+		}
+	}
+
+	// Return empty if no matches.
+	if len(suggestions) == 0 {
+		w.Header().Set("Content-Type", "text/html; charset=utf-8")
+		return
+	}
+
+	// Build HTML suggestions dropdown.
+	var html strings.Builder
+	html.WriteString(`<div class="absolute z-50 bg-white border border-gray-200 rounded-lg shadow-lg mt-1 w-full max-h-48 overflow-y-auto">`)
+	for _, suggestion := range suggestions {
+		// Each suggestion is clickable and fills in the recipient field.
+		fmt.Fprintf(&html,
+			`<div class="px-3 py-2 hover:bg-blue-50 cursor-pointer text-sm"
+				onclick="document.querySelector('input[name=recipients]').value='%s'; document.getElementById('recipient-suggestions').innerHTML=''">%s</div>`,
+			suggestion, suggestion,
+		)
+	}
+	html.WriteString(`</div>`)
+
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	w.Write([]byte(html.String()))
 }
@@ -2029,6 +2099,11 @@ func (s *Server) sendNewMessagesEvent(w http.ResponseWriter, flusher http.Flushe
 	})
 	if err != nil || len(messages) == 0 {
 		return lastID
+	}
+
+	// Check if there are any messages newer than lastID.
+	if len(messages) > 0 && messages[0].ID > lastID {
+		log.Printf("SSE: Agent %d has new messages (first=%d, lastID=%d)", agentID, messages[0].ID, lastID)
 	}
 
 	// Find new messages.
@@ -2502,27 +2577,78 @@ func (s *Server) renderThreadView(ctx context.Context, w http.ResponseWriter, th
 func (s *Server) handleThreadArchive(
 	ctx context.Context, w http.ResponseWriter, r *http.Request, threadID string,
 ) {
-	// TODO: Implement archive functionality (update message state).
+	// Update all recipients in this thread to archived state.
+	rowsAffected, err := s.store.Queries().UpdateAllThreadRecipientState(
+		ctx, sqlc.UpdateAllThreadRecipientStateParams{
+			State:    "archived",
+			ThreadID: threadID,
+		},
+	)
+	if err != nil {
+		log.Printf("Error archiving thread %s: %v", threadID, err)
+		w.Header().Set("HX-Trigger", `{"showToast": "Error archiving thread"}`)
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+
+	log.Printf("Archived thread %s, updated %d recipients", threadID, rowsAffected)
+
+	// Send HTMX headers to close thread view and refresh inbox.
+	w.Header().Set("HX-Trigger", `{"showToast": "Thread archived", "closeThread": true, "refreshInbox": true}`)
 	w.Header().Set("Content-Type", "text/html")
-	w.Write([]byte(`<div class="p-2 text-sm text-gray-500">Thread archived</div>`))
+	w.WriteHeader(http.StatusOK)
 }
 
 // handleThreadTrash handles trashing a thread.
 func (s *Server) handleThreadTrash(
 	ctx context.Context, w http.ResponseWriter, r *http.Request, threadID string,
 ) {
-	// TODO: Implement trash functionality (update message state).
+	// Update all recipients in this thread to trash state.
+	rowsAffected, err := s.store.Queries().UpdateAllThreadRecipientState(
+		ctx, sqlc.UpdateAllThreadRecipientStateParams{
+			State:    "trash",
+			ThreadID: threadID,
+		},
+	)
+	if err != nil {
+		log.Printf("Error trashing thread %s: %v", threadID, err)
+		w.Header().Set("HX-Trigger", `{"showToast": "Error moving thread to trash"}`)
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+
+	log.Printf("Trashed thread %s, updated %d recipients", threadID, rowsAffected)
+
+	// Send HTMX headers to close thread view and refresh inbox.
+	w.Header().Set("HX-Trigger", `{"showToast": "Thread moved to trash", "closeThread": true, "refreshInbox": true}`)
 	w.Header().Set("Content-Type", "text/html")
-	w.Write([]byte(`<div class="p-2 text-sm text-gray-500">Thread moved to trash</div>`))
+	w.WriteHeader(http.StatusOK)
 }
 
 // handleThreadUnread handles marking a thread as unread.
 func (s *Server) handleThreadUnread(
 	ctx context.Context, w http.ResponseWriter, r *http.Request, threadID string,
 ) {
-	// TODO: Implement unread functionality (update recipient state).
+	// Update all recipients in this thread to unread state.
+	rowsAffected, err := s.store.Queries().UpdateAllThreadRecipientState(
+		ctx, sqlc.UpdateAllThreadRecipientStateParams{
+			State:    "unread",
+			ThreadID: threadID,
+		},
+	)
+	if err != nil {
+		log.Printf("Error marking thread %s as unread: %v", threadID, err)
+		w.Header().Set("HX-Trigger", `{"showToast": "Error marking thread as unread"}`)
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+
+	log.Printf("Marked thread %s as unread, updated %d recipients", threadID, rowsAffected)
+
+	// Send HTMX headers to close thread view and refresh inbox.
+	w.Header().Set("HX-Trigger", `{"showToast": "Thread marked as unread", "closeThread": true, "refreshInbox": true}`)
 	w.Header().Set("Content-Type", "text/html")
-	w.Write([]byte(`<div class="p-2 text-sm text-gray-500">Thread marked as unread</div>`))
+	w.WriteHeader(http.StatusOK)
 }
 
 // handleMessageSend handles sending a new message from the compose form.
@@ -2545,6 +2671,21 @@ func (s *Server) handleMessageSend(w http.ResponseWriter, r *http.Request) {
 	if to == "" {
 		to = r.FormValue("recipients")
 	}
+
+	// Also accept to_agent_id for the agents dashboard message modal.
+	if to == "" {
+		toAgentIDStr := r.FormValue("to_agent_id")
+		if toAgentIDStr != "" {
+			toAgentID, err := strconv.ParseInt(toAgentIDStr, 10, 64)
+			if err == nil {
+				agent, err := s.store.Queries().GetAgent(ctx, toAgentID)
+				if err == nil {
+					to = agent.Name
+				}
+			}
+		}
+	}
+
 	subject := r.FormValue("subject")
 	body := r.FormValue("body")
 	priority := r.FormValue("priority")
