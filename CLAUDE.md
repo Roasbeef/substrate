@@ -73,6 +73,16 @@ Use the session log to track progress: `/session-log --progress "description"`
 - Leave tasks as `in_progress` or `pending` if work remains
 - When blocked, ask the user for guidance rather than marking done
 
+### Documentation Updates
+
+**Update docs when adding or modifying features.** After implementing new functionality:
+
+1. **docs/HOOKS.md** - Update if hook behavior changes
+2. **CLAUDE.md** - Update if new commands, patterns, or workflows are added
+3. **~/.claude/CLAUDE.md** (global) - Update if Subtrate integration changes
+
+Check if related documentation exists before finishing a feature. Use `ls docs/` to see available docs.
+
 ### Running the Server
 The web UI is built into substrated. By default, `make run` starts in web-only mode (no MCP/stdio):
 
