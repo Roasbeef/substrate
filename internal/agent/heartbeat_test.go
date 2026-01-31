@@ -249,3 +249,100 @@ func TestGetStatusCounts(t *testing.T) {
 		t.Errorf("expected 1 busy, got %d", counts.Busy)
 	}
 }
+
+func TestRecordHeartbeatByName(t *testing.T) {
+	store, cleanup := testDB(t)
+	defer cleanup()
+
+	registry := NewRegistry(store)
+	hm := NewHeartbeatManager(registry, DefaultHeartbeatConfig())
+
+	ctx := context.Background()
+
+	// Register an agent.
+	agent, err := registry.RegisterAgent(ctx, "heartbeat-by-name-agent", "", "")
+	if err != nil {
+		t.Fatalf("RegisterAgent: %v", err)
+	}
+
+	// Record heartbeat by name.
+	if err := hm.RecordHeartbeatByName(ctx, agent.Name); err != nil {
+		t.Fatalf("RecordHeartbeatByName: %v", err)
+	}
+
+	// Verify agent is active.
+	aws, err := hm.GetAgentWithStatus(ctx, agent.ID)
+	if err != nil {
+		t.Fatalf("GetAgentWithStatus: %v", err)
+	}
+
+	if aws.Status != StatusActive {
+		t.Errorf("expected status %q after heartbeat by name, got %q",
+			StatusActive, aws.Status)
+	}
+}
+
+func TestRecordHeartbeatByName_NotFound(t *testing.T) {
+	store, cleanup := testDB(t)
+	defer cleanup()
+
+	registry := NewRegistry(store)
+	hm := NewHeartbeatManager(registry, DefaultHeartbeatConfig())
+
+	ctx := context.Background()
+
+	// Record heartbeat for non-existent agent.
+	err := hm.RecordHeartbeatByName(ctx, "non-existent-agent")
+	if err == nil {
+		t.Error("expected error for non-existent agent")
+	}
+}
+
+func TestGetAgentWithStatusByName(t *testing.T) {
+	store, cleanup := testDB(t)
+	defer cleanup()
+
+	registry := NewRegistry(store)
+	hm := NewHeartbeatManager(registry, DefaultHeartbeatConfig())
+
+	ctx := context.Background()
+
+	// Register an agent.
+	agent, err := registry.RegisterAgent(ctx, "status-by-name-agent", "", "")
+	if err != nil {
+		t.Fatalf("RegisterAgent: %v", err)
+	}
+
+	// Record heartbeat.
+	hm.RecordHeartbeat(ctx, agent.ID)
+
+	// Get agent with status by name.
+	aws, err := hm.GetAgentWithStatusByName(ctx, agent.Name)
+	if err != nil {
+		t.Fatalf("GetAgentWithStatusByName: %v", err)
+	}
+
+	if aws.Agent.Name != agent.Name {
+		t.Errorf("expected agent name %q, got %q", agent.Name, aws.Agent.Name)
+	}
+
+	if aws.Status != StatusActive {
+		t.Errorf("expected status %q, got %q", StatusActive, aws.Status)
+	}
+}
+
+func TestGetAgentWithStatusByName_NotFound(t *testing.T) {
+	store, cleanup := testDB(t)
+	defer cleanup()
+
+	registry := NewRegistry(store)
+	hm := NewHeartbeatManager(registry, DefaultHeartbeatConfig())
+
+	ctx := context.Background()
+
+	// Get status for non-existent agent.
+	_, err := hm.GetAgentWithStatusByName(ctx, "non-existent-agent")
+	if err == nil {
+		t.Error("expected error for non-existent agent")
+	}
+}

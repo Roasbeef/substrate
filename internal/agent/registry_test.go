@@ -272,3 +272,41 @@ func TestRegistry_EnsureUniqueAgentName(t *testing.T) {
 	require.NoError(t, err)
 	require.NotEmpty(t, name2)
 }
+
+func TestRegistry_DeleteAgent(t *testing.T) {
+	store, cleanup := testDB(t)
+	defer cleanup()
+
+	registry := NewRegistry(store)
+	ctx := context.Background()
+
+	// Register an agent.
+	agent, err := registry.RegisterAgent(ctx, "delete-test-agent", "", "")
+	require.NoError(t, err)
+	require.NotNil(t, agent)
+
+	// Verify agent exists.
+	found, err := registry.GetAgent(ctx, agent.ID)
+	require.NoError(t, err)
+	require.NotNil(t, found)
+
+	// Delete the agent.
+	err = registry.DeleteAgent(ctx, agent.ID)
+	require.NoError(t, err)
+
+	// Verify agent no longer exists.
+	_, err = registry.GetAgent(ctx, agent.ID)
+	require.Error(t, err)
+}
+
+func TestRegistry_DeleteAgent_NotFound(t *testing.T) {
+	store, cleanup := testDB(t)
+	defer cleanup()
+
+	registry := NewRegistry(store)
+	ctx := context.Background()
+
+	// Delete non-existent agent - should not error.
+	err := registry.DeleteAgent(ctx, 999999)
+	require.NoError(t, err)
+}
