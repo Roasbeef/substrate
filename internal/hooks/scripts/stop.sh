@@ -16,6 +16,13 @@
 #
 # Output format: JSON for Stop hook decision
 
+# Prevent recursion when claude -p spawns its own Stop hook.
+# The env var is set when we invoke claude -p below for status summaries.
+if [ "$SUBSTRATE_SUMMARIZING" = "1" ]; then
+    echo '{"decision": "allow"}'
+    exit 0
+fi
+
 # Read hook input from stdin
 input=$(cat)
 session_id=$(echo "$input" | jq -r '.session_id // empty')
@@ -162,10 +169,32 @@ fi
     project_hash=$(echo "$project_dir" | tr '/.' '-')
     claude_projects_dir="$HOME/.claude/projects/$project_hash"
 
-    # Strategy 1 (DISABLED): claude -p causes recursive loops even with stop_hook_active.
-    # The spawned claude -p is a new process with stop_hook_active=false.
-    # TODO: Use lock file or env var to prevent recursion.
-    echo "Strategy 1: DISABLED - claude -p causes loops" >> "$debug_log"
+    # Strategy 1: Use claude -p with haiku to summarize session log.
+    # SUBSTRATE_SUMMARIZING=1 prevents recursion (checked at top of script).
+    if command -v claude >/dev/null 2>&1 && [ -n "$session_id" ]; then
+        echo "Strategy 1: Running claude -p" >> "$debug_log"
+
+        session_log="$claude_projects_dir/$session_id.jsonl"
+        if [ -f "$session_log" ]; then
+            echo "Found session log: $session_log" >> "$debug_log"
+
+            # Set SUBSTRATE_SUMMARIZING to prevent recursive hooks.
+            summary=$(tail -10 "$session_log" 2>/dev/null | head -c 50000 | \
+                SUBSTRATE_SUMMARIZING=1 claude -p \
+                "Summarize what this Claude Code agent accomplished in 2-3 brief bullet points. Be very concise." \
+                --model haiku 2>/dev/null || echo "")
+
+            if [ -n "$summary" ]; then
+                echo "Generated summary with claude -p haiku" >> "$debug_log"
+            else
+                echo "claude -p returned empty summary" >> "$debug_log"
+            fi
+        else
+            echo "Session log not found: $session_log" >> "$debug_log"
+        fi
+    else
+        echo "Strategy 1: SKIPPED (claude not available or no session_id)" >> "$debug_log"
+    fi
 
     # Strategy 2: Check ~/.claude/projects/{project-hash}/sessions-index.json
     if [ -z "$summary" ]; then
