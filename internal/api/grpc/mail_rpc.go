@@ -54,9 +54,26 @@ func (s *Server) SendMail(ctx context.Context, req *SendMailRequest) (*SendMailR
 		Attachments:    req.AttachmentsJson,
 	}
 
-	resp, err := s.mailSvc.Send(ctx, sendReq)
-	if err != nil {
-		return nil, status.Errorf(codes.Internal, "failed to send mail: %v", err)
+	// Use actor system if available, otherwise fall back to direct service call.
+	var messageID int64
+	var threadID string
+	if s.mailRef != nil {
+		resp, err := s.sendMailActor(ctx, sendReq)
+		if err != nil {
+			return nil, status.Errorf(codes.Internal, "failed to send mail: %v", err)
+		}
+		if resp.Error != nil {
+			return nil, status.Errorf(codes.Internal, "failed to send mail: %v", resp.Error)
+		}
+		messageID = resp.MessageID
+		threadID = resp.ThreadID
+	} else {
+		resp, err := s.mailSvc.Send(ctx, sendReq)
+		if err != nil {
+			return nil, status.Errorf(codes.Internal, "failed to send mail: %v", err)
+		}
+		messageID = resp.MessageID
+		threadID = resp.ThreadID
 	}
 
 	// Record activity for the message.
@@ -79,8 +96,8 @@ func (s *Server) SendMail(ctx context.Context, req *SendMailRequest) (*SendMailR
 	})
 
 	return &SendMailResponse{
-		MessageId: resp.MessageID,
-		ThreadId:  resp.ThreadID,
+		MessageId: messageID,
+		ThreadId:  threadID,
 	}, nil
 }
 
@@ -102,14 +119,30 @@ func (s *Server) FetchInbox(ctx context.Context, req *FetchInboxRequest) (*Fetch
 		stateFilter = &state
 	}
 
-	msgs, err := s.mailSvc.FetchInbox(ctx, mail.FetchInboxRequest{
+	fetchReq := mail.FetchInboxRequest{
 		AgentID:     req.AgentId,
 		Limit:       limit,
 		UnreadOnly:  req.UnreadOnly,
 		StateFilter: stateFilter,
-	})
-	if err != nil {
-		return nil, status.Errorf(codes.Internal, "failed to fetch inbox: %v", err)
+	}
+
+	// Use actor system if available, otherwise fall back to direct service call.
+	var msgs []mail.InboxMessage
+	if s.mailRef != nil {
+		resp, err := s.fetchInboxActor(ctx, fetchReq)
+		if err != nil {
+			return nil, status.Errorf(codes.Internal, "failed to fetch inbox: %v", err)
+		}
+		if resp.Error != nil {
+			return nil, status.Errorf(codes.Internal, "failed to fetch inbox: %v", resp.Error)
+		}
+		msgs = resp.Messages
+	} else {
+		var err error
+		msgs, err = s.mailSvc.FetchInbox(ctx, fetchReq)
+		if err != nil {
+			return nil, status.Errorf(codes.Internal, "failed to fetch inbox: %v", err)
+		}
 	}
 
 	return &FetchInboxResponse{
@@ -126,9 +159,23 @@ func (s *Server) ReadMessage(ctx context.Context, req *ReadMessageRequest) (*Rea
 		return nil, status.Error(codes.InvalidArgument, "message_id is required")
 	}
 
-	msg, err := s.mailSvc.ReadMessage(ctx, req.AgentId, req.MessageId)
-	if err != nil {
-		return nil, status.Errorf(codes.Internal, "failed to read message: %v", err)
+	// Use actor system if available, otherwise fall back to direct service call.
+	var msg *mail.InboxMessage
+	if s.mailRef != nil {
+		resp, err := s.readMessageActor(ctx, req.AgentId, req.MessageId)
+		if err != nil {
+			return nil, status.Errorf(codes.Internal, "failed to read message: %v", err)
+		}
+		if resp.Error != nil {
+			return nil, status.Errorf(codes.Internal, "failed to read message: %v", resp.Error)
+		}
+		msg = resp.Message
+	} else {
+		var err error
+		msg, err = s.mailSvc.ReadMessage(ctx, req.AgentId, req.MessageId)
+		if err != nil {
+			return nil, status.Errorf(codes.Internal, "failed to read message: %v", err)
+		}
 	}
 
 	return &ReadMessageResponse{
@@ -177,14 +224,27 @@ func (s *Server) UpdateState(ctx context.Context, req *UpdateStateRequest) (*Upd
 		snoozedUntil = &t
 	}
 
-	err := s.mailSvc.UpdateState(ctx, mail.UpdateStateRequest{
-		AgentID:      req.AgentId,
-		MessageID:    req.MessageId,
-		NewState:     newState,
-		SnoozedUntil: snoozedUntil,
-	})
-	if err != nil {
-		return nil, status.Errorf(codes.Internal, "failed to update state: %v", err)
+	// Use actor system if available, otherwise fall back to direct service call.
+	if s.mailRef != nil {
+		resp, err := s.updateMessageStateActor(
+			ctx, req.AgentId, req.MessageId, newState, snoozedUntil,
+		)
+		if err != nil {
+			return nil, status.Errorf(codes.Internal, "failed to update state: %v", err)
+		}
+		if resp.Error != nil {
+			return nil, status.Errorf(codes.Internal, "failed to update state: %v", resp.Error)
+		}
+	} else {
+		err := s.mailSvc.UpdateState(ctx, mail.UpdateStateRequest{
+			AgentID:      req.AgentId,
+			MessageID:    req.MessageId,
+			NewState:     newState,
+			SnoozedUntil: snoozedUntil,
+		})
+		if err != nil {
+			return nil, status.Errorf(codes.Internal, "failed to update state: %v", err)
+		}
 	}
 
 	return &UpdateStateResponse{Success: true}, nil
@@ -199,9 +259,20 @@ func (s *Server) AckMessage(ctx context.Context, req *AckMessageRequest) (*AckMe
 		return nil, status.Error(codes.InvalidArgument, "message_id is required")
 	}
 
-	err := s.mailSvc.AckMessage(ctx, req.AgentId, req.MessageId)
-	if err != nil {
-		return nil, status.Errorf(codes.Internal, "failed to ack message: %v", err)
+	// Use actor system if available, otherwise fall back to direct service call.
+	if s.mailRef != nil {
+		resp, err := s.ackMessageActor(ctx, req.AgentId, req.MessageId)
+		if err != nil {
+			return nil, status.Errorf(codes.Internal, "failed to ack message: %v", err)
+		}
+		if resp.Error != nil {
+			return nil, status.Errorf(codes.Internal, "failed to ack message: %v", resp.Error)
+		}
+	} else {
+		err := s.mailSvc.AckMessage(ctx, req.AgentId, req.MessageId)
+		if err != nil {
+			return nil, status.Errorf(codes.Internal, "failed to ack message: %v", err)
+		}
 	}
 
 	return &AckMessageResponse{Success: true}, nil
@@ -213,9 +284,23 @@ func (s *Server) GetStatus(ctx context.Context, req *GetStatusRequest) (*GetStat
 		return nil, status.Error(codes.InvalidArgument, "agent_id is required")
 	}
 
-	stat, err := s.mailSvc.GetStatus(ctx, req.AgentId)
-	if err != nil {
-		return nil, status.Errorf(codes.Internal, "failed to get status: %v", err)
+	// Use actor system if available, otherwise fall back to direct service call.
+	var stat mail.AgentStatus
+	if s.mailRef != nil {
+		resp, err := s.getAgentStatusActor(ctx, req.AgentId)
+		if err != nil {
+			return nil, status.Errorf(codes.Internal, "failed to get status: %v", err)
+		}
+		if resp.Error != nil {
+			return nil, status.Errorf(codes.Internal, "failed to get status: %v", resp.Error)
+		}
+		stat = resp.Status
+	} else {
+		var err error
+		stat, err = s.mailSvc.GetStatus(ctx, req.AgentId)
+		if err != nil {
+			return nil, status.Errorf(codes.Internal, "failed to get status: %v", err)
+		}
 	}
 
 	return &GetStatusResponse{
@@ -234,17 +319,34 @@ func (s *Server) PollChanges(ctx context.Context, req *PollChangesRequest) (*Pol
 		return nil, status.Error(codes.InvalidArgument, "agent_id is required")
 	}
 
-	resp, err := s.mailSvc.PollChanges(ctx, mail.PollChangesRequest{
-		AgentID:      req.AgentId,
-		SinceOffsets: req.SinceOffsets,
-	})
-	if err != nil {
-		return nil, status.Errorf(codes.Internal, "failed to poll changes: %v", err)
+	// Use actor system if available, otherwise fall back to direct service call.
+	var newMessages []mail.InboxMessage
+	var newOffsets map[int64]int64
+	if s.mailRef != nil {
+		resp, err := s.pollChangesActor(ctx, req.AgentId, req.SinceOffsets)
+		if err != nil {
+			return nil, status.Errorf(codes.Internal, "failed to poll changes: %v", err)
+		}
+		if resp.Error != nil {
+			return nil, status.Errorf(codes.Internal, "failed to poll changes: %v", resp.Error)
+		}
+		newMessages = resp.NewMessages
+		newOffsets = resp.NewOffsets
+	} else {
+		resp, err := s.mailSvc.PollChanges(ctx, mail.PollChangesRequest{
+			AgentID:      req.AgentId,
+			SinceOffsets: req.SinceOffsets,
+		})
+		if err != nil {
+			return nil, status.Errorf(codes.Internal, "failed to poll changes: %v", err)
+		}
+		newMessages = resp.NewMessages
+		newOffsets = resp.NewOffsets
 	}
 
 	return &PollChangesResponse{
-		NewMessages: convertMessages(resp.NewMessages),
-		NewOffsets:  resp.NewOffsets,
+		NewMessages: convertMessages(newMessages),
+		NewOffsets:  newOffsets,
 	}, nil
 }
 
@@ -324,20 +426,39 @@ func (s *Server) Publish(ctx context.Context, req *PublishRequest) (*PublishResp
 		priority = mail.PriorityUrgent
 	}
 
-	resp, err := s.mailSvc.Publish(ctx, mail.PublishRequest{
+	pubReq := mail.PublishRequest{
 		SenderID:  req.SenderId,
 		TopicName: req.TopicName,
 		Subject:   req.Subject,
 		Body:      req.Body,
 		Priority:  priority,
-	})
-	if err != nil {
-		return nil, status.Errorf(codes.Internal, "failed to publish: %v", err)
+	}
+
+	// Use actor system if available, otherwise fall back to direct service call.
+	var messageID int64
+	var recipientsCount int
+	if s.mailRef != nil {
+		resp, err := s.publishMessageActor(ctx, pubReq)
+		if err != nil {
+			return nil, status.Errorf(codes.Internal, "failed to publish: %v", err)
+		}
+		if resp.Error != nil {
+			return nil, status.Errorf(codes.Internal, "failed to publish: %v", resp.Error)
+		}
+		messageID = resp.MessageID
+		recipientsCount = resp.RecipientsCount
+	} else {
+		resp, err := s.mailSvc.Publish(ctx, pubReq)
+		if err != nil {
+			return nil, status.Errorf(codes.Internal, "failed to publish: %v", err)
+		}
+		messageID = resp.MessageID
+		recipientsCount = resp.RecipientsCount
 	}
 
 	return &PublishResponse{
-		MessageId:       resp.MessageID,
-		RecipientsCount: int32(resp.RecipientsCount),
+		MessageId:       messageID,
+		RecipientsCount: int32(recipientsCount),
 	}, nil
 }
 

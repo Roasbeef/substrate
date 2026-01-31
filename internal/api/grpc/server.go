@@ -62,6 +62,7 @@ type Server struct {
 	store       *db.Store
 	mailSvc     *mail.Service
 	mailRef     mail.MailActorRef // Optional actor ref for mail operations.
+	actorRefs   *ActorRefs        // Additional actor references.
 	agentReg    *agent.Registry
 	identityMgr *agent.IdentityManager
 
@@ -92,11 +93,20 @@ func NewServer(
 	identityMgr *agent.IdentityManager,
 	notificationHub actor.ActorRef[mail.NotificationRequest, mail.NotificationResponse],
 ) *Server {
+	// Build actor refs if a mail actor ref is provided.
+	var actorRefs *ActorRefs
+	if cfg.MailActorRef != nil {
+		actorRefs = &ActorRefs{
+			MailRef: cfg.MailActorRef,
+		}
+	}
+
 	return &Server{
 		cfg:             cfg,
 		store:           store,
 		mailSvc:         mailSvc,
 		mailRef:         cfg.MailActorRef,
+		actorRefs:       actorRefs,
 		agentReg:        agentReg,
 		identityMgr:     identityMgr,
 		notificationHub: notificationHub,
