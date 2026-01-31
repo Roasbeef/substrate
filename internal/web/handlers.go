@@ -12,8 +12,10 @@ import (
 	"strings"
 	"time"
 
+	"github.com/roasbeef/subtrate/internal/activity"
 	"github.com/roasbeef/subtrate/internal/agent"
 	"github.com/roasbeef/subtrate/internal/db/sqlc"
+	"github.com/roasbeef/subtrate/internal/mail"
 )
 
 // PageData holds common data for page templates.
@@ -2699,13 +2701,6 @@ func (s *Server) handleMessageSend(w http.ResponseWriter, r *http.Request) {
 		priority = "normal"
 	}
 
-	// Find the recipient agent.
-	recipient, err := s.store.Queries().GetAgentByName(ctx, to)
-	if err != nil {
-		http.Error(w, "Recipient agent not found: "+to, http.StatusBadRequest)
-		return
-	}
-
 	// Use User agent as sender.
 	senderID := s.getUserAgentID(ctx)
 	if senderID == 0 {
@@ -2713,69 +2708,104 @@ func (s *Server) handleMessageSend(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Get or create the topic for the recipient's inbox.
-	topicName := "agent/" + to + "/inbox"
-	topic, err := s.store.Queries().GetTopicByName(ctx, topicName)
-	if err != nil {
-		// Create the topic if it doesn't exist.
-		topic, err = s.store.Queries().CreateTopic(ctx, sqlc.CreateTopicParams{
-			Name:             topicName,
-			TopicType:        "direct",
-			RetentionSeconds: sql.NullInt64{Int64: 604800, Valid: true},
-			CreatedAt:        time.Now().Unix(),
+	// Use actor system if available, otherwise fall back to direct DB calls.
+	if s.actorRefs.HasActors() {
+		// Send via actor system.
+		resp, err := s.sendMail(ctx, mail.SendMailRequest{
+			SenderID:       senderID,
+			RecipientNames: []string{to},
+			Subject:        subject,
+			Body:           body,
+			Priority:       mail.Priority(priority),
 		})
 		if err != nil {
-			http.Error(w, "Failed to create topic: "+err.Error(), http.StatusInternalServerError)
+			http.Error(w, "Failed to send message: "+err.Error(), http.StatusInternalServerError)
 			return
 		}
-	}
-
-	// Generate thread ID for new message.
-	threadID := fmt.Sprintf("thread-%d-%d", time.Now().UnixNano(), senderID)
-
-	// Get next log offset.
-	maxOffsetResult, err := s.store.Queries().GetMaxLogOffset(ctx, topic.ID)
-	var nextOffset int64 = 1
-	if err == nil && maxOffsetResult != nil {
-		if offset, ok := maxOffsetResult.(int64); ok {
-			nextOffset = offset + 1
+		if resp.Error != nil {
+			http.Error(w, "Failed to send message: "+resp.Error.Error(), http.StatusInternalServerError)
+			return
 		}
-	}
 
-	// Create the message.
-	msg, err := s.store.Queries().CreateMessage(ctx, sqlc.CreateMessageParams{
-		ThreadID:  threadID,
-		TopicID:   topic.ID,
-		LogOffset: nextOffset,
-		SenderID:  senderID,
-		Subject:   subject,
-		BodyMd:    body,
-		Priority:  priority,
-		CreatedAt: time.Now().Unix(),
-	})
-	if err != nil {
-		http.Error(w, "Failed to create message: "+err.Error(), http.StatusInternalServerError)
-		return
-	}
+		// Record activity via actor system (fire and forget).
+		s.recordActivity(ctx, activity.RecordActivityRequest{
+			AgentID:      senderID,
+			ActivityType: "message",
+			Description:  fmt.Sprintf("Sent \"%s\" to %s", subject, to),
+		})
+	} else {
+		// Fallback: direct DB calls.
+		// Find the recipient agent.
+		recipient, err := s.store.Queries().GetAgentByName(ctx, to)
+		if err != nil {
+			http.Error(w, "Recipient agent not found: "+to, http.StatusBadRequest)
+			return
+		}
 
-	// Create recipient entry.
-	err = s.store.Queries().CreateMessageRecipient(ctx, sqlc.CreateMessageRecipientParams{
-		MessageID: msg.ID,
-		AgentID:   recipient.ID,
-	})
-	if err != nil {
-		http.Error(w, "Failed to add recipient: "+err.Error(), http.StatusInternalServerError)
-		return
-	}
+		// Get or create the topic for the recipient's inbox.
+		topicName := "agent/" + to + "/inbox"
+		topic, err := s.store.Queries().GetTopicByName(ctx, topicName)
+		if err != nil {
+			// Create the topic if it doesn't exist.
+			topic, err = s.store.Queries().CreateTopic(ctx, sqlc.CreateTopicParams{
+				Name:             topicName,
+				TopicType:        "direct",
+				RetentionSeconds: sql.NullInt64{Int64: 604800, Valid: true},
+				CreatedAt:        time.Now().Unix(),
+			})
+			if err != nil {
+				http.Error(w, "Failed to create topic: "+err.Error(), http.StatusInternalServerError)
+				return
+			}
+		}
 
-	// Record activity for the message.
-	_, _ = s.store.Queries().CreateActivity(ctx, sqlc.CreateActivityParams{
-		AgentID:      senderID,
-		ActivityType: "message",
-		Description:  fmt.Sprintf("Sent \"%s\" to %s", subject, to),
-		Metadata:     sql.NullString{},
-		CreatedAt:    time.Now().Unix(),
-	})
+		// Generate thread ID for new message.
+		threadID := fmt.Sprintf("thread-%d-%d", time.Now().UnixNano(), senderID)
+
+		// Get next log offset.
+		maxOffsetResult, err := s.store.Queries().GetMaxLogOffset(ctx, topic.ID)
+		var nextOffset int64 = 1
+		if err == nil && maxOffsetResult != nil {
+			if offset, ok := maxOffsetResult.(int64); ok {
+				nextOffset = offset + 1
+			}
+		}
+
+		// Create the message.
+		msg, err := s.store.Queries().CreateMessage(ctx, sqlc.CreateMessageParams{
+			ThreadID:  threadID,
+			TopicID:   topic.ID,
+			LogOffset: nextOffset,
+			SenderID:  senderID,
+			Subject:   subject,
+			BodyMd:    body,
+			Priority:  priority,
+			CreatedAt: time.Now().Unix(),
+		})
+		if err != nil {
+			http.Error(w, "Failed to create message: "+err.Error(), http.StatusInternalServerError)
+			return
+		}
+
+		// Create recipient entry.
+		err = s.store.Queries().CreateMessageRecipient(ctx, sqlc.CreateMessageRecipientParams{
+			MessageID: msg.ID,
+			AgentID:   recipient.ID,
+		})
+		if err != nil {
+			http.Error(w, "Failed to add recipient: "+err.Error(), http.StatusInternalServerError)
+			return
+		}
+
+		// Record activity for the message.
+		_, _ = s.store.Queries().CreateActivity(ctx, sqlc.CreateActivityParams{
+			AgentID:      senderID,
+			ActivityType: "message",
+			Description:  fmt.Sprintf("Sent \"%s\" to %s", subject, to),
+			Metadata:     sql.NullString{},
+			CreatedAt:    time.Now().Unix(),
+		})
+	}
 
 	// Return success with HX-Trigger to close modal and refresh.
 	w.Header().Set("HX-Trigger", "messageSent")
@@ -2868,32 +2898,56 @@ func (s *Server) handleMessageStar(
 		return
 	}
 
-	// Get current state.
-	recipient, err := s.store.Queries().GetMessageRecipient(ctx, sqlc.GetMessageRecipientParams{
-		MessageID: messageID,
-		AgentID:   agentID,
-	})
-	if err != nil {
-		http.Error(w, "Message not found", http.StatusNotFound)
-		return
+	// Toggle star state - need to check current state first.
+	var currentState string
+	var newState string
+
+	if s.actorRefs.HasActors() {
+		// Get current state by reading the message.
+		readResp, err := s.readMessage(ctx, agentID, messageID)
+		if err != nil || readResp.Error != nil || readResp.Message == nil {
+			http.Error(w, "Message not found", http.StatusNotFound)
+			return
+		}
+		currentState = readResp.Message.State
+	} else {
+		// Fallback: direct DB call.
+		recipient, err := s.store.Queries().GetMessageRecipient(ctx, sqlc.GetMessageRecipientParams{
+			MessageID: messageID,
+			AgentID:   agentID,
+		})
+		if err != nil {
+			http.Error(w, "Message not found", http.StatusNotFound)
+			return
+		}
+		currentState = recipient.State
 	}
 
 	// Toggle star state.
-	newState := "starred"
-	if recipient.State == "starred" {
+	newState = "starred"
+	if currentState == "starred" {
 		newState = "read"
 	}
 
-	_, err = s.store.Queries().UpdateRecipientState(ctx, sqlc.UpdateRecipientStateParams{
-		State:     newState,
-		Column2:   newState,
-		ReadAt:    sql.NullInt64{Int64: time.Now().Unix(), Valid: true},
-		MessageID: messageID,
-		AgentID:   agentID,
-	})
-	if err != nil {
-		http.Error(w, "Failed to update state", http.StatusInternalServerError)
-		return
+	// Update state.
+	if s.actorRefs.HasActors() {
+		resp, err := s.updateMessageState(ctx, agentID, messageID, newState, nil)
+		if err != nil || resp.Error != nil {
+			http.Error(w, "Failed to update state", http.StatusInternalServerError)
+			return
+		}
+	} else {
+		_, err := s.store.Queries().UpdateRecipientState(ctx, sqlc.UpdateRecipientStateParams{
+			State:     newState,
+			Column2:   newState,
+			ReadAt:    sql.NullInt64{Int64: time.Now().Unix(), Valid: true},
+			MessageID: messageID,
+			AgentID:   agentID,
+		})
+		if err != nil {
+			http.Error(w, "Failed to update state", http.StatusInternalServerError)
+			return
+		}
 	}
 
 	// Return updated star button.
@@ -2924,16 +2978,24 @@ func (s *Server) handleMessageArchive(
 		return
 	}
 
-	_, err := s.store.Queries().UpdateRecipientState(ctx, sqlc.UpdateRecipientStateParams{
-		State:     "archived",
-		Column2:   "archived",
-		ReadAt:    sql.NullInt64{Int64: time.Now().Unix(), Valid: true},
-		MessageID: messageID,
-		AgentID:   agentID,
-	})
-	if err != nil {
-		http.Error(w, "Failed to archive message", http.StatusInternalServerError)
-		return
+	if s.actorRefs.HasActors() {
+		resp, err := s.updateMessageState(ctx, agentID, messageID, "archived", nil)
+		if err != nil || resp.Error != nil {
+			http.Error(w, "Failed to archive message", http.StatusInternalServerError)
+			return
+		}
+	} else {
+		_, err := s.store.Queries().UpdateRecipientState(ctx, sqlc.UpdateRecipientStateParams{
+			State:     "archived",
+			Column2:   "archived",
+			ReadAt:    sql.NullInt64{Int64: time.Now().Unix(), Valid: true},
+			MessageID: messageID,
+			AgentID:   agentID,
+		})
+		if err != nil {
+			http.Error(w, "Failed to archive message", http.StatusInternalServerError)
+			return
+		}
 	}
 
 	// Return empty response to remove the message from the list.
@@ -3024,16 +3086,24 @@ func (s *Server) handleMessageSnooze(
 		return
 	}
 
-	snoozedUntil := time.Now().Add(duration).Unix()
+	snoozedUntil := time.Now().Add(duration)
 
-	err = s.store.Queries().UpdateRecipientSnoozed(ctx, sqlc.UpdateRecipientSnoozedParams{
-		SnoozedUntil: sql.NullInt64{Int64: snoozedUntil, Valid: true},
-		MessageID:    messageID,
-		AgentID:      agentID,
-	})
-	if err != nil {
-		http.Error(w, "Failed to snooze message", http.StatusInternalServerError)
-		return
+	if s.actorRefs.HasActors() {
+		resp, err := s.updateMessageState(ctx, agentID, messageID, "snoozed", &snoozedUntil)
+		if err != nil || resp.Error != nil {
+			http.Error(w, "Failed to snooze message", http.StatusInternalServerError)
+			return
+		}
+	} else {
+		err = s.store.Queries().UpdateRecipientSnoozed(ctx, sqlc.UpdateRecipientSnoozedParams{
+			SnoozedUntil: sql.NullInt64{Int64: snoozedUntil.Unix(), Valid: true},
+			MessageID:    messageID,
+			AgentID:      agentID,
+		})
+		if err != nil {
+			http.Error(w, "Failed to snooze message", http.StatusInternalServerError)
+			return
+		}
 	}
 
 	// Return empty response to remove the message from the list.
@@ -3081,17 +3151,25 @@ func (s *Server) handleMessageTrash(
 		return
 	}
 
-	// Otherwise, update recipient state.
-	_, err = s.store.Queries().UpdateRecipientState(ctx, sqlc.UpdateRecipientStateParams{
-		State:     "trash",
-		Column2:   "trash",
-		ReadAt:    sql.NullInt64{Int64: time.Now().Unix(), Valid: true},
-		MessageID: messageID,
-		AgentID:   agentID,
-	})
-	if err != nil {
-		http.Error(w, "Failed to trash message", http.StatusInternalServerError)
-		return
+	// Update recipient state via actor or direct DB call.
+	if s.actorRefs.HasActors() {
+		resp, err := s.updateMessageState(ctx, agentID, messageID, "trash", nil)
+		if err != nil || resp.Error != nil {
+			http.Error(w, "Failed to trash message", http.StatusInternalServerError)
+			return
+		}
+	} else {
+		_, err = s.store.Queries().UpdateRecipientState(ctx, sqlc.UpdateRecipientStateParams{
+			State:     "trash",
+			Column2:   "trash",
+			ReadAt:    sql.NullInt64{Int64: time.Now().Unix(), Valid: true},
+			MessageID: messageID,
+			AgentID:   agentID,
+		})
+		if err != nil {
+			http.Error(w, "Failed to trash message", http.StatusInternalServerError)
+			return
+		}
 	}
 
 	// Return empty response to remove the message from the list.
@@ -3110,14 +3188,22 @@ func (s *Server) handleMessageAck(
 		return
 	}
 
-	err := s.store.Queries().UpdateRecipientAcked(ctx, sqlc.UpdateRecipientAckedParams{
-		AckedAt:   sql.NullInt64{Int64: time.Now().Unix(), Valid: true},
-		MessageID: messageID,
-		AgentID:   agentID,
-	})
-	if err != nil {
-		http.Error(w, "Failed to acknowledge message", http.StatusInternalServerError)
-		return
+	if s.actorRefs.HasActors() {
+		resp, err := s.ackMessage(ctx, agentID, messageID)
+		if err != nil || resp.Error != nil {
+			http.Error(w, "Failed to acknowledge message", http.StatusInternalServerError)
+			return
+		}
+	} else {
+		err := s.store.Queries().UpdateRecipientAcked(ctx, sqlc.UpdateRecipientAckedParams{
+			AckedAt:   sql.NullInt64{Int64: time.Now().Unix(), Valid: true},
+			MessageID: messageID,
+			AgentID:   agentID,
+		})
+		if err != nil {
+			http.Error(w, "Failed to acknowledge message", http.StatusInternalServerError)
+			return
+		}
 	}
 
 	w.Header().Set("Content-Type", "text/html")
