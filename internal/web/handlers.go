@@ -941,8 +941,8 @@ func (s *Server) convertStarredToView(
 		sender, err := s.store.Queries().GetAgent(ctx, m.SenderID)
 		if err == nil {
 			senderName = formatAgentDisplayName(
-					sender.Name, sender.ProjectKey.String, sender.GitBranch.String,
-				)
+				sender.Name, sender.ProjectKey.String, sender.GitBranch.String,
+			)
 		}
 
 		messages[i] = MessageView{
@@ -972,8 +972,8 @@ func (s *Server) convertSnoozedToView(
 		sender, err := s.store.Queries().GetAgent(ctx, m.SenderID)
 		if err == nil {
 			senderName = formatAgentDisplayName(
-					sender.Name, sender.ProjectKey.String, sender.GitBranch.String,
-				)
+				sender.Name, sender.ProjectKey.String, sender.GitBranch.String,
+			)
 		}
 
 		messages[i] = MessageView{
@@ -1003,8 +1003,8 @@ func (s *Server) convertArchivedToView(
 		sender, err := s.store.Queries().GetAgent(ctx, m.SenderID)
 		if err == nil {
 			senderName = formatAgentDisplayName(
-					sender.Name, sender.ProjectKey.String, sender.GitBranch.String,
-				)
+				sender.Name, sender.ProjectKey.String, sender.GitBranch.String,
+			)
 		}
 
 		messages[i] = MessageView{
@@ -1034,8 +1034,8 @@ func (s *Server) convertSentMessagesToView(
 		sender, err := s.store.Queries().GetAgent(ctx, m.SenderID)
 		if err == nil {
 			senderName = formatAgentDisplayName(
-					sender.Name, sender.ProjectKey.String, sender.GitBranch.String,
-				)
+				sender.Name, sender.ProjectKey.String, sender.GitBranch.String,
+			)
 		}
 
 		messages[i] = MessageView{
@@ -1113,8 +1113,8 @@ func (s *Server) handleTopicView(w http.ResponseWriter, r *http.Request) {
 		sender, err := s.store.Queries().GetAgent(ctx, m.SenderID)
 		if err == nil {
 			senderName = formatAgentDisplayName(
-					sender.Name, sender.ProjectKey.String, sender.GitBranch.String,
-				)
+				sender.Name, sender.ProjectKey.String, sender.GitBranch.String,
+			)
 		}
 
 		messages[i] = MessageView{
@@ -1241,8 +1241,8 @@ func (s *Server) handleSearch(w http.ResponseWriter, r *http.Request) {
 		senderName := fmt.Sprintf("Agent#%d", result.SenderID)
 		if sender, err := s.store.Queries().GetAgent(ctx, result.SenderID); err == nil {
 			senderName = formatAgentDisplayName(
-					sender.Name, sender.ProjectKey.String, sender.GitBranch.String,
-				)
+				sender.Name, sender.ProjectKey.String, sender.GitBranch.String,
+			)
 		}
 
 		// Format time.
@@ -2514,8 +2514,8 @@ func (s *Server) renderThreadView(ctx context.Context, w http.ResponseWriter, th
 		sender, err := s.store.Queries().GetAgent(ctx, m.SenderID)
 		if err == nil {
 			senderName = formatAgentDisplayName(
-					sender.Name, sender.ProjectKey.String, sender.GitBranch.String,
-				)
+				sender.Name, sender.ProjectKey.String, sender.GitBranch.String,
+			)
 		}
 
 		// Get avatar initial.
