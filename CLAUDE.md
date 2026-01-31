@@ -11,18 +11,28 @@ Subtrate is a central command center for managing Claude Code agents with mail/m
 - **substrate** (`cmd/substrate`) - Command-line interface for mail operations
 - **Mail Service** (`internal/mail`) - Core messaging with actor pattern
 - **Agent Registry** (`internal/agent`) - Agent identity and registration
-- **Web UI** (`internal/web`) - HTMX-based web interface served by substrated
+- **Web API** (`internal/web`) - JSON API and embedded React frontend
+- **React Frontend** (`web/frontend`) - React + TypeScript SPA with Vite
 
 ## Essential Commands
 
 ### Building and Testing
 - `make build` - Compile all packages
 - `make build-all` - Build CLI and MCP binaries
+- `make build-production` - Build daemon with embedded frontend (production)
 - `make test` - Run all tests (includes FTS5 CGO flags)
 - `make test-cover` - Run tests with coverage summary
 - `make lint` - Run the linter (must pass before committing)
 - `make fmt` - Format all Go source files
 - `make clean` - Remove build artifacts
+
+### Frontend Commands
+- `make bun-install` - Install frontend dependencies
+- `make bun-build` - Build frontend for production
+- `make bun-dev` - Start frontend dev server (port 5174)
+- `make bun-test` - Run frontend unit/integration tests
+- `make bun-test-e2e` - Run Playwright E2E tests
+- `make bun-lint` - Lint frontend code
 
 ### Code Generation
 - `make sqlc` - Regenerate type-safe database queries (after schema/query changes)
@@ -292,7 +302,118 @@ replace github.com/lightninglabs/darepo-client => /Users/roasbeef/gocode/src/git
 - `github.com/lightningnetwork/lnd/fn/v2` - Result type
 - `github.com/mattn/go-sqlite3` - SQLite driver with CGO
 
-## HTMX Frontend Development
+## React Frontend Development
+
+The web UI is a React + TypeScript SPA built with Vite and bun, located in `web/frontend/`.
+
+### Tech Stack
+- **React 18** with TypeScript (strict mode)
+- **Vite** for build tooling
+- **bun** as package manager
+- **TanStack Query** for server state management
+- **Zustand** for client state
+- **Tailwind CSS** for styling
+- **Headless UI** for accessible components
+- **Playwright** for E2E testing
+
+### Project Structure
+```
+web/frontend/
+├── src/
+│   ├── api/           # API client layer (typed fetch)
+│   ├── components/    # React components
+│   │   ├── ui/        # Reusable UI components
+│   │   ├── layout/    # Layout components
+│   │   ├── inbox/     # Inbox feature
+│   │   ├── agents/    # Agents feature
+│   │   └── sessions/  # Sessions feature
+│   ├── hooks/         # Custom React hooks
+│   ├── stores/        # Zustand stores
+│   ├── pages/         # Page components
+│   ├── lib/           # Utility functions
+│   └── types/         # TypeScript types
+├── tests/
+│   ├── unit/          # Vitest unit tests
+│   ├── integration/   # Component tests
+│   └── e2e/           # Playwright E2E tests
+└── dist/              # Build output (embedded in Go binary)
+```
+
+### Development Workflow
+```bash
+# Install dependencies
+make bun-install
+
+# Start dev server (runs on port 5174)
+make bun-dev
+
+# Run Go backend (runs on port 8081)
+make run
+
+# The Vite dev server proxies /api/* and /ws to Go backend
+```
+
+### API Client Patterns
+All API calls go through the typed client in `src/api/`:
+```typescript
+import { api } from '@/api/client';
+
+// Fetch messages with TanStack Query
+const { data, isLoading, error } = useQuery({
+  queryKey: ['messages', filter],
+  queryFn: () => api.messages.list(filter),
+});
+
+// Mutations with optimistic updates
+const mutation = useMutation({
+  mutationFn: api.messages.star,
+  onMutate: async (id) => {
+    // Optimistic update
+  },
+});
+```
+
+### WebSocket Integration
+Real-time updates use WebSocket via `src/api/websocket.ts`:
+```typescript
+const { isConnected, lastMessage } = useWebSocket({
+  onMessage: (event) => {
+    queryClient.invalidateQueries(['messages']);
+  },
+});
+```
+
+### Component Patterns
+- Components use **inline SVG icons** (no external icon library)
+- Use **Headless UI** for modals, dropdowns, tabs
+- Follow **Tailwind CSS** conventions for styling
+- Export **named exports** for components
+
+### Testing
+```bash
+# Run all frontend tests
+make bun-test
+
+# Run E2E tests
+make bun-test-e2e
+
+# Run tests in watch mode
+cd web/frontend && bun run test:watch
+```
+
+### Production Build
+```bash
+# Build frontend and embed in Go binary
+make build-production
+
+# The built files are embedded via //go:embed in web/frontend_embed.go
+```
+
+---
+
+## HTMX Frontend Development (Legacy)
+
+> **Note**: The HTMX frontend is being replaced by React. This section is kept for reference.
 
 ### References
 - **Documentation**: https://htmx.org/docs/
