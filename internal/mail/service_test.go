@@ -8,12 +8,12 @@ import (
 	"time"
 
 	"github.com/roasbeef/subtrate/internal/db"
-	"github.com/roasbeef/subtrate/internal/db/sqlc"
+	"github.com/roasbeef/subtrate/internal/store"
 	"github.com/stretchr/testify/require"
 )
 
 // testDB creates a temporary test database with migrations applied.
-func testDB(t *testing.T) (*db.Store, func()) {
+func testDB(t *testing.T) (store.Storage, func()) {
 	t.Helper()
 
 	// Create temp directory for test database.
@@ -23,22 +23,25 @@ func testDB(t *testing.T) (*db.Store, func()) {
 	dbPath := filepath.Join(tmpDir, "test.db")
 
 	// Open database.
-	store, err := db.Open(dbPath)
+	sqlDB, err := db.OpenSQLite(dbPath)
 	require.NoError(t, err)
 
 	// Find migrations directory.
 	migrationsDir := findMigrationsDir(t)
 
 	// Run migrations.
-	err = db.RunMigrations(store.DB(), migrationsDir)
+	err = db.RunMigrations(sqlDB, migrationsDir)
 	require.NoError(t, err)
 
+	// Create the storage implementation.
+	storage := store.FromDB(sqlDB)
+
 	cleanup := func() {
-		store.Close()
+		storage.Close()
 		os.RemoveAll(tmpDir)
 	}
 
-	return store, cleanup
+	return storage, cleanup
 }
 
 // findMigrationsDir locates the migrations directory relative to the test.
@@ -69,12 +72,11 @@ func findMigrationsDir(t *testing.T) string {
 }
 
 // createTestAgent creates an agent for testing.
-func createTestAgent(t *testing.T, store *db.Store, name string) sqlc.Agent {
+func createTestAgent(t *testing.T, storage store.Storage, name string) store.Agent {
 	t.Helper()
 
-	agent, err := store.Queries().CreateAgent(context.Background(), sqlc.CreateAgentParams{
-		Name:      name,
-		CreatedAt: time.Now().Unix(),
+	agent, err := storage.CreateAgent(context.Background(), store.CreateAgentParams{
+		Name: name,
 	})
 	require.NoError(t, err)
 
@@ -82,13 +84,12 @@ func createTestAgent(t *testing.T, store *db.Store, name string) sqlc.Agent {
 }
 
 // createTestTopic creates a topic for testing.
-func createTestTopic(t *testing.T, store *db.Store, name, topicType string) sqlc.Topic {
+func createTestTopic(t *testing.T, storage store.Storage, name, topicType string) store.Topic {
 	t.Helper()
 
-	topic, err := store.Queries().CreateTopic(context.Background(), sqlc.CreateTopicParams{
+	topic, err := storage.CreateTopic(context.Background(), store.CreateTopicParams{
 		Name:      name,
 		TopicType: topicType,
-		CreatedAt: time.Now().Unix(),
 	})
 	require.NoError(t, err)
 
@@ -96,15 +97,15 @@ func createTestTopic(t *testing.T, store *db.Store, name, topicType string) sqlc
 }
 
 func TestService_SendMail(t *testing.T) {
-	store, cleanup := testDB(t)
+	storage, cleanup := testDB(t)
 	defer cleanup()
 
-	svc := NewService(store)
+	svc := NewService(storage)
 	ctx := context.Background()
 
 	// Create sender and recipient agents.
-	sender := createTestAgent(t, store, "Sender")
-	recipient := createTestAgent(t, store, "Recipient")
+	sender := createTestAgent(t, storage, "Sender")
+	recipient := createTestAgent(t, storage, "Recipient")
 
 	// Send a message.
 	req := SendMailRequest{
@@ -126,14 +127,14 @@ func TestService_SendMail(t *testing.T) {
 }
 
 func TestService_SendMail_WithThread(t *testing.T) {
-	store, cleanup := testDB(t)
+	storage, cleanup := testDB(t)
 	defer cleanup()
 
-	svc := NewService(store)
+	svc := NewService(storage)
 	ctx := context.Background()
 
-	sender := createTestAgent(t, store, "Sender")
-	recipient := createTestAgent(t, store, "Recipient")
+	sender := createTestAgent(t, storage, "Sender")
+	recipient := createTestAgent(t, storage, "Recipient")
 
 	// Send first message.
 	req1 := SendMailRequest{
@@ -169,14 +170,14 @@ func TestService_SendMail_WithThread(t *testing.T) {
 }
 
 func TestService_FetchInbox(t *testing.T) {
-	store, cleanup := testDB(t)
+	storage, cleanup := testDB(t)
 	defer cleanup()
 
-	svc := NewService(store)
+	svc := NewService(storage)
 	ctx := context.Background()
 
-	sender := createTestAgent(t, store, "Sender")
-	recipient := createTestAgent(t, store, "Recipient")
+	sender := createTestAgent(t, storage, "Sender")
+	recipient := createTestAgent(t, storage, "Recipient")
 
 	// Send a few messages.
 	for i := 0; i < 3; i++ {
@@ -211,14 +212,14 @@ func TestService_FetchInbox(t *testing.T) {
 }
 
 func TestService_FetchInbox_UnreadOnly(t *testing.T) {
-	store, cleanup := testDB(t)
+	storage, cleanup := testDB(t)
 	defer cleanup()
 
-	svc := NewService(store)
+	svc := NewService(storage)
 	ctx := context.Background()
 
-	sender := createTestAgent(t, store, "Sender")
-	recipient := createTestAgent(t, store, "Recipient")
+	sender := createTestAgent(t, storage, "Sender")
+	recipient := createTestAgent(t, storage, "Recipient")
 
 	// Send messages.
 	var messageIDs []int64
@@ -265,14 +266,14 @@ func TestService_FetchInbox_UnreadOnly(t *testing.T) {
 }
 
 func TestService_ReadMessage(t *testing.T) {
-	store, cleanup := testDB(t)
+	storage, cleanup := testDB(t)
 	defer cleanup()
 
-	svc := NewService(store)
+	svc := NewService(storage)
 	ctx := context.Background()
 
-	sender := createTestAgent(t, store, "Sender")
-	recipient := createTestAgent(t, store, "Recipient")
+	sender := createTestAgent(t, storage, "Sender")
+	recipient := createTestAgent(t, storage, "Recipient")
 
 	// Send a message.
 	sendReq := SendMailRequest{
@@ -309,14 +310,14 @@ func TestService_ReadMessage(t *testing.T) {
 }
 
 func TestService_UpdateState(t *testing.T) {
-	store, cleanup := testDB(t)
+	storage, cleanup := testDB(t)
 	defer cleanup()
 
-	svc := NewService(store)
+	svc := NewService(storage)
 	ctx := context.Background()
 
-	sender := createTestAgent(t, store, "Sender")
-	recipient := createTestAgent(t, store, "Recipient")
+	sender := createTestAgent(t, storage, "Sender")
+	recipient := createTestAgent(t, storage, "Recipient")
 
 	// Send a message.
 	sendReq := SendMailRequest{
@@ -349,14 +350,14 @@ func TestService_UpdateState(t *testing.T) {
 }
 
 func TestService_UpdateState_Snooze(t *testing.T) {
-	store, cleanup := testDB(t)
+	storage, cleanup := testDB(t)
 	defer cleanup()
 
-	svc := NewService(store)
+	svc := NewService(storage)
 	ctx := context.Background()
 
-	sender := createTestAgent(t, store, "Sender")
-	recipient := createTestAgent(t, store, "Recipient")
+	sender := createTestAgent(t, storage, "Sender")
+	recipient := createTestAgent(t, storage, "Recipient")
 
 	// Send a message.
 	sendReq := SendMailRequest{
@@ -391,14 +392,14 @@ func TestService_UpdateState_Snooze(t *testing.T) {
 }
 
 func TestService_AckMessage(t *testing.T) {
-	store, cleanup := testDB(t)
+	storage, cleanup := testDB(t)
 	defer cleanup()
 
-	svc := NewService(store)
+	svc := NewService(storage)
 	ctx := context.Background()
 
-	sender := createTestAgent(t, store, "Sender")
-	recipient := createTestAgent(t, store, "Recipient")
+	sender := createTestAgent(t, storage, "Sender")
+	recipient := createTestAgent(t, storage, "Recipient")
 
 	// Send a message with deadline.
 	deadline := time.Now().Add(time.Hour)
@@ -432,14 +433,14 @@ func TestService_AckMessage(t *testing.T) {
 }
 
 func TestService_GetStatus(t *testing.T) {
-	store, cleanup := testDB(t)
+	storage, cleanup := testDB(t)
 	defer cleanup()
 
-	svc := NewService(store)
+	svc := NewService(storage)
 	ctx := context.Background()
 
-	sender := createTestAgent(t, store, "Sender")
-	recipient := createTestAgent(t, store, "Recipient")
+	sender := createTestAgent(t, storage, "Sender")
+	recipient := createTestAgent(t, storage, "Recipient")
 
 	// Send messages with different priorities.
 	for _, priority := range []Priority{PriorityUrgent, PriorityNormal, PriorityLow} {
@@ -476,33 +477,25 @@ func TestService_GetStatus(t *testing.T) {
 }
 
 func TestService_Publish(t *testing.T) {
-	store, cleanup := testDB(t)
+	storage, cleanup := testDB(t)
 	defer cleanup()
 
-	svc := NewService(store)
+	svc := NewService(storage)
 	ctx := context.Background()
 
 	// Create publisher and subscribers.
-	publisher := createTestAgent(t, store, "Publisher")
-	sub1 := createTestAgent(t, store, "Subscriber1")
-	sub2 := createTestAgent(t, store, "Subscriber2")
+	publisher := createTestAgent(t, storage, "Publisher")
+	sub1 := createTestAgent(t, storage, "Subscriber1")
+	sub2 := createTestAgent(t, storage, "Subscriber2")
 
 	// Create a topic.
-	topic := createTestTopic(t, store, "announcements", "broadcast")
+	topic := createTestTopic(t, storage, "announcements", "broadcast")
 
 	// Subscribe agents to topic.
-	err := store.Queries().CreateSubscription(ctx, sqlc.CreateSubscriptionParams{
-		AgentID:      sub1.ID,
-		TopicID:      topic.ID,
-		SubscribedAt: time.Now().Unix(),
-	})
+	err := storage.CreateSubscription(ctx, sub1.ID, topic.ID)
 	require.NoError(t, err)
 
-	err = store.Queries().CreateSubscription(ctx, sqlc.CreateSubscriptionParams{
-		AgentID:      sub2.ID,
-		TopicID:      topic.ID,
-		SubscribedAt: time.Now().Unix(),
-	})
+	err = storage.CreateSubscription(ctx, sub2.ID, topic.ID)
 	require.NoError(t, err)
 
 	// Publish a message.
@@ -525,23 +518,19 @@ func TestService_Publish(t *testing.T) {
 }
 
 func TestService_PollChanges(t *testing.T) {
-	store, cleanup := testDB(t)
+	storage, cleanup := testDB(t)
 	defer cleanup()
 
-	svc := NewService(store)
+	svc := NewService(storage)
 	ctx := context.Background()
 
 	// Create agents.
-	sender := createTestAgent(t, store, "Sender")
-	recipient := createTestAgent(t, store, "Recipient")
+	sender := createTestAgent(t, storage, "Sender")
+	recipient := createTestAgent(t, storage, "Recipient")
 
 	// Create a topic and subscribe.
-	topic := createTestTopic(t, store, "notifications", "broadcast")
-	err := store.Queries().CreateSubscription(ctx, sqlc.CreateSubscriptionParams{
-		AgentID:      recipient.ID,
-		TopicID:      topic.ID,
-		SubscribedAt: time.Now().Unix(),
-	})
+	topic := createTestTopic(t, storage, "notifications", "broadcast")
+	err := storage.CreateSubscription(ctx, recipient.ID, topic.ID)
 	require.NoError(t, err)
 
 	// Publish some messages.
@@ -605,10 +594,10 @@ func TestService_PollChanges(t *testing.T) {
 }
 
 func TestService_UnknownMessageType(t *testing.T) {
-	store, cleanup := testDB(t)
+	storage, cleanup := testDB(t)
 	defer cleanup()
 
-	svc := NewService(store)
+	svc := NewService(storage)
 	ctx := context.Background()
 
 	// Create a fake message type that implements MailRequest.
@@ -621,13 +610,13 @@ func TestService_UnknownMessageType(t *testing.T) {
 }
 
 func TestService_ReadMessage_NotFound(t *testing.T) {
-	store, cleanup := testDB(t)
+	storage, cleanup := testDB(t)
 	defer cleanup()
 
-	svc := NewService(store)
+	svc := NewService(storage)
 	ctx := context.Background()
 
-	recipient := createTestAgent(t, store, "Recipient")
+	recipient := createTestAgent(t, storage, "Recipient")
 
 	// Try to read non-existent message.
 	readReq := ReadMessageRequest{
@@ -644,13 +633,13 @@ func TestService_ReadMessage_NotFound(t *testing.T) {
 }
 
 func TestService_UpdateState_NonExistentMessage(t *testing.T) {
-	store, cleanup := testDB(t)
+	storage, cleanup := testDB(t)
 	defer cleanup()
 
-	svc := NewService(store)
+	svc := NewService(storage)
 	ctx := context.Background()
 
-	agent := createTestAgent(t, store, "Agent")
+	agent := createTestAgent(t, storage, "Agent")
 
 	// SQLite UPDATE succeeds even when no rows match (no rows affected).
 	// The service reports success because the query completed without error.
@@ -671,13 +660,13 @@ func TestService_UpdateState_NonExistentMessage(t *testing.T) {
 }
 
 func TestService_AckMessage_NonExistentMessage(t *testing.T) {
-	store, cleanup := testDB(t)
+	storage, cleanup := testDB(t)
 	defer cleanup()
 
-	svc := NewService(store)
+	svc := NewService(storage)
 	ctx := context.Background()
 
-	agent := createTestAgent(t, store, "Agent")
+	agent := createTestAgent(t, storage, "Agent")
 
 	// SQLite UPDATE succeeds even when no rows match (no rows affected).
 	// The service reports success because the query completed without error.
@@ -697,13 +686,13 @@ func TestService_AckMessage_NonExistentMessage(t *testing.T) {
 }
 
 func TestService_Publish_TopicNotFound(t *testing.T) {
-	store, cleanup := testDB(t)
+	storage, cleanup := testDB(t)
 	defer cleanup()
 
-	svc := NewService(store)
+	svc := NewService(storage)
 	ctx := context.Background()
 
-	publisher := createTestAgent(t, store, "Publisher")
+	publisher := createTestAgent(t, storage, "Publisher")
 
 	// Try to publish to non-existent topic.
 	pubReq := PublishRequest{
@@ -723,13 +712,13 @@ func TestService_Publish_TopicNotFound(t *testing.T) {
 }
 
 func TestService_SendMail_RecipientNotFound(t *testing.T) {
-	store, cleanup := testDB(t)
+	storage, cleanup := testDB(t)
 	defer cleanup()
 
-	svc := NewService(store)
+	svc := NewService(storage)
 	ctx := context.Background()
 
-	sender := createTestAgent(t, store, "Sender")
+	sender := createTestAgent(t, storage, "Sender")
 
 	// Try to send to non-existent recipient.
 	req := SendMailRequest{
@@ -750,13 +739,13 @@ func TestService_SendMail_RecipientNotFound(t *testing.T) {
 }
 
 func TestService_GetStatus_NoMessages(t *testing.T) {
-	store, cleanup := testDB(t)
+	storage, cleanup := testDB(t)
 	defer cleanup()
 
-	svc := NewService(store)
+	svc := NewService(storage)
 	ctx := context.Background()
 
-	agent := createTestAgent(t, store, "Agent")
+	agent := createTestAgent(t, storage, "Agent")
 
 	// Get status with no messages.
 	statusReq := GetStatusRequest{
@@ -774,14 +763,14 @@ func TestService_GetStatus_NoMessages(t *testing.T) {
 }
 
 func TestService_UpdateState_Archive(t *testing.T) {
-	store, cleanup := testDB(t)
+	storage, cleanup := testDB(t)
 	defer cleanup()
 
-	svc := NewService(store)
+	svc := NewService(storage)
 	ctx := context.Background()
 
-	sender := createTestAgent(t, store, "Sender")
-	recipient := createTestAgent(t, store, "Recipient")
+	sender := createTestAgent(t, storage, "Sender")
+	recipient := createTestAgent(t, storage, "Recipient")
 
 	// Send a message.
 	sendReq := SendMailRequest{
@@ -814,14 +803,14 @@ func TestService_UpdateState_Archive(t *testing.T) {
 }
 
 func TestService_UpdateState_Trash(t *testing.T) {
-	store, cleanup := testDB(t)
+	storage, cleanup := testDB(t)
 	defer cleanup()
 
-	svc := NewService(store)
+	svc := NewService(storage)
 	ctx := context.Background()
 
-	sender := createTestAgent(t, store, "Sender")
-	recipient := createTestAgent(t, store, "Recipient")
+	sender := createTestAgent(t, storage, "Sender")
+	recipient := createTestAgent(t, storage, "Recipient")
 
 	// Send a message.
 	sendReq := SendMailRequest{
