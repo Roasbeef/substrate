@@ -16,6 +16,7 @@ import (
 	"github.com/roasbeef/subtrate/internal/db"
 	"github.com/roasbeef/subtrate/internal/db/sqlc"
 	"github.com/roasbeef/subtrate/internal/mail"
+	"github.com/roasbeef/subtrate/internal/store"
 	"github.com/roasbeef/subtrate/internal/web"
 	"github.com/stretchr/testify/require"
 )
@@ -54,12 +55,12 @@ func newHTTPTestEnv(t *testing.T) *httpTestEnv {
 	dbPath := filepath.Join(tmpDir, "test.db")
 
 	// Open database.
-	store, err := db.Open(dbPath)
+	dbStore, err := db.Open(dbPath)
 	require.NoError(t, err)
 
 	// Find and run migrations.
 	migrationsDir := findMigrationsDir(t)
-	err = db.RunMigrations(store.DB(), migrationsDir)
+	err = db.RunMigrations(dbStore.DB(), migrationsDir)
 	require.NoError(t, err)
 
 	// Find a free port.
@@ -72,7 +73,7 @@ func newHTTPTestEnv(t *testing.T) *httpTestEnv {
 	cfg := web.DefaultConfig()
 	cfg.Addr = addr
 
-	server, err := web.NewServer(cfg, store)
+	server, err := web.NewServer(cfg, dbStore)
 	require.NoError(t, err)
 
 	// Start server in background.
@@ -87,11 +88,11 @@ func newHTTPTestEnv(t *testing.T) *httpTestEnv {
 	waitForServer(t, addr)
 
 	// Create mail service for setup.
-	mailSvc := mail.NewService(store)
+	mailSvc := mail.NewService(store.FromDB(dbStore.DB()))
 
 	env := &httpTestEnv{
 		t:       t,
-		store:   store,
+		store:   dbStore,
 		server:  server,
 		addr:    addr,
 		mailSvc: mailSvc,
@@ -102,7 +103,7 @@ func newHTTPTestEnv(t *testing.T) *httpTestEnv {
 
 	env.cleanups = append(env.cleanups, func() {
 		server.Shutdown(context.Background())
-		store.Close()
+		dbStore.Close()
 		os.RemoveAll(tmpDir)
 	})
 

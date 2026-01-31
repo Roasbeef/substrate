@@ -17,6 +17,7 @@ import (
 	"github.com/roasbeef/subtrate/internal/db"
 	"github.com/roasbeef/subtrate/internal/mail"
 	"github.com/roasbeef/subtrate/internal/mcp"
+	"github.com/roasbeef/subtrate/internal/store"
 	"github.com/roasbeef/subtrate/internal/web"
 )
 
@@ -52,12 +53,13 @@ func main() {
 	defer sqliteStore.Close()
 
 	// Get the underlying store for services.
-	store := sqliteStore.Store
+	dbStore := sqliteStore.Store
+	storage := store.FromDB(dbStore.DB())
 
 	// Create core services.
-	mailSvc := mail.NewService(store)
-	agentReg := agent.NewRegistry(store)
-	identityMgr, err := agent.NewIdentityManager(store, agentReg)
+	mailSvc := mail.NewService(storage)
+	agentReg := agent.NewRegistry(dbStore)
+	identityMgr, err := agent.NewIdentityManager(dbStore, agentReg)
 	if err != nil {
 		log.Fatalf("Failed to create identity manager: %v", err)
 	}
@@ -77,7 +79,7 @@ func main() {
 	// Create the MCP server (unless web-only mode).
 	var mcpServer *mcp.Server
 	if !*webOnly {
-		mcpServer = mcp.NewServer(store)
+		mcpServer = mcp.NewServer(dbStore)
 	}
 
 	// Set up signal handling for graceful shutdown.
@@ -101,7 +103,7 @@ func main() {
 
 		// Pass the notification hub actor for gRPC streaming RPCs.
 		grpcServer = subtraterpc.NewServer(
-			grpcCfg, store, mailSvc, agentReg, identityMgr,
+			grpcCfg, dbStore, mailSvc, agentReg, identityMgr,
 			notificationHub,
 		)
 		if err := grpcServer.Start(); err != nil {
@@ -116,7 +118,7 @@ func main() {
 		webCfg := web.DefaultConfig()
 		webCfg.Addr = *webAddr
 
-		webServer, err := web.NewServer(webCfg, store)
+		webServer, err := web.NewServer(webCfg, dbStore)
 		if err != nil {
 			log.Fatalf("Failed to create web server: %v", err)
 		}

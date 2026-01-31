@@ -11,6 +11,7 @@ import (
 	"github.com/roasbeef/subtrate/internal/db"
 	"github.com/roasbeef/subtrate/internal/db/sqlc"
 	"github.com/roasbeef/subtrate/internal/mail"
+	"github.com/roasbeef/subtrate/internal/store"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 )
@@ -127,21 +128,21 @@ func tryGRPCConnection(addr string) (*Client, error) {
 
 // getDirectClient creates a client that directly accesses the database.
 func getDirectClient() (*Client, error) {
-	store, err := getStore()
+	dbStore, err := getStore()
 	if err != nil {
 		return nil, fmt.Errorf("failed to open database: %w", err)
 	}
 
-	registry := agent.NewRegistry(store)
-	identityMgr, err := agent.NewIdentityManager(store, registry)
+	registry := agent.NewRegistry(dbStore)
+	identityMgr, err := agent.NewIdentityManager(dbStore, registry)
 	if err != nil {
-		store.Close()
+		dbStore.Close()
 		return nil, fmt.Errorf("failed to create identity manager: %w", err)
 	}
 
 	return &Client{
-		store:       store,
-		mailService: mail.NewService(store),
+		store:       dbStore,
+		mailService: mail.NewService(store.FromDB(dbStore.DB())),
 		registry:    registry,
 		identityMgr: identityMgr,
 		mode:        ModeDirect,

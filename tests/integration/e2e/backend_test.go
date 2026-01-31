@@ -10,6 +10,7 @@ import (
 	"github.com/roasbeef/subtrate/internal/db"
 	"github.com/roasbeef/subtrate/internal/db/sqlc"
 	"github.com/roasbeef/subtrate/internal/mail"
+	"github.com/roasbeef/subtrate/internal/store"
 	"github.com/stretchr/testify/require"
 )
 
@@ -43,28 +44,28 @@ func newTestEnv(t *testing.T) *testEnv {
 	dbPath := filepath.Join(tmpDir, "test.db")
 
 	// Open database.
-	store, err := db.Open(dbPath)
+	dbStore, err := db.Open(dbPath)
 	require.NoError(t, err)
 
 	// Find and run migrations.
 	migrationsDir := findMigrationsDir(t)
-	err = db.RunMigrations(store.DB(), migrationsDir)
+	err = db.RunMigrations(dbStore.DB(), migrationsDir)
 	require.NoError(t, err)
 
 	// Create services.
-	mailSvc := mail.NewService(store)
+	mailSvc := mail.NewService(store.FromDB(dbStore.DB()))
 
 	env := &testEnv{
 		t:       t,
 		dbPath:  dbPath,
-		store:   store,
+		store:   dbStore,
 		mailSvc: mailSvc,
 		agents:  make(map[string]sqlc.Agent),
 		topics:  make(map[string]sqlc.Topic),
 	}
 
 	env.cleanups = append(env.cleanups, func() {
-		store.Close()
+		dbStore.Close()
 		os.RemoveAll(tmpDir)
 	})
 
