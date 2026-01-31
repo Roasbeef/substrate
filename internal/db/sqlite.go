@@ -252,16 +252,31 @@ func Open(dbPath string) (*Store, error) {
 // RunMigrations applies all pending database migrations using the legacy
 // method of reading from file. Prefer NewSqliteStore which uses golang-migrate.
 func RunMigrations(db *sql.DB, migrationsDir string) error {
-	// Read and execute the init migration.
-	initPath := filepath.Join(migrationsDir, "000001_init.up.sql")
+	// Apply migrations in order up to the latest version.
+	for i := uint(1); i <= LatestMigrationVersion; i++ {
+		migrationPath := filepath.Join(
+			migrationsDir,
+			fmt.Sprintf("%06d_*.up.sql", i),
+		)
 
-	migrationSQL, err := os.ReadFile(initPath)
-	if err != nil {
-		return fmt.Errorf("failed to read migration file: %w", err)
-	}
+		// Find the migration file matching the pattern.
+		matches, err := filepath.Glob(migrationPath)
+		if err != nil {
+			return fmt.Errorf("failed to find migration %d: %w", i, err)
+		}
 
-	if _, err := db.Exec(string(migrationSQL)); err != nil {
-		return fmt.Errorf("failed to execute migration: %w", err)
+		if len(matches) == 0 {
+			return fmt.Errorf("migration %d not found", i)
+		}
+
+		migrationSQL, err := os.ReadFile(matches[0])
+		if err != nil {
+			return fmt.Errorf("failed to read migration %d: %w", i, err)
+		}
+
+		if _, err := db.Exec(string(migrationSQL)); err != nil {
+			return fmt.Errorf("failed to execute migration %d: %w", i, err)
+		}
 	}
 
 	return nil
