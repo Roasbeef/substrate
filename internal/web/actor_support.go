@@ -57,8 +57,34 @@ func (s *Server) ackMessage(
 	})
 }
 
+// getAgentStatus gets an agent's mail status via the actor system.
+func (s *Server) getAgentStatus(
+	ctx context.Context, agentID int64,
+) (mail.GetStatusResponse, error) {
+	return actorutil.AskAwaitTyped[
+		mail.MailRequest, mail.MailResponse, mail.GetStatusResponse,
+	](ctx, s.mailRef, mail.GetStatusRequest{
+		AgentID: agentID,
+	})
+}
+
 // recordActivity records an activity event via the actor system.
 func (s *Server) recordActivity(ctx context.Context, req activity.RecordActivityRequest) {
 	// Fire and forget.
 	s.activityRef.Tell(ctx, req)
+}
+
+// listRecentActivities lists recent activities via the actor system.
+func (s *Server) listRecentActivities(
+	ctx context.Context, limit int,
+) ([]activity.Activity, error) {
+	resp, err := actorutil.AskAwaitTyped[
+		activity.ActivityRequest, activity.ActivityResponse,
+		activity.ListRecentResponse,
+	](ctx, s.activityRef, activity.ListRecentRequest{Limit: limit})
+	if err != nil {
+		return nil, err
+	}
+
+	return resp.Activities, resp.Error
 }
