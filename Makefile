@@ -12,6 +12,7 @@ export CGO_CFLAGS := -DSQLITE_ENABLE_FTS5
 # Variables
 PKG := ./...
 TIMEOUT := 5m
+FRONTEND_DIR := web/frontend
 
 # Build targets
 .PHONY: build
@@ -28,6 +29,36 @@ build-daemon:
 
 .PHONY: build-all
 build-all: build-cli build-daemon
+
+# Frontend targets
+.PHONY: bun-install
+bun-install:
+	cd $(FRONTEND_DIR) && bun install
+
+.PHONY: bun-build
+bun-build:
+	cd $(FRONTEND_DIR) && bun run build
+
+.PHONY: bun-dev
+bun-dev:
+	cd $(FRONTEND_DIR) && bun run dev
+
+.PHONY: bun-test
+bun-test:
+	cd $(FRONTEND_DIR) && bun run test
+
+.PHONY: bun-test-e2e
+bun-test-e2e:
+	cd $(FRONTEND_DIR) && bun run test:e2e
+
+.PHONY: bun-lint
+bun-lint:
+	cd $(FRONTEND_DIR) && bun run lint
+
+# Build daemon with embedded frontend (production build).
+.PHONY: build-production
+build-production: bun-build build-daemon
+	@echo "Production build complete with embedded frontend."
 
 .PHONY: install
 install:
@@ -134,6 +165,8 @@ migrate-down:
 clean:
 	rm -f substrate substrated
 	rm -f coverage.out coverage.html
+	rm -rf $(FRONTEND_DIR)/dist
+	rm -rf $(FRONTEND_DIR)/node_modules/.vite
 
 # Server execution
 WEB_PORT ?= 8080
@@ -231,6 +264,7 @@ help:
 	@echo "  build-cli      Build CLI binary (./substrate)"
 	@echo "  build-daemon   Build daemon binary (./substrated with web UI)"
 	@echo "  build-all      Build all binaries (CLI + daemon)"
+	@echo "  build-production Build daemon with embedded frontend"
 	@echo "  install        Install binaries to GOPATH/bin"
 	@echo "  quick          Quick build check (compile only)"
 	@echo ""
@@ -274,6 +308,14 @@ help:
 	@echo "  stop           Stop running server"
 	@echo "  restart        Stop, rebuild, and start server"
 	@echo "                 Usage: make restart WEB_PORT=8081"
+	@echo ""
+	@echo "Frontend targets:"
+	@echo "  bun-install    Install frontend dependencies"
+	@echo "  bun-build      Build frontend for production"
+	@echo "  bun-dev        Start frontend dev server"
+	@echo "  bun-test       Run frontend unit/integration tests"
+	@echo "  bun-test-e2e   Run frontend E2E tests with Playwright"
+	@echo "  bun-lint       Lint frontend code"
 	@echo ""
 	@echo "Development:"
 	@echo "  check          Run fmt, vet, lint, and tests"
