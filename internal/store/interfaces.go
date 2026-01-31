@@ -45,6 +45,11 @@ type MessageStore interface {
 	// AckMessage acknowledges a message for a recipient.
 	AckMessage(ctx context.Context, messageID, agentID int64) error
 
+	// SnoozeMessage snoozes a message until the given time.
+	SnoozeMessage(
+		ctx context.Context, messageID, agentID int64, until time.Time,
+	) error
+
 	// CreateMessageRecipient creates a recipient entry for a message.
 	CreateMessageRecipient(
 		ctx context.Context, messageID, agentID int64,
@@ -68,6 +73,12 @@ type MessageStore interface {
 
 	// NextLogOffset returns the next available log offset for a topic.
 	NextLogOffset(ctx context.Context, topicID int64) (int64, error)
+
+	// SearchMessagesForAgent performs full-text search for messages visible to
+	// a specific agent.
+	SearchMessagesForAgent(
+		ctx context.Context, query string, agentID int64, limit int,
+	) ([]Message, error)
 }
 
 // AgentStore handles agent persistence operations.
@@ -192,8 +203,8 @@ type SessionStore interface {
 	) error
 }
 
-// Store combines all store interfaces for unified access.
-type Store interface {
+// Storage combines all store interfaces for unified access.
+type Storage interface {
 	MessageStore
 	AgentStore
 	TopicStore
@@ -201,7 +212,7 @@ type Store interface {
 	SessionStore
 
 	// WithTx executes a function within a database transaction.
-	WithTx(ctx context.Context, fn func(ctx context.Context, s Store) error) error
+	WithTx(ctx context.Context, fn func(ctx context.Context, s Storage) error) error
 
 	// Close closes the store and releases resources.
 	Close() error
