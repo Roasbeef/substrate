@@ -21,7 +21,7 @@ type SearchResult struct {
 func (s *Store) SearchMessages(ctx context.Context, query string,
 	limit int) ([]SearchResult, error) {
 
-	rows, err := s.db.QueryContext(ctx, `
+	rows, err := s.DB().QueryContext(ctx, `
 		SELECT m.id, m.thread_id, m.topic_id, m.log_offset, m.sender_id,
 		       m.subject, m.body_md, m.priority, m.deadline_at,
 		       m.attachments, m.created_at, fts.rank
@@ -68,7 +68,7 @@ func (s *Store) SearchMessages(ctx context.Context, query string,
 func (s *Store) SearchMessagesForAgent(ctx context.Context, query string,
 	agentID int64, limit int) ([]SearchResult, error) {
 
-	rows, err := s.db.QueryContext(ctx, `
+	rows, err := s.DB().QueryContext(ctx, `
 		SELECT m.id, m.thread_id, m.topic_id, m.log_offset, m.sender_id,
 		       m.subject, m.body_md, m.priority, m.deadline_at,
 		       m.attachments, m.created_at, mr.state, fts.rank
