@@ -1183,6 +1183,27 @@ func (q *Queries) MarkMessageDeletedBySender(ctx context.Context, arg MarkMessag
 	return err
 }
 
+const UpdateAllThreadRecipientState = `-- name: UpdateAllThreadRecipientState :execrows
+UPDATE message_recipients
+SET state = ?
+WHERE message_id IN (SELECT id FROM messages WHERE thread_id = ?)
+`
+
+type UpdateAllThreadRecipientStateParams struct {
+	State    string
+	ThreadID string
+}
+
+// Update the state of all message recipients in a thread for ALL agents.
+// Used for global view archive/trash operations.
+func (q *Queries) UpdateAllThreadRecipientState(ctx context.Context, arg UpdateAllThreadRecipientStateParams) (int64, error) {
+	result, err := q.db.ExecContext(ctx, UpdateAllThreadRecipientState, arg.State, arg.ThreadID)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected()
+}
+
 const UpdateRecipientAcked = `-- name: UpdateRecipientAcked :exec
 UPDATE message_recipients
 SET acked_at = ?
@@ -1239,6 +1260,29 @@ func (q *Queries) UpdateRecipientState(ctx context.Context, arg UpdateRecipientS
 		arg.MessageID,
 		arg.AgentID,
 	)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected()
+}
+
+const UpdateThreadRecipientState = `-- name: UpdateThreadRecipientState :execrows
+UPDATE message_recipients
+SET state = ?
+WHERE agent_id = ?
+  AND message_id IN (SELECT id FROM messages WHERE thread_id = ?)
+`
+
+type UpdateThreadRecipientStateParams struct {
+	State    string
+	AgentID  int64
+	ThreadID string
+}
+
+// Update the state of all message recipients in a thread for a specific agent.
+// Used for archive, trash, and mark as unread operations.
+func (q *Queries) UpdateThreadRecipientState(ctx context.Context, arg UpdateThreadRecipientStateParams) (int64, error) {
+	result, err := q.db.ExecContext(ctx, UpdateThreadRecipientState, arg.State, arg.AgentID, arg.ThreadID)
 	if err != nil {
 		return 0, err
 	}

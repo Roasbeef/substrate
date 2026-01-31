@@ -195,5 +195,20 @@ WHERE m.sender_id = ?
   AND mr.acked_at IS NULL
   AND m.subject LIKE '[Status]%';
 
+-- name: UpdateThreadRecipientState :execrows
+-- Update the state of all message recipients in a thread for a specific agent.
+-- Used for archive, trash, and mark as unread operations.
+UPDATE message_recipients
+SET state = ?
+WHERE agent_id = ?
+  AND message_id IN (SELECT id FROM messages WHERE thread_id = ?);
+
+-- name: UpdateAllThreadRecipientState :execrows
+-- Update the state of all message recipients in a thread for ALL agents.
+-- Used for global view archive/trash operations.
+UPDATE message_recipients
+SET state = ?
+WHERE message_id IN (SELECT id FROM messages WHERE thread_id = ?);
+
 -- Note: Full-text search queries using FTS5 are handled manually in Go code
 -- since sqlc doesn't fully support FTS5 virtual tables.

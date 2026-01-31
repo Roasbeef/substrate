@@ -83,10 +83,16 @@ type Querier interface {
 	UpdateAgentGitBranch(ctx context.Context, arg UpdateAgentGitBranchParams) error
 	UpdateAgentLastActive(ctx context.Context, arg UpdateAgentLastActiveParams) error
 	UpdateAgentSession(ctx context.Context, arg UpdateAgentSessionParams) error
+	// Update the state of all message recipients in a thread for ALL agents.
+	// Used for global view archive/trash operations.
+	UpdateAllThreadRecipientState(ctx context.Context, arg UpdateAllThreadRecipientStateParams) (int64, error)
 	UpdateRecipientAcked(ctx context.Context, arg UpdateRecipientAckedParams) error
 	UpdateRecipientSnoozed(ctx context.Context, arg UpdateRecipientSnoozedParams) error
 	UpdateRecipientState(ctx context.Context, arg UpdateRecipientStateParams) (int64, error)
 	UpdateSessionIdentityLastActive(ctx context.Context, arg UpdateSessionIdentityLastActiveParams) error
+	// Update the state of all message recipients in a thread for a specific agent.
+	// Used for archive, trash, and mark as unread operations.
+	UpdateThreadRecipientState(ctx context.Context, arg UpdateThreadRecipientStateParams) (int64, error)
 	UpdateTopicRetention(ctx context.Context, arg UpdateTopicRetentionParams) error
 	UpsertConsumerOffset(ctx context.Context, arg UpsertConsumerOffsetParams) error
 	WakeSnoozedMessages(ctx context.Context, snoozedUntil sql.NullInt64) (int64, error)
