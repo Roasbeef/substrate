@@ -4,7 +4,6 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
-	"log/slog"
 	"time"
 
 	"github.com/roasbeef/subtrate/internal/db"
@@ -161,7 +160,7 @@ func NewSqlcStore(sqlDB *sql.DB) *SqlcStore {
 		return sqlc.New(tx)
 	}
 
-	executor := db.NewTransactionExecutor(baseDB, createQuery, slog.Default())
+	executor := db.NewTransactionExecutor(baseDB, createQuery, nil)
 
 	return &SqlcStore{
 		db:    executor,
@@ -237,8 +236,7 @@ type txSqlcStore struct {
 func (s *txSqlcStore) WithTx(ctx context.Context,
 	fn func(ctx context.Context, store Storage) error) error {
 
-	return fmt.Errorf("nested transactions not supported: already within " +
-		"a transaction context")
+	return fmt.Errorf("nested transactions not supported")
 }
 
 // Close is a no-op for transaction stores.
@@ -264,7 +262,6 @@ func (s *SqlcStore) CreateMessage(ctx context.Context,
 		Priority:    params.Priority,
 		DeadlineAt:  ToSqlcNullInt64(params.DeadlineAt),
 		Attachments: ToSqlcNullString(params.Attachments),
-		CreatedAt:   time.Now().Unix(),
 	})
 	if err != nil {
 		return Message{}, err
@@ -531,13 +528,10 @@ func (s *SqlcStore) SearchMessagesForAgent(ctx context.Context, query string,
 func (s *SqlcStore) CreateAgent(ctx context.Context,
 	params CreateAgentParams) (Agent, error) {
 
-	now := time.Now().Unix()
 	agent, err := s.db.CreateAgent(ctx, sqlc.CreateAgentParams{
-		Name:         params.Name,
-		ProjectKey:   ToSqlcNullString(params.ProjectKey),
-		GitBranch:    ToSqlcNullString(params.GitBranch),
-		CreatedAt:    now,
-		LastActiveAt: now,
+		Name:       params.Name,
+		ProjectKey: ToSqlcNullString(params.ProjectKey),
+		GitBranch:  ToSqlcNullString(params.GitBranch),
 	})
 	if err != nil {
 		return Agent{}, err
@@ -644,7 +638,6 @@ func (s *SqlcStore) CreateTopic(ctx context.Context,
 			Int64: params.RetentionSeconds,
 			Valid: params.RetentionSeconds > 0,
 		},
-		CreatedAt: time.Now().Unix(),
 	})
 	if err != nil {
 		return Topic{}, err
@@ -736,9 +729,8 @@ func (s *SqlcStore) CreateSubscription(ctx context.Context, agentID,
 	topicID int64) error {
 
 	return s.db.CreateSubscription(ctx, sqlc.CreateSubscriptionParams{
-		AgentID:      agentID,
-		TopicID:      topicID,
-		SubscribedAt: time.Now().Unix(),
+		AgentID: agentID,
+		TopicID: topicID,
 	})
 }
 
@@ -795,7 +787,6 @@ func (s *SqlcStore) CreateActivity(ctx context.Context,
 		ActivityType: params.ActivityType,
 		Description:  params.Description,
 		Metadata:     ToSqlcNullString(params.Metadata),
-		CreatedAt:    time.Now().Unix(),
 	})
 	return err
 }
@@ -937,7 +928,6 @@ func (s *txSqlcStore) CreateMessage(ctx context.Context,
 		Priority:    params.Priority,
 		DeadlineAt:  ToSqlcNullInt64(params.DeadlineAt),
 		Attachments: ToSqlcNullString(params.Attachments),
-		CreatedAt:   time.Now().Unix(),
 	})
 	if err != nil {
 		return Message{}, err
@@ -1202,13 +1192,10 @@ func (s *txSqlcStore) SearchMessagesForAgent(ctx context.Context, query string,
 func (s *txSqlcStore) CreateAgent(ctx context.Context,
 	params CreateAgentParams) (Agent, error) {
 
-	now := time.Now().Unix()
 	agent, err := s.queries.CreateAgent(ctx, sqlc.CreateAgentParams{
-		Name:         params.Name,
-		ProjectKey:   ToSqlcNullString(params.ProjectKey),
-		GitBranch:    ToSqlcNullString(params.GitBranch),
-		CreatedAt:    now,
-		LastActiveAt: now,
+		Name:       params.Name,
+		ProjectKey: ToSqlcNullString(params.ProjectKey),
+		GitBranch:  ToSqlcNullString(params.GitBranch),
 	})
 	if err != nil {
 		return Agent{}, err
@@ -1311,7 +1298,6 @@ func (s *txSqlcStore) CreateTopic(ctx context.Context,
 			Int64: params.RetentionSeconds,
 			Valid: params.RetentionSeconds > 0,
 		},
-		CreatedAt: time.Now().Unix(),
 	})
 	if err != nil {
 		return Topic{}, err
@@ -1403,9 +1389,8 @@ func (s *txSqlcStore) CreateSubscription(ctx context.Context, agentID,
 	topicID int64) error {
 
 	return s.queries.CreateSubscription(ctx, sqlc.CreateSubscriptionParams{
-		AgentID:      agentID,
-		TopicID:      topicID,
-		SubscribedAt: time.Now().Unix(),
+		AgentID: agentID,
+		TopicID: topicID,
 	})
 }
 
@@ -1458,7 +1443,6 @@ func (s *txSqlcStore) CreateActivity(ctx context.Context,
 		ActivityType: params.ActivityType,
 		Description:  params.Description,
 		Metadata:     ToSqlcNullString(params.Metadata),
-		CreatedAt:    time.Now().Unix(),
 	})
 	return err
 }
