@@ -46,35 +46,21 @@ alive indefinitely, continuously checking for work.
 
 ### Behavior Flow
 
-```
-┌─────────────────────────────────────────────────────────────┐
-│                     STOP HOOK TRIGGERED                      │
-└─────────────────────────────────────────────────────────────┘
-                              │
-                              ▼
-┌─────────────────────────────────────────────────────────────┐
-│  Step 1: Quick Mail Check                                    │
-│  - Send heartbeat                                            │
-│  - substrate poll --format hook --quiet                      │
-│  - If mail exists → BLOCK immediately (show messages)        │
-└─────────────────────────────────────────────────────────────┘
-                              │ (no mail)
-                              ▼
-┌─────────────────────────────────────────────────────────────┐
-│  Step 2: Check Incomplete Tasks                              │
-│  - Scan ~/.claude/tasks/{session_id}/*.json                  │
-│  - Count tasks where status != "completed"                   │
-│  - If incomplete tasks → BLOCK (list them)                   │
-└─────────────────────────────────────────────────────────────┘
-                              │ (no incomplete tasks)
-                              ▼
-┌─────────────────────────────────────────────────────────────┐
-│  Step 3: Long Poll (Keep Alive)                              │
-│  - substrate poll --wait=55s --format hook --always-block    │
-│  - Waits up to 55s for new messages                          │
-│  - ALWAYS outputs "block" to stay alive                      │
-│  - User can Ctrl+C to force exit                             │
-└─────────────────────────────────────────────────────────────┘
+```mermaid
+flowchart TD
+    A[STOP HOOK TRIGGERED] --> B{Quick Mail Check}
+    B -->|Mail exists| C[BLOCK - Show messages]
+    B -->|No mail| D{Check Incomplete Tasks}
+    D -->|Tasks incomplete| E[BLOCK - List tasks]
+    D -->|No incomplete tasks| F[Long Poll 55s]
+    F -->|New message| C
+    F -->|Timeout| G[BLOCK - Heartbeat mode]
+    G --> H[Ctrl+C to force exit]
+
+    style A fill:#f9f,stroke:#333,stroke-width:2px
+    style C fill:#fbb,stroke:#333
+    style E fill:#fbb,stroke:#333
+    style G fill:#bbf,stroke:#333
 ```
 
 ### Key Characteristics
@@ -129,27 +115,17 @@ not stay alive indefinitely like main agents.
 
 ### Behavior Flow
 
-```
-┌─────────────────────────────────────────────────────────────┐
-│                  SUBAGENT STOP TRIGGERED                     │
-└─────────────────────────────────────────────────────────────┘
-                              │
-                              ▼
-┌─────────────────────────────────────────────────────────────┐
-│  Check stop_hook_active flag                                 │
-│  - If true: Claude already processed our previous block      │
-│    → Output null (allow exit)                                │
-│  - If false: First stop attempt                              │
-│    → Continue to mail check                                  │
-└─────────────────────────────────────────────────────────────┘
-                              │ (first stop)
-                              ▼
-┌─────────────────────────────────────────────────────────────┐
-│  Quick Mail Check (no long-poll)                             │
-│  - substrate poll --format hook                              │
-│  - If mail exists → BLOCK (Claude will see messages)         │
-│  - If no mail → Output null (allow exit)                     │
-└─────────────────────────────────────────────────────────────┘
+```mermaid
+flowchart TD
+    A[SUBAGENT STOP TRIGGERED] --> B{stop_hook_active?}
+    B -->|true| C[Allow exit - Already processed]
+    B -->|false| D{Quick Mail Check}
+    D -->|Mail exists| E[BLOCK - Claude will see messages]
+    D -->|No mail| C
+
+    style A fill:#f9f,stroke:#333,stroke-width:2px
+    style C fill:#bfb,stroke:#333
+    style E fill:#fbb,stroke:#333
 ```
 
 ### Key Differences from Stop Hook
@@ -176,6 +152,18 @@ trying to stop after a previous hook block. This allows subagents to:
 Runs when a Claude Code session begins.
 
 ### What It Does
+
+```mermaid
+flowchart LR
+    A[Session Starts] --> B[Export session_id]
+    B --> C[Send heartbeat]
+    C --> D{Check inbox}
+    D -->|Messages| E[Inject as context]
+    D -->|Empty| F[Silent continue]
+
+    style A fill:#f9f,stroke:#333,stroke-width:2px
+    style E fill:#bbf,stroke:#333
+```
 
 1. **Exports session ID** - Writes `CLAUDE_SESSION_ID` to `$CLAUDE_ENV_FILE`
 2. **Sends heartbeat** - Marks the agent as active with `--session-start`
@@ -220,6 +208,18 @@ Runs before context compaction.
 
 ### What It Does
 
+```mermaid
+flowchart LR
+    A[Compaction Starting] --> B[Save identity]
+    B --> C[Record heartbeat]
+    C --> D[Output status summary]
+    D --> E[Context compacts]
+    E --> F[Identity restored post-compaction]
+
+    style A fill:#ff9,stroke:#333,stroke-width:2px
+    style F fill:#bfb,stroke:#333
+```
+
 1. **Saves identity** - `substrate identity save`
 2. **Records heartbeat** - Updates last active time
 3. **Outputs status** - Summary for post-compaction context
@@ -243,6 +243,64 @@ All hooks receive JSON input via stdin:
 - `session_id` - Claude Code session identifier (critical for agent identity)
 - `stop_hook_active` - True if Claude is stopping after a previous block
 - `hook_type` - The type of hook being executed
+
+---
+
+## Agent Lifecycle
+
+```mermaid
+sequenceDiagram
+    participant U as User
+    participant CC as Claude Code
+    participant SH as SessionStart Hook
+    participant AH as Stop Hook
+    participant S as Subtrate Server
+
+    U->>CC: Start session
+    CC->>SH: Run hook
+    SH->>S: Heartbeat (session-start)
+    SH->>S: Poll for mail
+    S-->>SH: Pending messages
+    SH-->>CC: Inject context
+
+    loop Work Loop
+        U->>CC: Send prompt
+        CC->>CC: Process request
+        CC->>AH: Try to stop
+        AH->>S: Quick mail check
+        alt Has mail
+            S-->>AH: Messages
+            AH-->>CC: Block + show messages
+            CC->>CC: Process messages
+        else No mail, has tasks
+            AH-->>CC: Block + list tasks
+        else No mail, no tasks
+            AH->>S: Long poll (55s)
+            S-->>AH: Wait for messages
+            AH-->>CC: Block (heartbeat)
+        end
+    end
+
+    U->>CC: Ctrl+C
+    CC->>CC: Force exit
+```
+
+---
+
+## Session ID Flow
+
+```mermaid
+flowchart TD
+    A[Claude Code starts] --> B[SessionStart hook runs]
+    B --> C[session_id from hook input]
+    C --> D[Export to CLAUDE_ENV_FILE]
+    D --> E[Available as $CLAUDE_SESSION_ID]
+    E --> F[Used by all substrate commands]
+    F --> G[Identity resolution]
+
+    style A fill:#f9f,stroke:#333,stroke-width:2px
+    style G fill:#bfb,stroke:#333
+```
 
 ---
 
@@ -352,26 +410,6 @@ mechanism to:
 
 Claude Code hooks have a 60-second timeout. The Stop hook's 55-second long poll
 stays under this limit while maximizing responsiveness to incoming messages.
-
-### Session ID Flow
-
-```
-Claude Code starts
-       │
-       ▼
-SessionStart hook runs
-       │
-       ├─→ session_id from hook input
-       │
-       ▼
-Exports to CLAUDE_ENV_FILE
-       │
-       ▼
-Available as $CLAUDE_SESSION_ID
-       │
-       ▼
-Used by all substrate commands for identity resolution
-```
 
 ---
 
