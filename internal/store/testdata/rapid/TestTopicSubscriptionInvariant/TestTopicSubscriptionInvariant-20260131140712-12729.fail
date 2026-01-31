@@ -1,0 +1,25 @@
+# 2026/01/31 14:07:12.541870 [TestTopicSubscriptionInvariant] [rapid] draw numAgents: 2
+# 2026/01/31 14:07:12.541874 [TestTopicSubscriptionInvariant] [rapid] draw agent: "Sub0"
+# 2026/01/31 14:07:12.541875 [TestTopicSubscriptionInvariant] [rapid] draw agent: "Sub0"
+# 2026/01/31 14:07:12.541876 [TestTopicSubscriptionInvariant] [rapid] draw subscribe: false
+# 2026/01/31 14:07:12.541877 [TestTopicSubscriptionInvariant] [rapid] draw subscribe: true
+# 2026/01/31 14:07:12.541877 [TestTopicSubscriptionInvariant] expected 1 subscribers, got 0
+# 
+v0.4.8#5779639161864555254
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x0
+0x1

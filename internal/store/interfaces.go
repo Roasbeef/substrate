@@ -1,0 +1,444 @@
+package store
+
+import (
+	"context"
+	"database/sql"
+	"time"
+
+	"github.com/roasbeef/subtrate/internal/db/sqlc"
+)
+
+// MessageStore handles message persistence operations.
+type MessageStore interface {
+	// CreateMessage creates a new message in the database.
+	CreateMessage(ctx context.Context, params CreateMessageParams) (Message, error)
+
+	// GetMessage retrieves a message by its ID.
+	GetMessage(ctx context.Context, id int64) (Message, error)
+
+	// GetMessagesByThread retrieves all messages in a thread.
+	GetMessagesByThread(ctx context.Context, threadID string) ([]Message, error)
+
+	// GetInboxMessages retrieves inbox messages for an agent.
+	GetInboxMessages(
+		ctx context.Context, agentID int64, limit int,
+	) ([]InboxMessage, error)
+
+	// GetUnreadMessages retrieves unread messages for an agent.
+	GetUnreadMessages(
+		ctx context.Context, agentID int64, limit int,
+	) ([]InboxMessage, error)
+
+	// GetArchivedMessages retrieves archived messages for an agent.
+	GetArchivedMessages(
+		ctx context.Context, agentID int64, limit int,
+	) ([]InboxMessage, error)
+
+	// UpdateRecipientState updates the state of a message for a recipient.
+	UpdateRecipientState(
+		ctx context.Context, messageID, agentID int64, state string,
+	) error
+
+	// MarkMessageRead marks a message as read for a recipient.
+	MarkMessageRead(ctx context.Context, messageID, agentID int64) error
+
+	// AckMessage acknowledges a message for a recipient.
+	AckMessage(ctx context.Context, messageID, agentID int64) error
+
+	// CreateMessageRecipient creates a recipient entry for a message.
+	CreateMessageRecipient(
+		ctx context.Context, messageID, agentID int64,
+	) error
+
+	// GetMessageRecipient retrieves the recipient state for a message.
+	GetMessageRecipient(
+		ctx context.Context, messageID, agentID int64,
+	) (MessageRecipient, error)
+
+	// CountUnreadByAgent counts unread messages for an agent.
+	CountUnreadByAgent(ctx context.Context, agentID int64) (int64, error)
+
+	// CountUnreadUrgentByAgent counts urgent unread messages for an agent.
+	CountUnreadUrgentByAgent(ctx context.Context, agentID int64) (int64, error)
+
+	// GetMessagesSinceOffset retrieves messages after a given log offset.
+	GetMessagesSinceOffset(
+		ctx context.Context, topicID, offset int64, limit int,
+	) ([]Message, error)
+
+	// NextLogOffset returns the next available log offset for a topic.
+	NextLogOffset(ctx context.Context, topicID int64) (int64, error)
+}
+
+// AgentStore handles agent persistence operations.
+type AgentStore interface {
+	// CreateAgent creates a new agent in the database.
+	CreateAgent(ctx context.Context, params CreateAgentParams) (Agent, error)
+
+	// GetAgent retrieves an agent by its ID.
+	GetAgent(ctx context.Context, id int64) (Agent, error)
+
+	// GetAgentByName retrieves an agent by its name.
+	GetAgentByName(ctx context.Context, name string) (Agent, error)
+
+	// GetAgentBySessionID retrieves an agent by session ID.
+	GetAgentBySessionID(ctx context.Context, sessionID string) (Agent, error)
+
+	// ListAgents lists all agents.
+	ListAgents(ctx context.Context) ([]Agent, error)
+
+	// ListAgentsByProject lists agents for a specific project.
+	ListAgentsByProject(
+		ctx context.Context, projectKey string,
+	) ([]Agent, error)
+
+	// UpdateLastActive updates the last active timestamp for an agent.
+	UpdateLastActive(ctx context.Context, id int64, ts time.Time) error
+
+	// UpdateSession updates the session ID for an agent.
+	UpdateSession(ctx context.Context, id int64, sessionID string) error
+
+	// DeleteAgent deletes an agent by its ID.
+	DeleteAgent(ctx context.Context, id int64) error
+}
+
+// TopicStore handles topic and subscription persistence.
+type TopicStore interface {
+	// CreateTopic creates a new topic.
+	CreateTopic(ctx context.Context, params CreateTopicParams) (Topic, error)
+
+	// GetTopic retrieves a topic by its ID.
+	GetTopic(ctx context.Context, id int64) (Topic, error)
+
+	// GetTopicByName retrieves a topic by its name.
+	GetTopicByName(ctx context.Context, name string) (Topic, error)
+
+	// GetOrCreateAgentInboxTopic gets or creates an agent's inbox topic.
+	GetOrCreateAgentInboxTopic(
+		ctx context.Context, agentName string,
+	) (Topic, error)
+
+	// GetOrCreateTopic gets or creates a topic by name.
+	GetOrCreateTopic(
+		ctx context.Context, name, topicType string,
+	) (Topic, error)
+
+	// ListTopics lists all topics.
+	ListTopics(ctx context.Context) ([]Topic, error)
+
+	// ListTopicsByType lists topics of a specific type.
+	ListTopicsByType(ctx context.Context, topicType string) ([]Topic, error)
+
+	// CreateSubscription subscribes an agent to a topic.
+	CreateSubscription(
+		ctx context.Context, agentID, topicID int64,
+	) error
+
+	// DeleteSubscription unsubscribes an agent from a topic.
+	DeleteSubscription(ctx context.Context, agentID, topicID int64) error
+
+	// ListSubscriptionsByAgent lists topics an agent is subscribed to.
+	ListSubscriptionsByAgent(ctx context.Context, agentID int64) ([]Topic, error)
+
+	// ListSubscriptionsByTopic lists agents subscribed to a topic.
+	ListSubscriptionsByTopic(ctx context.Context, topicID int64) ([]Agent, error)
+}
+
+// ActivityStore handles activity feed persistence.
+type ActivityStore interface {
+	// CreateActivity records a new activity event.
+	CreateActivity(ctx context.Context, params CreateActivityParams) error
+
+	// ListRecentActivities lists the most recent activities.
+	ListRecentActivities(ctx context.Context, limit int) ([]Activity, error)
+
+	// ListActivitiesByAgent lists activities for a specific agent.
+	ListActivitiesByAgent(
+		ctx context.Context, agentID int64, limit int,
+	) ([]Activity, error)
+
+	// ListActivitiesSince lists activities since a given timestamp.
+	ListActivitiesSince(
+		ctx context.Context, since time.Time, limit int,
+	) ([]Activity, error)
+
+	// DeleteOldActivities removes activities older than a given time.
+	DeleteOldActivities(ctx context.Context, olderThan time.Time) error
+}
+
+// SessionStore handles session identity persistence.
+type SessionStore interface {
+	// CreateSessionIdentity creates a new session identity mapping.
+	CreateSessionIdentity(
+		ctx context.Context, params CreateSessionIdentityParams,
+	) error
+
+	// GetSessionIdentity retrieves a session identity by session ID.
+	GetSessionIdentity(
+		ctx context.Context, sessionID string,
+	) (SessionIdentity, error)
+
+	// DeleteSessionIdentity removes a session identity.
+	DeleteSessionIdentity(ctx context.Context, sessionID string) error
+
+	// ListSessionIdentitiesByAgent lists session identities for an agent.
+	ListSessionIdentitiesByAgent(
+		ctx context.Context, agentID int64,
+	) ([]SessionIdentity, error)
+
+	// UpdateSessionIdentityLastActive updates the last active timestamp.
+	UpdateSessionIdentityLastActive(
+		ctx context.Context, sessionID string, ts time.Time,
+	) error
+}
+
+// Store combines all store interfaces for unified access.
+type Store interface {
+	MessageStore
+	AgentStore
+	TopicStore
+	ActivityStore
+	SessionStore
+
+	// WithTx executes a function within a database transaction.
+	WithTx(ctx context.Context, fn func(ctx context.Context, s Store) error) error
+
+	// Close closes the store and releases resources.
+	Close() error
+}
+
+// Domain model types that abstract sqlc models.
+
+// Message represents a mail message.
+type Message struct {
+	ID              int64
+	ThreadID        string
+	TopicID         int64
+	LogOffset       int64
+	SenderID        int64
+	Subject         string
+	Body            string
+	Priority        string
+	DeadlineAt      *time.Time
+	Attachments     string
+	CreatedAt       time.Time
+	DeletedBySender bool
+}
+
+// MessageRecipient represents a message recipient's state.
+type MessageRecipient struct {
+	MessageID    int64
+	AgentID      int64
+	State        string
+	SnoozedUntil *time.Time
+	ReadAt       *time.Time
+	AckedAt      *time.Time
+}
+
+// InboxMessage represents a message in an agent's inbox with metadata.
+type InboxMessage struct {
+	Message
+	SenderName   string
+	State        string
+	SnoozedUntil *time.Time
+	ReadAt       *time.Time
+	AckedAt      *time.Time
+}
+
+// Agent represents an agent in the system.
+type Agent struct {
+	ID               int64
+	Name             string
+	ProjectKey       string
+	GitBranch        string
+	CurrentSessionID string
+	CreatedAt        time.Time
+	LastActiveAt     time.Time
+}
+
+// Topic represents a message topic for pub/sub.
+type Topic struct {
+	ID               int64
+	Name             string
+	TopicType        string
+	RetentionSeconds int64
+	CreatedAt        time.Time
+}
+
+// Activity represents an activity event.
+type Activity struct {
+	ID           int64
+	AgentID      int64
+	ActivityType string
+	Description  string
+	Metadata     string
+	CreatedAt    time.Time
+}
+
+// SessionIdentity maps a session ID to an agent.
+type SessionIdentity struct {
+	SessionID    string
+	AgentID      int64
+	ProjectKey   string
+	GitBranch    string
+	CreatedAt    time.Time
+	LastActiveAt time.Time
+}
+
+// Parameter types for create operations.
+
+// CreateMessageParams contains parameters for creating a message.
+type CreateMessageParams struct {
+	ThreadID    string
+	TopicID     int64
+	LogOffset   int64
+	SenderID    int64
+	Subject     string
+	Body        string
+	Priority    string
+	DeadlineAt  *time.Time
+	Attachments string
+}
+
+// CreateAgentParams contains parameters for creating an agent.
+type CreateAgentParams struct {
+	Name       string
+	ProjectKey string
+	GitBranch  string
+}
+
+// CreateTopicParams contains parameters for creating a topic.
+type CreateTopicParams struct {
+	Name             string
+	TopicType        string
+	RetentionSeconds int64
+}
+
+// CreateActivityParams contains parameters for creating an activity.
+type CreateActivityParams struct {
+	AgentID      int64
+	ActivityType string
+	Description  string
+	Metadata     string
+}
+
+// CreateSessionIdentityParams contains parameters for creating a session
+// identity.
+type CreateSessionIdentityParams struct {
+	SessionID  string
+	AgentID    int64
+	ProjectKey string
+	GitBranch  string
+}
+
+// Conversion functions from sqlc models.
+
+// MessageFromSqlc converts a sqlc.Message to a store.Message.
+func MessageFromSqlc(m sqlc.Message) Message {
+	msg := Message{
+		ID:              m.ID,
+		ThreadID:        m.ThreadID,
+		TopicID:         m.TopicID,
+		LogOffset:       m.LogOffset,
+		SenderID:        m.SenderID,
+		Subject:         m.Subject,
+		Body:            m.BodyMd,
+		Priority:        m.Priority,
+		CreatedAt:       time.Unix(m.CreatedAt, 0),
+		DeletedBySender: m.DeletedBySender == 1,
+	}
+	if m.DeadlineAt.Valid {
+		t := time.Unix(m.DeadlineAt.Int64, 0)
+		msg.DeadlineAt = &t
+	}
+	if m.Attachments.Valid {
+		msg.Attachments = m.Attachments.String
+	}
+	return msg
+}
+
+// AgentFromSqlc converts a sqlc.Agent to a store.Agent.
+func AgentFromSqlc(a sqlc.Agent) Agent {
+	return Agent{
+		ID:               a.ID,
+		Name:             a.Name,
+		ProjectKey:       a.ProjectKey.String,
+		GitBranch:        a.GitBranch.String,
+		CurrentSessionID: a.CurrentSessionID.String,
+		CreatedAt:        time.Unix(a.CreatedAt, 0),
+		LastActiveAt:     time.Unix(a.LastActiveAt, 0),
+	}
+}
+
+// TopicFromSqlc converts a sqlc.Topic to a store.Topic.
+func TopicFromSqlc(t sqlc.Topic) Topic {
+	return Topic{
+		ID:               t.ID,
+		Name:             t.Name,
+		TopicType:        t.TopicType,
+		RetentionSeconds: t.RetentionSeconds.Int64,
+		CreatedAt:        time.Unix(t.CreatedAt, 0),
+	}
+}
+
+// ActivityFromSqlc converts a sqlc.Activity to a store.Activity.
+func ActivityFromSqlc(a sqlc.Activity) Activity {
+	return Activity{
+		ID:           a.ID,
+		AgentID:      a.AgentID,
+		ActivityType: a.ActivityType,
+		Description:  a.Description,
+		Metadata:     a.Metadata.String,
+		CreatedAt:    time.Unix(a.CreatedAt, 0),
+	}
+}
+
+// SessionIdentityFromSqlc converts a sqlc.SessionIdentity to a store model.
+func SessionIdentityFromSqlc(s sqlc.SessionIdentity) SessionIdentity {
+	return SessionIdentity{
+		SessionID:    s.SessionID,
+		AgentID:      s.AgentID,
+		ProjectKey:   s.ProjectKey.String,
+		GitBranch:    s.GitBranch.String,
+		CreatedAt:    time.Unix(s.CreatedAt, 0),
+		LastActiveAt: time.Unix(s.LastActiveAt, 0),
+	}
+}
+
+// MessageRecipientFromSqlc converts a sqlc.MessageRecipient to a store model.
+func MessageRecipientFromSqlc(r sqlc.MessageRecipient) MessageRecipient {
+	mr := MessageRecipient{
+		MessageID: r.MessageID,
+		AgentID:   r.AgentID,
+		State:     r.State,
+	}
+	if r.SnoozedUntil.Valid {
+		t := time.Unix(r.SnoozedUntil.Int64, 0)
+		mr.SnoozedUntil = &t
+	}
+	if r.ReadAt.Valid {
+		t := time.Unix(r.ReadAt.Int64, 0)
+		mr.ReadAt = &t
+	}
+	if r.AckedAt.Valid {
+		t := time.Unix(r.AckedAt.Int64, 0)
+		mr.AckedAt = &t
+	}
+	return mr
+}
+
+// ToSqlcNullString converts a string to sql.NullString.
+func ToSqlcNullString(s string) sql.NullString {
+	if s == "" {
+		return sql.NullString{}
+	}
+	return sql.NullString{String: s, Valid: true}
+}
+
+// ToSqlcNullInt64 converts an int64 pointer to sql.NullInt64.
+func ToSqlcNullInt64(t *time.Time) sql.NullInt64 {
+	if t == nil {
+		return sql.NullInt64{}
+	}
+	return sql.NullInt64{Int64: t.Unix(), Valid: true}
+}
