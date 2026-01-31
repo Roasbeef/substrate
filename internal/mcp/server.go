@@ -14,11 +14,27 @@ type Server struct {
 	server   *mcp.Server
 	store    *db.Store
 	mailSvc  *mail.Service
+	mailRef  mail.MailActorRef // Optional actor ref for mail operations.
 	registry *agent.Registry
+}
+
+// Config holds configuration for the MCP server.
+type Config struct {
+	// Store is the database store.
+	Store *db.Store
+
+	// MailActorRef is an optional actor reference for mail operations.
+	// If set, mail operations will use the actor system.
+	MailActorRef mail.MailActorRef
 }
 
 // NewServer creates a new MCP server with all mail tools registered.
 func NewServer(store *db.Store) *Server {
+	return NewServerWithConfig(Config{Store: store})
+}
+
+// NewServerWithConfig creates a new MCP server with the given configuration.
+func NewServerWithConfig(cfg Config) *Server {
 	mcpServer := mcp.NewServer(&mcp.Implementation{
 		Name:    "subtrate",
 		Version: "0.1.0",
@@ -26,9 +42,10 @@ func NewServer(store *db.Store) *Server {
 
 	s := &Server{
 		server:   mcpServer,
-		store:    store,
-		mailSvc:  mail.NewService(store),
-		registry: agent.NewRegistry(store),
+		store:    cfg.Store,
+		mailSvc:  mail.NewService(cfg.Store),
+		mailRef:  cfg.MailActorRef,
+		registry: agent.NewRegistry(cfg.Store),
 	}
 
 	// Register all mail tools.

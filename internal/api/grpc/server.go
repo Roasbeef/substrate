@@ -38,6 +38,11 @@ type ServerConfig struct {
 
 	// ClientAllowPingWithoutStream allows pings even without active streams.
 	ClientAllowPingWithoutStream bool
+
+	// MailActorRef is an optional actor reference for mail operations.
+	// If set, mail operations will use the actor system instead of direct
+	// service calls.
+	MailActorRef mail.MailActorRef
 }
 
 // DefaultServerConfig returns a ServerConfig with sensible defaults.
@@ -56,6 +61,7 @@ type Server struct {
 	cfg         ServerConfig
 	store       *db.Store
 	mailSvc     *mail.Service
+	mailRef     mail.MailActorRef // Optional actor ref for mail operations.
 	agentReg    *agent.Registry
 	identityMgr *agent.IdentityManager
 
@@ -90,6 +96,7 @@ func NewServer(
 		cfg:             cfg,
 		store:           store,
 		mailSvc:         mailSvc,
+		mailRef:         cfg.MailActorRef,
 		agentReg:        agentReg,
 		identityMgr:     identityMgr,
 		notificationHub: notificationHub,

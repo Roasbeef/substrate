@@ -35,6 +35,7 @@ type Server struct {
 	store        *db.Store
 	registry     *agent.Registry
 	heartbeatMgr *agent.HeartbeatManager
+	actorRefs    *ActorRefs // Optional actor references for Ask/Tell pattern.
 	templates    map[string]*template.Template // Page-specific template sets.
 	partials     *template.Template            // Shared partials.
 	mux          *http.ServeMux
@@ -46,6 +47,10 @@ type Server struct {
 // Config holds configuration for the web server.
 type Config struct {
 	Addr string
+
+	// ActorRefs holds optional actor references for the Ask/Tell pattern.
+	// If nil, the server will use direct database access.
+	ActorRefs *ActorRefs
 }
 
 // DefaultConfig returns the default server configuration.
@@ -64,6 +69,7 @@ func NewServer(cfg *Config, store *db.Store) (*Server, error) {
 		store:        store,
 		registry:     registry,
 		heartbeatMgr: heartbeatMgr,
+		actorRefs:    cfg.ActorRefs,
 		templates:    make(map[string]*template.Template),
 		mux:          http.NewServeMux(),
 		addr:         cfg.Addr,
