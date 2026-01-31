@@ -4,10 +4,12 @@
 # Priority order:
 # 1. Quick mail check - if mail exists, block immediately
 # 2. Check Tasks - if incomplete tasks exist, block immediately
-# 3. Long poll - keep agent alive, continuously checking for work
+# 3. Send status update to User (with deduplication)
+# 4. Long poll - keep agent alive, continuously checking for work
 #
 # Key behaviors:
 # - Checks mail before tasks (mail is more actionable)
+# - Sends status updates to User with deduplication
 # - Long-polls for 55s (under 60s hook timeout)
 # - Always outputs {"decision": "block"} to stay alive
 # - User can force exit with Ctrl+C (bypasses hooks)
@@ -17,6 +19,7 @@
 # Read hook input from stdin
 input=$(cat)
 session_id=$(echo "$input" | jq -r '.session_id // empty')
+stop_hook_active=$(echo "$input" | jq -r '.stop_hook_active // false')
 
 # Build session ID args if available (critical for agent identity resolution).
 session_args=""
@@ -105,7 +108,130 @@ EOF
 fi
 
 # ============================================================================
-# Step 3: Long poll to keep agent alive
+# Step 3: Send status update (with deduplication)
+# ============================================================================
+
+# Send status update in background to not block the hook.
+# Uses a flag file for deduplication - only sends if no recent status sent.
+{
+    # Debug log file
+    debug_log="$HOME/.subtrate/stop_hook_debug.log"
+    mkdir -p "$(dirname "$debug_log")"
+
+    echo "=== Stop Hook Status Update $(date) ===" >> "$debug_log"
+    echo "Session ID: ${session_id:-'(empty)'}" >> "$debug_log"
+    echo "Session args: ${session_args:-'(empty)'}" >> "$debug_log"
+
+    # Deduplication: check if we sent a status in the last 5 minutes
+    status_flag="$HOME/.subtrate/status_sent_${session_id:-default}"
+    now=$(date +%s)
+
+    if [ -f "$status_flag" ]; then
+        last_sent=$(cat "$status_flag" 2>/dev/null || echo "0")
+        elapsed=$((now - last_sent))
+        echo "Dedup check: flag exists, last_sent=$last_sent, elapsed=${elapsed}s" >> "$debug_log"
+        # Skip if sent within last 5 minutes (300 seconds)
+        if [ "$elapsed" -lt 300 ]; then
+            echo "SKIPPED: Within 5-minute dedup window" >> "$debug_log"
+            exit 0
+        fi
+    else
+        echo "Dedup check: no flag file exists" >> "$debug_log"
+    fi
+
+    # Get agent info
+    # Format is "Current agent: AgentName (ID: N)"
+    agent_name=$(substrate identity current $session_args --format text 2>/dev/null | sed -n 's/Current agent: \([^ ]*\).*/\1/p' || echo "Unknown")
+    echo "Agent name lookup result: '$agent_name'" >> "$debug_log"
+
+    # Skip if no valid agent
+    if [ "$agent_name" = "Unknown" ] || [ -z "$agent_name" ]; then
+        echo "SKIPPED: No valid agent (name='$agent_name')" >> "$debug_log"
+        exit 0
+    fi
+
+    # Get project info
+    project_dir="${CLAUDE_PROJECT_DIR:-$(pwd)}"
+    project_name=$(basename "$project_dir")
+    git_branch=$(git -C "$project_dir" branch --show-current 2>/dev/null || echo "unknown")
+
+    # Try to generate summary using multiple strategies.
+    summary=""
+
+    # Compute project hash for Claude's projects directory.
+    project_hash=$(echo "$project_dir" | tr '/.' '-')
+    claude_projects_dir="$HOME/.claude/projects/$project_hash"
+
+    # Strategy 1 (DISABLED): claude -p causes recursive loops even with stop_hook_active.
+    # The spawned claude -p is a new process with stop_hook_active=false.
+    # TODO: Use lock file or env var to prevent recursion.
+    echo "Strategy 1: DISABLED - claude -p causes loops" >> "$debug_log"
+
+    # Strategy 2: Check ~/.claude/projects/{project-hash}/sessions-index.json
+    if [ -z "$summary" ]; then
+        sessions_index="$claude_projects_dir/sessions-index.json"
+        echo "Strategy 2: Looking for sessions-index at: $sessions_index" >> "$debug_log"
+
+        if [ -f "$sessions_index" ]; then
+            latest_summary=$(jq -r '.entries[-1].summary // empty' "$sessions_index" 2>/dev/null)
+            if [ -n "$latest_summary" ]; then
+                summary="$latest_summary"
+                echo "Got summary from sessions-index.json: $summary" >> "$debug_log"
+            fi
+        fi
+    fi
+
+    # Strategy 3: Fallback to project's .sessions/active/ directory TL;DR.
+    if [ -z "$summary" ]; then
+        session_dir="$project_dir/.sessions/active"
+        echo "Strategy 3: Looking for session files in: $session_dir" >> "$debug_log"
+
+        if [ -d "$session_dir" ]; then
+            session_file=$(ls -t "$session_dir"/*.md 2>/dev/null | head -1)
+            if [ -n "$session_file" ] && [ -f "$session_file" ]; then
+                tldr=$(sed -n '/^## TL;DR/,/^## /p' "$session_file" 2>/dev/null | head -10 | tail -n +2)
+                if [ -n "$tldr" ]; then
+                    summary="$tldr"
+                    echo "Extracted TL;DR from session file" >> "$debug_log"
+                fi
+            fi
+        fi
+    fi
+
+    # Fallback summary
+    if [ -z "$summary" ]; then
+        summary="Agent idle, waiting for next task."
+        echo "Using fallback summary" >> "$debug_log"
+    fi
+
+    # Build status message
+    status_body="[Context: Working on $project_name, branch: $git_branch]
+
+$summary
+
+---
+(Automated status update - agent standing by)"
+
+    echo "Attempting to send status update..." >> "$debug_log"
+    echo "Subject: [Status] $agent_name - Standing By" >> "$debug_log"
+
+    # Send to User
+    if substrate send $session_args \
+        --to User \
+        --subject "[Status] $agent_name - Standing By" \
+        --body "$status_body" \
+        2>>"$debug_log"; then
+            # Update deduplication flag
+            mkdir -p "$(dirname "$status_flag")"
+            echo "$now" > "$status_flag"
+            echo "SUCCESS: Status sent, flag updated at $status_flag" >> "$debug_log"
+    else
+        echo "FAILED: substrate send returned error" >> "$debug_log"
+    fi
+} &
+
+# ============================================================================
+# Step 4: Long poll to keep agent alive
 # ============================================================================
 
 # No mail, no tasks - do a longer poll to keep agent alive
