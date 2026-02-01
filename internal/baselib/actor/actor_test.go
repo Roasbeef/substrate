@@ -109,10 +109,14 @@ func (b *errorBehavior) Receive(_ context.Context,
 }
 
 // blockingBehavior is an actor behavior that blocks until its actorCtx is done.
+//
+//nolint:unused
 type blockingBehavior struct{}
 
 // Receive blocks until the actor's context is cancelled, then returns the
 // context's error.
+//
+//nolint:unused
 func (b *blockingBehavior) Receive(actorCtx context.Context,
 	_ *testMsg,
 ) fn.Result[string] {
@@ -122,12 +126,16 @@ func (b *blockingBehavior) Receive(actorCtx context.Context,
 
 // deadLetterTestMsg is a distinct message type used for testing DLO
 // interactions.
+//
+//nolint:unused
 type deadLetterTestMsg struct {
 	BaseMessage
 	id string
 }
 
 // MessageType returns the type name of the message.
+//
+//nolint:unused
 func (m *deadLetterTestMsg) MessageType() string {
 	return "deadLetterTestMsg"
 }

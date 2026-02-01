@@ -36,6 +36,8 @@ func (c *ChannelTellOnlyRef[M]) ID() string {
 }
 
 // baseActorRefMarker implements the BaseActorRef sealed interface marker.
+//
+//nolint:unused
 func (c *ChannelTellOnlyRef[M]) baseActorRefMarker() {}
 
 // Messages returns the underlying channel for receiving messages.

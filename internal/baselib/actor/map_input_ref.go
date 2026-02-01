@@ -48,6 +48,8 @@ func (m *MapInputRef[In, Out]) ID() string {
 }
 
 // baseActorRefMarker implements the BaseActorRef sealed interface marker.
+//
+//nolint:unused
 func (m *MapInputRef[In, Out]) baseActorRefMarker() {}
 
 // Compile-time check that MapInputRef implements TellOnlyRef.

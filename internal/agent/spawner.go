@@ -96,7 +96,6 @@ type SpawnedProcess struct {
 	Prompt    string
 	Response  *SpawnResponse
 	Error     error
-	client    *claudeagent.Client
 }
 
 // NewSpawner creates a new agent spawner.

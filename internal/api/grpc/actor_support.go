@@ -4,7 +4,6 @@ import (
 	"context"
 	"time"
 
-	"github.com/roasbeef/subtrate/internal/activity"
 	"github.com/roasbeef/subtrate/internal/actorutil"
 	"github.com/roasbeef/subtrate/internal/mail"
 )
@@ -96,10 +95,4 @@ func (s *Server) publishMessageActor(
 	return actorutil.AskAwaitTyped[
 		mail.MailRequest, mail.MailResponse, mail.PublishResponse,
 	](ctx, s.mailRef, req)
-}
-
-// recordActivity records an activity event via the actor system.
-func (s *Server) recordActivity(ctx context.Context, req activity.RecordActivityRequest) {
-	// Fire and forget.
-	s.activityRef.Tell(ctx, req)
 }

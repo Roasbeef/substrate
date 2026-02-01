@@ -83,7 +83,7 @@ func (s *Store) WithReadTx(ctx context.Context, fn TxFunc) error {
 
 // Close closes the underlying database connection.
 func (s *Store) Close() error {
-	return s.BaseDB.DB.Close()
+	return s.BaseDB.Close()
 }
 
 // DB returns the underlying database connection. This method exists for

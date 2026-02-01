@@ -467,7 +467,7 @@ func TestE2E_MessageStates(t *testing.T) {
 		}
 
 		result = env.mailSvc.Receive(ctx, req)
-		val, err = result.Unpack()
+		_, err = result.Unpack()
 		require.NoError(t, err)
 
 		t.Logf("Transition: %s -> %s", s.action, s.newState)

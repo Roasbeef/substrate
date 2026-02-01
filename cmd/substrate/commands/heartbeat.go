@@ -104,10 +104,3 @@ func runHeartbeat(cmd *cobra.Command, args []string) error {
 
 	return nil
 }
-
-// sendHeartbeatQuiet is a helper function for other commands to send heartbeats.
-// It silently updates the agent's last active timestamp without any output.
-func sendHeartbeatQuiet(ctx context.Context, client *Client, agentID int64) {
-	// Ignore errors for quiet heartbeat - best effort.
-	_ = client.UpdateHeartbeat(ctx, agentID)
-}

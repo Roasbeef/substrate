@@ -158,18 +158,6 @@ func (e *httpTestEnv) get(path string) *http.Response {
 	return resp
 }
 
-// post makes a POST request with form data.
-func (e *httpTestEnv) post(path string, data string) *http.Response {
-	e.t.Helper()
-	resp, err := e.client.Post(
-		e.baseURL()+path,
-		"application/x-www-form-urlencoded",
-		strings.NewReader(data),
-	)
-	require.NoError(e.t, err)
-	return resp
-}
-
 // postJSON makes a POST request with JSON data.
 func (e *httpTestEnv) postJSON(path string, data any) *http.Response {
 	e.t.Helper()
@@ -418,7 +406,7 @@ func TestHTTP_ThreadView(t *testing.T) {
 	}
 
 	result = env.mailSvc.Receive(ctx, replyReq)
-	val, err = result.Unpack()
+	_, err = result.Unpack()
 	require.NoError(t, err)
 
 	// Fetch thread view.

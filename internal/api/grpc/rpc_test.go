@@ -59,7 +59,7 @@ func newTestHarness(t *testing.T) *testHarness {
 	require.NoError(t, err)
 
 	// Create storage from the sql.DB.
-	storage := store.FromDB(sqliteStore.Store.DB())
+	storage := store.FromDB(sqliteStore.DB())
 
 	// Create services.
 	mailSvc := mail.NewService(storage)

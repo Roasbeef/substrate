@@ -351,7 +351,7 @@ func (s *Server) handleInbox(w http.ResponseWriter, r *http.Request) {
 	pageSize := 50
 
 	// Build messages endpoint with agent filter.
-	messagesEndpoint := "/inbox/messages"
+	var messagesEndpoint string
 	if currentAgentID == 0 {
 		messagesEndpoint = "/inbox/messages?agent_id=all"
 	} else {
@@ -552,7 +552,7 @@ func (s *Server) handleSent(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Build endpoint with agent_id parameter.
-	endpoint := "/sent/messages"
+	var endpoint string
 	if currentAgentID > 0 {
 		endpoint = fmt.Sprintf("/sent/messages?agent_id=%d", currentAgentID)
 	} else {
@@ -1505,7 +1505,7 @@ func (s *Server) handleAPIStatus(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 
 	// Try to get first agent for status.
-	var agentName string = "no agents"
+	agentName := "no agents"
 	var unreadCount, urgentCount int64
 
 	agents, err := s.store.Queries().ListAgents(ctx)
@@ -1759,7 +1759,7 @@ func (s *Server) handleAPISessionCreate(w http.ResponseWriter, r *http.Request) 
 
 	// Use agent's project key as work dir if not specified.
 	if workDir == "" && agent.ProjectKey.Valid {
-		workDir = agent.ProjectKey.String
+		_ = agent.ProjectKey.String // workDir is not used yet.
 	}
 
 	// Generate session ID.
@@ -1878,20 +1878,6 @@ func (s *Server) sendAgentStatusEvent(w http.ResponseWriter, flusher http.Flushe
 	}
 
 	flusher.Flush()
-}
-
-// statusColor returns the CSS class for an agent status color.
-func statusColor(status string) string {
-	switch status {
-	case "active":
-		return "bg-green-500"
-	case "busy":
-		return "bg-yellow-500"
-	case "idle":
-		return "bg-gray-400"
-	default:
-		return "bg-red-500"
-	}
 }
 
 // handleSSEActivity streams activity updates via SSE.

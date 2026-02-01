@@ -139,7 +139,7 @@ func (t *TransactionExecutor[Q]) ExecTx(ctx context.Context,
 
 	for i := 0; i < t.opts.numRetries; i++ {
 		// Create the db transaction.
-		tx, err := t.BatchedQuerier.BeginTx(ctx, txOptions)
+		tx, err := t.BeginTx(ctx, txOptions)
 		if err != nil {
 			dbErr := MapSQLError(err)
 			if IsSerializationOrDeadlockError(dbErr) {
