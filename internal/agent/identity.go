@@ -156,7 +156,8 @@ func (m *IdentityManager) EnsureIdentity(ctx context.Context, sessionID string,
 	return identity, nil
 }
 
-// RestoreIdentity restores an agent identity from the session ID.
+// RestoreIdentity restores an agent identity from the session ID. Database
+// operations are wrapped in a read transaction for consistent reads.
 func (m *IdentityManager) RestoreIdentity(ctx context.Context,
 	sessionID string,
 ) (*IdentityFile, error) {
@@ -183,47 +184,57 @@ func (m *IdentityManager) RestoreIdentity(ctx context.Context,
 		return &identity, nil
 	}
 
-	// Try database.
-	session, err := m.store.Queries().GetSessionIdentity(ctx, sessionID)
-	if err != nil {
-		return nil, fmt.Errorf("session not found: %w", err)
-	}
-
-	agent, err := m.registry.GetAgent(ctx, session.AgentID)
-	if err != nil {
-		return nil, fmt.Errorf("agent not found: %w", err)
-	}
-
-	identity := &IdentityFile{
-		SessionID:       sessionID,
-		AgentName:       agent.Name,
-		AgentID:         agent.ID,
-		CreatedAt:       time.Unix(session.CreatedAt, 0),
-		LastActiveAt:    time.Unix(session.LastActiveAt, 0),
-		ConsumerOffsets: make(map[string]int64),
-	}
-
-	if session.ProjectKey.Valid {
-		identity.ProjectKey = session.ProjectKey.String
-	}
-	if session.GitBranch.Valid {
-		identity.GitBranch = session.GitBranch.String
-	}
-
-	// Load consumer offsets.
-	offsets, err := m.store.Queries().ListConsumerOffsetsByAgent(
-		ctx, agent.ID,
-	)
-	if err == nil {
-		for _, offset := range offsets {
-			identity.ConsumerOffsets[offset.TopicName] = offset.LastOffset
+	// Try database with read transaction for consistent reads.
+	var identity *IdentityFile
+	err = m.store.WithReadTx(ctx, func(ctx context.Context,
+		q *sqlc.Queries,
+	) error {
+		session, err := q.GetSessionIdentity(ctx, sessionID)
+		if err != nil {
+			return fmt.Errorf("session not found: %w", err)
 		}
+
+		agent, err := q.GetAgent(ctx, session.AgentID)
+		if err != nil {
+			return fmt.Errorf("agent not found: %w", err)
+		}
+
+		identity = &IdentityFile{
+			SessionID:       sessionID,
+			AgentName:       agent.Name,
+			AgentID:         agent.ID,
+			CreatedAt:       time.Unix(session.CreatedAt, 0),
+			LastActiveAt:    time.Unix(session.LastActiveAt, 0),
+			ConsumerOffsets: make(map[string]int64),
+		}
+
+		if session.ProjectKey.Valid {
+			identity.ProjectKey = session.ProjectKey.String
+		}
+		if session.GitBranch.Valid {
+			identity.GitBranch = session.GitBranch.String
+		}
+
+		// Load consumer offsets.
+		offsets, err := q.ListConsumerOffsetsByAgent(ctx, agent.ID)
+		if err == nil {
+			for _, offset := range offsets {
+				identity.ConsumerOffsets[offset.TopicName] = offset.LastOffset
+			}
+		}
+
+		return nil
+	})
+
+	if err != nil {
+		return nil, err
 	}
 
 	return identity, nil
 }
 
-// SaveIdentity persists the current identity state (including offsets).
+// SaveIdentity persists the current identity state (including offsets). All
+// database operations are wrapped in a transaction to ensure atomicity.
 func (m *IdentityManager) SaveIdentity(ctx context.Context,
 	identity *IdentityFile,
 ) error {
@@ -233,34 +244,59 @@ func (m *IdentityManager) SaveIdentity(ctx context.Context,
 		return err
 	}
 
-	if err := m.saveSessionDB(ctx, identity); err != nil {
-		return err
-	}
-
-	// Save consumer offsets.
-	for topicName, offset := range identity.ConsumerOffsets {
-		topic, err := m.store.Queries().GetTopicByName(ctx, topicName)
-		if err != nil {
-			continue
+	// Wrap all database operations in a transaction.
+	return m.store.WithTx(ctx, func(ctx context.Context,
+		q *sqlc.Queries,
+	) error {
+		// Save session identity.
+		if identity.SessionID != "" {
+			err := q.CreateSessionIdentity(
+				ctx, sqlc.CreateSessionIdentityParams{
+					SessionID: identity.SessionID,
+					AgentID:   identity.AgentID,
+					ProjectKey: sql.NullString{
+						String: identity.ProjectKey,
+						Valid:  identity.ProjectKey != "",
+					},
+					GitBranch: sql.NullString{
+						String: identity.GitBranch,
+						Valid:  identity.GitBranch != "",
+					},
+					CreatedAt:    identity.CreatedAt.Unix(),
+					LastActiveAt: identity.LastActiveAt.Unix(),
+				},
+			)
+			if err != nil {
+				return fmt.Errorf("failed to save session: %w", err)
+			}
 		}
 
-		err = m.store.Queries().UpsertConsumerOffset(
-			ctx, sqlc.UpsertConsumerOffsetParams{
-				AgentID:    identity.AgentID,
-				TopicID:    topic.ID,
-				LastOffset: offset,
-				UpdatedAt:  time.Now().Unix(),
-			},
-		)
-		if err != nil {
-			return fmt.Errorf("failed to save offset: %w", err)
-		}
-	}
+		// Save consumer offsets.
+		for topicName, offset := range identity.ConsumerOffsets {
+			topic, err := q.GetTopicByName(ctx, topicName)
+			if err != nil {
+				continue
+			}
 
-	return nil
+			err = q.UpsertConsumerOffset(
+				ctx, sqlc.UpsertConsumerOffsetParams{
+					AgentID:    identity.AgentID,
+					TopicID:    topic.ID,
+					LastOffset: offset,
+					UpdatedAt:  time.Now().Unix(),
+				},
+			)
+			if err != nil {
+				return fmt.Errorf("failed to save offset: %w", err)
+			}
+		}
+
+		return nil
+	})
 }
 
-// GetProjectDefaultIdentity returns the default agent for a project.
+// GetProjectDefaultIdentity returns the default agent for a project. Database
+// operations are wrapped in a read transaction for consistent reads.
 func (m *IdentityManager) GetProjectDefaultIdentity(ctx context.Context,
 	projectKey string,
 ) (*IdentityFile, error) {
@@ -288,28 +324,41 @@ func (m *IdentityManager) GetProjectDefaultIdentity(ctx context.Context,
 		return &identity, nil
 	}
 
-	// Try database.
-	session, err := m.store.Queries().GetSessionIdentityByProject(
-		ctx, sql.NullString{String: projectKey, Valid: true},
-	)
+	// Try database with read transaction for consistent reads.
+	var identity *IdentityFile
+	err = m.store.WithReadTx(ctx, func(ctx context.Context,
+		q *sqlc.Queries,
+	) error {
+		session, err := q.GetSessionIdentityByProject(
+			ctx, sql.NullString{String: projectKey, Valid: true},
+		)
+		if err != nil {
+			return fmt.Errorf("no default for project: %w", err)
+		}
+
+		agent, err := q.GetAgent(ctx, session.AgentID)
+		if err != nil {
+			return fmt.Errorf("agent not found: %w", err)
+		}
+
+		identity = &IdentityFile{
+			SessionID:       session.SessionID,
+			AgentName:       agent.Name,
+			AgentID:         agent.ID,
+			ProjectKey:      projectKey,
+			CreatedAt:       time.Unix(session.CreatedAt, 0),
+			LastActiveAt:    time.Unix(session.LastActiveAt, 0),
+			ConsumerOffsets: make(map[string]int64),
+		}
+
+		return nil
+	})
+
 	if err != nil {
-		return nil, fmt.Errorf("no default for project: %w", err)
+		return nil, err
 	}
 
-	agent, err := m.registry.GetAgent(ctx, session.AgentID)
-	if err != nil {
-		return nil, fmt.Errorf("agent not found: %w", err)
-	}
-
-	return &IdentityFile{
-		SessionID:       session.SessionID,
-		AgentName:       agent.Name,
-		AgentID:         agent.ID,
-		ProjectKey:      projectKey,
-		CreatedAt:       time.Unix(session.CreatedAt, 0),
-		LastActiveAt:    time.Unix(session.LastActiveAt, 0),
-		ConsumerOffsets: make(map[string]int64),
-	}, nil
+	return identity, nil
 }
 
 // SetProjectDefault sets the default agent for a project.
