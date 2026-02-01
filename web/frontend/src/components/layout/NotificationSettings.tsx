@@ -17,7 +17,16 @@ export function NotificationSettings({ className = '' }: NotificationSettingsPro
     preferences,
     requestPermission,
     updatePreferences,
+    showNotification,
   } = useNotifications();
+
+  // Handle test notification.
+  const handleTestNotification = useCallback(() => {
+    showNotification('Test Notification', {
+      body: 'This is a test notification from Subtrate. Notifications are working correctly!',
+      tag: 'test-notification',
+    });
+  }, [showNotification]);
 
   // Handle permission request.
   const handleRequestPermission = useCallback(async () => {
@@ -119,6 +128,23 @@ export function NotificationSettings({ className = '' }: NotificationSettingsPro
           <p className="mt-2 text-xs text-gray-500 dark:text-gray-400">
             To enable notifications, update your browser settings for this site.
           </p>
+        )}
+
+        {/* Test notification button. */}
+        {permission === 'granted' && preferences.enabled && (
+          <div className="mt-4 flex items-center justify-between border-t border-gray-200 pt-4 dark:border-gray-700">
+            <div>
+              <p className="text-sm font-medium text-gray-900 dark:text-gray-100">
+                Test Notifications
+              </p>
+              <p className="text-sm text-gray-500 dark:text-gray-400">
+                Send a test notification to verify setup.
+              </p>
+            </div>
+            <Button size="sm" variant="outline" onClick={handleTestNotification}>
+              Send Test
+            </Button>
+          </div>
         )}
       </div>
 
