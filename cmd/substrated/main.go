@@ -145,7 +145,7 @@ func main() {
 		webCfg.MailRef = mailRef
 		webCfg.ActivityRef = activityRef
 
-		webServer, err := web.NewServer(webCfg, dbStore)
+		webServer, err := web.NewServer(webCfg, storage, agentReg)
 		if err != nil {
 			log.Fatalf("Failed to create web server: %v", err)
 		}

@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"github.com/roasbeef/subtrate/internal/activity"
+	"github.com/roasbeef/subtrate/internal/agent"
 	"github.com/roasbeef/subtrate/internal/baselib/actor"
 	"github.com/roasbeef/subtrate/internal/db"
 	"github.com/roasbeef/subtrate/internal/db/sqlc"
@@ -96,13 +97,16 @@ func newHTTPTestEnv(t *testing.T) *httpTestEnv {
 		activitySvc,
 	)
 
+	// Create agent registry.
+	registry := agent.NewRegistry(dbStore)
+
 	// Create web server.
 	cfg := web.DefaultConfig()
 	cfg.Addr = addr
 	cfg.MailRef = mailRef
 	cfg.ActivityRef = activityRef
 
-	server, err := web.NewServer(cfg, dbStore)
+	server, err := web.NewServer(cfg, storage, registry)
 	require.NoError(t, err)
 
 	// Start server in background.
