@@ -249,59 +249,65 @@ func (s *Service) handleFetchInbox(ctx context.Context,
 	return response
 }
 
-// handleReadMessage processes a ReadMessageRequest.
+// handleReadMessage processes a ReadMessageRequest. The read-and-mark-read
+// operation is wrapped in a transaction to ensure atomic state transition.
 func (s *Service) handleReadMessage(ctx context.Context,
 	req ReadMessageRequest,
 ) ReadMessageResponse {
 	var response ReadMessageResponse
 
-	// Get the message.
-	msg, err := s.store.GetMessage(ctx, req.MessageID)
-	if err != nil {
-		response.Error = fmt.Errorf("message not found: %w", err)
-		return response
-	}
-
-	// Get the recipient state.
-	recipient, err := s.store.GetMessageRecipient(
-		ctx, req.MessageID, req.AgentID,
-	)
-	if err != nil {
-		response.Error = fmt.Errorf("not a recipient: %w", err)
-		return response
-	}
-
-	// Mark as read if currently unread.
-	if recipient.State == "unread" {
-		err = s.store.MarkMessageRead(ctx, req.MessageID, req.AgentID)
+	err := s.store.WithTx(ctx, func(ctx context.Context,
+		txStore store.Storage,
+	) error {
+		// Get the message.
+		msg, err := txStore.GetMessage(ctx, req.MessageID)
 		if err != nil {
-			response.Error = fmt.Errorf("failed to mark read: %w",
-				err)
-			return response
+			return fmt.Errorf("message not found: %w", err)
 		}
-		recipient.State = "read"
-		now := time.Now()
-		recipient.ReadAt = &now
-	}
 
-	// Build response.
-	inboxMsg := InboxMessage{
-		ID:           msg.ID,
-		ThreadID:     msg.ThreadID,
-		TopicID:      msg.TopicID,
-		SenderID:     msg.SenderID,
-		Subject:      msg.Subject,
-		Body:         msg.Body,
-		Priority:     Priority(msg.Priority),
-		State:        recipient.State,
-		CreatedAt:    msg.CreatedAt,
-		Deadline:     msg.DeadlineAt,
-		SnoozedUntil: recipient.SnoozedUntil,
-		ReadAt:       recipient.ReadAt,
-		AckedAt:      recipient.AckedAt,
-	}
+		// Get the recipient state.
+		recipient, err := txStore.GetMessageRecipient(
+			ctx, req.MessageID, req.AgentID,
+		)
+		if err != nil {
+			return fmt.Errorf("not a recipient: %w", err)
+		}
 
-	response.Message = &inboxMsg
+		// Mark as read if currently unread.
+		if recipient.State == StateUnreadStr.String() {
+			err = txStore.MarkMessageRead(ctx, req.MessageID, req.AgentID)
+			if err != nil {
+				return fmt.Errorf("failed to mark read: %w", err)
+			}
+			recipient.State = StateReadStr.String()
+			now := time.Now()
+			recipient.ReadAt = &now
+		}
+
+		// Build response.
+		inboxMsg := InboxMessage{
+			ID:           msg.ID,
+			ThreadID:     msg.ThreadID,
+			TopicID:      msg.TopicID,
+			SenderID:     msg.SenderID,
+			Subject:      msg.Subject,
+			Body:         msg.Body,
+			Priority:     Priority(msg.Priority),
+			State:        recipient.State,
+			CreatedAt:    msg.CreatedAt,
+			Deadline:     msg.DeadlineAt,
+			SnoozedUntil: recipient.SnoozedUntil,
+			ReadAt:       recipient.ReadAt,
+			AckedAt:      recipient.AckedAt,
+		}
+
+		response.Message = &inboxMsg
+		return nil
+	})
+
+	if err != nil {
+		response.Error = err
+	}
 	return response
 }
 
