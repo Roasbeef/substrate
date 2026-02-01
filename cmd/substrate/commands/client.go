@@ -18,65 +18,66 @@ import (
 
 // ReviewInfo contains information about a code review.
 type ReviewInfo struct {
-	ReviewID    string
-	ThreadID    string
-	RequesterID int64
-	PRNumber    *int64
-	Branch      string
-	BaseBranch  string
-	CommitSHA   string
-	RepoPath    string
-	ReviewType  string
-	Priority    string
-	State       string
-	CreatedAt   time.Time
-	UpdatedAt   time.Time
-	CompletedAt *time.Time
+	ReviewID      string     `json:"id"`
+	ThreadID      string     `json:"thread_id"`
+	RequesterID   int64      `json:"requester_id"`
+	RequesterName string     `json:"requester_name,omitempty"`
+	PRNumber      *int64     `json:"pr_number,omitempty"`
+	Branch        string     `json:"branch"`
+	BaseBranch    string     `json:"base_branch"`
+	CommitSHA     string     `json:"commit_sha"`
+	RepoPath      string     `json:"repo_path"`
+	ReviewType    string     `json:"review_type"`
+	Priority      string     `json:"priority"`
+	State         string     `json:"state"`
+	CreatedAt     time.Time  `json:"created_at"`
+	UpdatedAt     time.Time  `json:"updated_at"`
+	CompletedAt   *time.Time `json:"completed_at,omitempty"`
 }
 
 // ReviewIterationInfo contains information about a review iteration.
 type ReviewIterationInfo struct {
-	ID                int64
-	ReviewID          string
-	IterationNum      int
-	ReviewerID        string
-	ReviewerSessionID string
-	Decision          string
-	Summary           string
-	FilesReviewed     int
-	LinesAnalyzed     int
-	DurationMS        int64
-	CostUSD           float64
-	StartedAt         time.Time
-	CompletedAt       *time.Time
+	ID                int64      `json:"id"`
+	ReviewID          string     `json:"review_id"`
+	IterationNum      int        `json:"iteration_num"`
+	ReviewerID        string     `json:"reviewer_id"`
+	ReviewerSessionID string     `json:"reviewer_session_id"`
+	Decision          string     `json:"decision"`
+	Summary           string     `json:"summary"`
+	FilesReviewed     int        `json:"files_reviewed"`
+	LinesAnalyzed     int        `json:"lines_analyzed"`
+	DurationMS        int64      `json:"duration_ms"`
+	CostUSD           float64    `json:"cost_usd"`
+	StartedAt         time.Time  `json:"started_at"`
+	CompletedAt       *time.Time `json:"completed_at,omitempty"`
 }
 
 // ReviewIssueInfo contains information about a review issue.
 type ReviewIssueInfo struct {
-	ID           int64
-	ReviewID     string
-	IterationNum int
-	IssueType    string
-	Severity     string
-	FilePath     string
-	LineStart    int
-	LineEnd      *int
-	Title        string
-	Description  string
-	CodeSnippet  string
-	Suggestion   string
-	ClaudeMDRef  string
-	Status       string
-	CreatedAt    time.Time
+	ID           int64     `json:"id"`
+	ReviewID     string    `json:"review_id"`
+	IterationNum int       `json:"iteration_num"`
+	IssueType    string    `json:"issue_type"`
+	Severity     string    `json:"severity"`
+	FilePath     string    `json:"file_path"`
+	LineStart    int       `json:"line_start"`
+	LineEnd      *int      `json:"line_end,omitempty"`
+	Title        string    `json:"title"`
+	Description  string    `json:"description"`
+	CodeSnippet  string    `json:"code_snippet,omitempty"`
+	Suggestion   string    `json:"suggestion,omitempty"`
+	ClaudeMDRef  string    `json:"claude_md_ref,omitempty"`
+	Status       string    `json:"status"`
+	CreatedAt    time.Time `json:"created_at"`
 }
 
 // ReviewStatsInfo contains aggregate review statistics.
 type ReviewStatsInfo struct {
-	TotalReviews     int64
-	Approved         int64
-	Pending          int64
-	InProgress       int64
-	ChangesRequested int64
+	TotalReviews     int64 `json:"total_reviews"`
+	Approved         int64 `json:"approved"`
+	Pending          int64 `json:"pending"`
+	InProgress       int64 `json:"in_progress"`
+	ChangesRequested int64 `json:"changes_requested"`
 }
 
 const (

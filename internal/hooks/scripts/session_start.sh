@@ -36,3 +36,39 @@ fi
 if [ -n "$result" ]; then
     echo "$result"
 fi
+
+# Check for pending code reviews.
+# This injects review context for agents operating as reviewers.
+review_args=""
+if [ -n "$session_id" ]; then
+    review_args="--session-id $session_id"
+fi
+
+# Check pending reviews (assigned to this agent)
+pending_reviews=$(substrate review list $review_args --state pending_review --format json 2>/dev/null || echo '{"reviews":[]}')
+pending_count=$(echo "$pending_reviews" | jq -r '.reviews | length' 2>/dev/null || echo "0")
+
+# Check re-review requests
+rereview=$(substrate review list $review_args --state re_review --format json 2>/dev/null || echo '{"reviews":[]}')
+rereview_count=$(echo "$rereview" | jq -r '.reviews | length' 2>/dev/null || echo "0")
+
+# Output review context if there are pending reviews
+if [ "$pending_count" -gt 0 ] || [ "$rereview_count" -gt 0 ]; then
+    echo ""
+    echo "=== Code Review Queue ==="
+
+    if [ "$pending_count" -gt 0 ]; then
+        echo ""
+        echo "Pending Reviews ($pending_count):"
+        echo "$pending_reviews" | jq -r '.reviews[] | "  - #\(.id): \(.branch) from \(.requester_name // "unknown")"' 2>/dev/null || true
+    fi
+
+    if [ "$rereview_count" -gt 0 ]; then
+        echo ""
+        echo "Re-Reviews Needed ($rereview_count):"
+        echo "$rereview" | jq -r '.reviews[] | "  - #\(.id): \(.branch) - fixes pushed"' 2>/dev/null || true
+    fi
+
+    echo ""
+    echo "Use 'substrate review status <id>' for review details."
+fi

@@ -3,9 +3,10 @@
 #
 # Priority order:
 # 1. Quick mail check - if mail exists, block immediately
-# 2. Check Tasks - if incomplete tasks exist, block immediately
-# 3. Send status update to User (with deduplication)
-# 4. Long poll - keep agent alive, continuously checking for work
+# 2. Check code reviews - if pending reviews exist, block immediately
+# 3. Check Tasks - if incomplete tasks exist, block immediately
+# 4. Send status update to User (with deduplication)
+# 5. Long poll - keep agent alive, continuously checking for work
 #
 # Key behaviors:
 # - Checks mail before tasks (mail is more actionable)
@@ -52,7 +53,36 @@ if [ "$quick_decision" = "block" ]; then
 fi
 
 # ============================================================================
-# Step 2: Check for incomplete tasks
+# Step 2: Check for pending code reviews
+# ============================================================================
+
+# Check if this agent has pending reviews to process
+pending_reviews=$(substrate review list $session_args --state pending_review --format json 2>/dev/null || echo '{"reviews":[]}')
+pending_count=$(echo "$pending_reviews" | jq -r '.reviews | length' 2>/dev/null || echo "0")
+
+rereview=$(substrate review list $session_args --state re_review --format json 2>/dev/null || echo '{"reviews":[]}')
+rereview_count=$(echo "$rereview" | jq -r '.reviews | length' 2>/dev/null || echo "0")
+
+total_reviews=$((pending_count + rereview_count))
+
+if [ "$total_reviews" -gt 0 ]; then
+    review_list=""
+    if [ "$pending_count" -gt 0 ]; then
+        review_list=$(echo "$pending_reviews" | jq -r '.reviews[] | "#\(.id) \(.branch)"' 2>/dev/null | tr '\n' ', ')
+    fi
+    if [ "$rereview_count" -gt 0 ]; then
+        rereview_list=$(echo "$rereview" | jq -r '.reviews[] | "#\(.id) re-review"' 2>/dev/null | tr '\n' ', ')
+        review_list="${review_list}${rereview_list}"
+    fi
+
+    cat <<EOF
+{"decision": "block", "reason": "${total_reviews} pending code review(s): ${review_list}Process reviews before stopping."}
+EOF
+    exit 0
+fi
+
+# ============================================================================
+# Step 3: Check for incomplete tasks (TodoWrite tasks)
 # ============================================================================
 
 # Function to count incomplete tasks for a session.
@@ -115,7 +145,7 @@ EOF
 fi
 
 # ============================================================================
-# Step 3: Send status update (with deduplication)
+# Step 4: Send status update (with deduplication)
 # ============================================================================
 
 # Send status update in background to not block the hook.
@@ -260,7 +290,7 @@ $summary
 } &
 
 # ============================================================================
-# Step 4: Long poll to keep agent alive
+# Step 5: Long poll to keep agent alive
 # ============================================================================
 
 # No mail, no tasks - do a longer poll to keep agent alive

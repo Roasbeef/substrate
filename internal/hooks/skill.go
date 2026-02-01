@@ -94,4 +94,53 @@ Open http://localhost:8080 to:
 - When blocked waiting for input
 - Before finishing tasks
 - After completing work (others may have sent follow-up)
+
+# Code Review Operations
+
+Subtrate supports native code review with AI agents. Reviewer agents can be assigned reviews and provide structured feedback.
+
+## Review Quick Reference
+
+| Action | Command |
+|--------|---------|
+| List reviews | ` + "`substrate review list`" + ` |
+| Check review status | ` + "`substrate review status <id>`" + ` |
+| Request a review | ` + "`substrate review request --branch <branch> --base <base>`" + ` |
+| View review stats | ` + "`substrate review stats`" + ` |
+| Cancel a review | ` + "`substrate review cancel <id>`" + ` |
+
+## For Reviewer Agents
+
+If you are operating as a code reviewer agent:
+
+1. **Check for pending reviews**: ` + "`substrate review list --state pending_review`" + `
+2. **Review the code**: Checkout the branch and analyze changes
+3. **Submit feedback**: Send structured review via mail reply
+4. **Iterate**: Handle re-review requests after fixes
+
+## Review Types
+
+- **general**: Full code review (default)
+- **security**: Security-focused review
+- **performance**: Performance-focused review
+- **architecture**: Architecture and design review
+
+## Review Workflow
+
+1. **Author** requests review via ` + "`substrate review request`" + `
+2. **Reviewer** receives review mail, checkouts code, analyzes diff
+3. **Reviewer** submits APPROVE/REQUEST_CHANGES/COMMENT decision
+4. **Author** addresses feedback and re-requests if needed
+5. **Reviewer** reviews fixes and approves when ready
+
+## Review States
+
+- ` + "`new`" + `: Review created, not yet assigned
+- ` + "`pending_review`" + `: Assigned, awaiting reviewer
+- ` + "`under_review`" + `: Reviewer actively analyzing
+- ` + "`changes_requested`" + `: Feedback provided, needs fixes
+- ` + "`re_review`" + `: Fixes pushed, awaiting re-review
+- ` + "`approved`" + `: Review passed
+- ` + "`rejected`" + `: Review rejected
+- ` + "`cancelled`" + `: Review cancelled
 `

@@ -180,7 +180,11 @@ func runReviewList(cmd *cobra.Command, args []string) error {
 
 	switch outputFormat {
 	case "json":
-		return outputJSON(reviews)
+		// Wrap reviews in an object for consistency with hooks.
+		return outputJSON(map[string]interface{}{
+			"reviews": reviews,
+			"count":   len(reviews),
+		})
 	case "context":
 		if len(reviews) == 0 {
 			return nil

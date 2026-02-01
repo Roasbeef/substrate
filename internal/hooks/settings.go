@@ -18,8 +18,8 @@ type ClaudeSettings struct {
 
 // HookEntry represents a hook configuration in settings.json.
 type HookEntry struct {
-	Matcher string          `json:"matcher"`
-	Hooks   []HookCommand   `json:"hooks"`
+	Matcher string        `json:"matcher"`
+	Hooks   []HookCommand `json:"hooks"`
 }
 
 // HookCommand represents a single hook command.
