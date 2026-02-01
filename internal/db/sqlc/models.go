@@ -86,3 +86,59 @@ type Topic struct {
 	RetentionSeconds sql.NullInt64
 	CreatedAt        int64
 }
+
+type Review struct {
+	ID          int64
+	ReviewID    string
+	ThreadID    string
+	RequesterID int64
+	PrNumber    sql.NullInt64
+	Branch      string
+	BaseBranch  string
+	CommitSha   string
+	RepoPath    string
+	ReviewType  string
+	Priority    string
+	State       string
+	CreatedAt   int64
+	UpdatedAt   int64
+	CompletedAt sql.NullInt64
+}
+
+type ReviewIteration struct {
+	ID                int64
+	ReviewID          string
+	IterationNum      int64
+	ReviewerID        string
+	ReviewerSessionID sql.NullString
+	Decision          string
+	Summary           string
+	IssuesJson        sql.NullString
+	SuggestionsJson   sql.NullString
+	FilesReviewed     int64
+	LinesAnalyzed     int64
+	DurationMs        int64
+	CostUsd           float64
+	StartedAt         int64
+	CompletedAt       sql.NullInt64
+}
+
+type ReviewIssue struct {
+	ID                  int64
+	ReviewID            string
+	IterationNum        int64
+	IssueType           string
+	Severity            string
+	FilePath            string
+	LineStart           int64
+	LineEnd             sql.NullInt64
+	Title               string
+	Description         string
+	CodeSnippet         sql.NullString
+	Suggestion          sql.NullString
+	ClaudeMdRef         sql.NullString
+	Status              string
+	ResolvedAt          sql.NullInt64
+	ResolvedInIteration sql.NullInt64
+	CreatedAt           int64
+}

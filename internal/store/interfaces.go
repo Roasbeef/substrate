@@ -203,6 +203,90 @@ type SessionStore interface {
 	) error
 }
 
+// ReviewStore handles review persistence operations.
+type ReviewStore interface {
+	// CreateReview creates a new review in the database.
+	CreateReview(ctx context.Context, params CreateReviewParams) (Review, error)
+
+	// GetReview retrieves a review by its review ID.
+	GetReview(ctx context.Context, reviewID string) (Review, error)
+
+	// GetReviewByThread retrieves a review by its thread ID.
+	GetReviewByThread(ctx context.Context, threadID string) (Review, error)
+
+	// ListReviews lists all reviews with a limit.
+	ListReviews(ctx context.Context, limit int) ([]Review, error)
+
+	// ListReviewsByRequester lists reviews by a specific requester.
+	ListReviewsByRequester(
+		ctx context.Context, requesterID int64, limit int,
+	) ([]Review, error)
+
+	// ListReviewsByState lists reviews by state.
+	ListReviewsByState(ctx context.Context, state string, limit int) ([]Review, error)
+
+	// ListPendingReviews lists reviews pending review, ordered by priority.
+	ListPendingReviews(ctx context.Context, limit int) ([]Review, error)
+
+	// ListActiveReviews lists active (not completed) reviews.
+	ListActiveReviews(ctx context.Context, limit int) ([]Review, error)
+
+	// UpdateReviewState updates the state of a review.
+	UpdateReviewState(ctx context.Context, reviewID, state string) error
+
+	// UpdateReviewCommit updates the commit SHA for a review.
+	UpdateReviewCommit(ctx context.Context, reviewID, commitSHA string) error
+
+	// CompleteReview marks a review as completed with a final state.
+	CompleteReview(ctx context.Context, reviewID, state string) error
+
+	// DeleteReview deletes a review and its related data.
+	DeleteReview(ctx context.Context, reviewID string) error
+
+	// GetReviewStats retrieves aggregate review statistics.
+	GetReviewStats(ctx context.Context) (ReviewStats, error)
+
+	// CreateReviewIteration creates a new review iteration.
+	CreateReviewIteration(
+		ctx context.Context, params CreateReviewIterationParams,
+	) (ReviewIteration, error)
+
+	// GetLatestReviewIteration retrieves the latest iteration for a review.
+	GetLatestReviewIteration(
+		ctx context.Context, reviewID string,
+	) (ReviewIteration, error)
+
+	// ListReviewIterations lists all iterations for a review.
+	ListReviewIterations(
+		ctx context.Context, reviewID string,
+	) ([]ReviewIteration, error)
+
+	// GetIterationCount returns the current iteration number for a review.
+	GetIterationCount(ctx context.Context, reviewID string) (int, error)
+
+	// CreateReviewIssue creates a new review issue.
+	CreateReviewIssue(
+		ctx context.Context, params CreateReviewIssueParams,
+	) (ReviewIssue, error)
+
+	// ListReviewIssues lists all issues for a review.
+	ListReviewIssues(ctx context.Context, reviewID string) ([]ReviewIssue, error)
+
+	// ListOpenReviewIssues lists open issues for a review.
+	ListOpenReviewIssues(ctx context.Context, reviewID string) ([]ReviewIssue, error)
+
+	// ResolveIssue marks an issue as resolved.
+	ResolveIssue(ctx context.Context, issueID int64, iterationNum int) error
+
+	// CountOpenIssues counts open issues for a review.
+	CountOpenIssues(ctx context.Context, reviewID string) (int64, error)
+
+	// GetReviewerDecisions retrieves reviewer decisions for an iteration.
+	GetReviewerDecisions(
+		ctx context.Context, reviewID string, iterationNum int,
+	) ([]ReviewerDecision, error)
+}
+
 // Storage combines all store interfaces for unified access.
 type Storage interface {
 	MessageStore
@@ -210,6 +294,7 @@ type Storage interface {
 	TopicStore
 	ActivityStore
 	SessionStore
+	ReviewStore
 
 	// WithTx executes a function within a database transaction.
 	WithTx(ctx context.Context, fn func(ctx context.Context, s Storage) error) error
@@ -296,6 +381,80 @@ type SessionIdentity struct {
 	LastActiveAt time.Time
 }
 
+// Review represents a code review request.
+type Review struct {
+	ID          int64
+	ReviewID    string
+	ThreadID    string
+	RequesterID int64
+	PRNumber    *int64
+	Branch      string
+	BaseBranch  string
+	CommitSHA   string
+	RepoPath    string
+	ReviewType  string
+	Priority    string
+	State       string
+	CreatedAt   time.Time
+	UpdatedAt   time.Time
+	CompletedAt *time.Time
+}
+
+// ReviewIteration represents a single round of review feedback.
+type ReviewIteration struct {
+	ID                int64
+	ReviewID          string
+	IterationNum      int
+	ReviewerID        string
+	ReviewerSessionID string
+	Decision          string
+	Summary           string
+	IssuesJSON        string
+	SuggestionsJSON   string
+	FilesReviewed     int
+	LinesAnalyzed     int
+	DurationMS        int64
+	CostUSD           float64
+	StartedAt         time.Time
+	CompletedAt       *time.Time
+}
+
+// ReviewIssue represents an issue found during code review.
+type ReviewIssue struct {
+	ID                  int64
+	ReviewID            string
+	IterationNum        int
+	IssueType           string
+	Severity            string
+	FilePath            string
+	LineStart           int
+	LineEnd             *int
+	Title               string
+	Description         string
+	CodeSnippet         string
+	Suggestion          string
+	ClaudeMDRef         string
+	Status              string
+	ResolvedAt          *time.Time
+	ResolvedInIteration *int
+	CreatedAt           time.Time
+}
+
+// ReviewStats contains aggregate review statistics.
+type ReviewStats struct {
+	TotalReviews     int64
+	Approved         int64
+	Pending          int64
+	InProgress       int64
+	ChangesRequested int64
+}
+
+// ReviewerDecision represents a reviewer's decision for an iteration.
+type ReviewerDecision struct {
+	ReviewerID string
+	Decision   string
+}
+
 // Parameter types for create operations.
 
 // CreateMessageParams contains parameters for creating a message.
@@ -340,6 +499,53 @@ type CreateSessionIdentityParams struct {
 	AgentID    int64
 	ProjectKey string
 	GitBranch  string
+}
+
+// CreateReviewParams contains parameters for creating a review.
+type CreateReviewParams struct {
+	ReviewID    string
+	ThreadID    string
+	RequesterID int64
+	PRNumber    *int64
+	Branch      string
+	BaseBranch  string
+	CommitSHA   string
+	RepoPath    string
+	ReviewType  string
+	Priority    string
+}
+
+// CreateReviewIterationParams contains parameters for creating a review
+// iteration.
+type CreateReviewIterationParams struct {
+	ReviewID          string
+	IterationNum      int
+	ReviewerID        string
+	ReviewerSessionID string
+	Decision          string
+	Summary           string
+	IssuesJSON        string
+	SuggestionsJSON   string
+	FilesReviewed     int
+	LinesAnalyzed     int
+	DurationMS        int64
+	CostUSD           float64
+}
+
+// CreateReviewIssueParams contains parameters for creating a review issue.
+type CreateReviewIssueParams struct {
+	ReviewID     string
+	IterationNum int
+	IssueType    string
+	Severity     string
+	FilePath     string
+	LineStart    int
+	LineEnd      *int
+	Title        string
+	Description  string
+	CodeSnippet  string
+	Suggestion   string
+	ClaudeMDRef  string
 }
 
 // Conversion functions from sqlc models.
@@ -452,4 +658,90 @@ func ToSqlcNullInt64(t *time.Time) sql.NullInt64 {
 		return sql.NullInt64{}
 	}
 	return sql.NullInt64{Int64: t.Unix(), Valid: true}
+}
+
+// ReviewFromSqlc converts a sqlc.Review to a store.Review.
+func ReviewFromSqlc(r sqlc.Review) Review {
+	review := Review{
+		ID:          r.ID,
+		ReviewID:    r.ReviewID,
+		ThreadID:    r.ThreadID,
+		RequesterID: r.RequesterID,
+		Branch:      r.Branch,
+		BaseBranch:  r.BaseBranch,
+		CommitSHA:   r.CommitSha,
+		RepoPath:    r.RepoPath,
+		ReviewType:  r.ReviewType,
+		Priority:    r.Priority,
+		State:       r.State,
+		CreatedAt:   time.Unix(r.CreatedAt, 0),
+		UpdatedAt:   time.Unix(r.UpdatedAt, 0),
+	}
+	if r.PrNumber.Valid {
+		prNum := r.PrNumber.Int64
+		review.PRNumber = &prNum
+	}
+	if r.CompletedAt.Valid {
+		t := time.Unix(r.CompletedAt.Int64, 0)
+		review.CompletedAt = &t
+	}
+	return review
+}
+
+// ReviewIterationFromSqlc converts a sqlc.ReviewIteration to a store model.
+func ReviewIterationFromSqlc(r sqlc.ReviewIteration) ReviewIteration {
+	iter := ReviewIteration{
+		ID:                r.ID,
+		ReviewID:          r.ReviewID,
+		IterationNum:      int(r.IterationNum),
+		ReviewerID:        r.ReviewerID,
+		ReviewerSessionID: r.ReviewerSessionID.String,
+		Decision:          r.Decision,
+		Summary:           r.Summary,
+		IssuesJSON:        r.IssuesJson.String,
+		SuggestionsJSON:   r.SuggestionsJson.String,
+		FilesReviewed:     int(r.FilesReviewed),
+		LinesAnalyzed:     int(r.LinesAnalyzed),
+		DurationMS:        r.DurationMs,
+		CostUSD:           r.CostUsd,
+		StartedAt:         time.Unix(r.StartedAt, 0),
+	}
+	if r.CompletedAt.Valid {
+		t := time.Unix(r.CompletedAt.Int64, 0)
+		iter.CompletedAt = &t
+	}
+	return iter
+}
+
+// ReviewIssueFromSqlc converts a sqlc.ReviewIssue to a store model.
+func ReviewIssueFromSqlc(r sqlc.ReviewIssue) ReviewIssue {
+	issue := ReviewIssue{
+		ID:           r.ID,
+		ReviewID:     r.ReviewID,
+		IterationNum: int(r.IterationNum),
+		IssueType:    r.IssueType,
+		Severity:     r.Severity,
+		FilePath:     r.FilePath,
+		LineStart:    int(r.LineStart),
+		Title:        r.Title,
+		Description:  r.Description,
+		CodeSnippet:  r.CodeSnippet.String,
+		Suggestion:   r.Suggestion.String,
+		ClaudeMDRef:  r.ClaudeMdRef.String,
+		Status:       r.Status,
+		CreatedAt:    time.Unix(r.CreatedAt, 0),
+	}
+	if r.LineEnd.Valid {
+		lineEnd := int(r.LineEnd.Int64)
+		issue.LineEnd = &lineEnd
+	}
+	if r.ResolvedAt.Valid {
+		t := time.Unix(r.ResolvedAt.Int64, 0)
+		issue.ResolvedAt = &t
+	}
+	if r.ResolvedInIteration.Valid {
+		resolvedIn := int(r.ResolvedInIteration.Int64)
+		issue.ResolvedInIteration = &resolvedIn
+	}
+	return issue
 }
