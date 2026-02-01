@@ -1,13 +1,17 @@
 package review
 
 import (
+	"bytes"
 	"context"
+	"encoding/json"
 	"fmt"
 	"log/slog"
 	"sync"
+	"text/template"
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/roasbeef/subtrate/internal/agent"
 	"github.com/roasbeef/subtrate/internal/store"
 )
 
@@ -15,6 +19,9 @@ import (
 type Service struct {
 	store store.Storage
 	log   *slog.Logger
+
+	// Spawner for one-shot structured analysis
+	spawner *agent.Spawner
 
 	// Registered reviewer configurations (for validation/routing)
 	reviewers map[string]*ReviewerConfig
@@ -25,20 +32,58 @@ type Service struct {
 
 	// Default multi-reviewer config
 	defaultConfig *MultiReviewConfig
+
+	// Structured review prompt template (parsed once)
+	promptTemplate *template.Template
+}
+
+// ServiceOption is a functional option for configuring the review service.
+type ServiceOption func(*Service)
+
+// WithSpawner sets a custom spawner for the service.
+func WithSpawner(spawner *agent.Spawner) ServiceOption {
+	return func(s *Service) {
+		s.spawner = spawner
+	}
+}
+
+// WithLogger sets a custom logger for the service.
+func WithLogger(log *slog.Logger) ServiceOption {
+	return func(s *Service) {
+		s.log = log
+	}
+}
+
+// WithMultiReviewConfig sets a custom multi-review configuration.
+func WithMultiReviewConfig(config *MultiReviewConfig) ServiceOption {
+	return func(s *Service) {
+		s.defaultConfig = config
+	}
 }
 
 // NewService creates a new review service.
-func NewService(s store.Storage, log *slog.Logger) *Service {
-	if log == nil {
-		log = slog.Default()
+func NewService(s store.Storage, opts ...ServiceOption) *Service {
+	// Parse the prompt template once
+	tmpl, err := template.New("structured_review").Parse(StructuredReviewPromptTemplate)
+	if err != nil {
+		// This should never happen since the template is a constant
+		panic(fmt.Sprintf("failed to parse review prompt template: %v", err))
 	}
-	return &Service{
-		store:         s,
-		log:           log,
-		reviewers:     SpecializedReviewers(),
-		activeReviews: make(map[string]*ReviewFSM),
-		defaultConfig: DefaultMultiReviewConfig(),
+
+	svc := &Service{
+		store:          s,
+		log:            slog.Default(),
+		reviewers:      SpecializedReviewers(),
+		activeReviews:  make(map[string]*ReviewFSM),
+		defaultConfig:  DefaultMultiReviewConfig(),
+		promptTemplate: tmpl,
 	}
+
+	for _, opt := range opts {
+		opt(svc)
+	}
+
+	return svc
 }
 
 // RequestReview creates a new review request and returns the review ID.
@@ -343,4 +388,310 @@ func (s *Service) CleanupOldFSMs(maxAge time.Duration) {
 			}
 		}
 	}
+}
+
+// =============================================================================
+// Spawner Integration for Structured Analysis
+// =============================================================================
+
+// SpawnStructuredReview runs a one-shot Claude Code analysis with JSON output.
+// This is used for automated review passes that need structured data.
+func (s *Service) SpawnStructuredReview(ctx context.Context,
+	req StructuredReviewRequest) (*StructuredReviewResult, error) {
+
+	if s.spawner == nil {
+		return nil, fmt.Errorf("spawner not configured")
+	}
+
+	// Build the prompt from the template
+	prompt, err := s.buildStructuredPrompt(req)
+	if err != nil {
+		return nil, fmt.Errorf("failed to build prompt: %w", err)
+	}
+
+	s.log.Info("Spawning structured review",
+		"review_id", req.ReviewID,
+		"work_dir", req.WorkDir,
+		"files", len(req.ChangedFiles),
+	)
+
+	startTime := time.Now()
+
+	// Spawn Claude with the prompt
+	resp, err := s.spawner.Spawn(ctx, prompt)
+	if err != nil {
+		return nil, fmt.Errorf("spawn failed: %w", err)
+	}
+
+	if resp.IsError {
+		return nil, fmt.Errorf("reviewer returned error: %s", resp.Error)
+	}
+
+	// Parse the structured JSON response
+	result, err := s.parseStructuredResponse(resp.Result)
+	if err != nil {
+		// Log the raw response for debugging
+		s.log.Warn("Failed to parse structured response",
+			"error", err,
+			"review_id", req.ReviewID,
+			"raw_response_len", len(resp.Result),
+		)
+		return nil, fmt.Errorf("failed to parse response: %w", err)
+	}
+
+	// Add metadata from the spawn response
+	result.SessionID = resp.SessionID
+	result.CostUSD = resp.CostUSD
+	result.DurationMS = resp.DurationMS
+
+	s.log.Info("Structured review completed",
+		"review_id", req.ReviewID,
+		"decision", result.Decision,
+		"issues", len(result.Issues),
+		"duration_ms", time.Since(startTime).Milliseconds(),
+		"cost_usd", resp.CostUSD,
+	)
+
+	return result, nil
+}
+
+// buildStructuredPrompt builds the prompt for a structured review.
+func (s *Service) buildStructuredPrompt(req StructuredReviewRequest) (string, error) {
+	var buf bytes.Buffer
+	if err := s.promptTemplate.Execute(&buf, req); err != nil {
+		return "", err
+	}
+	return buf.String(), nil
+}
+
+// parseStructuredResponse extracts the JSON from the response and parses it.
+func (s *Service) parseStructuredResponse(response string) (*StructuredReviewResult, error) {
+	// Try to find JSON in the response
+	// The response might contain markdown code blocks around the JSON
+	jsonStr := extractJSON(response)
+	if jsonStr == "" {
+		return nil, fmt.Errorf("no JSON found in response")
+	}
+
+	var result StructuredReviewResult
+	if err := json.Unmarshal([]byte(jsonStr), &result); err != nil {
+		return nil, fmt.Errorf("failed to parse JSON: %w", err)
+	}
+
+	return &result, nil
+}
+
+// extractJSON attempts to extract JSON from a response that may contain
+// markdown code blocks or other text.
+func extractJSON(s string) string {
+	// First, try to find JSON in a code block
+	start := -1
+	end := -1
+
+	// Look for ```json ... ```
+	if idx := findSubstring(s, "```json"); idx != -1 {
+		start = idx + 7 // len("```json")
+		// Skip any whitespace after ```json
+		for start < len(s) && (s[start] == '\n' || s[start] == '\r') {
+			start++
+		}
+		// Find closing ```
+		if closeIdx := findSubstring(s[start:], "```"); closeIdx != -1 {
+			end = start + closeIdx
+		}
+	}
+
+	// Also try just ``` ... ```
+	if start == -1 {
+		if idx := findSubstring(s, "```"); idx != -1 {
+			start = idx + 3
+			// Skip whitespace
+			for start < len(s) && (s[start] == '\n' || s[start] == '\r') {
+				start++
+			}
+			// Find closing ```
+			if closeIdx := findSubstring(s[start:], "```"); closeIdx != -1 {
+				end = start + closeIdx
+			}
+		}
+	}
+
+	if start != -1 && end != -1 {
+		return s[start:end]
+	}
+
+	// Try to find a JSON object directly
+	// Look for first { and last }
+	braceStart := findSubstring(s, "{")
+	braceEnd := lastIndex(s, "}")
+	if braceStart != -1 && braceEnd != -1 && braceEnd > braceStart {
+		return s[braceStart : braceEnd+1]
+	}
+
+	return ""
+}
+
+// findSubstring finds the first occurrence of substr in s.
+func findSubstring(s, substr string) int {
+	for i := 0; i <= len(s)-len(substr); i++ {
+		if s[i:i+len(substr)] == substr {
+			return i
+		}
+	}
+	return -1
+}
+
+// lastIndex finds the last occurrence of char in s.
+func lastIndex(s string, char string) int {
+	for i := len(s) - 1; i >= 0; i-- {
+		if string(s[i]) == char {
+			return i
+		}
+	}
+	return -1
+}
+
+// ProcessStructuredResult processes the result from a structured review
+// and updates the database and FSM accordingly.
+func (s *Service) ProcessStructuredResult(ctx context.Context,
+	reviewID string, result *StructuredReviewResult) error {
+
+	// Create a ReviewResponse from the structured result
+	issues := make([]ReviewIssue, 0, len(result.Issues))
+	for _, issue := range result.Issues {
+		issues = append(issues, ReviewIssue{
+			Type:        IssueType(issue.Type),
+			Severity:    Severity(issue.Severity),
+			File:        issue.FilePath,
+			LineStart:   issue.LineStart,
+			LineEnd:     issue.LineEnd,
+			Title:       issue.Title,
+			Description: issue.Description,
+			CodeSnippet: issue.CodeSnippet,
+			Suggestion:  issue.Suggestion,
+			ClaudeMDRef: issue.ClaudeMDRef,
+		})
+	}
+
+	suggestions := make([]Suggestion, 0, len(result.Suggestions))
+	for _, sugg := range result.Suggestions {
+		suggestions = append(suggestions, Suggestion{
+			Title:       sugg.Title,
+			Description: sugg.Description,
+		})
+	}
+
+	resp := ReviewResponse{
+		ReviewID:      reviewID,
+		ReviewerName:  "StructuredReviewer",
+		Decision:      result.Decision,
+		Summary:       result.Summary,
+		Issues:        issues,
+		Suggestions:   suggestions,
+		FilesReviewed: result.FilesReviewed,
+		LinesAnalyzed: result.LinesAnalyzed,
+		DurationMS:    result.DurationMS,
+		CostUSD:       result.CostUSD,
+	}
+
+	return s.SubmitReviewIteration(ctx, resp)
+}
+
+// RunAutomatedReview runs a complete automated review cycle:
+// 1. Builds the structured review request
+// 2. Spawns Claude for analysis
+// 3. Processes the result
+func (s *Service) RunAutomatedReview(ctx context.Context,
+	reviewID string, opts AutomatedReviewOptions) (*StructuredReviewResult, error) {
+
+	// Get the review from the database
+	review, err := s.store.GetReview(ctx, reviewID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get review: %w", err)
+	}
+
+	// Get any previous issues for context
+	previousIssues, _ := s.store.ListOpenReviewIssues(ctx, reviewID)
+
+	// Build the request
+	req := StructuredReviewRequest{
+		ReviewID:     reviewID,
+		WorkDir:      review.RepoPath,
+		Diff:         opts.Diff,
+		Context:      opts.Context,
+		ChangedFiles: opts.ChangedFiles,
+		FocusAreas:   opts.FocusAreas,
+	}
+
+	// Convert previous issues
+	for _, issue := range previousIssues {
+		var lineEnd int
+		if issue.LineEnd != nil {
+			lineEnd = *issue.LineEnd
+		}
+		req.PreviousIssues = append(req.PreviousIssues, ReviewIssue{
+			Type:        IssueType(issue.IssueType),
+			Severity:    Severity(issue.Severity),
+			File:        issue.FilePath,
+			LineStart:   issue.LineStart,
+			LineEnd:     lineEnd,
+			Title:       issue.Title,
+			Description: issue.Description,
+		})
+	}
+
+	// Mark review as under_review
+	if err := s.StartReview(ctx, reviewID, "AutomatedReviewer"); err != nil {
+		s.log.Warn("Failed to transition to under_review", "error", err)
+	}
+
+	// Spawn the structured review
+	result, err := s.SpawnStructuredReview(ctx, req)
+	if err != nil {
+		return nil, fmt.Errorf("structured review failed: %w", err)
+	}
+
+	// Process the result
+	if err := s.ProcessStructuredResult(ctx, reviewID, result); err != nil {
+		return nil, fmt.Errorf("failed to process result: %w", err)
+	}
+
+	return result, nil
+}
+
+// AutomatedReviewOptions contains options for running an automated review.
+type AutomatedReviewOptions struct {
+	// Diff is the git diff to review.
+	Diff string
+
+	// Context provides additional context (PR description, etc.)
+	Context string
+
+	// ChangedFiles lists the files that were changed.
+	ChangedFiles []string
+
+	// FocusAreas specifies areas to focus on (security, performance, etc.)
+	FocusAreas []string
+
+	// ReviewerType specifies which reviewer prompt to use.
+	ReviewerType string
+}
+
+// CreateSpawnerForReviewer creates a spawner configured for a specific reviewer.
+func (s *Service) CreateSpawnerForReviewer(reviewerType string,
+	workDir string) *agent.Spawner {
+
+	prompt := GetReviewerPrompt(reviewerType)
+
+	cfg := agent.DefaultSpawnConfig()
+	cfg.SystemPrompt = prompt
+	cfg.WorkDir = workDir
+
+	// Use the appropriate model for the reviewer type
+	config, ok := s.reviewers[reviewerType]
+	if ok && config.Model != "" {
+		cfg.Model = config.Model
+	}
+
+	return agent.NewSpawner(cfg)
 }

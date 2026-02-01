@@ -16,6 +16,69 @@ import (
 	"google.golang.org/grpc/credentials/insecure"
 )
 
+// ReviewInfo contains information about a code review.
+type ReviewInfo struct {
+	ReviewID    string
+	ThreadID    string
+	RequesterID int64
+	PRNumber    *int64
+	Branch      string
+	BaseBranch  string
+	CommitSHA   string
+	RepoPath    string
+	ReviewType  string
+	Priority    string
+	State       string
+	CreatedAt   time.Time
+	UpdatedAt   time.Time
+	CompletedAt *time.Time
+}
+
+// ReviewIterationInfo contains information about a review iteration.
+type ReviewIterationInfo struct {
+	ID                int64
+	ReviewID          string
+	IterationNum      int
+	ReviewerID        string
+	ReviewerSessionID string
+	Decision          string
+	Summary           string
+	FilesReviewed     int
+	LinesAnalyzed     int
+	DurationMS        int64
+	CostUSD           float64
+	StartedAt         time.Time
+	CompletedAt       *time.Time
+}
+
+// ReviewIssueInfo contains information about a review issue.
+type ReviewIssueInfo struct {
+	ID           int64
+	ReviewID     string
+	IterationNum int
+	IssueType    string
+	Severity     string
+	FilePath     string
+	LineStart    int
+	LineEnd      *int
+	Title        string
+	Description  string
+	CodeSnippet  string
+	Suggestion   string
+	ClaudeMDRef  string
+	Status       string
+	CreatedAt    time.Time
+}
+
+// ReviewStatsInfo contains aggregate review statistics.
+type ReviewStatsInfo struct {
+	TotalReviews     int64
+	Approved         int64
+	Pending          int64
+	InProgress       int64
+	ChangesRequested int64
+}
+
 const (
 	// defaultGRPCAddr is the default address for the substrated daemon.
 	defaultGRPCAddr = "localhost:10009"
@@ -866,6 +929,272 @@ func (c *Client) ListSubscriptionsByAgent(ctx context.Context, agentID int64) ([
 		}
 	}
 	return subs, nil
+}
+
+// =============================================================================
+// Review methods
+// =============================================================================
+
+// GetReview retrieves a review by its review ID.
+func (c *Client) GetReview(ctx context.Context, reviewID string) (*ReviewInfo, error) {
+	if c.mode == ModeGRPC {
+		// Review gRPC endpoints not implemented yet.
+		return nil, fmt.Errorf("review operations require direct mode (daemon not running)")
+	}
+
+	review, err := c.store.Queries().GetReview(ctx, reviewID)
+	if err != nil {
+		return nil, err
+	}
+	return convertSqlcReview(review), nil
+}
+
+// ListReviews lists all reviews with a limit.
+func (c *Client) ListReviews(ctx context.Context, limit int) ([]ReviewInfo, error) {
+	if c.mode == ModeGRPC {
+		return nil, fmt.Errorf("review operations require direct mode (daemon not running)")
+	}
+
+	reviews, err := c.store.Queries().ListReviews(ctx, int64(limit))
+	if err != nil {
+		return nil, err
+	}
+	return convertSqlcReviews(reviews), nil
+}
+
+// ListReviewsByRequester lists reviews by a specific requester.
+func (c *Client) ListReviewsByRequester(
+	ctx context.Context, requesterID int64, limit int,
+) ([]ReviewInfo, error) {
+
+	if c.mode == ModeGRPC {
+		return nil, fmt.Errorf("review operations require direct mode (daemon not running)")
+	}
+
+	reviews, err := c.store.Queries().ListReviewsByRequester(
+		ctx, sqlc.ListReviewsByRequesterParams{
+			RequesterID: requesterID,
+			Limit:       int64(limit),
+		},
+	)
+	if err != nil {
+		return nil, err
+	}
+	return convertSqlcReviews(reviews), nil
+}
+
+// ListReviewsByState lists reviews by state.
+func (c *Client) ListReviewsByState(
+	ctx context.Context, state string, limit int,
+) ([]ReviewInfo, error) {
+
+	if c.mode == ModeGRPC {
+		return nil, fmt.Errorf("review operations require direct mode (daemon not running)")
+	}
+
+	reviews, err := c.store.Queries().ListReviewsByState(
+		ctx, sqlc.ListReviewsByStateParams{
+			State: state,
+			Limit: int64(limit),
+		},
+	)
+	if err != nil {
+		return nil, err
+	}
+	return convertSqlcReviews(reviews), nil
+}
+
+// ListPendingReviews lists reviews pending review.
+func (c *Client) ListPendingReviews(ctx context.Context, limit int) ([]ReviewInfo, error) {
+	if c.mode == ModeGRPC {
+		return nil, fmt.Errorf("review operations require direct mode (daemon not running)")
+	}
+
+	reviews, err := c.store.Queries().ListPendingReviews(ctx, int64(limit))
+	if err != nil {
+		return nil, err
+	}
+	return convertSqlcReviews(reviews), nil
+}
+
+// ListActiveReviews lists active (not completed) reviews.
+func (c *Client) ListActiveReviews(ctx context.Context, limit int) ([]ReviewInfo, error) {
+	if c.mode == ModeGRPC {
+		return nil, fmt.Errorf("review operations require direct mode (daemon not running)")
+	}
+
+	reviews, err := c.store.Queries().ListActiveReviews(ctx, int64(limit))
+	if err != nil {
+		return nil, err
+	}
+	return convertSqlcReviews(reviews), nil
+}
+
+// GetReviewStats retrieves aggregate review statistics.
+func (c *Client) GetReviewStats(ctx context.Context) (*ReviewStatsInfo, error) {
+	if c.mode == ModeGRPC {
+		return nil, fmt.Errorf("review operations require direct mode (daemon not running)")
+	}
+
+	stats, err := c.store.Queries().GetReviewStats(ctx)
+	if err != nil {
+		return nil, err
+	}
+	return &ReviewStatsInfo{
+		TotalReviews:     stats.TotalReviews,
+		Approved:         stats.Approved,
+		Pending:          stats.Pending,
+		InProgress:       stats.InProgress,
+		ChangesRequested: stats.ChangesRequested,
+	}, nil
+}
+
+// ListReviewIterations lists all iterations for a review.
+func (c *Client) ListReviewIterations(
+	ctx context.Context, reviewID string,
+) ([]ReviewIterationInfo, error) {
+
+	if c.mode == ModeGRPC {
+		return nil, fmt.Errorf("review operations require direct mode (daemon not running)")
+	}
+
+	iters, err := c.store.Queries().ListReviewIterations(ctx, reviewID)
+	if err != nil {
+		return nil, err
+	}
+	return convertSqlcReviewIterations(iters), nil
+}
+
+// ListReviewIssues lists all issues for a review.
+func (c *Client) ListReviewIssues(ctx context.Context, reviewID string) ([]ReviewIssueInfo, error) {
+	if c.mode == ModeGRPC {
+		return nil, fmt.Errorf("review operations require direct mode (daemon not running)")
+	}
+
+	issues, err := c.store.Queries().ListReviewIssues(ctx, reviewID)
+	if err != nil {
+		return nil, err
+	}
+	return convertSqlcReviewIssues(issues), nil
+}
+
+// ListOpenReviewIssues lists open issues for a review.
+func (c *Client) ListOpenReviewIssues(
+	ctx context.Context, reviewID string,
+) ([]ReviewIssueInfo, error) {
+
+	if c.mode == ModeGRPC {
+		return nil, fmt.Errorf("review operations require direct mode (daemon not running)")
+	}
+
+	issues, err := c.store.Queries().ListOpenReviewIssues(ctx, reviewID)
+	if err != nil {
+		return nil, err
+	}
+	return convertSqlcReviewIssues(issues), nil
+}
+
+// CancelReview cancels an active review.
+func (c *Client) CancelReview(ctx context.Context, reviewID string) error {
+	if c.mode == ModeGRPC {
+		return fmt.Errorf("review operations require direct mode (daemon not running)")
+	}
+
+	return c.store.Queries().UpdateReviewState(ctx, sqlc.UpdateReviewStateParams{
+		State:     "cancelled",
+		UpdatedAt: time.Now().Unix(),
+		ReviewID:  reviewID,
+	})
+}
+
+// Helper functions for review conversion.
+
+func convertSqlcReview(r sqlc.Review) *ReviewInfo {
+	review := &ReviewInfo{
+		ReviewID:    r.ReviewID,
+		ThreadID:    r.ThreadID,
+		RequesterID: r.RequesterID,
+		Branch:      r.Branch,
+		BaseBranch:  r.BaseBranch,
+		CommitSHA:   r.CommitSha,
+		RepoPath:    r.RepoPath,
+		ReviewType:  r.ReviewType,
+		Priority:    r.Priority,
+		State:       r.State,
+		CreatedAt:   time.Unix(r.CreatedAt, 0),
+		UpdatedAt:   time.Unix(r.UpdatedAt, 0),
+	}
+	if r.PrNumber.Valid {
+		prNum := r.PrNumber.Int64
+		review.PRNumber = &prNum
+	}
+	if r.CompletedAt.Valid {
+		t := time.Unix(r.CompletedAt.Int64, 0)
+		review.CompletedAt = &t
+	}
+	return review
+}
+
+func convertSqlcReviews(reviews []sqlc.Review) []ReviewInfo {
+	result := make([]ReviewInfo, len(reviews))
+	for i, r := range reviews {
+		result[i] = *convertSqlcReview(r)
+	}
+	return result
+}
+
+func convertSqlcReviewIterations(iters []sqlc.ReviewIteration) []ReviewIterationInfo {
+	result := make([]ReviewIterationInfo, len(iters))
+	for i, iter := range iters {
+		info := ReviewIterationInfo{
+			ID:                iter.ID,
+			ReviewID:          iter.ReviewID,
+			IterationNum:      int(iter.IterationNum),
+			ReviewerID:        iter.ReviewerID,
+			ReviewerSessionID: iter.ReviewerSessionID.String,
+			Decision:          iter.Decision,
+			Summary:           iter.Summary,
+			FilesReviewed:     int(iter.FilesReviewed),
+			LinesAnalyzed:     int(iter.LinesAnalyzed),
+			DurationMS:        iter.DurationMs,
+			CostUSD:           iter.CostUsd,
+			StartedAt:         time.Unix(iter.StartedAt, 0),
+		}
+		if iter.CompletedAt.Valid {
+			t := time.Unix(iter.CompletedAt.Int64, 0)
+			info.CompletedAt = &t
+		}
+		result[i] = info
+	}
+	return result
+}
+
+func convertSqlcReviewIssues(issues []sqlc.ReviewIssue) []ReviewIssueInfo {
+	result := make([]ReviewIssueInfo, len(issues))
+	for i, issue := range issues {
+		info := ReviewIssueInfo{
+			ID:           issue.ID,
+			ReviewID:     issue.ReviewID,
+			IterationNum: int(issue.IterationNum),
+			IssueType:    issue.IssueType,
+			Severity:     issue.Severity,
+			FilePath:     issue.FilePath,
+			LineStart:    int(issue.LineStart),
+			Title:        issue.Title,
+			Description:  issue.Description,
+			CodeSnippet:  issue.CodeSnippet.String,
+			Suggestion:   issue.Suggestion.String,
+			ClaudeMDRef:  issue.ClaudeMdRef.String,
+			Status:       issue.Status,
+			CreatedAt:    time.Unix(issue.CreatedAt, 0),
+		}
+		if issue.LineEnd.Valid {
+			lineEnd := int(issue.LineEnd.Int64)
+			info.LineEnd = &lineEnd
+		}
+		result[i] = info
+	}
+	return result
 }
 
 // Helper functions for proto conversion.

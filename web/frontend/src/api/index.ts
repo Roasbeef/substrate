@@ -4,6 +4,7 @@ export * from './client.js';
 export * from './activities.js';
 export * from './agents.js';
 export * from './messages.js';
+export * from './reviews.js';
 export * from './threads.js';
 export * from './sessions.js';
 export * from './topics.js';

@@ -113,6 +113,9 @@ func (s *Server) registerAPIV1Routes() {
 
 	// Search.
 	s.mux.HandleFunc("/api/v1/search", api(s.handleAPIV1Search))
+
+	// Reviews.
+	s.registerAPIV1ReviewRoutes(api)
 }
 
 // writeJSON writes a JSON response.
