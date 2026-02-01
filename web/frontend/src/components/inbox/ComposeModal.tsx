@@ -1,8 +1,6 @@
 // ComposeModal component - modal for composing and sending new messages.
 
 import { useCallback, useMemo, useState } from 'react';
-import { clsx } from 'clsx';
-import { twMerge } from 'tailwind-merge';
 import { Modal } from '@/components/ui/Modal.js';
 import { Button } from '@/components/ui/Button.js';
 import { Input, Textarea, Select } from '@/components/ui/Input.js';
@@ -12,11 +10,6 @@ import type {
   MessagePriority,
   SendMessageRequest,
 } from '@/types/api.js';
-
-// Combine clsx and tailwind-merge for class name handling.
-function cn(...inputs: (string | undefined | null | false)[]) {
-  return twMerge(clsx(inputs));
-}
 
 // Form state interface.
 interface ComposeFormState {

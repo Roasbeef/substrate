@@ -15,7 +15,7 @@ import { Button } from '@/components/ui/Button.js';
 import { Textarea } from '@/components/ui/Input.js';
 import { Spinner } from '@/components/ui/Spinner.js';
 import { ThreadMessage, DeadlineBanner } from './ThreadMessage.js';
-import type { ThreadWithMessages, Message } from '@/types/api.js';
+import type { ThreadWithMessages } from '@/types/api.js';
 
 // Combine clsx and tailwind-merge for class name handling.
 function cn(...inputs: (string | undefined | null | false)[]) {

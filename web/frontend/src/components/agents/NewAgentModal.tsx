@@ -1,16 +1,9 @@
 // NewAgentModal component - modal for registering a new agent.
 
 import { useState } from 'react';
-import { clsx } from 'clsx';
-import { twMerge } from 'tailwind-merge';
 import { Modal } from '@/components/ui/Modal.js';
 import { TextInput } from '@/components/ui/Input.js';
 import { Button } from '@/components/ui/Button.js';
-
-// Combine clsx and tailwind-merge for class name handling.
-function cn(...inputs: (string | undefined | null | false)[]) {
-  return twMerge(clsx(inputs));
-}
 
 // Form state for new agent.
 interface NewAgentFormState {

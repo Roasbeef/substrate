@@ -1,15 +1,15 @@
 // StartSessionModal component - modal for starting a new session.
 
 import { useState } from 'react';
-import { clsx } from 'clsx';
-import { twMerge } from 'tailwind-merge';
+// import { clsx } from 'clsx';
+// import { twMerge } from 'tailwind-merge';
 import { Modal } from '@/components/ui/Modal.js';
-import { TextInput, TextArea } from '@/components/ui/Input.js';
+import { TextInput } from '@/components/ui/Input.js';
 import { Button } from '@/components/ui/Button.js';
 import type { StartSessionRequest } from '@/types/api.js';
 
 // Combine clsx and tailwind-merge for class name handling.
-function cn(...inputs: (string | undefined | null | false)[]) {
+// function cn(...inputs: (string | undefined | null | false)[]) {
   return twMerge(clsx(inputs));
 }
 

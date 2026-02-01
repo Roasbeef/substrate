@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { clsx } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 import { SessionRow, CompactSessionRow } from './SessionRow.js';
-import { Spinner } from '@/components/ui/Spinner.js';
+// import { Spinner } from '@/components/ui/Spinner.js';
 import type { Session, SessionStatus } from '@/types/api.js';
 
 // Combine clsx and tailwind-merge for class name handling.

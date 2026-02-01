@@ -1,6 +1,6 @@
 // RecipientInput component - autocomplete input for selecting message recipients.
 
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react';
 import { clsx } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 import { Avatar } from '@/components/ui/Avatar.js';
@@ -245,10 +245,7 @@ export function RecipientInput({
     [isOpen, query, value, filteredSuggestions, highlightedIndex, onChange, handleSelect],
   );
 
-  const inputId = useMemo(
-    () => `recipient-input-${Math.random().toString(36).slice(2)}`,
-    [],
-  );
+  const inputId = useId();
 
   return (
     <div className={cn('relative', className)} ref={containerRef}>

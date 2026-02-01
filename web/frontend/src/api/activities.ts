@@ -1,7 +1,7 @@
 // API functions for activities.
 
 import { get } from './client.js';
-import type { Activity, APIResponse, APIMeta } from '@/types/api.js';
+import type { Activity, APIMeta } from '@/types/api.js';
 
 // Response type for activities list.
 export interface ActivitiesResponse {

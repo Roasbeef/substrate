@@ -1,6 +1,6 @@
 // FilterBar component - toolbar with filters, search, and bulk actions.
 
-import { type ReactNode, useState } from 'react';
+import { type ReactNode } from 'react';
 import { clsx } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 import { FilterTabs, type FilterType } from './CategoryTabs.js';
@@ -11,24 +11,6 @@ function cn(...inputs: (string | undefined | null | false)[]) {
 }
 
 // Icon components.
-function CheckIcon({ className }: { className?: string }) {
-  return (
-    <svg
-      className={cn('h-5 w-5', className)}
-      fill="none"
-      viewBox="0 0 24 24"
-      stroke="currentColor"
-    >
-      <path
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        strokeWidth={2}
-        d="M5 13l4 4L19 7"
-      />
-    </svg>
-  );
-}
-
 function RefreshIcon({ className }: { className?: string }) {
   return (
     <svg
