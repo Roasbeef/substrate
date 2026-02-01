@@ -182,212 +182,229 @@ When adding a new migration:
 - `internal/db/queries/topics.sql` - Topic and subscription queries
 - `internal/db/queries/messages.sql` - Message and recipient queries
 
-### Storage Layer Architecture
+### Storage Interface Architecture
 
-The database layer follows a three-tier architecture:
+The database layer follows a clean architecture with three tiers:
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
-│                    Services (mail, agent, etc.)              │
-│                    Uses: store.Storage interface             │
-└────────────────────────────┬────────────────────────────────┘
-                             │
-┌────────────────────────────▼────────────────────────────────┐
-│                    store.SqlcStore                           │
-│                    Implements: store.Storage                 │
-│                    Wraps: db.BatchedQuerier                  │
-└────────────────────────────┬────────────────────────────────┘
-                             │
-┌────────────────────────────▼────────────────────────────────┐
-│                    db.Store (implements BatchedQuerier)      │
-│                    Wraps: sqlc.Queries                       │
+│                   store.Storage Interface                    │
+│  (Domain types: store.Message, store.Agent, store.Topic)    │
+├─────────────────────────────────────────────────────────────┤
+│              SqlcStore / MockStore / txSqlcStore            │
+│  (Converts between domain types and sqlc types)             │
+├─────────────────────────────────────────────────────────────┤
+│                   QueryStore Interface                       │
+│  (sqlc types: sqlc.Message, sqlc.CreateMessageParams)       │
+├─────────────────────────────────────────────────────────────┤
+│              sqlc.Queries (generated code)                   │
+│  (Raw SQL operations - DO NOT EDIT)                         │
 └─────────────────────────────────────────────────────────────┘
 ```
 
-**Key interfaces:**
-- `db.BatchedQuerier` - Low-level interface for raw sqlc queries + transactions
-- `store.Storage` - Domain-level interface for business operations
+**Key interfaces in `internal/store/interfaces.go`:**
+- `MessageStore` - Message CRUD and inbox operations
+- `AgentStore` - Agent management
+- `TopicStore` - Topics and subscriptions
+- `ActivityStore` - Activity feed
+- `SessionStore` - Session identity mapping
+- `Storage` - Combines all above + `WithTx()` + `Close()`
+
+**Domain types vs sqlc types:**
+- Domain types (e.g., `store.Message`) use native Go types (`time.Time`, `string`)
+- sqlc types use database types (`sql.NullInt64`, `sql.NullString`)
+- Conversion functions: `MessageFromSqlc()`, `AgentFromSqlc()`, etc.
+- Helper functions: `ToSqlcNullString()`, `ToSqlcNullInt64()`, `nullInt64ToTime()`
 
 ### Adding New Database Methods
 
-**Step 1: Add the sqlc query**
+Follow this process when adding a new database operation:
+
+**Step 1: Add sqlc query**
 ```sql
--- internal/db/queries/messages.sql
--- name: GetMessageByID :one
-SELECT * FROM messages WHERE id = ?;
+-- In internal/db/queries/messages.sql
+
+-- name: GetMessagesByPriority :many
+SELECT * FROM messages WHERE priority = ? ORDER BY created_at DESC LIMIT ?;
 ```
 
 **Step 2: Regenerate sqlc**
 ```bash
 make sqlc
 ```
+This creates types like `GetMessagesByPriorityParams` and `GetMessagesByPriorityRow`.
 
-**Step 3: Add to store.Storage interface**
+**Step 3: Add to QueryStore interface** (`internal/store/sqlc_store.go`)
 ```go
-// internal/store/interfaces.go
-type Storage interface {
+type QueryStore interface {
     // ... existing methods ...
-    GetMessageByID(ctx context.Context, id int64) (Message, error)
+    GetMessagesByPriority(
+        ctx context.Context, arg sqlc.GetMessagesByPriorityParams,
+    ) ([]sqlc.Message, error)
 }
 ```
 
-**Step 4: Implement in SqlcStore**
+**Step 4: Add to domain interface** (`internal/store/interfaces.go`)
 ```go
-// internal/store/sqlc_store.go
-func (s *SqlcStore) GetMessageByID(ctx context.Context, id int64) (Message, error) {
-    var msg Message
-    readOp := func(q sqlc.Querier) error {
-        dbMsg, err := q.GetMessageByID(ctx, id)
-        if err != nil {
-            return err
-        }
-        msg = convertDbMessage(dbMsg)  // Convert sqlc type to domain type
-        return nil
-    }
-    err := s.db.ExecTx(ctx, db.ReadTxOpts(), readOp)
-    return msg, err
+type MessageStore interface {
+    // ... existing methods ...
+
+    // GetMessagesByPriority retrieves messages with a specific priority.
+    GetMessagesByPriority(
+        ctx context.Context, priority string, limit int,
+    ) ([]Message, error)
 }
 ```
 
-**Step 5: Implement in txSqlcStore** (for transaction context)
+**Step 5: Implement in SqlcStore** (`internal/store/sqlc_store.go`)
 ```go
-// internal/store/sqlc_store.go
-func (s *txSqlcStore) GetMessageByID(ctx context.Context, id int64) (Message, error) {
-    dbMsg, err := s.q.GetMessageByID(ctx, id)
+func (s *SqlcStore) GetMessagesByPriority(ctx context.Context,
+    priority string, limit int) ([]Message, error) {
+
+    rows, err := s.db.GetMessagesByPriority(ctx, sqlc.GetMessagesByPriorityParams{
+        Priority: priority,
+        Limit:    int64(limit),
+    })
     if err != nil {
-        return Message{}, err
+        return nil, err
     }
-    return convertDbMessage(dbMsg), nil
+
+    messages := make([]Message, len(rows))
+    for i, row := range rows {
+        messages[i] = MessageFromSqlc(row)
+    }
+    return messages, nil
 }
 ```
 
-### Wrapper Type Pattern
-
-The store uses two implementations:
-
-1. **SqlcStore** - For standalone operations
-   - Wraps queries in transactions automatically
-   - Uses `s.db.ExecTx()` for all operations
-   - Handles transaction retries on serialization errors
-
-2. **txSqlcStore** - For operations within a transaction
-   - Created via `SqlcStore.WithTx(func(Storage) error)`
-   - Calls sqlc directly without wrapping in new transaction
-   - Enables composing multiple operations atomically
-
-**Example of transactional composition:**
+**Step 6: Implement in txSqlcStore** (same file, for transaction support)
 ```go
-err := store.WithTx(ctx, func(ctx context.Context, tx store.Storage) error {
-    // All these run in one transaction
-    msg, err := tx.CreateMessage(ctx, params)
+func (s *txSqlcStore) GetMessagesByPriority(ctx context.Context,
+    priority string, limit int) ([]Message, error) {
+
+    rows, err := s.queries.GetMessagesByPriority(ctx, sqlc.GetMessagesByPriorityParams{
+        Priority: priority,
+        Limit:    int64(limit),
+    })
     if err != nil {
-        return err
+        return nil, err
     }
-    return tx.AddRecipient(ctx, msg.ID, recipientID)
-})
+
+    messages := make([]Message, len(rows))
+    for i, row := range rows {
+        messages[i] = MessageFromSqlc(row)
+    }
+    return messages, nil
+}
 ```
 
-### WithTx Usage Patterns
-
-**Pattern 1: Multi-step creation with rollback on error**
+**Step 7: Implement in MockStore** (`internal/store/mock_store.go`)
 ```go
-func (s *Service) SendMail(ctx context.Context, req SendRequest) error {
-    var messageID int64
+func (m *MockStore) GetMessagesByPriority(
+    ctx context.Context, priority string, limit int,
+) ([]Message, error) {
 
-    err := s.store.WithTx(ctx, func(ctx context.Context, tx store.Storage) error {
-        // Step 1: Create message
-        msg, err := tx.CreateMessage(ctx, CreateMessageParams{
-            Subject:   req.Subject,
-            Body:      req.Body,
-            SenderID:  req.SenderID,
-            CreatedAt: time.Now(),
-        })
-        if err != nil {
-            return err  // Rollback
-        }
-        messageID = msg.ID
+    m.mu.RLock()
+    defer m.mu.RUnlock()
 
-        // Step 2: Add recipients (fails = rollback entire transaction)
-        for _, recipientID := range req.Recipients {
-            if err := tx.CreateMessageRecipient(ctx, msg.ID, recipientID); err != nil {
-                return err  // Rollback - message won't exist
+    var results []Message
+    for _, msg := range m.messages {
+        if msg.Priority == priority {
+            results = append(results, msg)
+            if len(results) >= limit {
+                break
             }
         }
-
-        // Step 3: Update sender's outbox topic offset
-        return tx.IncrementTopicOffset(ctx, req.SenderID)
-    })
-
-    return err
-}
-```
-
-**Pattern 2: Capturing results from transaction**
-```go
-func (s *Service) GetOrCreateAgent(ctx context.Context, name string) (Agent, error) {
-    var agent Agent
-
-    err := s.store.WithTx(ctx, func(ctx context.Context, tx store.Storage) error {
-        // Try to get existing agent
-        existing, err := tx.GetAgentByName(ctx, name)
-        if err == nil {
-            agent = existing
-            return nil
-        }
-
-        // Create new agent if not found
-        newAgent, err := tx.CreateAgent(ctx, CreateAgentParams{
-            Name:      name,
-            CreatedAt: time.Now(),
-        })
-        if err != nil {
-            return err
-        }
-        agent = newAgent
-        return nil
-    })
-
-    return agent, err
-}
-```
-
-**Pattern 3: Nested transactions are NOT supported**
-```go
-// This will fail with error!
-err := store.WithTx(ctx, func(ctx context.Context, tx store.Storage) error {
-    // DON'T DO THIS - nested WithTx will return error
-    return tx.WithTx(ctx, func(ctx context.Context, inner store.Storage) error {
-        // Never reaches here
-        return inner.DoSomething(ctx)
-    })
-})
-// err = "nested transactions not supported: already within a transaction context"
-```
-
-**Pattern 4: Read-only operations don't need WithTx**
-```go
-// For simple reads, use the store directly
-msg, err := store.GetMessage(ctx, messageID)
-
-// SqlcStore wraps single operations in transactions automatically
-// Only use WithTx when you need multiple operations to be atomic
-```
-
-### Domain Types vs sqlc Types
-
-- **sqlc types** (`internal/db/sqlc/`) - Generated from schema, use sql.Null* types
-- **Domain types** (`internal/store/types.go`) - Clean Go types for services
-
-Always convert between them in the store layer:
-```go
-func convertDbMessage(db sqlc.Message) Message {
-    return Message{
-        ID:        db.ID,
-        Subject:   db.Subject,
-        Body:      db.Body.String,  // Handle sql.NullString
-        CreatedAt: time.Unix(db.CreatedAt, 0),
     }
+    return results, nil
 }
+```
+
+### Transaction Pattern (WithTx/ExecTx)
+
+The `WithTx` method runs operations within a transaction with automatic retry:
+
+```go
+// In handlers/services:
+err := store.WithTx(ctx, func(ctx context.Context, txStore Storage) error {
+    // All operations on txStore are within the same transaction
+    msg, err := txStore.CreateMessage(ctx, params)
+    if err != nil {
+        return err // Transaction rolls back
+    }
+
+    err = txStore.CreateMessageRecipient(ctx, msg.ID, recipientID)
+    if err != nil {
+        return err // Transaction rolls back
+    }
+
+    return nil // Transaction commits
+})
+```
+
+**Internal implementation uses `ExecTx`** for retry logic:
+```go
+func (s *SqlcStore) WithTx(ctx context.Context,
+    fn func(ctx context.Context, store Storage) error) error {
+
+    var writeTxOpts StorageTxOptions
+    return s.db.ExecTx(ctx, &writeTxOpts, func(q QueryStore) error {
+        txStore := &txSqlcStore{
+            queries: q,
+            sqlDB:   s.sqlDB,
+        }
+        return fn(ctx, txStore)
+    })
+}
+```
+
+**When to use transactions:**
+- Multiple related writes that must succeed or fail together
+- Read-modify-write patterns
+- Creating parent + child records (message + recipients)
+
+**When NOT needed:**
+- Single reads
+- Single writes that are already atomic
+
+### Type Conversion Reference
+
+**Converting sqlc → domain:**
+```go
+// Use conversion functions from interfaces.go:
+msg := MessageFromSqlc(sqlcMsg)
+agent := AgentFromSqlc(sqlcAgent)
+topic := TopicFromSqlc(sqlcTopic)
+```
+
+**Converting domain → sqlc params:**
+```go
+// Use helper functions:
+ToSqlcNullString(s string) sql.NullString
+ToSqlcNullInt64(t *time.Time) sql.NullInt64
+
+// Example:
+params := sqlc.CreateAgentParams{
+    Name:       params.Name,              // string → string (direct)
+    ProjectKey: ToSqlcNullString(params.ProjectKey), // string → sql.NullString
+    GitBranch:  ToSqlcNullString(params.GitBranch),
+}
+```
+
+**Converting sql.NullInt64 timestamps → *time.Time:**
+```go
+// Use helper (in sqlc_store.go):
+func nullInt64ToTime(n sql.NullInt64) *time.Time {
+    if !n.Valid {
+        return nil
+    }
+    t := time.Unix(n.Int64, 0)
+    return &t
+}
+
+// Usage in row conversion:
+msg.DeadlineAt = nullInt64ToTime(row.DeadlineAt)
+msg.ReadAt = nullInt64ToTime(row.ReadAt)
 ```
 
 ## Git Commit Guidelines
