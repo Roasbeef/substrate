@@ -7,59 +7,115 @@
 
 Native review mode enables agents to request PR reviews from specialized reviewer personas, receive structured feedback, iterate on changes, and reach approval - all autonomously within Substrate's messaging system. The entire review conversation is visible in the web UI as a special thread type.
 
+**Key Design Principles:**
+1. **Mail-based messaging** - Review requests/responses are normal mail messages in threads
+2. **ReviewerService for orchestration** - FSM state tracking, DB persistence, consensus logic
+3. **Reviewer agents are full Claude Code agents** - They checkout the branch, run tests, browse code
+4. **Topic for fan-out** - Multiple specialized reviewers subscribe, each contributes independently
+5. **Bidirectional conversation** - Authors can clarify, push back, discuss; it's a real conversation
+
 ---
 
 ## Architecture Overview
 
 ```
-┌─────────────────────────────────────────────────────────────────────────┐
-│                         Review Flow                                      │
-│                                                                         │
-│  ┌──────────────┐    ReviewRequest    ┌──────────────────┐              │
-│  │ Agent (PR    │ ─────────────────▶  │ ReviewerService  │              │
-│  │ Author)      │                     │ (Actor)          │              │
-│  │              │ ◀───────────────── │                  │              │
-│  │              │    ReviewResponse   │   ┌──────────┐   │              │
-│  └──────────────┘                     │   │ Spawner  │   │              │
-│         │                             │   │ (Claude  │   │              │
-│         │ Iterates                    │   │ SDK)     │   │              │
-│         ▼                             │   └──────────┘   │              │
-│  ┌──────────────┐                     └──────────────────┘              │
-│  │ Pushes fixes │                              │                        │
-│  │ Re-requests  │                              │                        │
-│  │ review       │                              ▼                        │
-│  └──────────────┘                     ┌──────────────────┐              │
-│                                       │ Multi-Reviewer   │              │
-│                                       │ Topic (optional) │              │
-│                                       │                  │              │
-│                                       │ ┌────┐ ┌────┐    │              │
-│                                       │ │Sec │ │Perf│    │              │
-│                                       │ │Rev │ │Rev │    │              │
-│                                       │ └────┘ └────┘    │              │
-│                                       └──────────────────┘              │
-└─────────────────────────────────────────────────────────────────────────┘
+┌──────────────────────────────────────────────────────────────────────────┐
+│                         Review Flow                                       │
+│                                                                          │
+│  ┌─────────────┐   mail    ┌─────────────────┐   publish   ┌───────────┐│
+│  │ PR Author   │──────────▶│ ReviewerService │────────────▶│  reviews  ││
+│  │ Agent       │           │                 │   topic     │   topic   ││
+│  │             │           │ - Creates review│             └─────┬─────┘│
+│  │             │           │ - Tracks in DB  │                   │      │
+│  │             │           │ - Manages FSM   │       ┌───────────┼──────┤
+│  │             │           │ - Aggregates    │       │           │      │
+│  └──────▲──────┘           └─────────────────┘       ▼           ▼      │
+│         │                                       ┌────────┐  ┌────────┐  │
+│         │                                       │Security│  │  Perf  │  │
+│         │         thread replies                │Reviewer│  │Reviewer│  │
+│         └───────────────────────────────────────│ Agent  │  │ Agent  │  │
+│                                                 │        │  │        │  │
+│                 (clarify, pushback,             │checkout│  │checkout│  │
+│                  discuss, iterate)              │run test│  │profile │  │
+│                                                 └────────┘  └────────┘  │
+└──────────────────────────────────────────────────────────────────────────┘
+```
+
+**Reviewer Agent Workflow:**
+```bash
+# 1. Receive review request from topic (as mail)
+# 2. Checkout the branch for full code access
+gh pr checkout 123
+# or: git fetch origin feature-branch && git checkout feature-branch
+
+# 3. Full analysis - browse code, run tests, build
+make test
+make lint
+# Read files, explore architecture, understand changes
+
+# 4. The reviewer IS a Claude Code agent with specialized prompt
+# 5. Reply in thread with structured review (as mail)
+# 6. Participate in back-and-forth discussion with author
 ```
 
 ---
 
 ## 1. Core Components
 
-### 1.1 ReviewerService (Actor)
+### 1.1 Component Overview
+
+The review system has three main parts:
+
+1. **ReviewerService** - Server-side orchestration (FSM, DB, consensus)
+2. **Reviewer Agents** - Claude Code agents with reviewer persona (checkout, test, review)
+3. **CLI/Mail** - `substrate review request` wraps mail send with review metadata
+
+```
+┌─────────────────────────────────────────────────────────────────────┐
+│                      Component Responsibilities                      │
+├─────────────────────────────────────────────────────────────────────┤
+│                                                                     │
+│  substrate review request          ReviewerService                  │
+│  ┌─────────────────────┐          ┌─────────────────────┐          │
+│  │ - Gather git context│          │ - Create review in DB│          │
+│  │ - Format mail body  │─────────▶│ - Manage FSM state   │          │
+│  │ - Send to reviewers │          │ - Publish to topic   │          │
+│  │ - Set metadata      │          │ - Aggregate reviews  │          │
+│  └─────────────────────┘          │ - Compute consensus  │          │
+│                                   └─────────────────────┘          │
+│                                            │                        │
+│                                            ▼                        │
+│                              ┌─────────────────────────┐           │
+│                              │    Reviewer Agents      │           │
+│                              │ (Claude Code instances) │           │
+│                              │                         │           │
+│                              │ - Subscribe to topic    │           │
+│                              │ - Checkout branch (gh)  │           │
+│                              │ - Run tests/lint        │           │
+│                              │ - Analyze code          │           │
+│                              │ - Reply in thread       │           │
+│                              │ - Discuss with author   │           │
+│                              └─────────────────────────┘           │
+└─────────────────────────────────────────────────────────────────────┘
+```
+
+### 1.2 ReviewerService (Actor)
 
 **Location**: `internal/review/service.go`
 
-A dedicated actor that handles review workflows:
+The ReviewerService handles orchestration - it does NOT do the actual review.
+It tracks state, manages the FSM, and aggregates results from reviewer agents.
 
 ```go
 package review
 
 import (
     "context"
-    "github.com/Roasbeef/claude-agent-sdk-go/claudeagent"
     "github.com/lightningnetwork/lnd/fn/v2"
 )
 
 // ReviewRequest is sent by agents requesting a PR review.
+// This is typically created by `substrate review request` CLI command.
 type ReviewRequest struct {
     actor.BaseMessage
 
@@ -72,6 +128,7 @@ type ReviewRequest struct {
     BaseBranch    string    // Base branch (main, master, etc.)
     CommitSHA     string    // Specific commit to review
     RepoPath      string    // Local repo path for analysis
+    RemoteURL     string    // Git remote URL for reviewer to clone/fetch
 
     // Review Configuration
     ReviewType    ReviewType    // full, incremental, security, performance
@@ -129,17 +186,18 @@ type ReviewIssue struct {
     ClaudeMDRef string        // CLAUDE.md rule citation (if applicable)
 }
 
-// Service handles all review operations.
+// Service handles review orchestration (NOT the actual reviewing).
+// Reviewer agents are independent Claude Code instances that subscribe
+// to the reviews topic and do the actual code review work.
 type Service struct {
     store     store.Storage
-    spawner   *agent.Spawner
     mailSvc   *mail.Service
 
-    // Reviewer configurations
+    // Registered reviewer configurations (for validation/routing)
     reviewers map[string]*ReviewerConfig
 
-    // Active review sessions (for interactive mode)
-    sessions  map[string]*ReviewSession
+    // Active reviews being tracked
+    activeReviews map[string]*ReviewFSM
 }
 
 // Receive implements ActorBehavior for the review service.
@@ -157,20 +215,70 @@ func (s *Service) Receive(ctx context.Context, msg ReviewMessage) fn.Result[Revi
 }
 ```
 
-### 1.2 ReviewerConfig (Personas)
+### 1.3 Reviewer Agents (Claude Code Instances)
+
+**Key Insight**: Reviewer agents are NOT spawned subprocesses - they are full Claude Code
+agents running independently with a specialized reviewer persona.
+
+**Setup**: Each reviewer agent is started with:
+```bash
+# Start a reviewer agent (runs independently)
+claude --profile reviewer-security \
+       --system-prompt "$(cat ~/.substrate/reviewers/security/prompt.md)" \
+       --subscribe reviews-topic
+```
+
+**Or via Substrate CLI:**
+```bash
+# Register and start a reviewer agent
+substrate reviewer start --type security --subscribe reviews
+
+# List active reviewers
+substrate reviewer list
+
+# Stop a reviewer
+substrate reviewer stop security-reviewer-1
+```
+
+**Reviewer Agent Capabilities:**
+1. **Full code access** - Checkout branches, read any file
+2. **Run commands** - `make test`, `make lint`, `go build`, etc.
+3. **Git operations** - `gh pr checkout`, `git diff`, `git log`
+4. **Mail integration** - Receive requests, send reviews via Substrate mail
+5. **Conversational** - Respond to author questions, participate in discussion
+
+**Checkout Flow:**
+```bash
+# When reviewer receives a review request for branch "feature-xyz":
+
+# Option 1: GitHub PR (if PR number provided)
+gh pr checkout 123
+
+# Option 2: Direct branch fetch
+git fetch origin feature-xyz
+git checkout feature-xyz
+
+# Option 3: Different repo (if remote URL provided)
+git clone <remote-url> /tmp/review-workspace
+cd /tmp/review-workspace
+git checkout feature-xyz
+```
+
+### 1.4 ReviewerConfig (Personas)
 
 **Location**: `internal/review/config.go`
 
 ```go
 // ReviewerConfig defines a specialized reviewer persona.
+// This is used to configure reviewer agents when they start.
 type ReviewerConfig struct {
     Name           string            // "SecurityReviewer", "PerformanceReviewer"
-    SystemPrompt   string            // Base system prompt
+    SystemPrompt   string            // Base system prompt (CLAUDE.md content)
     FocusAreas     []string          // What to look for
     IgnorePatterns []string          // Files/patterns to skip
-    MaxConcurrent  int               // Max concurrent reviews
     Model          string            // claude-opus-4-5-20251101, sonnet, etc.
-    Timeout        time.Duration
+    WorkDir        string            // Where to checkout code
+    Hooks          ReviewerHooks     // Custom hooks for this reviewer type
 }
 
 // DefaultReviewerConfig returns the standard code reviewer configuration.
@@ -228,7 +336,69 @@ func SpecializedReviewers() map[string]*ReviewerConfig {
 }
 ```
 
-### 1.3 Review State Machine
+### 1.5 Conversational Review Flow
+
+Reviews are bidirectional conversations in a mail thread, not one-way feedback.
+
+**Example Thread:**
+```
+┌─────────────────────────────────────────────────────────────────────┐
+│ Thread: Review Request - feature-user-auth                          │
+├─────────────────────────────────────────────────────────────────────┤
+│                                                                     │
+│ [AuthorAgent] 10:00am                                               │
+│ Requesting review for feature-user-auth branch.                     │
+│ - Adds JWT authentication to API endpoints                         │
+│ - 12 files changed, +450/-23 lines                                  │
+│                                                                     │
+├─────────────────────────────────────────────────────────────────────┤
+│                                                                     │
+│ [SecurityReviewer] 10:05am                          REQUEST_CHANGES │
+│ Found 2 issues:                                                     │
+│ - HIGH: Token not validated in /api/admin endpoint (auth.go:145)   │
+│ - MEDIUM: JWT secret loaded from env without validation            │
+│                                                                     │
+├─────────────────────────────────────────────────────────────────────┤
+│                                                                     │
+│ [AuthorAgent] 10:15am                                               │
+│ For the JWT secret issue - we validate it at startup in main.go.   │
+│ Should I add a cross-reference comment, or is that sufficient?     │
+│                                                                     │
+├─────────────────────────────────────────────────────────────────────┤
+│                                                                     │
+│ [SecurityReviewer] 10:17am                                          │
+│ Good point, I see the validation in main.go:45. A brief comment    │
+│ would help but not blocking. The auth.go:145 issue still needs fix.│
+│                                                                     │
+├─────────────────────────────────────────────────────────────────────┤
+│                                                                     │
+│ [AuthorAgent] 10:30am                                               │
+│ Fixed the admin endpoint. Pushed commit abc123.                     │
+│ Re-requesting review.                                               │
+│                                                                     │
+├─────────────────────────────────────────────────────────────────────┤
+│                                                                     │
+│ [SecurityReviewer] 10:32am                                  APPROVE │
+│ Fix verified. Auth check now properly applied. LGTM.                │
+│                                                                     │
+└─────────────────────────────────────────────────────────────────────┘
+```
+
+**Author Actions:**
+- Reply with clarifications or context
+- Push back on feedback ("this is intentional because...")
+- Ask questions about suggestions
+- Notify of pushed fixes
+- Re-request review after changes
+
+**Reviewer Actions:**
+- Provide structured review with issues
+- Respond to author questions
+- Acknowledge valid pushback
+- Re-review after changes
+- Approve when satisfied
+
+### 1.6 Review State Machine
 
 **Location**: `internal/review/fsm.go`
 
@@ -986,7 +1156,117 @@ Use the structured review format in all responses.
 
 ---
 
-## 9. Implementation Phases
+## 9. Reviewer Agent Management
+
+### 9.1 Starting Reviewer Agents
+
+Reviewer agents can be started via CLI or programmatically via the Go SDK:
+
+**CLI Approach:**
+```bash
+# Start a security reviewer (long-running, subscribes to reviews topic)
+substrate reviewer start \
+    --type security \
+    --subscribe reviews \
+    --workdir /tmp/reviewer-security
+
+# Start with custom model
+substrate reviewer start \
+    --type performance \
+    --model claude-sonnet-4-20250514 \
+    --subscribe reviews
+
+# List active reviewers
+substrate reviewer list
+# Output:
+# NAME                  TYPE        STATUS   REVIEWS  LAST_ACTIVE
+# security-reviewer-1   security    active   12       2m ago
+# perf-reviewer-1       performance idle     8        15m ago
+
+# Stop a reviewer
+substrate reviewer stop security-reviewer-1
+```
+
+**Programmatic (Go SDK):**
+```go
+// Using the Claude Agent SDK to spawn a reviewer
+import "github.com/Roasbeef/claude-agent-sdk-go/claudeagent"
+
+cfg := &ReviewerConfig{
+    Name:         "security-reviewer",
+    Type:         "security",
+    SystemPrompt: securityReviewerPrompt,
+    Model:        "claude-opus-4-5-20251101",
+    WorkDir:      "/tmp/reviewer-security",
+}
+
+// Create spawner with reviewer config
+spawner := agent.NewSpawner(agent.SpawnConfig{
+    SystemPrompt:   cfg.SystemPrompt,
+    Model:          cfg.Model,
+    WorkDir:        cfg.WorkDir,
+    PermissionMode: claudeagent.PermissionModeAcceptEdits,
+})
+
+// Start interactive session (long-running)
+session, err := spawner.SpawnInteractive(ctx)
+if err != nil {
+    return err
+}
+
+// Inject initial prompt to subscribe to reviews
+session.Send("Subscribe to the 'reviews' topic and wait for review requests.")
+```
+
+### 9.2 Reviewer Hooks
+
+Each reviewer agent has specialized hooks:
+
+**SessionStart Hook:**
+```bash
+#!/bin/bash
+# Check for pending reviews assigned to this reviewer
+substrate review list --filter pending --assignee $REVIEWER_NAME --format context
+```
+
+**Stop Hook (Persistent Reviewer Pattern):**
+```bash
+#!/bin/bash
+# Long-poll for new reviews - keep reviewer alive
+result=$(substrate poll --topics reviews --wait 55s --format hook)
+
+if [ "$(echo "$result" | jq -r '.has_messages')" = "true" ]; then
+    echo "$result"
+    exit 1  # Block - new reviews to process
+fi
+
+# Still block to keep reviewer alive (heartbeat mode)
+echo '{"decision": "block", "reason": "Reviewer standing by for reviews"}'
+exit 0
+```
+
+### 9.3 Reviewer Registration
+
+Reviewers register with Substrate on startup:
+
+```go
+// When reviewer agent starts, register with the system
+type ReviewerRegistration struct {
+    Name       string   // "security-reviewer-1"
+    Type       string   // "security", "performance", "architecture"
+    Topics     []string // ["reviews", "security-reviews"]
+    Capabilities []string // ["checkout", "test", "lint"]
+    Model      string
+    StartedAt  time.Time
+}
+
+// Stored in DB for tracking
+// Heartbeats keep registration alive
+```
+
+---
+
+## 10. Implementation Phases
 
 ### Phase 1: Foundation (Week 1)
 
@@ -1119,17 +1399,51 @@ type ReviewMetadata struct {
 
 ---
 
-## 12. Open Questions
+## 12. Design Decisions
 
-1. **Review Scope**: Should reviews be per-commit or per-PR? (Recommend: per-commit with incremental option)
+These decisions have been made based on discussion:
 
-2. **Reviewer Persistence**: Should reviewer agents be long-running or spawned per-review? (Recommend: spawned per-review for isolation)
+1. **Mail-based messaging**: Review requests and responses are normal mail messages
+   - `substrate review request` is a wrapper around `substrate send`
+   - Reviews appear in inbox alongside other mail
+   - Thread management handled by existing mail system
 
-3. **GitHub Integration**: Should we post reviews to GitHub PRs? (Recommend: optional integration via `--github` flag)
+2. **Reviewer agents are Claude Code agents**: Not spawned subprocesses
+   - Full Claude Code instances with reviewer persona
+   - Can checkout code, run tests, browse files
+   - Participate in conversation with author
+   - Subscribe to reviews topic for incoming requests
 
-4. **Cost Tracking**: How to attribute review costs? (Recommend: track per-review, aggregate per-agent)
+3. **ReviewerService for orchestration**: Server-side tracking only
+   - Creates review records in DB
+   - Manages FSM state transitions
+   - Aggregates multi-reviewer results
+   - Does NOT do actual reviewing
 
-5. **Rate Limiting**: How to prevent review spam? (Recommend: configurable cooldown between requests)
+---
+
+## 13. Open Questions
+
+1. **Review Scope**: Should reviews be per-commit or per-PR?
+   - Recommend: Per-commit with incremental option for re-reviews
+
+2. **Reviewer Workspace**: Where do reviewers checkout code?
+   - Option A: Temp directory per review (isolation)
+   - Option B: Persistent workspace per reviewer (faster)
+   - Recommend: Configurable, default to temp
+
+3. **GitHub Integration**: Should we post reviews to GitHub PRs?
+   - Recommend: Optional via `--github` flag
+   - Could use `gh pr review` to post comments
+
+4. **Cost Tracking**: How to attribute review costs?
+   - Each reviewer agent tracks its own usage
+   - ReviewerService aggregates per-review
+
+5. **Reviewer Discovery**: How do reviewers find review requests?
+   - Topic subscription (reviews topic)
+   - Direct mail to specific reviewer
+   - Recommend: Both supported
 
 ---
 
