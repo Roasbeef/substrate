@@ -103,8 +103,19 @@ The review system has three main parts:
 
 **Location**: `internal/review/service.go`
 
-The ReviewerService handles orchestration - it does NOT do the actual review.
-It tracks state, manages the FSM, and aggregates results from reviewer agents.
+The ReviewerService handles orchestration AND can spawn one-shot Claude Code instances
+for structured analysis. It supports two patterns:
+
+**Pattern A: Route to Long-Running Reviewers**
+- Publish review request to topic
+- Reviewer agents (already running) pick it up
+- Conversational back-and-forth in mail thread
+
+**Pattern B: Spawn One-Shot Analysis**
+- Spawn Claude Code with `-p` (print mode) + `--output-format json`
+- Pass in diff, context, previous comments
+- Parse structured JSON response
+- Update FSM state, create issues in DB
 
 ```go
 package review
@@ -112,6 +123,7 @@ package review
 import (
     "context"
     "github.com/lightningnetwork/lnd/fn/v2"
+    "github.com/Roasbeef/claude-agent-sdk-go/claudeagent"
 )
 
 // ReviewRequest is sent by agents requesting a PR review.
@@ -186,18 +198,68 @@ type ReviewIssue struct {
     ClaudeMDRef string        // CLAUDE.md rule citation (if applicable)
 }
 
-// Service handles review orchestration (NOT the actual reviewing).
-// Reviewer agents are independent Claude Code instances that subscribe
-// to the reviews topic and do the actual code review work.
+// Service handles review orchestration and can spawn structured analysis.
 type Service struct {
     store     store.Storage
     mailSvc   *mail.Service
+    spawner   *agent.Spawner  // For one-shot structured analysis
 
     // Registered reviewer configurations (for validation/routing)
     reviewers map[string]*ReviewerConfig
 
     // Active reviews being tracked
     activeReviews map[string]*ReviewFSM
+}
+
+// SpawnStructuredReview runs a one-shot Claude Code analysis with JSON output.
+// This is used for automated review passes that need structured data.
+func (s *Service) SpawnStructuredReview(ctx context.Context, req StructuredReviewRequest) (*StructuredReviewResult, error) {
+    // Build prompt with diff, context, and expected JSON schema
+    prompt := s.buildStructuredPrompt(req)
+
+    // Spawn with -p (print mode) and JSON output
+    resp, err := s.spawner.Spawn(ctx, prompt, agent.SpawnOpts{
+        PrintMode:    true,
+        OutputFormat: "json",
+        WorkDir:      req.WorkDir,
+        Timeout:      5 * time.Minute,
+    })
+    if err != nil {
+        return nil, fmt.Errorf("spawn failed: %w", err)
+    }
+
+    // Parse structured JSON response
+    var result StructuredReviewResult
+    if err := json.Unmarshal([]byte(resp.Result), &result); err != nil {
+        return nil, fmt.Errorf("parse response: %w", err)
+    }
+
+    // Update FSM based on decision
+    s.processReviewResult(ctx, req.ReviewID, &result)
+
+    return &result, nil
+}
+
+// StructuredReviewRequest contains everything needed for one-shot analysis.
+type StructuredReviewRequest struct {
+    ReviewID     string
+    WorkDir      string            // Where code is checked out
+    Diff         string            // Git diff to review
+    Context      string            // PR description, previous comments
+    FocusAreas   []string          // What to look for
+    PreviousIssues []ReviewIssue   // Issues from prior iteration (for re-review)
+}
+
+// StructuredReviewResult is the JSON response from one-shot analysis.
+type StructuredReviewResult struct {
+    Decision    ReviewDecision `json:"decision"`
+    Summary     string         `json:"summary"`
+    Issues      []ReviewIssue  `json:"issues"`
+    Suggestions []Suggestion   `json:"suggestions,omitempty"`
+
+    // Metadata
+    FilesReviewed int `json:"files_reviewed"`
+    LinesAnalyzed int `json:"lines_analyzed"`
 }
 
 // Receive implements ActorBehavior for the review service.
@@ -719,6 +781,44 @@ func (s *Service) AggregateReviews(ctx context.Context, reviewID string) (*Aggre
 
 ## 5. Web UI Extensions
 
+The UI provides multiple views leveraging both mail threads and review tables:
+
+```
+┌─────────────────────────────────────────────────────────────────────────┐
+│                         UI View Architecture                             │
+├─────────────────────────────────────────────────────────────────────────┤
+│                                                                         │
+│  Data Sources:                                                          │
+│  ┌────────────────────┐     ┌────────────────────────────────────────┐ │
+│  │ Mail Thread        │     │ Review Tables                          │ │
+│  │ (messages table)   │     │ (reviews, review_iterations,           │ │
+│  │                    │     │  review_issues)                        │ │
+│  └─────────┬──────────┘     └──────────────────┬─────────────────────┘ │
+│            │                                    │                       │
+│            ▼                                    ▼                       │
+│  ┌─────────────────────────────────────────────────────────────────┐   │
+│  │                        UI Views                                  │   │
+│  ├──────────────────┬──────────────────┬───────────────────────────┤   │
+│  │ Conversation     │ Review Dashboard │ Issue Tracker             │   │
+│  │                  │                  │                           │   │
+│  │ • Mail thread    │ • State timeline │ • All issues by review    │   │
+│  │ • Author/reviewer│ • Iteration diffs│ • Filter: open/fixed      │   │
+│  │   back & forth   │ • Reviewer votes │ • Group by file/severity  │   │
+│  │ • Inline replies │ • Consensus view │ • Resolution time stats   │   │
+│  │                  │ • Cost/duration  │ • Link to code location   │   │
+│  └──────────────────┴──────────────────┴───────────────────────────┘   │
+│                                                                         │
+│  Additional Views:                                                      │
+│  ┌──────────────────┬──────────────────┬───────────────────────────┐   │
+│  │ Diff Annotations │ Reviewer Status  │ Review History            │   │
+│  │                  │                  │                           │   │
+│  │ • Side-by-side   │ • Active reviewers│ • Past reviews by repo   │   │
+│  │ • Issues inline  │ • Queue depth    │ • Approval rate           │   │
+│  │ • Suggestions    │ • Avg turnaround │ • Issue trends            │   │
+│  └──────────────────┴──────────────────┴───────────────────────────┘   │
+└─────────────────────────────────────────────────────────────────────────┘
+```
+
 ### 5.1 Review Thread Template
 
 **Location**: `web/templates/partials/review-thread.html`
@@ -886,7 +986,150 @@ func (s *Service) AggregateReviews(ctx context.Context, reviewID string) (*Aggre
 {{end}}
 ```
 
-### 5.2 Reviews List Page
+### 5.2 Diff Annotation View
+
+**Location**: `web/templates/partials/review-diff.html`
+
+Shows the diff with review issues annotated inline:
+
+```html
+{{define "review-diff"}}
+<div class="review-diff">
+    {{range .Files}}
+    <div class="diff-file border rounded-lg mb-4">
+        <div class="diff-file-header bg-gray-100 px-4 py-2 flex justify-between">
+            <span class="font-mono text-sm">{{.Path}}</span>
+            <span class="text-sm text-gray-500">+{{.Additions}} -{{.Deletions}}</span>
+        </div>
+
+        <div class="diff-content font-mono text-sm">
+            {{range .Hunks}}
+            <div class="diff-hunk">
+                <div class="hunk-header bg-blue-50 px-4 py-1 text-blue-700">
+                    @@ -{{.OldStart}},{{.OldLines}} +{{.NewStart}},{{.NewLines}} @@
+                </div>
+
+                {{range .Lines}}
+                <div class="diff-line flex {{if .IsAddition}}bg-green-50{{else if .IsDeletion}}bg-red-50{{end}}">
+                    <span class="line-num w-12 text-right pr-2 text-gray-400 select-none">{{.Number}}</span>
+                    <span class="line-indicator w-4 {{if .IsAddition}}text-green-600{{else if .IsDeletion}}text-red-600{{end}}">
+                        {{if .IsAddition}}+{{else if .IsDeletion}}-{{else}} {{end}}
+                    </span>
+                    <span class="line-content flex-1 px-2">{{.Content}}</span>
+                </div>
+
+                {{/* Inline issue annotation */}}
+                {{if .Issues}}
+                {{range .Issues}}
+                <div class="issue-annotation mx-4 my-2 p-3 rounded border-l-4
+                            {{if eq .Severity "critical"}}border-red-500 bg-red-50
+                            {{else if eq .Severity "high"}}border-orange-500 bg-orange-50
+                            {{else}}border-yellow-500 bg-yellow-50{{end}}">
+                    <div class="flex items-center gap-2 mb-1">
+                        <span class="px-2 py-0.5 text-xs font-medium rounded
+                                    {{if eq .Severity "critical"}}bg-red-100 text-red-800
+                                    {{else if eq .Severity "high"}}bg-orange-100 text-orange-800
+                                    {{else}}bg-yellow-100 text-yellow-800{{end}}">
+                            {{.Severity}}
+                        </span>
+                        <span class="font-medium text-gray-900">{{.Title}}</span>
+                        <span class="text-xs text-gray-500">by {{.ReviewerName}}</span>
+                    </div>
+                    <p class="text-sm text-gray-700">{{.Description}}</p>
+                    {{if .Suggestion}}
+                    <div class="mt-2 p-2 bg-green-50 border border-green-200 rounded text-sm">
+                        <strong>Suggestion:</strong> {{.Suggestion}}
+                    </div>
+                    {{end}}
+                </div>
+                {{end}}
+                {{end}}
+                {{end}}
+            </div>
+            {{end}}
+        </div>
+    </div>
+    {{end}}
+</div>
+{{end}}
+```
+
+### 5.3 Review Dashboard
+
+**Location**: `web/templates/partials/review-dashboard.html`
+
+Shows review state, iterations, and multi-reviewer consensus:
+
+```html
+{{define "review-dashboard"}}
+<div class="review-dashboard grid grid-cols-3 gap-4">
+    <!-- State Timeline -->
+    <div class="col-span-2 bg-white rounded-lg border p-4">
+        <h3 class="font-semibold mb-4">Review Timeline</h3>
+        <div class="space-y-4">
+            {{range .Iterations}}
+            <div class="flex items-start gap-4">
+                <div class="w-10 h-10 rounded-full flex items-center justify-center
+                            {{if eq .Decision "approve"}}bg-green-100 text-green-600
+                            {{else if eq .Decision "request_changes"}}bg-red-100 text-red-600
+                            {{else}}bg-gray-100 text-gray-600{{end}}">
+                    {{.IterationNum}}
+                </div>
+                <div class="flex-1">
+                    <div class="flex items-center gap-2">
+                        <span class="font-medium">{{.ReviewerName}}</span>
+                        <span class="text-sm text-gray-500">{{.RelativeTime}}</span>
+                        {{template "review-decision-badge" .Decision}}
+                    </div>
+                    <p class="text-sm text-gray-600 mt-1">{{.Summary}}</p>
+                    {{if .Issues}}
+                    <div class="mt-2 text-sm text-gray-500">
+                        {{len .Issues}} issue(s) flagged
+                    </div>
+                    {{end}}
+                </div>
+            </div>
+            {{end}}
+        </div>
+    </div>
+
+    <!-- Multi-Reviewer Status -->
+    <div class="bg-white rounded-lg border p-4">
+        <h3 class="font-semibold mb-4">Reviewer Status</h3>
+        {{range .ReviewerStatuses}}
+        <div class="flex items-center justify-between py-2 border-b last:border-0">
+            <span class="text-sm">{{.ReviewerName}}</span>
+            <div class="flex items-center gap-2">
+                {{if eq .Status "pending"}}
+                <span class="w-2 h-2 rounded-full bg-gray-300"></span>
+                <span class="text-xs text-gray-500">Pending</span>
+                {{else if eq .Status "reviewing"}}
+                <span class="w-2 h-2 rounded-full bg-yellow-400 animate-pulse"></span>
+                <span class="text-xs text-yellow-600">Reviewing</span>
+                {{else if eq .Decision "approve"}}
+                <span class="w-2 h-2 rounded-full bg-green-500"></span>
+                <span class="text-xs text-green-600">Approved</span>
+                {{else}}
+                <span class="w-2 h-2 rounded-full bg-red-500"></span>
+                <span class="text-xs text-red-600">Changes</span>
+                {{end}}
+            </div>
+        </div>
+        {{end}}
+
+        <!-- Consensus -->
+        <div class="mt-4 pt-4 border-t">
+            <div class="text-sm text-gray-500">Consensus</div>
+            <div class="mt-1">
+                {{template "review-status-badge" .ConsensusDecision}}
+            </div>
+        </div>
+    </div>
+</div>
+{{end}}
+```
+
+### 5.4 Reviews List Page
 
 **Location**: `web/templates/reviews.html`
 
