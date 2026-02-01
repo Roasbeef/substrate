@@ -137,7 +137,7 @@ export function ComposeModal({
         subject: form.subject.trim(),
         body: form.body.trim(),
         priority: form.priority,
-        deadline: form.deadline || undefined,
+        ...(form.deadline && { deadline: form.deadline }),
       };
 
       try {
@@ -176,7 +176,7 @@ export function ComposeModal({
           onSearch={onSearchRecipients}
           placeholder="Search for recipients..."
           disabled={isSending}
-          error={errors.recipients}
+          {...(errors.recipients && { error: errors.recipients })}
         />
 
         {/* Subject. */}

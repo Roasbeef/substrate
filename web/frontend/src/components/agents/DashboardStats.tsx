@@ -153,7 +153,7 @@ export function DashboardStats({
         icon={<BoltIcon />}
         iconBg="bg-green-100"
         iconColor="text-green-600"
-        onClick={onStatClick ? () => onStatClick('active') : undefined}
+        {...(onStatClick && { onClick: () => onStatClick('active') })}
       />
       <StatCard
         label="Busy"
@@ -161,7 +161,7 @@ export function DashboardStats({
         icon={<ServerIcon />}
         iconBg="bg-yellow-100"
         iconColor="text-yellow-600"
-        onClick={onStatClick ? () => onStatClick('busy') : undefined}
+        {...(onStatClick && { onClick: () => onStatClick('busy') })}
       />
       <StatCard
         label="Idle"
@@ -169,7 +169,7 @@ export function DashboardStats({
         icon={<ClockIcon />}
         iconBg="bg-gray-100"
         iconColor="text-gray-500"
-        onClick={onStatClick ? () => onStatClick('idle') : undefined}
+        {...(onStatClick && { onClick: () => onStatClick('idle') })}
       />
     </div>
   );

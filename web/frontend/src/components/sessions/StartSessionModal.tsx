@@ -105,9 +105,11 @@ export function StartSessionModal({
     }
 
     try {
+      const projectTrimmed = formState.project.trim();
+      const branchTrimmed = formState.branch.trim();
       await onSubmit({
-        project: formState.project.trim() || undefined,
-        branch: formState.branch.trim() || undefined,
+        ...(projectTrimmed && { project: projectTrimmed }),
+        ...(branchTrimmed && { branch: branchTrimmed }),
       });
       // Reset form on success.
       setFormState({ project: defaultProject, branch: defaultBranch });

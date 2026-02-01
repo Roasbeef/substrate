@@ -221,7 +221,7 @@ export function AgentCardGrid({
             <AgentCard
               key={agent.id}
               agent={agent}
-              onClick={onAgentClick ? () => onAgentClick(agent.id) : undefined}
+              {...(onAgentClick && { onClick: () => onAgentClick(agent.id) })}
               isSelected={selectedAgentId === agent.id}
             />
           ))}

@@ -22,8 +22,6 @@ const DEFAULT_PAGE_SIZE = 20;
 
 // Hook for fetching paginated activities.
 export function useActivities(options: ActivitiesQueryOptions = {}) {
-  const pageSize = options.page_size ?? DEFAULT_PAGE_SIZE;
-
   return useQuery({
     queryKey: activityKeys.list(options),
     queryFn: async ({ signal }) => {

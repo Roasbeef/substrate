@@ -256,7 +256,7 @@ export function createWebSocketClient(agentId?: number): WebSocketClient {
 
   return new WebSocketClient({
     url,
-    agentId,
+    ...(agentId !== undefined && { agentId }),
     reconnect: true,
     reconnectInterval: 1000,
     maxReconnectAttempts: 10,

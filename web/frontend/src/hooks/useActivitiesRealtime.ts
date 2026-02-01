@@ -73,12 +73,12 @@ export function useActivitiesRealtime(): RealtimeActivityState {
           return {
             ...oldData,
             data: [...trulyNew, ...oldData.data],
-            meta: oldData.meta
-              ? {
-                  ...oldData.meta,
-                  total: oldData.meta.total + trulyNew.length,
-                }
-              : undefined,
+            ...(oldData.meta && {
+              meta: {
+                ...oldData.meta,
+                total: oldData.meta.total + trulyNew.length,
+              },
+            }),
           };
         },
       );

@@ -176,7 +176,7 @@ export function MessageList({
           <CompactMessageRow
             key={message.id}
             message={message}
-            onClick={onMessageClick ? () => onMessageClick(message) : undefined}
+            {...(onMessageClick && { onClick: () => onMessageClick(message) })}
           />
         ))}
       </div>
@@ -191,16 +191,14 @@ export function MessageList({
           key={message.id}
           message={message}
           isSelected={selectedIds.has(message.id)}
-          onSelect={
-            onSelectionChange
-              ? (selected) => handleMessageSelect(message.id, selected)
-              : undefined
-          }
-          onClick={onMessageClick ? () => onMessageClick(message) : undefined}
-          onStar={onStar ? (starred) => onStar(message.id, starred) : undefined}
-          onArchive={onArchive ? () => onArchive(message.id) : undefined}
-          onSnooze={onSnooze ? () => onSnooze(message.id) : undefined}
-          onDelete={onDelete ? () => onDelete(message.id) : undefined}
+          {...(onSelectionChange && {
+            onSelect: (selected: boolean) => handleMessageSelect(message.id, selected),
+          })}
+          {...(onMessageClick && { onClick: () => onMessageClick(message) })}
+          {...(onStar && { onStar: (starred: boolean) => onStar(message.id, starred) })}
+          {...(onArchive && { onArchive: () => onArchive(message.id) })}
+          {...(onSnooze && { onSnooze: () => onSnooze(message.id) })}
+          {...(onDelete && { onDelete: () => onDelete(message.id) })}
           showCheckbox={showCheckboxes}
         />
       ))}
@@ -332,8 +330,8 @@ export function ConnectedMessageList({
       messages={data ?? []}
       isLoading={isLoading}
       isEmpty={!isLoading && (!data || data.length === 0)}
-      selectedIds={selection?.selectedIds}
-      onSelectionChange={selection?.setSelection}
+      {...(selection?.selectedIds && { selectedIds: selection.selectedIds })}
+      {...(selection?.setSelection && { onSelectionChange: selection.setSelection })}
       {...props}
     />
   );

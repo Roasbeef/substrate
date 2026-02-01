@@ -274,7 +274,8 @@ export const Textarea = forwardRef<HTMLTextAreaElement, Omit<TextareaProps, 'mul
 export const Input = forwardRef<HTMLInputElement | HTMLTextAreaElement, InputProps>(
   function Input(props, ref) {
     if (props.multiline) {
-      const { multiline: _, ...textareaProps } = props;
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
+      const { multiline: _multiline, ...textareaProps } = props;
       return (
         <Textarea
           ref={ref as React.Ref<HTMLTextAreaElement>}
@@ -283,7 +284,8 @@ export const Input = forwardRef<HTMLInputElement | HTMLTextAreaElement, InputPro
       );
     }
 
-    const { multiline: _, ...inputProps } = props as TextInputProps;
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    const { multiline: _multiline, ...inputProps } = props as TextInputProps;
     return (
       <TextInput
         ref={ref as React.Ref<HTMLInputElement>}

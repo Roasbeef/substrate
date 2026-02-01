@@ -312,10 +312,10 @@ export function ConnectedAgentSwitcher({
   return (
     <AgentSwitcher
       agents={agents}
-      selectedAgentId={currentAgent?.id}
+      {...(currentAgent?.id !== undefined && { selectedAgentId: currentAgent.id })}
       onSelectAgent={handleSelectAgent}
-      isLoading={isLoading}
-      className={className}
+      {...(isLoading !== undefined && { isLoading })}
+      {...(className !== undefined && { className })}
     />
   );
 }

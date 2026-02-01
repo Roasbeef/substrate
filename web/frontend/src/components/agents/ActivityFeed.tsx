@@ -124,7 +124,7 @@ export function ActivityFeed({
   if (error) {
     return (
       <div className={cn('rounded-lg border border-gray-200 bg-white', className)}>
-        <ErrorState message={error.message} onRetry={onRetry} />
+        <ErrorState message={error.message} {...(onRetry && { onRetry })} />
       </div>
     );
   }

@@ -82,12 +82,12 @@ export function useMessagesRealtime(): RealtimeMessageState {
           return {
             ...oldData,
             data: [newMessage, ...oldData.data],
-            meta: oldData.meta
-              ? {
-                  ...oldData.meta,
-                  total: oldData.meta.total + 1,
-                }
-              : undefined,
+            ...(oldData.meta && {
+              meta: {
+                ...oldData.meta,
+                total: oldData.meta.total + 1,
+              },
+            }),
           };
         },
       );

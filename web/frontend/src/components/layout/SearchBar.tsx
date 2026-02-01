@@ -305,13 +305,14 @@ export function SearchBar({
           e.preventDefault();
           setSelectedIndex((prev) => Math.max(prev - 1, 0));
           break;
-        case 'Enter':
+        case 'Enter': {
           e.preventDefault();
           const selectedResult = enrichedResults[selectedIndex];
           if (selectedResult) {
             handleSelectResult(selectedResult);
           }
           break;
+        }
         case 'Escape':
           e.preventDefault();
           closeSearch();

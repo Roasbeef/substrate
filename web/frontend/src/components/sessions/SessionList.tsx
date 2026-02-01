@@ -234,7 +234,7 @@ export function SessionList({
         {isLoading ? (
           <SessionListSkeleton />
         ) : error ? (
-          <ErrorState message={error.message} onRetry={onRetry} />
+          <ErrorState message={error.message} {...(onRetry && { onRetry })} />
         ) : !filteredSessions || filteredSessions.length === 0 ? (
           <EmptyState filter={filter} />
         ) : (
@@ -281,7 +281,7 @@ export function SessionList({
                 <SessionRow
                   key={session.id}
                   session={session}
-                  onClick={onSessionClick ? () => onSessionClick(session.id) : undefined}
+                  {...(onSessionClick && { onClick: () => onSessionClick(session.id) })}
                   isSelected={selectedSessionId === session.id}
                 />
               ))}
@@ -363,7 +363,7 @@ export function CompactSessionList({
             <CompactSessionRow
               key={session.id}
               session={session}
-              onClick={onSessionClick ? () => onSessionClick(session.id) : undefined}
+              {...(onSessionClick && { onClick: () => onSessionClick(session.id) })}
             />
           ))}
           {hasMore ? (

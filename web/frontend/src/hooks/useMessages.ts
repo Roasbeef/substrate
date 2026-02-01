@@ -14,7 +14,6 @@ import {
   type MessageListOptions,
 } from '@/api/messages.js';
 import type {
-  Message,
   MessageWithRecipients,
   SendMessageRequest,
 } from '@/types/api.js';

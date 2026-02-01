@@ -59,7 +59,7 @@ export function AppShell({
       {!hideSidebar ? <Sidebar footer={sidebarFooter} /> : null}
       <div className="flex flex-1 flex-col overflow-hidden">
         {!hideHeader ? <Header rightContent={headerContent} /> : null}
-        <MainContent className={mainClassName}>{children}</MainContent>
+        <MainContent {...(mainClassName && { className: mainClassName })}>{children}</MainContent>
       </div>
       {/* Notification permission prompt. */}
       <NotificationPrompt />

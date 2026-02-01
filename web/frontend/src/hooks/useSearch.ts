@@ -3,7 +3,7 @@
 import { useQuery, queryOptions } from '@tanstack/react-query';
 import { useState, useEffect, useMemo } from 'react';
 import { search, autocompleteRecipients } from '@/api/search.js';
-import type { SearchResult, AutocompleteRecipient, APIResponse } from '@/types/api.js';
+import type { SearchResult } from '@/types/api.js';
 
 // Search query keys.
 export const searchKeys = {

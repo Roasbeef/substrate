@@ -135,7 +135,7 @@ export default function AgentsDashboard({
       : data?.agents.filter((agent) => agent.status === filter);
 
   // Handle stat card click to filter.
-  const handleStatClick = (status: keyof typeof data.counts) => {
+  const handleStatClick = (status: 'active' | 'busy' | 'idle' | 'offline') => {
     setFilter(status);
   };
 
@@ -189,7 +189,7 @@ export default function AgentsDashboard({
 
       {/* Dashboard stats. */}
       <DashboardStats
-        counts={data?.counts}
+        {...(data?.counts && { counts: data.counts })}
         isLoading={isLoading}
         onStatClick={handleStatClick}
       />
@@ -246,7 +246,7 @@ export default function AgentsDashboard({
             <AgentCard
               key={agent.id}
               agent={agent}
-              onClick={onAgentClick ? () => onAgentClick(agent.id) : undefined}
+              {...(onAgentClick && { onClick: () => onAgentClick(agent.id) })}
             />
           ))}
         </div>

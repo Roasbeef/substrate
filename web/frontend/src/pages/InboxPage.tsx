@@ -81,11 +81,11 @@ export default function InboxPage() {
 
   // Compute stats from messages.
   const stats = useMemo(() => {
-    if (!messagesResponse?.data) {
+    const allMessages = messagesResponse?.data;
+    if (!allMessages) {
       return { unread: 0, starred: 0, urgent: 0, acknowledged: 0 };
     }
 
-    const allMessages = messagesResponse.data;
     return {
       unread: allMessages.filter(
         (m) => m.recipients[0]?.state === 'unread',
@@ -100,7 +100,7 @@ export default function InboxPage() {
         (m) => m.recipients[0]?.state === 'acknowledged',
       ).length,
     };
-  }, [messagesResponse?.data]);
+  }, [messagesResponse]);
 
   // Handle category change.
   const handleCategoryChange = useCallback((category: InboxCategory) => {
@@ -253,9 +253,9 @@ export default function InboxPage() {
         isIndeterminate={selection.isIndeterminate}
         onSelectAll={selection.selectAll}
         onRefresh={handleRefresh}
-        onArchive={selection.hasSelection ? handleBulkArchive : undefined}
-        onStar={selection.hasSelection ? handleBulkStar : undefined}
-        onDelete={selection.hasSelection ? handleBulkDelete : undefined}
+        {...(selection.hasSelection && { onArchive: handleBulkArchive })}
+        {...(selection.hasSelection && { onStar: handleBulkStar })}
+        {...(selection.hasSelection && { onDelete: handleBulkDelete })}
         isLoading={isLoading || isActionLoading}
       />
 

@@ -1,6 +1,6 @@
 // Component for managing notification settings.
 
-import { useCallback } from 'react';
+import { useCallback, type JSX } from 'react';
 import { useNotifications } from '@/hooks/useNotifications.js';
 import { Button } from '@/components/ui/Button.js';
 

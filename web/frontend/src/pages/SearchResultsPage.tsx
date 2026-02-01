@@ -1,7 +1,7 @@
 // Search results page component with query from URL params.
 
 import { useState, useMemo, useCallback } from 'react';
-import { useSearchParams, useNavigate, Link } from 'react-router-dom';
+import { useSearchParams, Link } from 'react-router-dom';
 import { clsx } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 import { useEnrichedSearch, type SearchResultWithRoute } from '@/hooks/useSearch.js';
@@ -194,7 +194,6 @@ function EmptyState({ query, hasFilter }: { query: string; hasFilter: boolean })
 // Main SearchResultsPage component.
 export default function SearchResultsPage() {
   const [searchParams, setSearchParams] = useSearchParams();
-  const navigate = useNavigate();
 
   // Get query and filter from URL.
   const initialQuery = searchParams.get('q') ?? '';

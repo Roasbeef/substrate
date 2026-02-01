@@ -1,6 +1,6 @@
 // Prompt component for requesting notification permission.
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useState, type JSX } from 'react';
 import { useNotifications } from '@/hooks/useNotifications.js';
 import { Button } from '@/components/ui/Button.js';
 

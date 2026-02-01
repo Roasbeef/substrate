@@ -54,7 +54,7 @@ describe('messages API', () => {
           const page = url.searchParams.get('page');
           return HttpResponse.json({
             data: [mockMessage],
-            meta: { total: 1, page: Number(page) ?? 1, page_size: 20 },
+            meta: { total: 1, page: page ? Number(page) : 1, page_size: 20 },
           });
         }),
       );

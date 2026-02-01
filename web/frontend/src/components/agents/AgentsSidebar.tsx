@@ -121,14 +121,14 @@ export function AgentsSidebar({
       {isLoading ? (
         <AgentsSidebarSkeleton count={maxVisible} />
       ) : !visibleAgents || visibleAgents.length === 0 ? (
-        <EmptyState filterStatus={filterStatus} />
+        <EmptyState {...(filterStatus !== undefined && { filterStatus })} />
       ) : (
         <div className="space-y-0.5">
           {visibleAgents.map((agent) => (
             <CompactAgentCard
               key={agent.id}
               agent={agent}
-              onClick={onAgentClick ? () => onAgentClick(agent.id) : undefined}
+              {...(onAgentClick && { onClick: () => onAgentClick(agent.id) })}
               className={cn(
                 selectedAgentId === agent.id
                   ? 'bg-blue-50 text-blue-700'

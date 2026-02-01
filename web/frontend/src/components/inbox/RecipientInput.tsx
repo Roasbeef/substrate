@@ -90,7 +90,7 @@ function SuggestionItem({
     >
       <Avatar name={recipient.name} size="sm" />
       <span className="flex-1 truncate font-medium">{recipient.name}</span>
-      <StatusDot status={recipient.status} />
+      <StatusDot {...(recipient.status && { status: recipient.status })} />
     </button>
   );
 }
@@ -135,7 +135,7 @@ export function RecipientInput({
   const containerRef = useRef<HTMLDivElement>(null);
 
   // Debounce search.
-  const searchTimeoutRef = useRef<ReturnType<typeof setTimeout>>();
+  const searchTimeoutRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
 
   // Filter out already selected recipients from suggestions.
   const filteredSuggestions = useMemo(

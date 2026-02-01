@@ -408,7 +408,7 @@ export function ThreadView({
               <DeadlineBanner
                 deadline={deadline}
                 isPast={isDeadlinePast}
-                onAcknowledge={onAcknowledge}
+                {...(onAcknowledge && { onAcknowledge })}
                 isLoading={isActionLoading}
               />
             ) : null}
