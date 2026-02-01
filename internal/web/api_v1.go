@@ -640,24 +640,24 @@ func (s *Server) handleMessageAction(w http.ResponseWriter, r *http.Request, msg
 	}
 	_ = json.NewDecoder(r.Body).Decode(&req)
 
-	switch action {
-	case "star":
-		_, err := s.updateMessageState(ctx, agentID, msgID, "starred", nil)
+	switch mail.MessageAction(action) {
+	case mail.ActionStar:
+		_, err := s.updateMessageState(ctx, agentID, msgID, mail.StateStarredStr.String(), nil)
 		if err != nil {
 			writeError(w, http.StatusInternalServerError, "action_failed", "Failed to star message")
 			return
 		}
-		writeJSON(w, http.StatusOK, map[string]string{"status": "starred"})
+		writeJSON(w, http.StatusOK, map[string]string{"status": mail.StateStarredStr.String()})
 
-	case "archive":
-		_, err := s.updateMessageState(ctx, agentID, msgID, "archived", nil)
+	case mail.ActionArchive:
+		_, err := s.updateMessageState(ctx, agentID, msgID, mail.StateArchivedStr.String(), nil)
 		if err != nil {
 			writeError(w, http.StatusInternalServerError, "action_failed", "Failed to archive message")
 			return
 		}
-		writeJSON(w, http.StatusOK, map[string]string{"status": "archived"})
+		writeJSON(w, http.StatusOK, map[string]string{"status": mail.StateArchivedStr.String()})
 
-	case "snooze":
+	case mail.ActionSnooze:
 		var snoozedUntil *time.Time
 		if req.SnoozedUntil != "" {
 			t, err := time.Parse(time.RFC3339, req.SnoozedUntil)
@@ -671,17 +671,17 @@ func (s *Server) handleMessageAction(w http.ResponseWriter, r *http.Request, msg
 			snoozedUntil = &t
 		}
 
-		_, err := s.updateMessageState(ctx, agentID, msgID, "snoozed", snoozedUntil)
+		_, err := s.updateMessageState(ctx, agentID, msgID, mail.StateSnoozedStr.String(), snoozedUntil)
 		if err != nil {
 			writeError(w, http.StatusInternalServerError, "action_failed", "Failed to snooze message")
 			return
 		}
 		writeJSON(w, http.StatusOK, map[string]any{
-			"status":        "snoozed",
+			"status":        mail.StateSnoozedStr.String(),
 			"snoozed_until": snoozedUntil.UTC().Format(time.RFC3339),
 		})
 
-	case "ack":
+	case mail.ActionAck:
 		_, err := s.ackMessage(ctx, agentID, msgID)
 		if err != nil {
 			writeError(w, http.StatusInternalServerError, "action_failed", "Failed to ack message")
@@ -689,21 +689,21 @@ func (s *Server) handleMessageAction(w http.ResponseWriter, r *http.Request, msg
 		}
 		writeJSON(w, http.StatusOK, map[string]string{"status": "acknowledged"})
 
-	case "read":
+	case mail.ActionRead:
 		_, err := s.readMessage(ctx, agentID, msgID)
 		if err != nil {
 			writeError(w, http.StatusInternalServerError, "action_failed", "Failed to mark message as read")
 			return
 		}
-		writeJSON(w, http.StatusOK, map[string]string{"status": "read"})
+		writeJSON(w, http.StatusOK, map[string]string{"status": mail.StateReadStr.String()})
 
-	case "unread":
-		_, err := s.updateMessageState(ctx, agentID, msgID, "unread", nil)
+	case mail.ActionUnread:
+		_, err := s.updateMessageState(ctx, agentID, msgID, mail.StateUnreadStr.String(), nil)
 		if err != nil {
 			writeError(w, http.StatusInternalServerError, "action_failed", "Failed to mark message as unread")
 			return
 		}
-		writeJSON(w, http.StatusOK, map[string]string{"status": "unread"})
+		writeJSON(w, http.StatusOK, map[string]string{"status": mail.StateUnreadStr.String()})
 
 	default:
 		writeError(w, http.StatusBadRequest, "invalid_action", "Unknown action: "+action)

@@ -587,35 +587,35 @@ func (s *Server) HasUnackedStatusTo(
 func stateToString(s MessageState) string {
 	switch s {
 	case MessageState_STATE_UNREAD:
-		return "unread"
+		return mail.StateUnreadStr.String()
 	case MessageState_STATE_READ:
-		return "read"
+		return mail.StateReadStr.String()
 	case MessageState_STATE_STARRED:
-		return "starred"
+		return mail.StateStarredStr.String()
 	case MessageState_STATE_SNOOZED:
-		return "snoozed"
+		return mail.StateSnoozedStr.String()
 	case MessageState_STATE_ARCHIVED:
-		return "archived"
+		return mail.StateArchivedStr.String()
 	case MessageState_STATE_TRASH:
-		return "trash"
+		return mail.StateTrashStr.String()
 	default:
-		return "unread"
+		return mail.StateUnreadStr.String()
 	}
 }
 
 func stringToState(s string) MessageState {
-	switch s {
-	case "unread":
+	switch mail.RecipientState(s) {
+	case mail.StateUnreadStr:
 		return MessageState_STATE_UNREAD
-	case "read":
+	case mail.StateReadStr:
 		return MessageState_STATE_READ
-	case "starred":
+	case mail.StateStarredStr:
 		return MessageState_STATE_STARRED
-	case "snoozed":
+	case mail.StateSnoozedStr:
 		return MessageState_STATE_SNOOZED
-	case "archived":
+	case mail.StateArchivedStr:
 		return MessageState_STATE_ARCHIVED
-	case "trash":
+	case mail.StateTrashStr:
 		return MessageState_STATE_TRASH
 	default:
 		return MessageState_STATE_UNREAD

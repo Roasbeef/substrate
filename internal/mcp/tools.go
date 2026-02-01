@@ -275,13 +275,13 @@ type StateChangeResult struct {
 func (s *Server) handleMarkRead(ctx context.Context,
 	req *mcp.CallToolRequest, args StateChangeArgs,
 ) (*mcp.CallToolResult, StateChangeResult, error) {
-	return s.updateState(ctx, args.AgentID, args.MessageID, "read", nil)
+	return s.updateState(ctx, args.AgentID, args.MessageID, mail.StateReadStr.String(), nil)
 }
 
 func (s *Server) handleStarMessage(ctx context.Context,
 	req *mcp.CallToolRequest, args StateChangeArgs,
 ) (*mcp.CallToolResult, StateChangeResult, error) {
-	return s.updateState(ctx, args.AgentID, args.MessageID, "starred", nil)
+	return s.updateState(ctx, args.AgentID, args.MessageID, mail.StateStarredStr.String(), nil)
 }
 
 // SnoozeArgs are the arguments for the snooze_message tool.
@@ -299,19 +299,19 @@ func (s *Server) handleSnoozeMessage(ctx context.Context,
 		return nil, StateChangeResult{}, fmt.Errorf("invalid snoozed_until format: %w", err)
 	}
 
-	return s.updateState(ctx, args.AgentID, args.MessageID, "snoozed", &t)
+	return s.updateState(ctx, args.AgentID, args.MessageID, mail.StateSnoozedStr.String(), &t)
 }
 
 func (s *Server) handleArchiveMessage(ctx context.Context,
 	req *mcp.CallToolRequest, args StateChangeArgs,
 ) (*mcp.CallToolResult, StateChangeResult, error) {
-	return s.updateState(ctx, args.AgentID, args.MessageID, "archived", nil)
+	return s.updateState(ctx, args.AgentID, args.MessageID, mail.StateArchivedStr.String(), nil)
 }
 
 func (s *Server) handleTrashMessage(ctx context.Context,
 	req *mcp.CallToolRequest, args StateChangeArgs,
 ) (*mcp.CallToolResult, StateChangeResult, error) {
-	return s.updateState(ctx, args.AgentID, args.MessageID, "trash", nil)
+	return s.updateState(ctx, args.AgentID, args.MessageID, mail.StateTrashStr.String(), nil)
 }
 
 func (s *Server) updateState(ctx context.Context, agentID, messageID int64,

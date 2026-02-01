@@ -42,25 +42,25 @@ func NewThreadFSMFromDB(agentID, messageID int64, threadID string,
 
 	// Reconstruct state with additional data.
 	var state ThreadState
-	switch stateStr {
-	case "unread":
+	switch RecipientState(stateStr) {
+	case StateUnreadStr:
 		state = &StateUnread{}
 
-	case "read":
+	case StateReadStr:
 		readTime := time.Time{}
 		if readAt != nil {
 			readTime = *readAt
 		}
 		state = &StateRead{ReadAt: readTime, AckedAt: ackedAt}
 
-	case "starred":
+	case StateStarredStr:
 		readTime := time.Time{}
 		if readAt != nil {
 			readTime = *readAt
 		}
 		state = &StateStarred{ReadAt: readTime, AckedAt: ackedAt}
 
-	case "snoozed":
+	case StateSnoozedStr:
 		snoozed := time.Time{}
 		if snoozedUntil != nil {
 			snoozed = *snoozedUntil
@@ -76,14 +76,14 @@ func NewThreadFSMFromDB(agentID, messageID int64, threadID string,
 			AckedAt:      ackedAt,
 		}
 
-	case "archived":
+	case StateArchivedStr:
 		readTime := time.Time{}
 		if readAt != nil {
 			readTime = *readAt
 		}
 		state = &StateArchived{ReadAt: readTime, AckedAt: ackedAt}
 
-	case "trash":
+	case StateTrashStr:
 		// Default purge time if not tracked elsewhere.
 		purgeAt := time.Now().Add(trashRetention)
 		state = &StateTrash{PurgeAt: purgeAt}

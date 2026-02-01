@@ -21,6 +21,84 @@ const (
 	PriorityLow Priority = "low"
 )
 
+// RecipientState represents the state of a message for a recipient.
+type RecipientState string
+
+const (
+	// StateUnreadStr indicates the message has not been read.
+	StateUnreadStr RecipientState = "unread"
+
+	// StateReadStr indicates the message has been read.
+	StateReadStr RecipientState = "read"
+
+	// StateStarredStr indicates the message has been starred/favorited.
+	StateStarredStr RecipientState = "starred"
+
+	// StateSnoozedStr indicates the message has been snoozed until later.
+	StateSnoozedStr RecipientState = "snoozed"
+
+	// StateArchivedStr indicates the message has been archived.
+	StateArchivedStr RecipientState = "archived"
+
+	// StateTrashStr indicates the message has been moved to trash.
+	StateTrashStr RecipientState = "trash"
+)
+
+// String returns the string representation of the state.
+func (s RecipientState) String() string {
+	return string(s)
+}
+
+// IsValid returns true if the state is a recognized value.
+func (s RecipientState) IsValid() bool {
+	switch s {
+	case StateUnreadStr, StateReadStr, StateStarredStr,
+		StateSnoozedStr, StateArchivedStr, StateTrashStr:
+		return true
+	default:
+		return false
+	}
+}
+
+// MessageAction represents an action that can be performed on a message.
+type MessageAction string
+
+const (
+	// ActionStar stars a message.
+	ActionStar MessageAction = "star"
+
+	// ActionArchive archives a message.
+	ActionArchive MessageAction = "archive"
+
+	// ActionSnooze snoozes a message.
+	ActionSnooze MessageAction = "snooze"
+
+	// ActionAck acknowledges a message.
+	ActionAck MessageAction = "ack"
+
+	// ActionRead marks a message as read.
+	ActionRead MessageAction = "read"
+
+	// ActionUnread marks a message as unread.
+	ActionUnread MessageAction = "unread"
+)
+
+// String returns the string representation of the action.
+func (a MessageAction) String() string {
+	return string(a)
+}
+
+// IsValid returns true if the action is a recognized value.
+func (a MessageAction) IsValid() bool {
+	switch a {
+	case ActionStar, ActionArchive, ActionSnooze,
+		ActionAck, ActionRead, ActionUnread:
+		return true
+	default:
+		return false
+	}
+}
+
 // SendMailRequest is an actor message requesting to send mail.
 type SendMailRequest struct {
 	actor.BaseMessage
