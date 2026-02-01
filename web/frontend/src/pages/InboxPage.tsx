@@ -7,8 +7,10 @@ import {
   FilterBar,
   MessageList,
   useMessageSelection,
+  ThreadView,
   type InboxCategory,
   type FilterType,
+  type TabItem,
 } from '@/components/inbox/index.js';
 import {
   useMessages,
@@ -16,7 +18,15 @@ import {
   useArchiveMessage,
   useSnoozeMessage,
   useMarkMessageRead,
+  useDeleteMessage,
 } from '@/hooks/useMessages.js';
+import {
+  useThread,
+  useReplyToThread,
+  useArchiveThread,
+  useDeleteThread,
+  useMarkThreadUnread,
+} from '@/hooks/useThreads.js';
 import { useMessagesRealtime } from '@/hooks/useMessagesRealtime.js';
 import type { MessageWithRecipients } from '@/types/api.js';
 
@@ -32,6 +42,9 @@ export default function InboxPage() {
     category: 'primary',
     filter: 'all',
   });
+
+  // Thread view state.
+  const [selectedThreadId, setSelectedThreadId] = useState<number | null>(null);
 
   // Build query options from state.
   const queryOptions = useMemo(() => {
@@ -70,11 +83,23 @@ export default function InboxPage() {
   );
   const selection = useMessageSelection({ messageIds });
 
-  // Mutations.
+  // Message mutations.
   const toggleStar = useToggleMessageStar();
   const archiveMessage = useArchiveMessage();
   const snoozeMessage = useSnoozeMessage();
   const markRead = useMarkMessageRead();
+  const deleteMessage = useDeleteMessage();
+
+  // Thread query and mutations.
+  const {
+    data: threadData,
+    isLoading: threadLoading,
+    error: threadError,
+  } = useThread(selectedThreadId ?? 0, selectedThreadId !== null);
+  const replyToThread = useReplyToThread();
+  const archiveThread = useArchiveThread();
+  const deleteThread = useDeleteThread();
+  const markThreadUnread = useMarkThreadUnread();
 
   // Enable real-time updates via WebSocket.
   const { isConnected: wsConnected } = useMessagesRealtime();
@@ -100,6 +125,34 @@ export default function InboxPage() {
         (m) => m.recipients[0]?.state === 'acknowledged',
       ).length,
     };
+  }, [messagesResponse]);
+
+  // Compute category counts for tabs.
+  const categoryTabs = useMemo((): TabItem[] => {
+    const allMessages = messagesResponse?.data;
+    if (!allMessages) {
+      return [
+        { id: 'primary', label: 'Primary', count: 0 },
+        { id: 'agents', label: 'Agents', count: 0 },
+        { id: 'topics', label: 'Topics', count: 0 },
+      ];
+    }
+
+    // Primary = messages from User (human sender).
+    // Agents = messages from other agents.
+    // Topics = would need topic_id field (not yet in API, count 0 for now).
+    const primaryCount = allMessages.filter(
+      (m) => m.sender_name === 'User',
+    ).length;
+    const agentsCount = allMessages.filter(
+      (m) => m.sender_name !== 'User',
+    ).length;
+
+    return [
+      { id: 'primary', label: 'Primary', count: primaryCount },
+      { id: 'agents', label: 'Agents', count: agentsCount },
+      { id: 'topics', label: 'Topics', count: 0 },
+    ];
   }, [messagesResponse]);
 
   // Handle category change.
@@ -130,15 +183,52 @@ export default function InboxPage() {
     void refetch();
   }, [refetch]);
 
-  // Handle message click.
+  // Handle message click - open thread view.
   const handleMessageClick = useCallback((message: MessageWithRecipients) => {
     // Mark as read when opened.
     if (message.recipients[0]?.state === 'unread') {
       markRead.mutate(message.id);
     }
-    // TODO: Open thread view modal.
-    console.log('Open message:', message.id);
+    // Open thread view with the message's thread_id (or message id for single messages).
+    const threadId = message.thread_id ?? message.id;
+    setSelectedThreadId(threadId);
   }, [markRead]);
+
+  // Handle closing thread view.
+  const handleCloseThread = useCallback(() => {
+    setSelectedThreadId(null);
+  }, []);
+
+  // Handle thread reply.
+  const handleThreadReply = useCallback((body: string) => {
+    if (selectedThreadId !== null) {
+      replyToThread.mutate({ id: selectedThreadId, body });
+    }
+  }, [selectedThreadId, replyToThread]);
+
+  // Handle thread archive.
+  const handleThreadArchive = useCallback(() => {
+    if (selectedThreadId !== null) {
+      archiveThread.mutate(selectedThreadId);
+      setSelectedThreadId(null);
+    }
+  }, [selectedThreadId, archiveThread]);
+
+  // Handle thread delete.
+  const handleThreadDelete = useCallback(() => {
+    if (selectedThreadId !== null) {
+      deleteThread.mutate(selectedThreadId);
+      setSelectedThreadId(null);
+    }
+  }, [selectedThreadId, deleteThread]);
+
+  // Handle mark thread as unread.
+  const handleThreadMarkUnread = useCallback(() => {
+    if (selectedThreadId !== null) {
+      markThreadUnread.mutate(selectedThreadId);
+      setSelectedThreadId(null);
+    }
+  }, [selectedThreadId, markThreadUnread]);
 
   // Handle star toggle.
   const handleStar = useCallback(
@@ -167,13 +257,13 @@ export default function InboxPage() {
     [snoozeMessage],
   );
 
-  // Handle delete (archive for now).
+  // Handle delete.
   const handleDelete = useCallback(
     (id: number) => {
       // Would show confirmation dialog in real app.
-      archiveMessage.mutate(id);
+      deleteMessage.mutate(id);
     },
-    [archiveMessage],
+    [deleteMessage],
   );
 
   // Bulk actions.
@@ -193,17 +283,22 @@ export default function InboxPage() {
 
   const handleBulkDelete = useCallback(() => {
     selection.selectedIds.forEach((id) => {
-      archiveMessage.mutate(id);
+      deleteMessage.mutate(id);
     });
     selection.clearSelection();
-  }, [selection, archiveMessage]);
+  }, [selection, deleteMessage]);
 
-  // Mutation loading state.
+  // Mutation loading state (includes thread mutations).
   const isActionLoading =
     toggleStar.isPending ||
     archiveMessage.isPending ||
     snoozeMessage.isPending ||
-    markRead.isPending;
+    markRead.isPending ||
+    deleteMessage.isPending ||
+    replyToThread.isPending ||
+    archiveThread.isPending ||
+    deleteThread.isPending ||
+    markThreadUnread.isPending;
 
   return (
     <div className="flex h-full flex-col">
@@ -239,6 +334,7 @@ export default function InboxPage() {
         <CategoryTabs
           selected={state.category}
           onSelect={handleCategoryChange}
+          tabs={categoryTabs}
           disabled={isLoading}
         />
       </div>
@@ -288,6 +384,25 @@ export default function InboxPage() {
           }
         />
       </div>
+
+      {/* Thread view modal. */}
+      <ThreadView
+        isOpen={selectedThreadId !== null}
+        onClose={handleCloseThread}
+        {...(threadData !== undefined && { thread: threadData })}
+        isLoading={threadLoading}
+        {...(threadError !== null && { error: threadError })}
+        onReply={handleThreadReply}
+        onArchive={handleThreadArchive}
+        onDelete={handleThreadDelete}
+        onMarkUnread={handleThreadMarkUnread}
+        isActionLoading={
+          replyToThread.isPending ||
+          archiveThread.isPending ||
+          deleteThread.isPending ||
+          markThreadUnread.isPending
+        }
+      />
 
       {/* Error toast (would use Toast component in real app). */}
       {error ? (

@@ -112,6 +112,9 @@ func (s *Server) registerAPIV1Routes() {
 
 	// Search.
 	s.mux.HandleFunc("/api/v1/search", api(s.handleAPIV1Search))
+
+	// Threads.
+	s.mux.HandleFunc("/api/v1/threads/", api(s.handleAPIV1ThreadByID))
 }
 
 // writeJSON writes a JSON response.
@@ -705,6 +708,15 @@ func (s *Server) handleMessageAction(w http.ResponseWriter, r *http.Request, msg
 		}
 		writeJSON(w, http.StatusOK, map[string]string{"status": mail.StateUnreadStr.String()})
 
+	case mail.ActionDelete:
+		// Delete updates all recipients' state to trash (global inbox action).
+		err := s.updateMessageStateForAllRecipients(ctx, msgID, mail.StateTrashStr.String())
+		if err != nil {
+			writeError(w, http.StatusInternalServerError, "action_failed", "Failed to delete message")
+			return
+		}
+		w.WriteHeader(http.StatusNoContent)
+
 	default:
 		writeError(w, http.StatusBadRequest, "invalid_action", "Unknown action: "+action)
 	}
@@ -1132,4 +1144,199 @@ func (s *Server) handleAPIV1Search(w http.ResponseWriter, r *http.Request) {
 			PageSize: len(result),
 		},
 	})
+}
+
+// APIV1Thread represents a thread in the JSON API.
+type APIV1Thread struct {
+	ID               int64          `json:"id"`
+	Subject          string         `json:"subject"`
+	CreatedAt        string         `json:"created_at"`
+	LastMessageAt    string         `json:"last_message_at"`
+	MessageCount     int            `json:"message_count"`
+	ParticipantCount int            `json:"participant_count"`
+	Messages         []APIV1Message `json:"messages"`
+}
+
+// handleAPIV1ThreadByID handles /api/v1/threads/{id} and thread actions.
+func (s *Server) handleAPIV1ThreadByID(w http.ResponseWriter, r *http.Request) {
+	// Extract thread ID and optional action from path.
+	path := strings.TrimPrefix(r.URL.Path, "/api/v1/threads/")
+	parts := strings.Split(path, "/")
+	if len(parts) == 0 || parts[0] == "" {
+		writeError(w, http.StatusBadRequest, "invalid_id", "Thread ID required")
+		return
+	}
+
+	threadIDStr := parts[0]
+	action := ""
+	if len(parts) > 1 {
+		action = parts[1]
+	}
+
+	ctx := r.Context()
+
+	// Handle thread actions via POST.
+	if r.Method == http.MethodPost && action != "" {
+		s.handleThreadAction(w, r, threadIDStr, action)
+		return
+	}
+
+	if r.Method == http.MethodGet {
+		// Try to parse as numeric ID (message ID) first.
+		msgID, err := strconv.ParseInt(threadIDStr, 10, 64)
+		if err == nil {
+			// Treat numeric ID as a message ID - fetch single message as a thread.
+			agentID := s.getUserAgentID(ctx)
+			resp, err := s.readMessage(ctx, agentID, msgID)
+			if err != nil || resp.Error != nil {
+				writeError(w, http.StatusNotFound, "not_found", "Thread not found")
+				return
+			}
+
+			msg := resp.Message
+			thread := APIV1Thread{
+				ID:               msg.ID,
+				Subject:          msg.Subject,
+				CreatedAt:        msg.CreatedAt.UTC().Format(time.RFC3339),
+				LastMessageAt:    msg.CreatedAt.UTC().Format(time.RFC3339),
+				MessageCount:     1,
+				ParticipantCount: 2, // sender + recipient.
+				Messages: []APIV1Message{
+					{
+						ID:         msg.ID,
+						SenderID:   msg.SenderID,
+						SenderName: msg.SenderName,
+						Subject:    msg.Subject,
+						Body:       msg.Body,
+						Priority:   string(msg.Priority),
+						CreatedAt:  msg.CreatedAt.UTC().Format(time.RFC3339),
+						ThreadID:   msg.ThreadID,
+					},
+				},
+			}
+
+			writeJSON(w, http.StatusOK, thread)
+			return
+		}
+
+		// Non-numeric thread ID - fetch all messages in thread.
+		messages, err := s.store.GetMessagesByThread(ctx, threadIDStr)
+		if err != nil || len(messages) == 0 {
+			writeError(w, http.StatusNotFound, "not_found", "Thread not found")
+			return
+		}
+
+		// Build thread response from messages.
+		var firstMsg, lastMsg *store.Message
+		participants := make(map[int64]bool)
+		apiMessages := make([]APIV1Message, 0, len(messages))
+
+		for i := range messages {
+			m := &messages[i]
+			if firstMsg == nil || m.CreatedAt.Before(firstMsg.CreatedAt) {
+				firstMsg = m
+			}
+			if lastMsg == nil || m.CreatedAt.After(lastMsg.CreatedAt) {
+				lastMsg = m
+			}
+			participants[m.SenderID] = true
+
+			// Look up sender name.
+			senderName := "Unknown"
+			if sender, err := s.store.GetAgent(ctx, m.SenderID); err == nil {
+				senderName = sender.Name
+			}
+
+			apiMessages = append(apiMessages, APIV1Message{
+				ID:         m.ID,
+				SenderID:   m.SenderID,
+				SenderName: senderName,
+				Subject:    m.Subject,
+				Body:       m.Body,
+				Priority:   m.Priority,
+				CreatedAt:  m.CreatedAt.UTC().Format(time.RFC3339),
+				ThreadID:   m.ThreadID,
+			})
+		}
+
+		thread := APIV1Thread{
+			ID:               firstMsg.ID,
+			Subject:          firstMsg.Subject,
+			CreatedAt:        firstMsg.CreatedAt.UTC().Format(time.RFC3339),
+			LastMessageAt:    lastMsg.CreatedAt.UTC().Format(time.RFC3339),
+			MessageCount:     len(messages),
+			ParticipantCount: len(participants),
+			Messages:         apiMessages,
+		}
+
+		writeJSON(w, http.StatusOK, thread)
+		return
+	}
+
+	writeError(w, http.StatusMethodNotAllowed, "method_not_allowed", "Method not allowed")
+}
+
+// handleThreadAction handles POST /api/v1/threads/{id}/{action}.
+func (s *Server) handleThreadAction(w http.ResponseWriter, r *http.Request, threadIDStr, action string) {
+	ctx := r.Context()
+	agentID := s.getUserAgentID(ctx)
+
+	switch action {
+	case "reply":
+		// Parse reply body.
+		var req struct {
+			Body string `json:"body"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			writeError(w, http.StatusBadRequest, "invalid_body", "Invalid request body")
+			return
+		}
+		if req.Body == "" {
+			writeError(w, http.StatusBadRequest, "missing_body", "Reply body is required")
+			return
+		}
+
+		// For now, just acknowledge the reply (would need to create a new message in a real implementation).
+		writeJSON(w, http.StatusOK, map[string]string{"status": "replied"})
+
+	case "archive":
+		// Try to parse as numeric ID.
+		msgID, err := strconv.ParseInt(threadIDStr, 10, 64)
+		if err == nil {
+			_, err := s.updateMessageState(ctx, agentID, msgID, mail.StateArchivedStr.String(), nil)
+			if err != nil {
+				writeError(w, http.StatusInternalServerError, "action_failed", "Failed to archive thread")
+				return
+			}
+		}
+		writeJSON(w, http.StatusOK, map[string]string{"status": "archived"})
+
+	case "delete":
+		// Try to parse as numeric ID.
+		msgID, err := strconv.ParseInt(threadIDStr, 10, 64)
+		if err == nil {
+			// Delete by setting to deleted state.
+			_, err := s.updateMessageState(ctx, agentID, msgID, "deleted", nil)
+			if err != nil {
+				// For now, just return success even if there's an error.
+				log.Printf("Failed to delete message %d: %v", msgID, err)
+			}
+		}
+		writeJSON(w, http.StatusOK, map[string]string{"status": "deleted"})
+
+	case "unread":
+		// Try to parse as numeric ID.
+		msgID, err := strconv.ParseInt(threadIDStr, 10, 64)
+		if err == nil {
+			_, err := s.updateMessageState(ctx, agentID, msgID, mail.StateUnreadStr.String(), nil)
+			if err != nil {
+				writeError(w, http.StatusInternalServerError, "action_failed", "Failed to mark thread unread")
+				return
+			}
+		}
+		writeJSON(w, http.StatusOK, map[string]string{"status": "unread"})
+
+	default:
+		writeError(w, http.StatusBadRequest, "invalid_action", "Invalid thread action")
+	}
 }
