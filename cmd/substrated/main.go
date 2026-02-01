@@ -11,6 +11,7 @@ import (
 	"syscall"
 
 	sdkmcp "github.com/modelcontextprotocol/go-sdk/mcp"
+	"github.com/roasbeef/subtrate/internal/activity"
 	"github.com/roasbeef/subtrate/internal/agent"
 	subtraterpc "github.com/roasbeef/subtrate/internal/api/grpc"
 	"github.com/roasbeef/subtrate/internal/baselib/actor"
@@ -64,10 +65,11 @@ func main() {
 		log.Fatalf("Failed to create identity manager: %v", err)
 	}
 
-	// Create the actor system and notification hub for gRPC streaming.
+	// Create the actor system and register core actors.
 	actorSystem := actor.NewActorSystem()
 	defer actorSystem.Shutdown(context.Background())
 
+	// Create and register the notification hub for gRPC streaming.
 	notificationHub := actor.RegisterWithSystem(
 		actorSystem,
 		"notification-hub",
@@ -75,6 +77,27 @@ func main() {
 		mail.NewNotificationHub(),
 	)
 	log.Println("NotificationHub actor started")
+
+	// Create and register the mail actor.
+	mailRef := actor.RegisterWithSystem(
+		actorSystem,
+		"mail-service",
+		mail.MailServiceKey,
+		mailSvc,
+	)
+	log.Println("Mail actor started")
+
+	// Create and register the activity actor.
+	activitySvc := activity.NewService(activity.ServiceConfig{
+		Store: storage,
+	})
+	activityRef := actor.RegisterWithSystem(
+		actorSystem,
+		"activity-service",
+		activity.ActivityServiceKey,
+		activitySvc,
+	)
+	log.Println("Activity actor started")
 
 	// Create the MCP server (unless web-only mode).
 	var mcpServer *mcp.Server
@@ -100,6 +123,8 @@ func main() {
 	if *grpcAddr != "" {
 		grpcCfg := subtraterpc.DefaultServerConfig()
 		grpcCfg.ListenAddr = *grpcAddr
+		grpcCfg.MailRef = mailRef
+		grpcCfg.ActivityRef = activityRef
 
 		// Pass the notification hub actor for gRPC streaming RPCs.
 		grpcServer = subtraterpc.NewServer(
@@ -117,6 +142,8 @@ func main() {
 	if *webAddr != "" {
 		webCfg := web.DefaultConfig()
 		webCfg.Addr = *webAddr
+		webCfg.MailRef = mailRef
+		webCfg.ActivityRef = activityRef
 
 		webServer, err := web.NewServer(webCfg, dbStore)
 		if err != nil {

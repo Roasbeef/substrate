@@ -13,6 +13,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/roasbeef/subtrate/internal/activity"
+	"github.com/roasbeef/subtrate/internal/baselib/actor"
 	"github.com/roasbeef/subtrate/internal/db"
 	"github.com/roasbeef/subtrate/internal/db/sqlc"
 	"github.com/roasbeef/subtrate/internal/mail"
@@ -26,9 +28,10 @@ type httpTestEnv struct {
 	t *testing.T
 
 	// Server components.
-	store  *db.Store
-	server *web.Server
-	addr   string
+	store       *db.Store
+	server      *web.Server
+	addr        string
+	actorSystem *actor.ActorSystem
 
 	// Services.
 	mailSvc *mail.Service
@@ -69,9 +72,35 @@ func newHTTPTestEnv(t *testing.T) *httpTestEnv {
 	addr := listener.Addr().String()
 	listener.Close()
 
+	// Create storage and services.
+	storage := store.FromDB(dbStore.DB())
+	mailSvc := mail.NewService(storage)
+
+	// Create actor system and actors.
+	actorSystem := actor.NewActorSystem()
+
+	mailRef := actor.RegisterWithSystem(
+		actorSystem,
+		"mail-service",
+		mail.MailServiceKey,
+		mailSvc,
+	)
+
+	activitySvc := activity.NewService(activity.ServiceConfig{
+		Store: storage,
+	})
+	activityRef := actor.RegisterWithSystem(
+		actorSystem,
+		"activity-service",
+		activity.ActivityServiceKey,
+		activitySvc,
+	)
+
 	// Create web server.
 	cfg := web.DefaultConfig()
 	cfg.Addr = addr
+	cfg.MailRef = mailRef
+	cfg.ActivityRef = activityRef
 
 	server, err := web.NewServer(cfg, dbStore)
 	require.NoError(t, err)
@@ -87,22 +116,21 @@ func newHTTPTestEnv(t *testing.T) *httpTestEnv {
 	// Wait for server to be ready.
 	waitForServer(t, addr)
 
-	// Create mail service for setup.
-	mailSvc := mail.NewService(store.FromDB(dbStore.DB()))
-
 	env := &httpTestEnv{
-		t:       t,
-		store:   dbStore,
-		server:  server,
-		addr:    addr,
-		mailSvc: mailSvc,
-		agents:  make(map[string]sqlc.Agent),
-		topics:  make(map[string]sqlc.Topic),
-		client:  &http.Client{Timeout: 5 * time.Second},
+		t:           t,
+		store:       dbStore,
+		server:      server,
+		addr:        addr,
+		actorSystem: actorSystem,
+		mailSvc:     mailSvc,
+		agents:      make(map[string]sqlc.Agent),
+		topics:      make(map[string]sqlc.Topic),
+		client:      &http.Client{Timeout: 5 * time.Second},
 	}
 
 	env.cleanups = append(env.cleanups, func() {
 		server.Shutdown(context.Background())
+		actorSystem.Shutdown(context.Background())
 		dbStore.Close()
 		os.RemoveAll(tmpDir)
 	})

@@ -13,9 +13,11 @@ import (
 	"strings"
 	"time"
 
+	"github.com/roasbeef/subtrate/internal/activity"
 	"github.com/roasbeef/subtrate/internal/agent"
 	"github.com/roasbeef/subtrate/internal/db"
 	"github.com/roasbeef/subtrate/internal/db/sqlc"
+	"github.com/roasbeef/subtrate/internal/mail"
 	"github.com/yuin/goldmark"
 	"github.com/yuin/goldmark/extension"
 	"github.com/yuin/goldmark/renderer/html"
@@ -35,7 +37,8 @@ type Server struct {
 	store        *db.Store
 	registry     *agent.Registry
 	heartbeatMgr *agent.HeartbeatManager
-	actorRefs    *ActorRefs                    // Optional actor references for Ask/Tell pattern.
+	mailRef      mail.MailActorRef             // Mail actor reference (required).
+	activityRef  activity.ActivityActorRef     // Activity actor reference (required).
 	templates    map[string]*template.Template // Page-specific template sets.
 	partials     *template.Template            // Shared partials.
 	mux          *http.ServeMux
@@ -48,9 +51,11 @@ type Server struct {
 type Config struct {
 	Addr string
 
-	// ActorRefs holds optional actor references for the Ask/Tell pattern.
-	// If nil, the server will use direct database access.
-	ActorRefs *ActorRefs
+	// MailRef is the mail actor reference (required).
+	MailRef mail.MailActorRef
+
+	// ActivityRef is the activity actor reference (required).
+	ActivityRef activity.ActivityActorRef
 }
 
 // DefaultConfig returns the default server configuration.
@@ -69,7 +74,8 @@ func NewServer(cfg *Config, store *db.Store) (*Server, error) {
 		store:        store,
 		registry:     registry,
 		heartbeatMgr: heartbeatMgr,
-		actorRefs:    cfg.ActorRefs,
+		mailRef:      cfg.MailRef,
+		activityRef:  cfg.ActivityRef,
 		templates:    make(map[string]*template.Template),
 		mux:          http.NewServeMux(),
 		addr:         cfg.Addr,

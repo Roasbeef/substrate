@@ -14,6 +14,7 @@ import (
 	"google.golang.org/grpc/keepalive"
 	"google.golang.org/grpc/status"
 
+	"github.com/roasbeef/subtrate/internal/activity"
 	"github.com/roasbeef/subtrate/internal/agent"
 	"github.com/roasbeef/subtrate/internal/db"
 	"github.com/roasbeef/subtrate/internal/mail"
@@ -39,10 +40,11 @@ type ServerConfig struct {
 	// ClientAllowPingWithoutStream allows pings even without active streams.
 	ClientAllowPingWithoutStream bool
 
-	// MailActorRef is an optional actor reference for mail operations.
-	// If set, mail operations will use the actor system instead of direct
-	// service calls.
-	MailActorRef mail.MailActorRef
+	// MailRef is the actor reference for mail operations (required).
+	MailRef mail.MailActorRef
+
+	// ActivityRef is the actor reference for activity operations (required).
+	ActivityRef activity.ActivityActorRef
 }
 
 // DefaultServerConfig returns a ServerConfig with sensible defaults.
@@ -61,8 +63,8 @@ type Server struct {
 	cfg         ServerConfig
 	store       *db.Store
 	mailSvc     *mail.Service
-	mailRef     mail.MailActorRef // Optional actor ref for mail operations.
-	actorRefs   *ActorRefs        // Additional actor references.
+	mailRef     mail.MailActorRef         // Mail actor reference (required).
+	activityRef activity.ActivityActorRef // Activity actor reference (required).
 	agentReg    *agent.Registry
 	identityMgr *agent.IdentityManager
 
@@ -93,20 +95,12 @@ func NewServer(
 	identityMgr *agent.IdentityManager,
 	notificationHub actor.ActorRef[mail.NotificationRequest, mail.NotificationResponse],
 ) *Server {
-	// Build actor refs if a mail actor ref is provided.
-	var actorRefs *ActorRefs
-	if cfg.MailActorRef != nil {
-		actorRefs = &ActorRefs{
-			MailRef: cfg.MailActorRef,
-		}
-	}
-
 	return &Server{
 		cfg:             cfg,
 		store:           store,
 		mailSvc:         mailSvc,
-		mailRef:         cfg.MailActorRef,
-		actorRefs:       actorRefs,
+		mailRef:         cfg.MailRef,
+		activityRef:     cfg.ActivityRef,
 		agentReg:        agentReg,
 		identityMgr:     identityMgr,
 		notificationHub: notificationHub,

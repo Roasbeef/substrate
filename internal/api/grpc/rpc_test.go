@@ -12,7 +12,9 @@ import (
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 
+	"github.com/roasbeef/subtrate/internal/activity"
 	"github.com/roasbeef/subtrate/internal/agent"
+	"github.com/roasbeef/subtrate/internal/baselib/actor"
 	"github.com/roasbeef/subtrate/internal/db"
 	"github.com/roasbeef/subtrate/internal/mail"
 	"github.com/roasbeef/subtrate/internal/store"
@@ -28,6 +30,7 @@ type testHarness struct {
 	agentReg    *agent.Registry
 	identityMgr *agent.IdentityManager
 	server      *Server
+	actorSystem *actor.ActorSystem
 
 	// Client connections.
 	conn        *grpc.ClientConn
@@ -64,6 +67,26 @@ func newTestHarness(t *testing.T) *testHarness {
 	identityMgr, err := agent.NewIdentityManager(sqliteStore.Store, agentReg)
 	require.NoError(t, err)
 
+	// Create actor system and actors.
+	actorSystem := actor.NewActorSystem()
+
+	mailRef := actor.RegisterWithSystem(
+		actorSystem,
+		"mail-service",
+		mail.MailServiceKey,
+		mailSvc,
+	)
+
+	activitySvc := activity.NewService(activity.ServiceConfig{
+		Store: storage,
+	})
+	activityRef := actor.RegisterWithSystem(
+		actorSystem,
+		"activity-service",
+		activity.ActivityServiceKey,
+		activitySvc,
+	)
+
 	// Create server config with a random port.
 	cfg := ServerConfig{
 		ListenAddr:                   "localhost:0", // Random port.
@@ -71,6 +94,8 @@ func newTestHarness(t *testing.T) *testHarness {
 		ServerPingTimeout:            1 * time.Minute,
 		ClientPingMinWait:            5 * time.Second,
 		ClientAllowPingWithoutStream: true,
+		MailRef:                      mailRef,
+		ActivityRef:                  activityRef,
 	}
 
 	// Create and start server.
@@ -99,6 +124,7 @@ func newTestHarness(t *testing.T) *testHarness {
 		agentReg:    agentReg,
 		identityMgr: identityMgr,
 		server:      server,
+		actorSystem: actorSystem,
 		conn:        conn,
 		mailClient:  mailClient,
 		agentClient: agentClient,
@@ -107,6 +133,7 @@ func newTestHarness(t *testing.T) *testHarness {
 	h.cleanup = func() {
 		conn.Close()
 		server.Stop()
+		actorSystem.Shutdown(context.Background())
 		sqliteStore.Close()
 		os.RemoveAll(tmpDir)
 	}
