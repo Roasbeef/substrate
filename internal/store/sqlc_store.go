@@ -1686,6 +1686,14 @@ func convertArchivedRows(rows []sqlc.GetArchivedMessagesRow) []InboxMessage {
 			t := time.Unix(row.AckedAt.Int64, 0)
 			msg.AckedAt = &t
 		}
+		if row.SnoozedUntil.Valid {
+			t := time.Unix(row.SnoozedUntil.Int64, 0)
+			msg.SnoozedUntil = &t
+		}
+		if row.ReadAt.Valid {
+			t := time.Unix(row.ReadAt.Int64, 0)
+			msg.ReadAt = &t
+		}
 		messages[i] = msg
 	}
 	return messages
