@@ -34,6 +34,7 @@ import type { MessageWithRecipients } from '@/types/api.js';
 interface InboxState {
   category: InboxCategory;
   filter: FilterType;
+  senderFilter: string | null;
 }
 
 export default function InboxPage() {
@@ -41,6 +42,7 @@ export default function InboxPage() {
   const [state, setState] = useState<InboxState>({
     category: 'primary',
     filter: 'all',
+    senderFilter: null,
   });
 
   // Thread view state.
@@ -74,7 +76,20 @@ export default function InboxPage() {
   } = useMessages(queryOptions);
 
   // Extract messages array from response.
-  const messages = messagesResponse?.data ?? [];
+  const allMessages = messagesResponse?.data ?? [];
+
+  // Get unique senders for filter dropdown.
+  const uniqueSenders = useMemo(() => {
+    const senders = new Set<string>();
+    allMessages.forEach((m) => senders.add(m.sender_name));
+    return Array.from(senders).sort();
+  }, [allMessages]);
+
+  // Apply sender filter.
+  const messages = useMemo(() => {
+    if (!state.senderFilter) return allMessages;
+    return allMessages.filter((m) => m.sender_name === state.senderFilter);
+  }, [allMessages, state.senderFilter]);
 
   // Selection state.
   const messageIds = useMemo(
@@ -163,6 +178,11 @@ export default function InboxPage() {
   // Handle filter change.
   const handleFilterChange = useCallback((filter: FilterType) => {
     setState((prev) => ({ ...prev, filter }));
+  }, []);
+
+  // Handle sender filter change.
+  const handleSenderFilterChange = useCallback((sender: string | null) => {
+    setState((prev) => ({ ...prev, senderFilter: sender }));
   }, []);
 
   // Handle stat card click to set filter.
@@ -338,6 +358,37 @@ export default function InboxPage() {
           disabled={isLoading}
         />
       </div>
+
+      {/* Sender filter (when multiple senders exist). */}
+      {uniqueSenders.length > 1 && (
+        <div className="flex items-center gap-2 border-b border-gray-200 bg-gray-50 px-6 py-2">
+          <label htmlFor="sender-filter" className="text-sm font-medium text-gray-700">
+            Filter by sender:
+          </label>
+          <select
+            id="sender-filter"
+            value={state.senderFilter ?? ''}
+            onChange={(e) => handleSenderFilterChange(e.target.value || null)}
+            className="rounded-md border border-gray-300 bg-white px-3 py-1.5 text-sm text-gray-900 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+          >
+            <option value="">All senders</option>
+            {uniqueSenders.map((sender) => (
+              <option key={sender} value={sender}>
+                {sender}
+              </option>
+            ))}
+          </select>
+          {state.senderFilter && (
+            <button
+              type="button"
+              onClick={() => handleSenderFilterChange(null)}
+              className="text-sm text-blue-600 hover:text-blue-700"
+            >
+              Clear filter
+            </button>
+          )}
+        </div>
+      )}
 
       {/* Filter bar. */}
       <FilterBar
