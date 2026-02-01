@@ -24,7 +24,9 @@ type Server struct {
 	heartbeatMgr *agent.HeartbeatManager
 	mailRef      mail.MailActorRef         // Mail actor reference (required).
 	activityRef  activity.ActivityActorRef // Activity actor reference (required).
+	notifHubRef  NotificationHubRef        // Notification hub reference (optional).
 	hub          *Hub                      // WebSocket hub for real-time updates.
+	notifBridge  *HubNotificationBridge    // Bridge for actor notifications to WebSocket.
 	mux          *http.ServeMux
 	srv          *http.Server
 	addr         string
@@ -40,6 +42,10 @@ type Config struct {
 
 	// ActivityRef is the activity actor reference (required).
 	ActivityRef activity.ActivityActorRef
+
+	// NotificationHubRef is the notification hub reference (optional).
+	// When provided, enables real-time actor-based notifications to WebSocket clients.
+	NotificationHubRef NotificationHubRef
 }
 
 // DefaultConfig returns the default server configuration.
@@ -70,6 +76,7 @@ func NewServer(cfg *Config, st store.Storage,
 		heartbeatMgr: heartbeatMgr,
 		mailRef:      cfg.MailRef,
 		activityRef:  cfg.ActivityRef,
+		notifHubRef:  cfg.NotificationHubRef,
 		mux:          http.NewServeMux(),
 		addr:         cfg.Addr,
 	}
@@ -80,6 +87,12 @@ func NewServer(cfg *Config, st store.Storage,
 	// Initialize and start WebSocket hub.
 	s.hub = NewHub(s)
 	go s.hub.Run()
+
+	// Start notification bridge if notification hub is configured.
+	if cfg.NotificationHubRef != nil {
+		s.notifBridge = NewHubNotificationBridge(s.hub, cfg.NotificationHubRef)
+		s.notifBridge.Start()
+	}
 
 	// Register WebSocket route.
 	s.mux.HandleFunc("/ws", s.handleWebSocket)
@@ -110,7 +123,12 @@ func (s *Server) Start() error {
 
 // Shutdown gracefully shuts down the server.
 func (s *Server) Shutdown(ctx context.Context) error {
-	// Stop the WebSocket hub first.
+	// Stop the notification bridge first.
+	if s.notifBridge != nil {
+		s.notifBridge.Stop()
+	}
+
+	// Stop the WebSocket hub.
 	if s.hub != nil {
 		s.hub.Stop()
 	}

@@ -2,6 +2,9 @@ package mail
 
 import "github.com/roasbeef/subtrate/internal/baselib/actor"
 
+// NotificationActorRef is the typed actor reference for the notification hub.
+type NotificationActorRef = actor.ActorRef[NotificationRequest, NotificationResponse]
+
 // NotificationRequest is the union type for all notification hub requests.
 type NotificationRequest interface {
 	actor.Message
