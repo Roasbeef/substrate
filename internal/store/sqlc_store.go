@@ -250,6 +250,22 @@ func (s *SqlcStore) WithTx(ctx context.Context,
 	})
 }
 
+// WithReadTx executes the given function within a read-only database
+// transaction. This ensures consistent snapshot reads across multiple queries.
+func (s *SqlcStore) WithReadTx(ctx context.Context,
+	fn func(ctx context.Context, store Storage) error,
+) error {
+	readTxOpts := NewReadTx()
+	return s.db.ExecTx(ctx, readTxOpts, func(q QueryStore) error {
+		// Create a txStore that wraps this transaction's queries.
+		txStore := &txSqlcStore{
+			queries: q,
+			sqlDB:   s.sqlDB,
+		}
+		return fn(ctx, txStore)
+	})
+}
+
 // txSqlcStore is a Storage implementation for use within a transaction.
 type txSqlcStore struct {
 	queries QueryStore
@@ -259,6 +275,15 @@ type txSqlcStore struct {
 // WithTx for txSqlcStore returns an error since nested transactions are not
 // supported.
 func (s *txSqlcStore) WithTx(ctx context.Context,
+	fn func(ctx context.Context, store Storage) error,
+) error {
+	return fmt.Errorf("nested transactions not supported: already within " +
+		"a transaction context")
+}
+
+// WithReadTx for txSqlcStore returns an error since nested transactions are
+// not supported.
+func (s *txSqlcStore) WithReadTx(ctx context.Context,
 	fn func(ctx context.Context, store Storage) error,
 ) error {
 	return fmt.Errorf("nested transactions not supported: already within " +

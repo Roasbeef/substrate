@@ -238,8 +238,12 @@ type Storage interface {
 	ActivityStore
 	SessionStore
 
-	// WithTx executes a function within a database transaction.
+	// WithTx executes a function within a write database transaction.
 	WithTx(ctx context.Context, fn func(ctx context.Context, s Storage) error) error
+
+	// WithReadTx executes a function within a read-only database transaction.
+	// This ensures consistent snapshot reads across multiple queries.
+	WithReadTx(ctx context.Context, fn func(ctx context.Context, s Storage) error) error
 
 	// Close closes the store and releases resources.
 	Close() error

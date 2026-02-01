@@ -66,6 +66,15 @@ func (m *MockStore) WithTx(
 	return fn(ctx, m)
 }
 
+// WithReadTx executes the function within a read-only "transaction" (just runs
+// the function for the mock).
+func (m *MockStore) WithReadTx(
+	ctx context.Context,
+	fn func(ctx context.Context, s Storage) error,
+) error {
+	return fn(ctx, m)
+}
+
 // IsConsistent verifies that the store's internal state is consistent.
 // Used for property-based testing.
 func (m *MockStore) IsConsistent() bool {
