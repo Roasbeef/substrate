@@ -91,11 +91,13 @@ jobs:
         run: make build
         env:
           CGO_CFLAGS: "-DSQLITE_ENABLE_FTS5"
+          CGO_LDFLAGS: "-lm"
 
       - name: Build CLI and daemon
         run: make build-all
         env:
           CGO_CFLAGS: "-DSQLITE_ENABLE_FTS5"
+          CGO_LDFLAGS: "-lm"
 
   ########################
   # unit tests
@@ -116,8 +118,10 @@ jobs:
         run: make test
         env:
           CGO_CFLAGS: "-DSQLITE_ENABLE_FTS5"
+          CGO_LDFLAGS: "-lm"
 
       - name: Run tests with coverage
         run: make test-cover
         env:
           CGO_CFLAGS: "-DSQLITE_ENABLE_FTS5"
+          CGO_LDFLAGS: "-lm"
