@@ -47,7 +47,7 @@ type SpawnConfig struct {
 func DefaultSpawnConfig() *SpawnConfig {
 	return &SpawnConfig{
 		CLIPath: "claude",
-		Model:   "claude-sonnet-4-5-20250929",
+		Model:   "claude-opus-4-5-20251101",
 		Timeout: 5 * time.Minute,
 	}
 }

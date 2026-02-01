@@ -15,8 +15,8 @@ func TestDefaultSpawnConfig(t *testing.T) {
 		t.Errorf("expected 'claude', got %s", cfg.CLIPath)
 	}
 
-	if cfg.Model != "claude-sonnet-4-5-20250929" {
-		t.Errorf("expected 'claude-sonnet-4-5-20250929', got %s", cfg.Model)
+	if cfg.Model != "claude-opus-4-5-20251101" {
+		t.Errorf("expected 'claude-opus-4-5-20251101', got %s", cfg.Model)
 	}
 
 	if cfg.Timeout != 5*time.Minute {
@@ -171,7 +171,7 @@ func TestSpawner_NewSpawnerWithNilConfig(t *testing.T) {
 		t.Errorf("expected 'claude', got %s", spawner.cfg.CLIPath)
 	}
 
-	if spawner.cfg.Model != "claude-sonnet-4-5-20250929" {
+	if spawner.cfg.Model != "claude-opus-4-5-20251101" {
 		t.Errorf("expected default model, got %s", spawner.cfg.Model)
 	}
 }
