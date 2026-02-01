@@ -11,6 +11,8 @@ import (
 
 // TestNotificationHubSubscribeUnsubscribe tests subscribing and unsubscribing.
 func TestNotificationHubSubscribeUnsubscribe(t *testing.T) {
+	t.Parallel()
+
 	system := actor.NewActorSystem()
 	defer system.Shutdown(context.Background())
 
@@ -61,6 +63,8 @@ func TestNotificationHubSubscribeUnsubscribe(t *testing.T) {
 
 // TestNotificationHubNotifyAgent tests sending notifications to subscribers.
 func TestNotificationHubNotifyAgent(t *testing.T) {
+	t.Parallel()
+
 	system := actor.NewActorSystem()
 	defer system.Shutdown(context.Background())
 
@@ -129,6 +133,8 @@ func TestNotificationHubNotifyAgent(t *testing.T) {
 
 // TestNotificationHubNotifyTopic tests sending topic notifications.
 func TestNotificationHubNotifyTopic(t *testing.T) {
+	t.Parallel()
+
 	system := actor.NewActorSystem()
 	defer system.Shutdown(context.Background())
 
@@ -208,6 +214,8 @@ func TestNotificationHubNotifyTopic(t *testing.T) {
 
 // TestNotificationHubNonBlockingSend tests that notifications don't block.
 func TestNotificationHubNonBlockingSend(t *testing.T) {
+	t.Parallel()
+
 	system := actor.NewActorSystem()
 	defer system.Shutdown(context.Background())
 
@@ -249,6 +257,8 @@ func TestNotificationHubNonBlockingSend(t *testing.T) {
 
 // TestNotificationHubIdempotentUnsubscribe tests unsubscribing is idempotent.
 func TestNotificationHubIdempotentUnsubscribe(t *testing.T) {
+	t.Parallel()
+
 	system := actor.NewActorSystem()
 	defer system.Shutdown(context.Background())
 
@@ -275,6 +285,8 @@ func TestNotificationHubIdempotentUnsubscribe(t *testing.T) {
 
 // TestNotificationHubDuplicateSubscribe tests subscribing twice is idempotent.
 func TestNotificationHubDuplicateSubscribe(t *testing.T) {
+	t.Parallel()
+
 	system := actor.NewActorSystem()
 	defer system.Shutdown(context.Background())
 

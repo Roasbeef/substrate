@@ -18,6 +18,8 @@ func mockAgent(id int64, lastActiveAt int64) *sqlc.Agent {
 }
 
 func TestComputeStatus(t *testing.T) {
+	t.Parallel()
+
 	tests := []struct {
 		name           string
 		lastActiveAgo  time.Duration
@@ -87,6 +89,8 @@ func TestComputeStatus(t *testing.T) {
 }
 
 func TestSessionTracking(t *testing.T) {
+	t.Parallel()
+
 	hm := NewHeartbeatManager(nil, DefaultHeartbeatConfig())
 
 	agentID := int64(1)
@@ -121,6 +125,8 @@ func TestSessionTracking(t *testing.T) {
 }
 
 func TestHeartbeatManagerWithRegistry(t *testing.T) {
+	t.Parallel()
+
 	store, cleanup := testDB(t)
 	defer cleanup()
 
@@ -170,6 +176,8 @@ func TestHeartbeatManagerWithRegistry(t *testing.T) {
 }
 
 func TestListAgentsWithStatus(t *testing.T) {
+	t.Parallel()
+
 	store, cleanup := testDB(t)
 	defer cleanup()
 
@@ -216,6 +224,8 @@ func TestListAgentsWithStatus(t *testing.T) {
 }
 
 func TestGetStatusCounts(t *testing.T) {
+	t.Parallel()
+
 	store, cleanup := testDB(t)
 	defer cleanup()
 
@@ -251,6 +261,8 @@ func TestGetStatusCounts(t *testing.T) {
 }
 
 func TestRecordHeartbeatByName(t *testing.T) {
+	t.Parallel()
+
 	store, cleanup := testDB(t)
 	defer cleanup()
 
@@ -283,6 +295,8 @@ func TestRecordHeartbeatByName(t *testing.T) {
 }
 
 func TestRecordHeartbeatByName_NotFound(t *testing.T) {
+	t.Parallel()
+
 	store, cleanup := testDB(t)
 	defer cleanup()
 
@@ -299,6 +313,8 @@ func TestRecordHeartbeatByName_NotFound(t *testing.T) {
 }
 
 func TestGetAgentWithStatusByName(t *testing.T) {
+	t.Parallel()
+
 	store, cleanup := testDB(t)
 	defer cleanup()
 
@@ -332,6 +348,8 @@ func TestGetAgentWithStatusByName(t *testing.T) {
 }
 
 func TestGetAgentWithStatusByName_NotFound(t *testing.T) {
+	t.Parallel()
+
 	store, cleanup := testDB(t)
 	defer cleanup()
 

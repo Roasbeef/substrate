@@ -97,6 +97,8 @@ func createTestTopic(t *testing.T, storage store.Storage, name, topicType string
 }
 
 func TestService_SendMail(t *testing.T) {
+	t.Parallel()
+
 	storage, cleanup := testDB(t)
 	defer cleanup()
 
@@ -127,6 +129,8 @@ func TestService_SendMail(t *testing.T) {
 }
 
 func TestService_SendMail_WithThread(t *testing.T) {
+	t.Parallel()
+
 	storage, cleanup := testDB(t)
 	defer cleanup()
 
@@ -170,6 +174,8 @@ func TestService_SendMail_WithThread(t *testing.T) {
 }
 
 func TestService_FetchInbox(t *testing.T) {
+	t.Parallel()
+
 	storage, cleanup := testDB(t)
 	defer cleanup()
 
@@ -212,6 +218,8 @@ func TestService_FetchInbox(t *testing.T) {
 }
 
 func TestService_FetchInbox_UnreadOnly(t *testing.T) {
+	t.Parallel()
+
 	storage, cleanup := testDB(t)
 	defer cleanup()
 
@@ -266,6 +274,8 @@ func TestService_FetchInbox_UnreadOnly(t *testing.T) {
 }
 
 func TestService_ReadMessage(t *testing.T) {
+	t.Parallel()
+
 	storage, cleanup := testDB(t)
 	defer cleanup()
 
@@ -310,6 +320,8 @@ func TestService_ReadMessage(t *testing.T) {
 }
 
 func TestService_UpdateState(t *testing.T) {
+	t.Parallel()
+
 	storage, cleanup := testDB(t)
 	defer cleanup()
 
@@ -350,6 +362,8 @@ func TestService_UpdateState(t *testing.T) {
 }
 
 func TestService_UpdateState_Snooze(t *testing.T) {
+	t.Parallel()
+
 	storage, cleanup := testDB(t)
 	defer cleanup()
 
@@ -392,6 +406,8 @@ func TestService_UpdateState_Snooze(t *testing.T) {
 }
 
 func TestService_AckMessage(t *testing.T) {
+	t.Parallel()
+
 	storage, cleanup := testDB(t)
 	defer cleanup()
 
@@ -433,6 +449,8 @@ func TestService_AckMessage(t *testing.T) {
 }
 
 func TestService_GetStatus(t *testing.T) {
+	t.Parallel()
+
 	storage, cleanup := testDB(t)
 	defer cleanup()
 
@@ -477,6 +495,8 @@ func TestService_GetStatus(t *testing.T) {
 }
 
 func TestService_Publish(t *testing.T) {
+	t.Parallel()
+
 	storage, cleanup := testDB(t)
 	defer cleanup()
 
@@ -518,6 +538,8 @@ func TestService_Publish(t *testing.T) {
 }
 
 func TestService_PollChanges(t *testing.T) {
+	t.Parallel()
+
 	storage, cleanup := testDB(t)
 	defer cleanup()
 
@@ -594,6 +616,8 @@ func TestService_PollChanges(t *testing.T) {
 }
 
 func TestService_UnknownMessageType(t *testing.T) {
+	t.Parallel()
+
 	storage, cleanup := testDB(t)
 	defer cleanup()
 
@@ -610,6 +634,8 @@ func TestService_UnknownMessageType(t *testing.T) {
 }
 
 func TestService_ReadMessage_NotFound(t *testing.T) {
+	t.Parallel()
+
 	storage, cleanup := testDB(t)
 	defer cleanup()
 
@@ -633,6 +659,8 @@ func TestService_ReadMessage_NotFound(t *testing.T) {
 }
 
 func TestService_UpdateState_NonExistentMessage(t *testing.T) {
+	t.Parallel()
+
 	storage, cleanup := testDB(t)
 	defer cleanup()
 
@@ -660,6 +688,8 @@ func TestService_UpdateState_NonExistentMessage(t *testing.T) {
 }
 
 func TestService_AckMessage_NonExistentMessage(t *testing.T) {
+	t.Parallel()
+
 	storage, cleanup := testDB(t)
 	defer cleanup()
 
@@ -686,6 +716,8 @@ func TestService_AckMessage_NonExistentMessage(t *testing.T) {
 }
 
 func TestService_Publish_TopicNotFound(t *testing.T) {
+	t.Parallel()
+
 	storage, cleanup := testDB(t)
 	defer cleanup()
 
@@ -712,6 +744,8 @@ func TestService_Publish_TopicNotFound(t *testing.T) {
 }
 
 func TestService_SendMail_RecipientNotFound(t *testing.T) {
+	t.Parallel()
+
 	storage, cleanup := testDB(t)
 	defer cleanup()
 
@@ -739,6 +773,8 @@ func TestService_SendMail_RecipientNotFound(t *testing.T) {
 }
 
 func TestService_GetStatus_NoMessages(t *testing.T) {
+	t.Parallel()
+
 	storage, cleanup := testDB(t)
 	defer cleanup()
 
@@ -763,6 +799,8 @@ func TestService_GetStatus_NoMessages(t *testing.T) {
 }
 
 func TestService_UpdateState_Archive(t *testing.T) {
+	t.Parallel()
+
 	storage, cleanup := testDB(t)
 	defer cleanup()
 
@@ -803,6 +841,8 @@ func TestService_UpdateState_Archive(t *testing.T) {
 }
 
 func TestService_UpdateState_Trash(t *testing.T) {
+	t.Parallel()
+
 	storage, cleanup := testDB(t)
 	defer cleanup()
 

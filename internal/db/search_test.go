@@ -10,6 +10,8 @@ import (
 )
 
 func TestSearchMessages(t *testing.T) {
+	t.Parallel()
+
 	store, cleanup := testDB(t)
 	defer cleanup()
 
@@ -72,6 +74,8 @@ func TestSearchMessages(t *testing.T) {
 }
 
 func TestSearchMessagesForAgent(t *testing.T) {
+	t.Parallel()
+
 	store, cleanup := testDB(t)
 	defer cleanup()
 
@@ -161,6 +165,8 @@ func TestSearchMessagesForAgent(t *testing.T) {
 }
 
 func TestSearchMessages_NoResults(t *testing.T) {
+	t.Parallel()
+
 	store, cleanup := testDB(t)
 	defer cleanup()
 

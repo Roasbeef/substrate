@@ -71,6 +71,8 @@ func findMigrationsDir(t *testing.T) string {
 }
 
 func TestNewStore(t *testing.T) {
+	t.Parallel()
+
 	store, cleanup := testDB(t)
 	defer cleanup()
 
@@ -80,6 +82,8 @@ func TestNewStore(t *testing.T) {
 }
 
 func TestWithTx_Commit(t *testing.T) {
+	t.Parallel()
+
 	store, cleanup := testDB(t)
 	defer cleanup()
 
@@ -102,6 +106,8 @@ func TestWithTx_Commit(t *testing.T) {
 }
 
 func TestWithTx_Rollback(t *testing.T) {
+	t.Parallel()
+
 	store, cleanup := testDB(t)
 	defer cleanup()
 
@@ -128,6 +134,8 @@ func TestWithTx_Rollback(t *testing.T) {
 }
 
 func TestNextLogOffset(t *testing.T) {
+	t.Parallel()
+
 	store, cleanup := testDB(t)
 	defer cleanup()
 
