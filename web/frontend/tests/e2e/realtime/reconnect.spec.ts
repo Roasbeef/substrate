@@ -33,7 +33,7 @@ test.describe('WebSocket reconnection', () => {
   });
 
   test('receives messages after reconnection', async ({ page }) => {
-    let connections: WebSocketRoute[] = [];
+    const connections: WebSocketRoute[] = [];
 
     await page.routeWebSocket(/\/ws/, async (ws) => {
       connections.push(ws);
@@ -115,7 +115,7 @@ test.describe('WebSocket reconnection', () => {
 
 test.describe('Reconnection with pending actions', () => {
   test('queued messages are sent after reconnection', async ({ page }) => {
-    let sentMessages: string[] = [];
+    const sentMessages: string[] = [];
     let wsConnection: WebSocketRoute | undefined;
 
     await page.routeWebSocket(/\/ws/, async (ws) => {

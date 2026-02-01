@@ -27,7 +27,7 @@ async function setupMessagesAPI(page: import('@playwright/test').Page) {
     },
   ];
 
-  let archivedIds: number[] = [];
+  const archivedIds: number[] = [];
 
   await page.route('**/api/v1/messages*', async (route) => {
     const activeMessages = messages.filter((m) => !archivedIds.includes(m.id));

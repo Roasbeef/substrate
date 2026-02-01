@@ -123,7 +123,7 @@ test.describe('Star toggle interaction', () => {
   test('star state persists after toggle', async ({ page }) => {
     await setupMessagesAPI(page);
 
-    let messageStates: Record<number, boolean> = { 1: false, 2: true };
+    const messageStates: Record<number, boolean> = { 1: false, 2: true };
 
     await page.route('**/api/v1/messages/*/star', async (route) => {
       const url = route.request().url();

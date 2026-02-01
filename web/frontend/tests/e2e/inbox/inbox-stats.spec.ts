@@ -174,7 +174,7 @@ test.describe('Inbox stats cards', () => {
   });
 
   test('stats update when messages change', async ({ page }) => {
-    let messageCount = 2;
+    const messageCount = 2;
 
     await page.route('**/api/v1/messages*', async (route) => {
       await route.fulfill({
