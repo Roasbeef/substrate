@@ -16,8 +16,11 @@ type Pool[M actor.Message, R any] struct {
 	// id is the identifier for this pool.
 	id string
 
-	// actors holds the pooled actor references.
+	// actors holds the pooled actor references for message sending.
 	actors []actor.ActorRef[M, R]
+
+	// rawActors holds the underlying Actor instances for lifecycle management.
+	rawActors []*actor.Actor[M, R]
 
 	// next is the atomic counter for round-robin selection.
 	next atomic.Uint64
@@ -58,8 +61,9 @@ func NewPool[M actor.Message, R any](
 	}
 
 	p := &Pool[M, R]{
-		id:     cfg.ID,
-		actors: make([]actor.ActorRef[M, R], cfg.Size),
+		id:        cfg.ID,
+		actors:    make([]actor.ActorRef[M, R], cfg.Size),
+		rawActors: make([]*actor.Actor[M, R], cfg.Size),
 	}
 
 	// Create and start each actor in the pool.
@@ -75,6 +79,7 @@ func NewPool[M actor.Message, R any](
 
 		a := actor.NewActor(actorCfg)
 		a.Start()
+		p.rawActors[i] = a
 		p.actors[i] = a.Ref()
 	}
 
@@ -131,14 +136,9 @@ func (p *Pool[M, R]) Actors() []actor.ActorRef[M, R] {
 
 // Stop gracefully stops all actors in the pool and waits for them to exit.
 func (p *Pool[M, R]) Stop() {
-	// Stop all actors.
-	for _, ref := range p.actors {
-		// We need to cast to get the underlying actor to call Stop.
-		// This is a limitation of only having the ActorRef interface.
-		// In practice, pools should be stopped via the actor system.
-		if stopper, ok := any(ref).(interface{ Stop() }); ok {
-			stopper.Stop()
-		}
+	// Stop all actors using the underlying Actor instances.
+	for _, a := range p.rawActors {
+		a.Stop()
 	}
 
 	// Wait for all actors to exit.
