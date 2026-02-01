@@ -60,6 +60,41 @@ bun-lint:
 build-production: bun-build build-daemon
 	@echo "Production build complete with embedded frontend."
 
+# Full test suite (Go + frontend).
+.PHONY: test-all
+test-all: test bun-test
+	@echo "All tests passed (Go + frontend)."
+
+# Full lint (Go + frontend).
+.PHONY: lint-all
+lint-all: lint bun-lint
+	@echo "All linting passed (Go + frontend)."
+
+# Development mode: run Go backend and frontend dev server concurrently.
+# Use with 'make dev' - requires terminal multiplexer or run in separate terminals.
+.PHONY: dev
+dev:
+	@echo "Starting development servers..."
+	@echo "  Backend:  http://localhost:$(WEB_PORT)"
+	@echo "  Frontend: http://localhost:5174 (proxies to backend)"
+	@echo ""
+	@echo "Run these in separate terminals:"
+	@echo "  Terminal 1: make run"
+	@echo "  Terminal 2: make bun-dev"
+
+# CI targets - used by GitHub Actions.
+.PHONY: ci-go
+ci-go: tidy-check lint test
+	@echo "Go CI checks passed."
+
+.PHONY: ci-frontend
+ci-frontend: bun-install bun-lint bun-test
+	@echo "Frontend CI checks passed."
+
+.PHONY: ci
+ci: ci-go ci-frontend
+	@echo "All CI checks passed."
+
 .PHONY: install
 install:
 	go install ./cmd/substrate
@@ -316,6 +351,14 @@ help:
 	@echo "  bun-test       Run frontend unit/integration tests"
 	@echo "  bun-test-e2e   Run frontend E2E tests with Playwright"
 	@echo "  bun-lint       Lint frontend code"
+	@echo ""
+	@echo "Combined targets:"
+	@echo "  dev            Show instructions for development mode"
+	@echo "  test-all       Run all tests (Go + frontend)"
+	@echo "  lint-all       Run all linting (Go + frontend)"
+	@echo "  ci             Run full CI pipeline (Go + frontend)"
+	@echo "  ci-go          Run Go CI checks only"
+	@echo "  ci-frontend    Run frontend CI checks only"
 	@echo ""
 	@echo "Development:"
 	@echo "  check          Run fmt, vet, lint, and tests"
