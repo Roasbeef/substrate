@@ -2,15 +2,13 @@ package mail
 
 import (
 	"context"
-	"database/sql"
 	"fmt"
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/lightninglabs/darepo-client/baselib/actor"
 	"github.com/lightningnetwork/lnd/fn/v2"
-	"github.com/roasbeef/subtrate/internal/db"
-	"github.com/roasbeef/subtrate/internal/db/sqlc"
+	"github.com/roasbeef/subtrate/internal/baselib/actor"
+	"github.com/roasbeef/subtrate/internal/store"
 )
 
 // MailServiceKey is the service key for the mail service actor.
@@ -51,19 +49,19 @@ func (PublishResponse) isMailResponse()     {}
 
 // Service is the mail service actor behavior.
 type Service struct {
-	store *db.Store
+	store store.Storage
 }
 
-// NewService creates a new mail service with the given database store.
-func NewService(store *db.Store) *Service {
-	return &Service{store: store}
+// NewService creates a new mail service with the given store.
+func NewService(s store.Storage) *Service {
+	return &Service{store: s}
 }
 
 // Receive implements actor.ActorBehavior by dispatching to type-specific
 // handlers.
 func (s *Service) Receive(ctx context.Context,
-	msg MailRequest) fn.Result[MailResponse] {
-
+	msg MailRequest,
+) fn.Result[MailResponse] {
 	switch m := msg.(type) {
 	case SendMailRequest:
 		resp := s.handleSendMail(ctx, m)
@@ -106,13 +104,13 @@ func (s *Service) Receive(ctx context.Context,
 
 // handleSendMail processes a SendMailRequest.
 func (s *Service) handleSendMail(ctx context.Context,
-	req SendMailRequest) SendMailResponse {
-
+	req SendMailRequest,
+) SendMailResponse {
 	var response SendMailResponse
 
 	err := s.store.WithTx(ctx, func(ctx context.Context,
-		q *sqlc.Queries) error {
-
+		txStore store.Storage,
+	) error {
 		// Generate thread ID if not provided.
 		threadID := req.ThreadID
 		if threadID == "" {
@@ -123,7 +121,7 @@ func (s *Service) handleSendMail(ctx context.Context,
 		// Resolve recipient agent IDs.
 		var recipientIDs []int64
 		for _, name := range req.RecipientNames {
-			agent, err := q.GetAgentByName(ctx, name)
+			agent, err := txStore.GetAgentByName(ctx, name)
 			if err != nil {
 				return fmt.Errorf("recipient %q not found: %w",
 					name, err)
@@ -132,7 +130,7 @@ func (s *Service) handleSendMail(ctx context.Context,
 		}
 
 		// Get or create the sender's inbox topic for direct messages.
-		sender, err := q.GetAgent(ctx, req.SenderID)
+		sender, err := txStore.GetAgent(ctx, req.SenderID)
 		if err != nil {
 			return fmt.Errorf("sender not found: %w", err)
 		}
@@ -140,20 +138,14 @@ func (s *Service) handleSendMail(ctx context.Context,
 		// For direct messages, use the first recipient's inbox topic.
 		var topicID int64
 		if len(recipientIDs) > 0 {
-			recipient, err := q.GetAgent(ctx, recipientIDs[0])
+			recipient, err := txStore.GetAgent(ctx, recipientIDs[0])
 			if err != nil {
 				return fmt.Errorf("failed to get recipient: %w",
 					err)
 			}
 
-			topic, err := q.GetOrCreateAgentInboxTopic(
-				ctx, sqlc.GetOrCreateAgentInboxTopicParams{
-					Column1: sql.NullString{
-						String: recipient.Name,
-						Valid:  true,
-					},
-					CreatedAt: time.Now().Unix(),
-				},
+			topic, err := txStore.GetOrCreateAgentInboxTopic(
+				ctx, recipient.Name,
 			)
 			if err != nil {
 				return fmt.Errorf("failed to get inbox topic: "+
@@ -162,7 +154,7 @@ func (s *Service) handleSendMail(ctx context.Context,
 			topicID = topic.ID
 		} else if req.TopicName != "" {
 			// Use the specified topic for pub/sub.
-			topic, err := q.GetTopicByName(ctx, req.TopicName)
+			topic, err := txStore.GetTopicByName(ctx, req.TopicName)
 			if err != nil {
 				return fmt.Errorf("topic %q not found: %w",
 					req.TopicName, err)
@@ -173,41 +165,22 @@ func (s *Service) handleSendMail(ctx context.Context,
 		}
 
 		// Get the next log offset for the topic.
-		logOffset, err := db.NextLogOffset(ctx, q, topicID)
+		logOffset, err := txStore.NextLogOffset(ctx, topicID)
 		if err != nil {
 			return fmt.Errorf("failed to get next offset: %w", err)
 		}
 
-		// Convert deadline to nullable int64.
-		var deadlineAt sql.NullInt64
-		if req.Deadline != nil {
-			deadlineAt = sql.NullInt64{
-				Int64: req.Deadline.Unix(),
-				Valid: true,
-			}
-		}
-
-		// Convert attachments to nullable string.
-		var attachments sql.NullString
-		if req.Attachments != "" {
-			attachments = sql.NullString{
-				String: req.Attachments,
-				Valid:  true,
-			}
-		}
-
 		// Create the message.
-		msg, err := q.CreateMessage(ctx, sqlc.CreateMessageParams{
+		msg, err := txStore.CreateMessage(ctx, store.CreateMessageParams{
 			ThreadID:    threadID,
 			TopicID:     topicID,
 			LogOffset:   logOffset,
 			SenderID:    sender.ID,
 			Subject:     req.Subject,
-			BodyMd:      req.Body,
+			Body:        req.Body,
 			Priority:    string(req.Priority),
-			DeadlineAt:  deadlineAt,
-			Attachments: attachments,
-			CreatedAt:   time.Now().Unix(),
+			DeadlineAt:  req.Deadline,
+			Attachments: req.Attachments,
 		})
 		if err != nil {
 			return fmt.Errorf("failed to create message: %w", err)
@@ -216,11 +189,8 @@ func (s *Service) handleSendMail(ctx context.Context,
 
 		// Create recipient entries.
 		for _, recipientID := range recipientIDs {
-			err := q.CreateMessageRecipient(
-				ctx, sqlc.CreateMessageRecipientParams{
-					MessageID: msg.ID,
-					AgentID:   recipientID,
-				},
+			err := txStore.CreateMessageRecipient(
+				ctx, msg.ID, recipientID,
 			)
 			if err != nil {
 				return fmt.Errorf("failed to create recipient "+
@@ -230,7 +200,6 @@ func (s *Service) handleSendMail(ctx context.Context,
 
 		return nil
 	})
-
 	if err != nil {
 		response.Error = err
 	}
@@ -240,25 +209,17 @@ func (s *Service) handleSendMail(ctx context.Context,
 
 // handleFetchInbox processes a FetchInboxRequest.
 func (s *Service) handleFetchInbox(ctx context.Context,
-	req FetchInboxRequest) FetchInboxResponse {
-
+	req FetchInboxRequest,
+) FetchInboxResponse {
 	var response FetchInboxResponse
 
-	limit := int64(req.Limit)
+	limit := req.Limit
 	if limit <= 0 {
 		limit = 50
 	}
 
-	var rows []sqlc.GetInboxMessagesRow
-	var err error
-
 	if req.UnreadOnly {
-		unreadRows, err := s.store.Queries().GetUnreadMessages(
-			ctx, sqlc.GetUnreadMessagesParams{
-				AgentID: req.AgentID,
-				Limit:   limit,
-			},
-		)
+		msgs, err := s.store.GetUnreadMessages(ctx, req.AgentID, limit)
 		if err != nil {
 			response.Error = fmt.Errorf("failed to fetch unread: "+
 				"%w", err)
@@ -266,28 +227,23 @@ func (s *Service) handleFetchInbox(ctx context.Context,
 		}
 
 		// Convert to InboxMessage format.
-		for _, r := range unreadRows {
+		for _, m := range msgs {
 			response.Messages = append(
-				response.Messages, convertUnreadRow(r),
+				response.Messages, storeInboxToMail(m),
 			)
 		}
 
 		return response
 	}
 
-	rows, err = s.store.Queries().GetInboxMessages(
-		ctx, sqlc.GetInboxMessagesParams{
-			AgentID: req.AgentID,
-			Limit:   limit,
-		},
-	)
+	msgs, err := s.store.GetInboxMessages(ctx, req.AgentID, limit)
 	if err != nil {
 		response.Error = fmt.Errorf("failed to fetch inbox: %w", err)
 		return response
 	}
 
-	for _, r := range rows {
-		response.Messages = append(response.Messages, convertInboxRow(r))
+	for _, m := range msgs {
+		response.Messages = append(response.Messages, storeInboxToMail(m))
 	}
 
 	return response
@@ -295,23 +251,20 @@ func (s *Service) handleFetchInbox(ctx context.Context,
 
 // handleReadMessage processes a ReadMessageRequest.
 func (s *Service) handleReadMessage(ctx context.Context,
-	req ReadMessageRequest) ReadMessageResponse {
-
+	req ReadMessageRequest,
+) ReadMessageResponse {
 	var response ReadMessageResponse
 
 	// Get the message.
-	msg, err := s.store.Queries().GetMessage(ctx, req.MessageID)
+	msg, err := s.store.GetMessage(ctx, req.MessageID)
 	if err != nil {
 		response.Error = fmt.Errorf("message not found: %w", err)
 		return response
 	}
 
 	// Get the recipient state.
-	recipient, err := s.store.Queries().GetMessageRecipient(
-		ctx, sqlc.GetMessageRecipientParams{
-			MessageID: req.MessageID,
-			AgentID:   req.AgentID,
-		},
+	recipient, err := s.store.GetMessageRecipient(
+		ctx, req.MessageID, req.AgentID,
 	)
 	if err != nil {
 		response.Error = fmt.Errorf("not a recipient: %w", err)
@@ -320,56 +273,32 @@ func (s *Service) handleReadMessage(ctx context.Context,
 
 	// Mark as read if currently unread.
 	if recipient.State == "unread" {
-		now := time.Now().Unix()
-		_, err = s.store.Queries().UpdateRecipientState(
-			ctx, sqlc.UpdateRecipientStateParams{
-				State:     "read",
-				Column2:   "read",
-				ReadAt:    sql.NullInt64{Int64: now, Valid: true},
-				MessageID: req.MessageID,
-				AgentID:   req.AgentID,
-			},
-		)
+		err = s.store.MarkMessageRead(ctx, req.MessageID, req.AgentID)
 		if err != nil {
 			response.Error = fmt.Errorf("failed to mark read: %w",
 				err)
 			return response
 		}
 		recipient.State = "read"
-		recipient.ReadAt = sql.NullInt64{Int64: now, Valid: true}
+		now := time.Now()
+		recipient.ReadAt = &now
 	}
 
 	// Build response.
 	inboxMsg := InboxMessage{
-		ID:        msg.ID,
-		ThreadID:  msg.ThreadID,
-		TopicID:   msg.TopicID,
-		SenderID:  msg.SenderID,
-		Subject:   msg.Subject,
-		Body:      msg.BodyMd,
-		Priority:  Priority(msg.Priority),
-		State:     recipient.State,
-		CreatedAt: time.Unix(msg.CreatedAt, 0),
-	}
-
-	if msg.DeadlineAt.Valid {
-		t := time.Unix(msg.DeadlineAt.Int64, 0)
-		inboxMsg.Deadline = &t
-	}
-
-	if recipient.SnoozedUntil.Valid {
-		t := time.Unix(recipient.SnoozedUntil.Int64, 0)
-		inboxMsg.SnoozedUntil = &t
-	}
-
-	if recipient.ReadAt.Valid {
-		t := time.Unix(recipient.ReadAt.Int64, 0)
-		inboxMsg.ReadAt = &t
-	}
-
-	if recipient.AckedAt.Valid {
-		t := time.Unix(recipient.AckedAt.Int64, 0)
-		inboxMsg.AckedAt = &t
+		ID:           msg.ID,
+		ThreadID:     msg.ThreadID,
+		TopicID:      msg.TopicID,
+		SenderID:     msg.SenderID,
+		Subject:      msg.Subject,
+		Body:         msg.Body,
+		Priority:     Priority(msg.Priority),
+		State:        recipient.State,
+		CreatedAt:    msg.CreatedAt,
+		Deadline:     msg.DeadlineAt,
+		SnoozedUntil: recipient.SnoozedUntil,
+		ReadAt:       recipient.ReadAt,
+		AckedAt:      recipient.AckedAt,
 	}
 
 	response.Message = &inboxMsg
@@ -378,8 +307,8 @@ func (s *Service) handleReadMessage(ctx context.Context,
 
 // handleUpdateState processes an UpdateStateRequest.
 func (s *Service) handleUpdateState(ctx context.Context,
-	req UpdateStateRequest) UpdateStateResponse {
-
+	req UpdateStateRequest,
+) UpdateStateResponse {
 	var response UpdateStateResponse
 
 	if req.NewState == "snoozed" {
@@ -390,30 +319,16 @@ func (s *Service) handleUpdateState(ctx context.Context,
 			return response
 		}
 
-		err := s.store.Queries().UpdateRecipientSnoozed(
-			ctx, sqlc.UpdateRecipientSnoozedParams{
-				SnoozedUntil: sql.NullInt64{
-					Int64: req.SnoozedUntil.Unix(),
-					Valid: true,
-				},
-				MessageID: req.MessageID,
-				AgentID:   req.AgentID,
-			},
+		err := s.store.SnoozeMessage(
+			ctx, req.MessageID, req.AgentID, *req.SnoozedUntil,
 		)
 		if err != nil {
 			response.Error = fmt.Errorf("failed to snooze: %w", err)
 			return response
 		}
 	} else {
-		now := time.Now().Unix()
-		_, err := s.store.Queries().UpdateRecipientState(
-			ctx, sqlc.UpdateRecipientStateParams{
-				State:     req.NewState,
-				Column2:   req.NewState,
-				ReadAt:    sql.NullInt64{Int64: now, Valid: true},
-				MessageID: req.MessageID,
-				AgentID:   req.AgentID,
-			},
+		err := s.store.UpdateRecipientState(
+			ctx, req.MessageID, req.AgentID, req.NewState,
 		)
 		if err != nil {
 			response.Error = fmt.Errorf("failed to update state: "+
@@ -428,17 +343,11 @@ func (s *Service) handleUpdateState(ctx context.Context,
 
 // handleAckMessage processes an AckMessageRequest.
 func (s *Service) handleAckMessage(ctx context.Context,
-	req AckMessageRequest) AckMessageResponse {
-
+	req AckMessageRequest,
+) AckMessageResponse {
 	var response AckMessageResponse
 
-	err := s.store.Queries().UpdateRecipientAcked(
-		ctx, sqlc.UpdateRecipientAckedParams{
-			AckedAt:   sql.NullInt64{Int64: time.Now().Unix(), Valid: true},
-			MessageID: req.MessageID,
-			AgentID:   req.AgentID,
-		},
-	)
+	err := s.store.AckMessage(ctx, req.MessageID, req.AgentID)
 	if err != nil {
 		response.Error = fmt.Errorf("failed to ack: %w", err)
 		return response
@@ -450,27 +359,23 @@ func (s *Service) handleAckMessage(ctx context.Context,
 
 // handleGetStatus processes a GetStatusRequest.
 func (s *Service) handleGetStatus(ctx context.Context,
-	req GetStatusRequest) GetStatusResponse {
-
+	req GetStatusRequest,
+) GetStatusResponse {
 	var response GetStatusResponse
 
-	agent, err := s.store.Queries().GetAgent(ctx, req.AgentID)
+	agent, err := s.store.GetAgent(ctx, req.AgentID)
 	if err != nil {
 		response.Error = fmt.Errorf("agent not found: %w", err)
 		return response
 	}
 
-	unreadCount, err := s.store.Queries().CountUnreadByAgent(
-		ctx, req.AgentID,
-	)
+	unreadCount, err := s.store.CountUnreadByAgent(ctx, req.AgentID)
 	if err != nil {
 		response.Error = fmt.Errorf("failed to count unread: %w", err)
 		return response
 	}
 
-	urgentCount, err := s.store.Queries().CountUnreadUrgentByAgent(
-		ctx, req.AgentID,
-	)
+	urgentCount, err := s.store.CountUnreadUrgentByAgent(ctx, req.AgentID)
 	if err != nil {
 		response.Error = fmt.Errorf("failed to count urgent: %w", err)
 		return response
@@ -490,8 +395,8 @@ func (s *Service) handleGetStatus(ctx context.Context,
 // inbox messages (unread) and subscribed topic messages since the given
 // offsets. Messages are deduplicated by ID.
 func (s *Service) handlePollChanges(ctx context.Context,
-	req PollChangesRequest) PollChangesResponse {
-
+	req PollChangesRequest,
+) PollChangesResponse {
 	var response PollChangesResponse
 	response.NewOffsets = make(map[int64]int64)
 
@@ -500,12 +405,7 @@ func (s *Service) handlePollChanges(ctx context.Context,
 	seenMsgIDs := make(map[int64]bool)
 
 	// First, check for unread direct messages in the agent's inbox.
-	unreadMsgs, err := s.store.Queries().GetUnreadMessages(
-		ctx, sqlc.GetUnreadMessagesParams{
-			AgentID: req.AgentID,
-			Limit:   100,
-		},
-	)
+	unreadMsgs, err := s.store.GetUnreadMessages(ctx, req.AgentID, 100)
 	if err != nil {
 		response.Error = fmt.Errorf("failed to get unread messages: %w",
 			err)
@@ -515,46 +415,13 @@ func (s *Service) handlePollChanges(ctx context.Context,
 	// Add unread direct messages to response.
 	for _, msg := range unreadMsgs {
 		seenMsgIDs[msg.ID] = true
-
-		inboxMsg := InboxMessage{
-			ID:        msg.ID,
-			ThreadID:  msg.ThreadID,
-			TopicID:   msg.TopicID,
-			SenderID:  msg.SenderID,
-			Subject:   msg.Subject,
-			Body:      msg.BodyMd,
-			Priority:  Priority(msg.Priority),
-			State:     msg.State,
-			CreatedAt: time.Unix(msg.CreatedAt, 0),
-		}
-
-		if msg.DeadlineAt.Valid {
-			t := time.Unix(msg.DeadlineAt.Int64, 0)
-			inboxMsg.Deadline = &t
-		}
-
-		if msg.ReadAt.Valid {
-			t := time.Unix(msg.ReadAt.Int64, 0)
-			inboxMsg.ReadAt = &t
-		}
-
-		if msg.AckedAt.Valid {
-			t := time.Unix(msg.AckedAt.Int64, 0)
-			inboxMsg.AckedAt = &t
-		}
-
-		if msg.SnoozedUntil.Valid {
-			t := time.Unix(msg.SnoozedUntil.Int64, 0)
-			inboxMsg.SnoozedUntil = &t
-		}
-
-		response.NewMessages = append(response.NewMessages, inboxMsg)
+		response.NewMessages = append(
+			response.NewMessages, storeInboxToMail(msg),
+		)
 	}
 
 	// Then check subscribed topics for new messages since the given offsets.
-	topics, err := s.store.Queries().ListSubscriptionsByAgent(
-		ctx, req.AgentID,
-	)
+	topics, err := s.store.ListSubscriptionsByAgent(ctx, req.AgentID)
 	if err != nil {
 		response.Error = fmt.Errorf("failed to list subscriptions: %w",
 			err)
@@ -565,12 +432,8 @@ func (s *Service) handlePollChanges(ctx context.Context,
 	for _, topic := range topics {
 		sinceOffset := req.SinceOffsets[topic.ID]
 
-		msgs, err := s.store.Queries().GetMessagesSinceOffset(
-			ctx, sqlc.GetMessagesSinceOffsetParams{
-				TopicID:   topic.ID,
-				LogOffset: sinceOffset,
-				Limit:     100,
-			},
+		msgs, err := s.store.GetMessagesSinceOffset(
+			ctx, topic.ID, sinceOffset, 100,
 		)
 		if err != nil {
 			response.Error = fmt.Errorf("failed to poll topic %d: "+
@@ -590,24 +453,8 @@ func (s *Service) handlePollChanges(ctx context.Context,
 			}
 			seenMsgIDs[msg.ID] = true
 
-			inboxMsg := InboxMessage{
-				ID:        msg.ID,
-				ThreadID:  msg.ThreadID,
-				TopicID:   msg.TopicID,
-				SenderID:  msg.SenderID,
-				Subject:   msg.Subject,
-				Body:      msg.BodyMd,
-				Priority:  Priority(msg.Priority),
-				CreatedAt: time.Unix(msg.CreatedAt, 0),
-			}
-
-			if msg.DeadlineAt.Valid {
-				t := time.Unix(msg.DeadlineAt.Int64, 0)
-				inboxMsg.Deadline = &t
-			}
-
 			response.NewMessages = append(
-				response.NewMessages, inboxMsg,
+				response.NewMessages, storeMessageToMail(msg),
 			)
 		}
 	}
@@ -615,55 +462,52 @@ func (s *Service) handlePollChanges(ctx context.Context,
 	return response
 }
 
-// convertInboxRow converts a database row to InboxMessage.
-func convertInboxRow(r sqlc.GetInboxMessagesRow) InboxMessage {
-	msg := InboxMessage{
-		ID:         r.ID,
-		ThreadID:   r.ThreadID,
-		TopicID:    r.TopicID,
-		SenderID:   r.SenderID,
-		SenderName: r.SenderName.String,
-		Subject:    r.Subject,
-		Body:       r.BodyMd,
-		Priority:   Priority(r.Priority),
-		State:      r.State,
-		CreatedAt:  time.Unix(r.CreatedAt, 0),
+// storeInboxToMail converts a store.InboxMessage to mail.InboxMessage.
+func storeInboxToMail(m store.InboxMessage) InboxMessage {
+	return InboxMessage{
+		ID:           m.ID,
+		ThreadID:     m.ThreadID,
+		TopicID:      m.TopicID,
+		SenderID:     m.SenderID,
+		SenderName:   m.SenderName,
+		Subject:      m.Subject,
+		Body:         m.Body,
+		Priority:     Priority(m.Priority),
+		State:        m.State,
+		CreatedAt:    m.CreatedAt,
+		Deadline:     m.DeadlineAt,
+		SnoozedUntil: m.SnoozedUntil,
+		ReadAt:       m.ReadAt,
+		AckedAt:      m.AckedAt,
 	}
+}
 
-	if r.DeadlineAt.Valid {
-		t := time.Unix(r.DeadlineAt.Int64, 0)
-		msg.Deadline = &t
+// storeMessageToMail converts a store.Message to mail.InboxMessage.
+func storeMessageToMail(m store.Message) InboxMessage {
+	return InboxMessage{
+		ID:        m.ID,
+		ThreadID:  m.ThreadID,
+		TopicID:   m.TopicID,
+		SenderID:  m.SenderID,
+		Subject:   m.Subject,
+		Body:      m.Body,
+		Priority:  Priority(m.Priority),
+		CreatedAt: m.CreatedAt,
+		Deadline:  m.DeadlineAt,
 	}
-
-	if r.SnoozedUntil.Valid {
-		t := time.Unix(r.SnoozedUntil.Int64, 0)
-		msg.SnoozedUntil = &t
-	}
-
-	if r.ReadAt.Valid {
-		t := time.Unix(r.ReadAt.Int64, 0)
-		msg.ReadAt = &t
-	}
-
-	if r.AckedAt.Valid {
-		t := time.Unix(r.AckedAt.Int64, 0)
-		msg.AckedAt = &t
-	}
-
-	return msg
 }
 
 // handlePublish processes a PublishRequest.
 func (s *Service) handlePublish(ctx context.Context,
-	req PublishRequest) PublishResponse {
-
+	req PublishRequest,
+) PublishResponse {
 	var response PublishResponse
 
 	err := s.store.WithTx(ctx, func(ctx context.Context,
-		q *sqlc.Queries) error {
-
+		txStore store.Storage,
+	) error {
 		// Get the topic.
-		topic, err := q.GetTopicByName(ctx, req.TopicName)
+		topic, err := txStore.GetTopicByName(ctx, req.TopicName)
 		if err != nil {
 			return fmt.Errorf("topic %q not found: %w",
 				req.TopicName, err)
@@ -673,21 +517,20 @@ func (s *Service) handlePublish(ctx context.Context,
 		threadID := uuid.New().String()
 
 		// Get the next log offset.
-		logOffset, err := db.NextLogOffset(ctx, q, topic.ID)
+		logOffset, err := txStore.NextLogOffset(ctx, topic.ID)
 		if err != nil {
 			return fmt.Errorf("failed to get next offset: %w", err)
 		}
 
 		// Create the message.
-		msg, err := q.CreateMessage(ctx, sqlc.CreateMessageParams{
+		msg, err := txStore.CreateMessage(ctx, store.CreateMessageParams{
 			ThreadID:  threadID,
 			TopicID:   topic.ID,
 			LogOffset: logOffset,
 			SenderID:  req.SenderID,
 			Subject:   req.Subject,
-			BodyMd:    req.Body,
+			Body:      req.Body,
 			Priority:  string(req.Priority),
-			CreatedAt: time.Now().Unix(),
 		})
 		if err != nil {
 			return fmt.Errorf("failed to create message: %w", err)
@@ -695,18 +538,17 @@ func (s *Service) handlePublish(ctx context.Context,
 		response.MessageID = msg.ID
 
 		// Get all subscribers to the topic.
-		subscribers, err := q.ListSubscriptionsByTopic(ctx, topic.ID)
+		subscribers, err := txStore.ListSubscriptionsByTopic(
+			ctx, topic.ID,
+		)
 		if err != nil {
 			return fmt.Errorf("failed to get subscribers: %w", err)
 		}
 
 		// Create recipient entries for all subscribers.
 		for _, sub := range subscribers {
-			err := q.CreateMessageRecipient(
-				ctx, sqlc.CreateMessageRecipientParams{
-					MessageID: msg.ID,
-					AgentID:   sub.ID,
-				},
+			err := txStore.CreateMessageRecipient(
+				ctx, msg.ID, sub.ID,
 			)
 			if err != nil {
 				return fmt.Errorf("failed to create recipient "+
@@ -717,50 +559,11 @@ func (s *Service) handlePublish(ctx context.Context,
 
 		return nil
 	})
-
 	if err != nil {
 		response.Error = err
 	}
 
 	return response
-}
-
-// convertUnreadRow converts an unread row to InboxMessage.
-func convertUnreadRow(r sqlc.GetUnreadMessagesRow) InboxMessage {
-	msg := InboxMessage{
-		ID:         r.ID,
-		ThreadID:   r.ThreadID,
-		TopicID:    r.TopicID,
-		SenderID:   r.SenderID,
-		SenderName: r.SenderName.String,
-		Subject:    r.Subject,
-		Body:       r.BodyMd,
-		Priority:   Priority(r.Priority),
-		State:      r.State,
-		CreatedAt:  time.Unix(r.CreatedAt, 0),
-	}
-
-	if r.DeadlineAt.Valid {
-		t := time.Unix(r.DeadlineAt.Int64, 0)
-		msg.Deadline = &t
-	}
-
-	if r.SnoozedUntil.Valid {
-		t := time.Unix(r.SnoozedUntil.Int64, 0)
-		msg.SnoozedUntil = &t
-	}
-
-	if r.ReadAt.Valid {
-		t := time.Unix(r.ReadAt.Int64, 0)
-		msg.ReadAt = &t
-	}
-
-	if r.AckedAt.Valid {
-		t := time.Unix(r.AckedAt.Int64, 0)
-		msg.AckedAt = &t
-	}
-
-	return msg
 }
 
 // =============================================================================
@@ -791,28 +594,14 @@ func (s *Service) ReadMessage(ctx context.Context, agentID, messageID int64) (*I
 // ReadThread reads all messages in a thread synchronously.
 func (s *Service) ReadThread(ctx context.Context, agentID int64, threadID string) ([]InboxMessage, error) {
 	// Get messages by thread ID.
-	rows, err := s.store.Queries().GetMessagesByThread(ctx, threadID)
+	rows, err := s.store.GetMessagesByThread(ctx, threadID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get thread messages: %w", err)
 	}
 
 	var messages []InboxMessage
 	for _, r := range rows {
-		msg := InboxMessage{
-			ID:        r.ID,
-			ThreadID:  r.ThreadID,
-			TopicID:   r.TopicID,
-			SenderID:  r.SenderID,
-			Subject:   r.Subject,
-			Body:      r.BodyMd,
-			Priority:  Priority(r.Priority),
-			CreatedAt: time.Unix(r.CreatedAt, 0),
-		}
-		if r.DeadlineAt.Valid {
-			t := time.Unix(r.DeadlineAt.Int64, 0)
-			msg.Deadline = &t
-		}
-		messages = append(messages, msg)
+		messages = append(messages, storeMessageToMail(r))
 	}
 
 	return messages, nil
@@ -853,43 +642,41 @@ func (s *Service) Publish(ctx context.Context, req PublishRequest) (PublishRespo
 
 // Subscribe subscribes an agent to a topic.
 func (s *Service) Subscribe(ctx context.Context, agentID int64, topicName string) (int64, error) {
-	return s.store.WithTxResult(ctx, func(ctx context.Context, q *sqlc.Queries) (int64, error) {
+	var topicID int64
+
+	err := s.store.WithTx(ctx, func(ctx context.Context,
+		txStore store.Storage,
+	) error {
 		// Get or create the topic.
-		topic, err := q.GetOrCreateTopic(ctx, sqlc.GetOrCreateTopicParams{
-			Name:      topicName,
-			TopicType: "broadcast",
-			CreatedAt: time.Now().Unix(),
-		})
+		topic, err := txStore.GetOrCreateTopic(ctx, topicName, "broadcast")
 		if err != nil {
-			return 0, fmt.Errorf("failed to get/create topic: %w", err)
+			return fmt.Errorf("failed to get/create topic: %w", err)
 		}
 
 		// Create subscription.
-		err = q.CreateSubscription(ctx, sqlc.CreateSubscriptionParams{
-			AgentID:      agentID,
-			TopicID:      topic.ID,
-			SubscribedAt: time.Now().Unix(),
-		})
+		err = txStore.CreateSubscription(ctx, agentID, topic.ID)
 		if err != nil {
-			return 0, fmt.Errorf("failed to create subscription: %w", err)
+			return fmt.Errorf("failed to create subscription: %w", err)
 		}
 
-		return topic.ID, nil
+		topicID = topic.ID
+		return nil
 	})
+
+	return topicID, err
 }
 
 // Unsubscribe removes an agent's subscription to a topic.
 func (s *Service) Unsubscribe(ctx context.Context, agentID int64, topicName string) error {
-	return s.store.WithTx(ctx, func(ctx context.Context, q *sqlc.Queries) error {
-		topic, err := q.GetTopicByName(ctx, topicName)
+	return s.store.WithTx(ctx, func(ctx context.Context,
+		txStore store.Storage,
+	) error {
+		topic, err := txStore.GetTopicByName(ctx, topicName)
 		if err != nil {
 			return fmt.Errorf("topic not found: %w", err)
 		}
 
-		err = q.DeleteSubscription(ctx, sqlc.DeleteSubscriptionParams{
-			AgentID: agentID,
-			TopicID: topic.ID,
-		})
+		err = txStore.DeleteSubscription(ctx, agentID, topic.ID)
 		if err != nil {
 			return fmt.Errorf("failed to delete subscription: %w", err)
 		}
@@ -911,7 +698,7 @@ func (s *Service) ListTopics(ctx context.Context, req ListTopicsRequest) ([]Topi
 	var topics []TopicInfo
 
 	if req.SubscribedOnly && req.AgentID > 0 {
-		rows, err := s.store.Queries().ListSubscriptionsByAgent(ctx, req.AgentID)
+		rows, err := s.store.ListSubscriptionsByAgent(ctx, req.AgentID)
 		if err != nil {
 			return nil, fmt.Errorf("failed to list subscriptions: %w", err)
 		}
@@ -920,11 +707,11 @@ func (s *Service) ListTopics(ctx context.Context, req ListTopicsRequest) ([]Topi
 				ID:        r.ID,
 				Name:      r.Name,
 				TopicType: r.TopicType,
-				CreatedAt: time.Unix(r.CreatedAt, 0),
+				CreatedAt: r.CreatedAt,
 			})
 		}
 	} else {
-		rows, err := s.store.Queries().ListTopics(ctx)
+		rows, err := s.store.ListTopics(ctx)
 		if err != nil {
 			return nil, fmt.Errorf("failed to list topics: %w", err)
 		}
@@ -933,7 +720,7 @@ func (s *Service) ListTopics(ctx context.Context, req ListTopicsRequest) ([]Topi
 				ID:        r.ID,
 				Name:      r.Name,
 				TopicType: r.TopicType,
-				CreatedAt: time.Unix(r.CreatedAt, 0),
+				CreatedAt: r.CreatedAt,
 			})
 		}
 	}
@@ -962,24 +749,16 @@ func (s *Service) Search(ctx context.Context, req SearchRequest) ([]InboxMessage
 		limit = 50
 	}
 
-	rows, err := s.store.SearchMessagesForAgent(ctx, req.Query, req.AgentID, limit)
+	rows, err := s.store.SearchMessagesForAgent(
+		ctx, req.Query, req.AgentID, limit,
+	)
 	if err != nil {
 		return nil, fmt.Errorf("search failed: %w", err)
 	}
 
 	var messages []InboxMessage
 	for _, r := range rows {
-		msg := InboxMessage{
-			ID:        r.ID,
-			ThreadID:  r.ThreadID,
-			TopicID:   r.TopicID,
-			SenderID:  r.SenderID,
-			Subject:   r.Subject,
-			Body:      r.BodyMd,
-			Priority:  Priority(r.Priority),
-			CreatedAt: time.Unix(r.CreatedAt, 0),
-		}
-		messages = append(messages, msg)
+		messages = append(messages, storeMessageToMail(r))
 	}
 
 	return messages, nil
@@ -1011,19 +790,14 @@ func (s *Service) SubscribeInbox(ctx context.Context, agentID int64) (<-chan Inb
 				return
 			case <-ticker.C:
 				// Poll for new messages.
-				rows, err := s.store.Queries().GetInboxMessages(
-					ctx, sqlc.GetInboxMessagesParams{
-						AgentID: agentID,
-						Limit:   10,
-					},
-				)
+				rows, err := s.store.GetInboxMessages(ctx, agentID, 10)
 				if err != nil {
 					continue
 				}
 
 				for _, r := range rows {
 					if r.ID > lastID {
-						msg := convertInboxRow(r)
+						msg := storeInboxToMail(r)
 						select {
 						case msgCh <- msg:
 							lastID = r.ID

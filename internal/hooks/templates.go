@@ -24,11 +24,11 @@ var PreCompactScript string
 
 // ScriptNames maps script identifiers to their filenames.
 var ScriptNames = map[string]string{
-	"session_start":  "session_start.sh",
-	"stop":           "stop.sh",
-	"subagent_stop":  "subagent_stop.sh",
-	"user_prompt":    "user_prompt.sh",
-	"pre_compact":    "pre_compact.sh",
+	"session_start": "session_start.sh",
+	"stop":          "stop.sh",
+	"subagent_stop": "subagent_stop.sh",
+	"user_prompt":   "user_prompt.sh",
+	"pre_compact":   "pre_compact.sh",
 }
 
 // GetScript returns the embedded script content by name.
@@ -52,10 +52,10 @@ func GetScript(name string) string {
 // AllScripts returns all scripts as name -> content map.
 func AllScripts() map[string]string {
 	return map[string]string{
-		"session_start":  SessionStartScript,
-		"stop":           StopScript,
-		"subagent_stop":  SubagentStopScript,
-		"user_prompt":    UserPromptScript,
-		"pre_compact":    PreCompactScript,
+		"session_start": SessionStartScript,
+		"stop":          StopScript,
+		"subagent_stop": SubagentStopScript,
+		"user_prompt":   UserPromptScript,
+		"pre_compact":   PreCompactScript,
 	}
 }

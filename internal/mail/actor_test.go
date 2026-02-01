@@ -5,17 +5,16 @@ import (
 	"fmt"
 	"sync"
 	"testing"
-	"time"
 
-	"github.com/lightninglabs/darepo-client/baselib/actor"
-	"github.com/roasbeef/subtrate/internal/db/sqlc"
+	"github.com/roasbeef/subtrate/internal/baselib/actor"
+	"github.com/roasbeef/subtrate/internal/store"
 	"github.com/stretchr/testify/require"
 	"pgregory.net/rapid"
 )
 
 // TestMailActor_SendAndReceive tests the full actor-based message flow.
 func TestMailActor_SendAndReceive(t *testing.T) {
-	store, cleanup := testDB(t)
+	storage, cleanup := testDB(t)
 	defer cleanup()
 
 	ctx := context.Background()
@@ -23,7 +22,7 @@ func TestMailActor_SendAndReceive(t *testing.T) {
 	// Create the mail actor.
 	mailActor := NewMailActor(ActorConfig{
 		ID:          "test-mail-actor",
-		Store:       store,
+		Store:       storage,
 		MailboxSize: 10,
 	})
 	mailActor.Start()
@@ -32,15 +31,13 @@ func TestMailActor_SendAndReceive(t *testing.T) {
 	ref := mailActor.Ref()
 
 	// Create sender and recipient agents directly via store.
-	sender, err := store.Queries().CreateAgent(ctx, sqlc.CreateAgentParams{
-		Name:      "TestSender",
-		CreatedAt: time.Now().Unix(),
+	sender, err := storage.CreateAgent(ctx, store.CreateAgentParams{
+		Name: "TestSender",
 	})
 	require.NoError(t, err)
 
-	recipient, err := store.Queries().CreateAgent(ctx, sqlc.CreateAgentParams{
-		Name:      "TestRecipient",
-		CreatedAt: time.Now().Unix(),
+	recipient, err := storage.CreateAgent(ctx, store.CreateAgentParams{
+		Name: "TestRecipient",
 	})
 	require.NoError(t, err)
 
@@ -110,7 +107,7 @@ func TestMailActor_SendAndReceive(t *testing.T) {
 
 // TestMailActor_ConcurrentRequests tests concurrent message handling.
 func TestMailActor_ConcurrentRequests(t *testing.T) {
-	store, cleanup := testDB(t)
+	storage, cleanup := testDB(t)
 	defer cleanup()
 
 	ctx := context.Background()
@@ -118,7 +115,7 @@ func TestMailActor_ConcurrentRequests(t *testing.T) {
 	// Create the mail actor.
 	mailActor := NewMailActor(ActorConfig{
 		ID:          "test-concurrent-actor",
-		Store:       store,
+		Store:       storage,
 		MailboxSize: 100,
 	})
 	mailActor.Start()
@@ -127,15 +124,13 @@ func TestMailActor_ConcurrentRequests(t *testing.T) {
 	ref := mailActor.Ref()
 
 	// Create agents.
-	sender, err := store.Queries().CreateAgent(ctx, sqlc.CreateAgentParams{
-		Name:      "ConcurrentSender",
-		CreatedAt: time.Now().Unix(),
+	sender, err := storage.CreateAgent(ctx, store.CreateAgentParams{
+		Name: "ConcurrentSender",
 	})
 	require.NoError(t, err)
 
-	recipient, err := store.Queries().CreateAgent(ctx, sqlc.CreateAgentParams{
-		Name:      "ConcurrentRecipient",
-		CreatedAt: time.Now().Unix(),
+	recipient, err := storage.CreateAgent(ctx, store.CreateAgentParams{
+		Name: "ConcurrentRecipient",
 	})
 	require.NoError(t, err)
 
@@ -180,14 +175,14 @@ func TestMailActor_ConcurrentRequests(t *testing.T) {
 
 // TestMailActor_StateTransitions tests message state transitions via actor.
 func TestMailActor_StateTransitions(t *testing.T) {
-	store, cleanup := testDB(t)
+	storage, cleanup := testDB(t)
 	defer cleanup()
 
 	ctx := context.Background()
 
 	mailActor := NewMailActor(ActorConfig{
 		ID:          "test-state-actor",
-		Store:       store,
+		Store:       storage,
 		MailboxSize: 10,
 	})
 	mailActor.Start()
@@ -196,15 +191,13 @@ func TestMailActor_StateTransitions(t *testing.T) {
 	ref := mailActor.Ref()
 
 	// Create agents.
-	sender, err := store.Queries().CreateAgent(ctx, sqlc.CreateAgentParams{
-		Name:      "StateSender",
-		CreatedAt: time.Now().Unix(),
+	sender, err := storage.CreateAgent(ctx, store.CreateAgentParams{
+		Name: "StateSender",
 	})
 	require.NoError(t, err)
 
-	recipient, err := store.Queries().CreateAgent(ctx, sqlc.CreateAgentParams{
-		Name:      "StateRecipient",
-		CreatedAt: time.Now().Unix(),
+	recipient, err := storage.CreateAgent(ctx, store.CreateAgentParams{
+		Name: "StateRecipient",
 	})
 	require.NoError(t, err)
 
@@ -267,14 +260,14 @@ func TestMailActor_StateTransitions(t *testing.T) {
 
 // TestMailActor_MultipleRecipients tests sending to multiple recipients.
 func TestMailActor_MultipleRecipients(t *testing.T) {
-	store, cleanup := testDB(t)
+	storage, cleanup := testDB(t)
 	defer cleanup()
 
 	ctx := context.Background()
 
 	mailActor := NewMailActor(ActorConfig{
 		ID:          "test-multi-recipient-actor",
-		Store:       store,
+		Store:       storage,
 		MailboxSize: 10,
 	})
 	mailActor.Start()
@@ -283,18 +276,16 @@ func TestMailActor_MultipleRecipients(t *testing.T) {
 	ref := mailActor.Ref()
 
 	// Create sender and multiple recipients.
-	sender, err := store.Queries().CreateAgent(ctx, sqlc.CreateAgentParams{
-		Name:      "MultiSender",
-		CreatedAt: time.Now().Unix(),
+	sender, err := storage.CreateAgent(ctx, store.CreateAgentParams{
+		Name: "MultiSender",
 	})
 	require.NoError(t, err)
 
-	recipients := make([]sqlc.Agent, 5)
+	recipients := make([]store.Agent, 5)
 	recipientNames := make([]string, 5)
 	for i := range 5 {
-		recipients[i], err = store.Queries().CreateAgent(ctx, sqlc.CreateAgentParams{
-			Name:      fmt.Sprintf("MultiRecipient%d", i),
-			CreatedAt: time.Now().Unix(),
+		recipients[i], err = storage.CreateAgent(ctx, store.CreateAgentParams{
+			Name: fmt.Sprintf("MultiRecipient%d", i),
 		})
 		require.NoError(t, err)
 		recipientNames[i] = recipients[i].Name
@@ -332,14 +323,14 @@ func TestMailActor_MultipleRecipients(t *testing.T) {
 
 // TestMailActor_ThreadReply tests replying within a thread.
 func TestMailActor_ThreadReply(t *testing.T) {
-	store, cleanup := testDB(t)
+	storage, cleanup := testDB(t)
 	defer cleanup()
 
 	ctx := context.Background()
 
 	mailActor := NewMailActor(ActorConfig{
 		ID:          "test-thread-reply-actor",
-		Store:       store,
+		Store:       storage,
 		MailboxSize: 10,
 	})
 	mailActor.Start()
@@ -348,15 +339,13 @@ func TestMailActor_ThreadReply(t *testing.T) {
 	ref := mailActor.Ref()
 
 	// Create two agents.
-	alice, err := store.Queries().CreateAgent(ctx, sqlc.CreateAgentParams{
-		Name:      "Alice",
-		CreatedAt: time.Now().Unix(),
+	alice, err := storage.CreateAgent(ctx, store.CreateAgentParams{
+		Name: "Alice",
 	})
 	require.NoError(t, err)
 
-	bob, err := store.Queries().CreateAgent(ctx, sqlc.CreateAgentParams{
-		Name:      "Bob",
-		CreatedAt: time.Now().Unix(),
+	bob, err := storage.CreateAgent(ctx, store.CreateAgentParams{
+		Name: "Bob",
 	})
 	require.NoError(t, err)
 
@@ -417,14 +406,14 @@ func TestMailActor_ThreadReply(t *testing.T) {
 // recipients via the actor system.
 func TestMailActorProperty_DeliveryInvariant(t *testing.T) {
 	rapid.Check(t, func(rt *rapid.T) {
-		store, cleanup := testDB(t)
+		storage, cleanup := testDB(t)
 		defer cleanup()
 
 		ctx := context.Background()
 
 		mailActor := NewMailActor(ActorConfig{
 			ID:          "property-test-actor",
-			Store:       store,
+			Store:       storage,
 			MailboxSize: 100,
 		})
 		mailActor.Start()
@@ -434,9 +423,8 @@ func TestMailActorProperty_DeliveryInvariant(t *testing.T) {
 
 		// Create sender.
 		senderName := rapid.StringMatching(`Sender[A-Z][a-z]+`).Draw(rt, "sender")
-		sender, err := store.Queries().CreateAgent(ctx, sqlc.CreateAgentParams{
-			Name:      senderName,
-			CreatedAt: time.Now().Unix(),
+		sender, err := storage.CreateAgent(ctx, store.CreateAgentParams{
+			Name: senderName,
 		})
 		if err != nil {
 			rt.Skip("duplicate sender name")
@@ -444,14 +432,13 @@ func TestMailActorProperty_DeliveryInvariant(t *testing.T) {
 
 		// Create recipients (1-5).
 		numRecipients := rapid.IntRange(1, 5).Draw(rt, "numRecipients")
-		recipients := make([]sqlc.Agent, 0, numRecipients)
+		recipients := make([]store.Agent, 0, numRecipients)
 		recipientNames := make([]string, 0, numRecipients)
 
 		for i := 0; i < numRecipients; i++ {
 			name := rapid.StringMatching(`Recip[A-Z][a-z]+[0-9]+`).Draw(rt, "recipient")
-			r, err := store.Queries().CreateAgent(ctx, sqlc.CreateAgentParams{
-				Name:      name,
-				CreatedAt: time.Now().Unix(),
+			r, err := storage.CreateAgent(ctx, store.CreateAgentParams{
+				Name: name,
 			})
 			if err != nil {
 				continue // skip duplicates
@@ -522,14 +509,14 @@ func TestMailActorProperty_DeliveryInvariant(t *testing.T) {
 // doesn't cause panics or corruption.
 func TestMailActorProperty_ConcurrentAccess(t *testing.T) {
 	rapid.Check(t, func(rt *rapid.T) {
-		store, cleanup := testDB(t)
+		storage, cleanup := testDB(t)
 		defer cleanup()
 
 		ctx := context.Background()
 
 		mailActor := NewMailActor(ActorConfig{
 			ID:          "concurrent-property-actor",
-			Store:       store,
+			Store:       storage,
 			MailboxSize: 200,
 		})
 		mailActor.Start()
@@ -539,13 +526,12 @@ func TestMailActorProperty_ConcurrentAccess(t *testing.T) {
 
 		// Create agents.
 		numAgents := rapid.IntRange(2, 10).Draw(rt, "numAgents")
-		agents := make([]sqlc.Agent, 0, numAgents)
+		agents := make([]store.Agent, 0, numAgents)
 
 		for i := 0; i < numAgents; i++ {
 			name := rapid.StringMatching(`ConcAgent[0-9]+`).Draw(rt, "agent")
-			a, err := store.Queries().CreateAgent(ctx, sqlc.CreateAgentParams{
-				Name:      name,
-				CreatedAt: time.Now().Unix(),
+			a, err := storage.CreateAgent(ctx, store.CreateAgentParams{
+				Name: name,
 			})
 			if err != nil {
 				continue // skip duplicates
@@ -630,14 +616,14 @@ func TestMailActorProperty_ConcurrentAccess(t *testing.T) {
 // actor.
 func TestMailActorProperty_StateTransitions(t *testing.T) {
 	rapid.Check(t, func(rt *rapid.T) {
-		store, cleanup := testDB(t)
+		storage, cleanup := testDB(t)
 		defer cleanup()
 
 		ctx := context.Background()
 
 		mailActor := NewMailActor(ActorConfig{
 			ID:          "state-property-actor",
-			Store:       store,
+			Store:       storage,
 			MailboxSize: 10,
 		})
 		mailActor.Start()
@@ -646,13 +632,11 @@ func TestMailActorProperty_StateTransitions(t *testing.T) {
 		ref := mailActor.Ref()
 
 		// Create sender and recipient.
-		sender, _ := store.Queries().CreateAgent(ctx, sqlc.CreateAgentParams{
-			Name:      "PropertySender",
-			CreatedAt: time.Now().Unix(),
+		sender, _ := storage.CreateAgent(ctx, store.CreateAgentParams{
+			Name: "PropertySender",
 		})
-		recipient, _ := store.Queries().CreateAgent(ctx, sqlc.CreateAgentParams{
-			Name:      "PropertyRecipient",
-			CreatedAt: time.Now().Unix(),
+		recipient, _ := storage.CreateAgent(ctx, store.CreateAgentParams{
+			Name: "PropertyRecipient",
 		})
 
 		// Send a message.

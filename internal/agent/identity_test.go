@@ -30,7 +30,7 @@ func testIdentityManager(t *testing.T) (*IdentityManager, *db.Store, func()) {
 		filepath.Join(tmpDir, "by-project"),
 	}
 	for _, dir := range dirs {
-		err := os.MkdirAll(dir, 0700)
+		err := os.MkdirAll(dir, 0o700)
 		require.NoError(t, err)
 	}
 
@@ -49,6 +49,8 @@ func testIdentityManager(t *testing.T) (*IdentityManager, *db.Store, func()) {
 }
 
 func TestNewIdentityManager(t *testing.T) {
+	t.Parallel()
+
 	store, cleanup := testDB(t)
 	defer cleanup()
 
@@ -71,6 +73,8 @@ func TestNewIdentityManager(t *testing.T) {
 }
 
 func TestIdentityManager_EnsureIdentity_NewAgent(t *testing.T) {
+	t.Parallel()
+
 	mgr, _, cleanup := testIdentityManager(t)
 	defer cleanup()
 
@@ -94,6 +98,8 @@ func TestIdentityManager_EnsureIdentity_NewAgent(t *testing.T) {
 }
 
 func TestIdentityManager_EnsureIdentity_WithProject(t *testing.T) {
+	t.Parallel()
+
 	mgr, _, cleanup := testIdentityManager(t)
 	defer cleanup()
 
@@ -118,6 +124,8 @@ func TestIdentityManager_EnsureIdentity_WithProject(t *testing.T) {
 }
 
 func TestIdentityManager_EnsureIdentity_RestoresExisting(t *testing.T) {
+	t.Parallel()
+
 	mgr, _, cleanup := testIdentityManager(t)
 	defer cleanup()
 
@@ -141,6 +149,8 @@ func TestIdentityManager_EnsureIdentity_RestoresExisting(t *testing.T) {
 }
 
 func TestIdentityManager_EnsureIdentity_UsesProjectDefault(t *testing.T) {
+	t.Parallel()
+
 	mgr, _, cleanup := testIdentityManager(t)
 	defer cleanup()
 
@@ -163,6 +173,8 @@ func TestIdentityManager_EnsureIdentity_UsesProjectDefault(t *testing.T) {
 }
 
 func TestIdentityManager_RestoreIdentity_FromFile(t *testing.T) {
+	t.Parallel()
+
 	mgr, _, cleanup := testIdentityManager(t)
 	defer cleanup()
 
@@ -187,7 +199,7 @@ func TestIdentityManager_RestoreIdentity_FromFile(t *testing.T) {
 	)
 	data, err := json.MarshalIndent(identityFile, "", "  ")
 	require.NoError(t, err)
-	err = os.WriteFile(filePath, data, 0600)
+	err = os.WriteFile(filePath, data, 0o600)
 	require.NoError(t, err)
 
 	// Restore should find the file.
@@ -198,6 +210,8 @@ func TestIdentityManager_RestoreIdentity_FromFile(t *testing.T) {
 }
 
 func TestIdentityManager_RestoreIdentity_FromDatabase(t *testing.T) {
+	t.Parallel()
+
 	mgr, store, cleanup := testIdentityManager(t)
 	defer cleanup()
 
@@ -226,6 +240,8 @@ func TestIdentityManager_RestoreIdentity_FromDatabase(t *testing.T) {
 }
 
 func TestIdentityManager_RestoreIdentity_NotFound(t *testing.T) {
+	t.Parallel()
+
 	mgr, _, cleanup := testIdentityManager(t)
 	defer cleanup()
 
@@ -237,6 +253,8 @@ func TestIdentityManager_RestoreIdentity_NotFound(t *testing.T) {
 }
 
 func TestIdentityManager_RestoreIdentity_AgentNoLongerExists(t *testing.T) {
+	t.Parallel()
+
 	mgr, store, cleanup := testIdentityManager(t)
 	defer cleanup()
 
@@ -259,7 +277,7 @@ func TestIdentityManager_RestoreIdentity_AgentNoLongerExists(t *testing.T) {
 	)
 	data, err := json.MarshalIndent(identityFile, "", "  ")
 	require.NoError(t, err)
-	err = os.WriteFile(filePath, data, 0600)
+	err = os.WriteFile(filePath, data, 0o600)
 	require.NoError(t, err)
 
 	// Delete the agent from database.
@@ -273,6 +291,8 @@ func TestIdentityManager_RestoreIdentity_AgentNoLongerExists(t *testing.T) {
 }
 
 func TestIdentityManager_SaveIdentity(t *testing.T) {
+	t.Parallel()
+
 	mgr, store, cleanup := testIdentityManager(t)
 	defer cleanup()
 
@@ -322,6 +342,8 @@ func TestIdentityManager_SaveIdentity(t *testing.T) {
 }
 
 func TestIdentityManager_GetProjectDefaultIdentity_FromFile(t *testing.T) {
+	t.Parallel()
+
 	mgr, _, cleanup := testIdentityManager(t)
 	defer cleanup()
 
@@ -342,6 +364,8 @@ func TestIdentityManager_GetProjectDefaultIdentity_FromFile(t *testing.T) {
 }
 
 func TestIdentityManager_GetProjectDefaultIdentity_NotFound(t *testing.T) {
+	t.Parallel()
+
 	mgr, _, cleanup := testIdentityManager(t)
 	defer cleanup()
 
@@ -353,6 +377,8 @@ func TestIdentityManager_GetProjectDefaultIdentity_NotFound(t *testing.T) {
 }
 
 func TestIdentityManager_SetProjectDefault(t *testing.T) {
+	t.Parallel()
+
 	mgr, _, cleanup := testIdentityManager(t)
 	defer cleanup()
 
@@ -382,6 +408,8 @@ func TestIdentityManager_SetProjectDefault(t *testing.T) {
 }
 
 func TestIdentityManager_SetProjectDefault_AgentNotFound(t *testing.T) {
+	t.Parallel()
+
 	mgr, _, cleanup := testIdentityManager(t)
 	defer cleanup()
 
@@ -394,6 +422,8 @@ func TestIdentityManager_SetProjectDefault_AgentNotFound(t *testing.T) {
 }
 
 func TestIdentityManager_CurrentIdentity(t *testing.T) {
+	t.Parallel()
+
 	mgr, _, cleanup := testIdentityManager(t)
 	defer cleanup()
 
@@ -411,6 +441,8 @@ func TestIdentityManager_CurrentIdentity(t *testing.T) {
 }
 
 func TestIdentityManager_ListIdentities(t *testing.T) {
+	t.Parallel()
+
 	mgr, _, cleanup := testIdentityManager(t)
 	defer cleanup()
 
@@ -442,6 +474,8 @@ func TestIdentityManager_ListIdentities(t *testing.T) {
 }
 
 func TestIdentityManager_ListIdentities_Empty(t *testing.T) {
+	t.Parallel()
+
 	mgr, _, cleanup := testIdentityManager(t)
 	defer cleanup()
 
@@ -454,6 +488,8 @@ func TestIdentityManager_ListIdentities_Empty(t *testing.T) {
 }
 
 func TestHashProjectKey(t *testing.T) {
+	t.Parallel()
+
 	// Test that same input produces same hash.
 	hash1 := hashProjectKey("/path/to/project")
 	hash2 := hashProjectKey("/path/to/project")
@@ -469,6 +505,8 @@ func TestHashProjectKey(t *testing.T) {
 }
 
 func TestIdentityManager_SaveIdentityFile_EmptySessionID(t *testing.T) {
+	t.Parallel()
+
 	mgr, _, cleanup := testIdentityManager(t)
 	defer cleanup()
 
@@ -489,6 +527,8 @@ func TestIdentityManager_SaveIdentityFile_EmptySessionID(t *testing.T) {
 }
 
 func TestIdentityManager_SaveSessionDB_EmptySessionID(t *testing.T) {
+	t.Parallel()
+
 	mgr, _, cleanup := testIdentityManager(t)
 	defer cleanup()
 
@@ -506,6 +546,8 @@ func TestIdentityManager_SaveSessionDB_EmptySessionID(t *testing.T) {
 }
 
 func TestIdentityManager_EnsureIdentity_UpdatesGitBranch(t *testing.T) {
+	t.Parallel()
+
 	mgr, store, cleanup := testIdentityManager(t)
 	defer cleanup()
 
@@ -539,6 +581,8 @@ func TestIdentityManager_EnsureIdentity_UpdatesGitBranch(t *testing.T) {
 }
 
 func TestIdentityManager_EnsureIdentity_UpdatesGitBranch_ProjectDefault(t *testing.T) {
+	t.Parallel()
+
 	mgr, store, cleanup := testIdentityManager(t)
 	defer cleanup()
 

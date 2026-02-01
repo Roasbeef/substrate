@@ -11,6 +11,7 @@ import (
 	"github.com/roasbeef/subtrate/internal/db"
 	"github.com/roasbeef/subtrate/internal/db/sqlc"
 	"github.com/roasbeef/subtrate/internal/mail"
+	"github.com/roasbeef/subtrate/internal/store"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 )
@@ -127,21 +128,21 @@ func tryGRPCConnection(addr string) (*Client, error) {
 
 // getDirectClient creates a client that directly accesses the database.
 func getDirectClient() (*Client, error) {
-	store, err := getStore()
+	dbStore, err := getStore()
 	if err != nil {
 		return nil, fmt.Errorf("failed to open database: %w", err)
 	}
 
-	registry := agent.NewRegistry(store)
-	identityMgr, err := agent.NewIdentityManager(store, registry)
+	registry := agent.NewRegistry(dbStore)
+	identityMgr, err := agent.NewIdentityManager(dbStore, registry)
 	if err != nil {
-		store.Close()
+		dbStore.Close()
 		return nil, fmt.Errorf("failed to create identity manager: %w", err)
 	}
 
 	return &Client{
-		store:       store,
-		mailService: mail.NewService(store),
+		store:       dbStore,
+		mailService: mail.NewService(store.FromDB(dbStore.DB())),
 		registry:    registry,
 		identityMgr: identityMgr,
 		mode:        ModeDirect,
@@ -168,7 +169,6 @@ func (c *Client) Mode() ClientMode {
 func (c *Client) EnsureIdentity(
 	ctx context.Context, sessionID, projectDir, gitBranch string,
 ) (*agent.IdentityFile, error) {
-
 	if c.mode == ModeGRPC {
 		resp, err := c.agentClient.EnsureIdentity(ctx, &subtraterpc.EnsureIdentityRequest{
 			SessionId:  sessionID,
@@ -444,7 +444,6 @@ func (c *Client) GetStatus(ctx context.Context, agentID int64) (*mail.AgentStatu
 func (c *Client) HasUnackedStatusTo(
 	ctx context.Context, senderID, recipientID int64,
 ) (bool, error) {
-
 	if c.mode == ModeGRPC {
 		resp, err := c.mailClient.HasUnackedStatusTo(
 			ctx, &subtraterpc.HasUnackedStatusToRequest{
@@ -578,7 +577,6 @@ func (c *Client) Publish(ctx context.Context, senderID int64, topicName, subject
 func (c *Client) RegisterAgent(
 	ctx context.Context, name, projectKey, gitBranch string,
 ) (int64, string, error) {
-
 	if c.mode == ModeGRPC {
 		// Note: gRPC RegisterAgentRequest doesn't include git_branch yet.
 		// The branch will be set on first heartbeat/identity call.

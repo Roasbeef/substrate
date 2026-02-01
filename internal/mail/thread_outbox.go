@@ -12,11 +12,11 @@ type ThreadOutboxEvent interface {
 }
 
 // Ensure all outbox event types implement ThreadOutboxEvent.
-func (PersistStateChange) isThreadOutboxEvent()   {}
-func (NotifyStateChange) isThreadOutboxEvent()    {}
-func (ScheduleWake) isThreadOutboxEvent()         {}
-func (CancelScheduledWake) isThreadOutboxEvent()  {}
-func (SchedulePurge) isThreadOutboxEvent()        {}
+func (PersistStateChange) isThreadOutboxEvent()  {}
+func (NotifyStateChange) isThreadOutboxEvent()   {}
+func (ScheduleWake) isThreadOutboxEvent()        {}
+func (CancelScheduledWake) isThreadOutboxEvent() {}
+func (SchedulePurge) isThreadOutboxEvent()       {}
 
 // PersistStateChange requests that the new recipient state be persisted to
 // the database.
@@ -42,9 +42,9 @@ type NotifyStateChange struct {
 // ScheduleWake schedules a wake event for a snoozed message at the specified
 // time.
 type ScheduleWake struct {
-	AgentID      int64
-	MessageID    int64
-	WakeAt       time.Time
+	AgentID   int64
+	MessageID int64
+	WakeAt    time.Time
 }
 
 // CancelScheduledWake cancels a previously scheduled wake event.

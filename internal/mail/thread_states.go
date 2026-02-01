@@ -29,16 +29,16 @@ type ThreadState interface {
 // ThreadTransition represents the result of processing an event, containing
 // the next state and any events to emit.
 type ThreadTransition struct {
-	NextState   ThreadState
+	NextState    ThreadState
 	OutboxEvents []ThreadOutboxEvent
 }
 
 // ThreadEnvironment provides context for state transitions, including
 // configuration and metadata.
 type ThreadEnvironment struct {
-	AgentID      int64
-	MessageID    int64
-	ThreadID     string
+	AgentID        int64
+	MessageID      int64
+	ThreadID       string
 	TrashRetention time.Duration // How long to keep trashed messages.
 }
 
@@ -65,8 +65,8 @@ func (*StateUnread) String() string   { return "unread" }
 
 // ProcessEvent handles events in the unread state.
 func (s *StateUnread) ProcessEvent(ctx context.Context, event ThreadEvent,
-	env *ThreadEnvironment) (*ThreadTransition, error) {
-
+	env *ThreadEnvironment,
+) (*ThreadTransition, error) {
 	switch e := event.(type) {
 	case ReadEvent:
 		return &ThreadTransition{
@@ -219,8 +219,8 @@ func (*StateRead) String() string   { return "read" }
 
 // ProcessEvent handles events in the read state.
 func (s *StateRead) ProcessEvent(ctx context.Context, event ThreadEvent,
-	env *ThreadEnvironment) (*ThreadTransition, error) {
-
+	env *ThreadEnvironment,
+) (*ThreadTransition, error) {
 	switch e := event.(type) {
 	case StarEvent:
 		return &ThreadTransition{
@@ -353,8 +353,8 @@ func (*StateStarred) String() string   { return "starred" }
 
 // ProcessEvent handles events in the starred state.
 func (s *StateStarred) ProcessEvent(ctx context.Context, event ThreadEvent,
-	env *ThreadEnvironment) (*ThreadTransition, error) {
-
+	env *ThreadEnvironment,
+) (*ThreadTransition, error) {
 	switch e := event.(type) {
 	case UnstarEvent:
 		// Return to read state.
@@ -379,8 +379,8 @@ func (s *StateStarred) ProcessEvent(ctx context.Context, event ThreadEvent,
 	case ArchiveEvent:
 		return &ThreadTransition{
 			NextState: &StateArchived{
-				ReadAt:  s.ReadAt,
-				AckedAt: s.AckedAt,
+				ReadAt:     s.ReadAt,
+				AckedAt:    s.AckedAt,
 				WasStarred: true,
 			},
 			OutboxEvents: []ThreadOutboxEvent{
@@ -463,8 +463,8 @@ func (*StateSnoozed) String() string   { return "snoozed" }
 
 // ProcessEvent handles events in the snoozed state.
 func (s *StateSnoozed) ProcessEvent(ctx context.Context, event ThreadEvent,
-	env *ThreadEnvironment) (*ThreadTransition, error) {
-
+	env *ThreadEnvironment,
+) (*ThreadTransition, error) {
 	switch e := event.(type) {
 	case WakeEvent:
 		// Return to unread state to bring attention back.
@@ -603,8 +603,8 @@ func (*StateArchived) String() string   { return "archived" }
 
 // ProcessEvent handles events in the archived state.
 func (s *StateArchived) ProcessEvent(ctx context.Context, event ThreadEvent,
-	env *ThreadEnvironment) (*ThreadTransition, error) {
-
+	env *ThreadEnvironment,
+) (*ThreadTransition, error) {
 	switch event.(type) {
 	case UnarchiveEvent:
 		// Restore to read state.
@@ -670,8 +670,8 @@ func (*StateTrash) String() string   { return "trash" }
 
 // ProcessEvent handles events in the trash state.
 func (s *StateTrash) ProcessEvent(ctx context.Context, event ThreadEvent,
-	env *ThreadEnvironment) (*ThreadTransition, error) {
-
+	env *ThreadEnvironment,
+) (*ThreadTransition, error) {
 	switch event.(type) {
 	case RestoreEvent:
 		// Restore to unread state.

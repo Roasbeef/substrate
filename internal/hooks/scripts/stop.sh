@@ -19,7 +19,7 @@
 # Prevent recursion when claude -p spawns its own Stop hook.
 # The env var is set when we invoke claude -p below for status summaries.
 if [ "$SUBSTRATE_SUMMARIZING" = "1" ]; then
-    echo '{"decision": "allow"}'
+    echo '{"decision": "approve"}'
     exit 0
 fi
 

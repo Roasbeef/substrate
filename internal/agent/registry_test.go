@@ -61,6 +61,8 @@ func findMigrationsDir(t *testing.T) string {
 }
 
 func TestNewRegistry(t *testing.T) {
+	t.Parallel()
+
 	store, cleanup := testDB(t)
 	defer cleanup()
 
@@ -69,6 +71,8 @@ func TestNewRegistry(t *testing.T) {
 }
 
 func TestRegistry_RegisterAgent(t *testing.T) {
+	t.Parallel()
+
 	store, cleanup := testDB(t)
 	defer cleanup()
 
@@ -84,6 +88,8 @@ func TestRegistry_RegisterAgent(t *testing.T) {
 }
 
 func TestRegistry_RegisterAgent_WithProject(t *testing.T) {
+	t.Parallel()
+
 	store, cleanup := testDB(t)
 	defer cleanup()
 
@@ -100,6 +106,8 @@ func TestRegistry_RegisterAgent_WithProject(t *testing.T) {
 }
 
 func TestRegistry_RegisterAgent_DuplicateName(t *testing.T) {
+	t.Parallel()
+
 	store, cleanup := testDB(t)
 	defer cleanup()
 
@@ -116,6 +124,8 @@ func TestRegistry_RegisterAgent_DuplicateName(t *testing.T) {
 }
 
 func TestRegistry_GetAgent(t *testing.T) {
+	t.Parallel()
+
 	store, cleanup := testDB(t)
 	defer cleanup()
 
@@ -134,6 +144,8 @@ func TestRegistry_GetAgent(t *testing.T) {
 }
 
 func TestRegistry_GetAgent_NotFound(t *testing.T) {
+	t.Parallel()
+
 	store, cleanup := testDB(t)
 	defer cleanup()
 
@@ -146,6 +158,8 @@ func TestRegistry_GetAgent_NotFound(t *testing.T) {
 }
 
 func TestRegistry_GetAgentByName(t *testing.T) {
+	t.Parallel()
+
 	store, cleanup := testDB(t)
 	defer cleanup()
 
@@ -163,6 +177,8 @@ func TestRegistry_GetAgentByName(t *testing.T) {
 }
 
 func TestRegistry_GetAgentByName_NotFound(t *testing.T) {
+	t.Parallel()
+
 	store, cleanup := testDB(t)
 	defer cleanup()
 
@@ -175,6 +191,8 @@ func TestRegistry_GetAgentByName_NotFound(t *testing.T) {
 }
 
 func TestRegistry_ListAgents(t *testing.T) {
+	t.Parallel()
+
 	store, cleanup := testDB(t)
 	defer cleanup()
 
@@ -194,6 +212,8 @@ func TestRegistry_ListAgents(t *testing.T) {
 }
 
 func TestRegistry_ListAgentsByProject(t *testing.T) {
+	t.Parallel()
+
 	store, cleanup := testDB(t)
 	defer cleanup()
 
@@ -215,6 +235,8 @@ func TestRegistry_ListAgentsByProject(t *testing.T) {
 }
 
 func TestRegistry_UpdateLastActive(t *testing.T) {
+	t.Parallel()
+
 	store, cleanup := testDB(t)
 	defer cleanup()
 
@@ -237,6 +259,8 @@ func TestRegistry_UpdateLastActive(t *testing.T) {
 }
 
 func TestGenerateMemoableName(t *testing.T) {
+	t.Parallel()
+
 	// Generate multiple names and verify they are valid.
 	names := make(map[string]bool)
 
@@ -252,6 +276,8 @@ func TestGenerateMemoableName(t *testing.T) {
 }
 
 func TestRegistry_EnsureUniqueAgentName(t *testing.T) {
+	t.Parallel()
+
 	store, cleanup := testDB(t)
 	defer cleanup()
 
@@ -274,6 +300,8 @@ func TestRegistry_EnsureUniqueAgentName(t *testing.T) {
 }
 
 func TestRegistry_DeleteAgent(t *testing.T) {
+	t.Parallel()
+
 	store, cleanup := testDB(t)
 	defer cleanup()
 
@@ -300,6 +328,8 @@ func TestRegistry_DeleteAgent(t *testing.T) {
 }
 
 func TestRegistry_DeleteAgent_NotFound(t *testing.T) {
+	t.Parallel()
+
 	store, cleanup := testDB(t)
 	defer cleanup()
 

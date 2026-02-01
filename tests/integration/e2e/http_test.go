@@ -13,9 +13,12 @@ import (
 	"testing"
 	"time"
 
+	"github.com/roasbeef/subtrate/internal/activity"
+	"github.com/roasbeef/subtrate/internal/baselib/actor"
 	"github.com/roasbeef/subtrate/internal/db"
 	"github.com/roasbeef/subtrate/internal/db/sqlc"
 	"github.com/roasbeef/subtrate/internal/mail"
+	"github.com/roasbeef/subtrate/internal/store"
 	"github.com/roasbeef/subtrate/internal/web"
 	"github.com/stretchr/testify/require"
 )
@@ -25,9 +28,10 @@ type httpTestEnv struct {
 	t *testing.T
 
 	// Server components.
-	store  *db.Store
-	server *web.Server
-	addr   string
+	store       *db.Store
+	server      *web.Server
+	addr        string
+	actorSystem *actor.ActorSystem
 
 	// Services.
 	mailSvc *mail.Service
@@ -54,12 +58,12 @@ func newHTTPTestEnv(t *testing.T) *httpTestEnv {
 	dbPath := filepath.Join(tmpDir, "test.db")
 
 	// Open database.
-	store, err := db.Open(dbPath)
+	dbStore, err := db.Open(dbPath)
 	require.NoError(t, err)
 
 	// Find and run migrations.
 	migrationsDir := findMigrationsDir(t)
-	err = db.RunMigrations(store.DB(), migrationsDir)
+	err = db.RunMigrations(dbStore.DB(), migrationsDir)
 	require.NoError(t, err)
 
 	// Find a free port.
@@ -68,11 +72,37 @@ func newHTTPTestEnv(t *testing.T) *httpTestEnv {
 	addr := listener.Addr().String()
 	listener.Close()
 
+	// Create storage and services.
+	storage := store.FromDB(dbStore.DB())
+	mailSvc := mail.NewService(storage)
+
+	// Create actor system and actors.
+	actorSystem := actor.NewActorSystem()
+
+	mailRef := actor.RegisterWithSystem(
+		actorSystem,
+		"mail-service",
+		mail.MailServiceKey,
+		mailSvc,
+	)
+
+	activitySvc := activity.NewService(activity.ServiceConfig{
+		Store: storage,
+	})
+	activityRef := actor.RegisterWithSystem(
+		actorSystem,
+		"activity-service",
+		activity.ActivityServiceKey,
+		activitySvc,
+	)
+
 	// Create web server.
 	cfg := web.DefaultConfig()
 	cfg.Addr = addr
+	cfg.MailRef = mailRef
+	cfg.ActivityRef = activityRef
 
-	server, err := web.NewServer(cfg, store)
+	server, err := web.NewServer(cfg, dbStore)
 	require.NoError(t, err)
 
 	// Start server in background.
@@ -86,23 +116,22 @@ func newHTTPTestEnv(t *testing.T) *httpTestEnv {
 	// Wait for server to be ready.
 	waitForServer(t, addr)
 
-	// Create mail service for setup.
-	mailSvc := mail.NewService(store)
-
 	env := &httpTestEnv{
-		t:       t,
-		store:   store,
-		server:  server,
-		addr:    addr,
-		mailSvc: mailSvc,
-		agents:  make(map[string]sqlc.Agent),
-		topics:  make(map[string]sqlc.Topic),
-		client:  &http.Client{Timeout: 5 * time.Second},
+		t:           t,
+		store:       dbStore,
+		server:      server,
+		addr:        addr,
+		actorSystem: actorSystem,
+		mailSvc:     mailSvc,
+		agents:      make(map[string]sqlc.Agent),
+		topics:      make(map[string]sqlc.Topic),
+		client:      &http.Client{Timeout: 5 * time.Second},
 	}
 
 	env.cleanups = append(env.cleanups, func() {
 		server.Shutdown(context.Background())
-		store.Close()
+		actorSystem.Shutdown(context.Background())
+		dbStore.Close()
 		os.RemoveAll(tmpDir)
 	})
 
@@ -125,18 +154,6 @@ func (e *httpTestEnv) baseURL() string {
 func (e *httpTestEnv) get(path string) *http.Response {
 	e.t.Helper()
 	resp, err := e.client.Get(e.baseURL() + path)
-	require.NoError(e.t, err)
-	return resp
-}
-
-// post makes a POST request with form data.
-func (e *httpTestEnv) post(path string, data string) *http.Response {
-	e.t.Helper()
-	resp, err := e.client.Post(
-		e.baseURL()+path,
-		"application/x-www-form-urlencoded",
-		strings.NewReader(data),
-	)
 	require.NoError(e.t, err)
 	return resp
 }
@@ -389,7 +406,7 @@ func TestHTTP_ThreadView(t *testing.T) {
 	}
 
 	result = env.mailSvc.Receive(ctx, replyReq)
-	val, err = result.Unpack()
+	_, err = result.Unpack()
 	require.NoError(t, err)
 
 	// Fetch thread view.

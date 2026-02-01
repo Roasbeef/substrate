@@ -12,9 +12,12 @@ import (
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 
+	"github.com/roasbeef/subtrate/internal/activity"
 	"github.com/roasbeef/subtrate/internal/agent"
+	"github.com/roasbeef/subtrate/internal/baselib/actor"
 	"github.com/roasbeef/subtrate/internal/db"
 	"github.com/roasbeef/subtrate/internal/mail"
+	"github.com/roasbeef/subtrate/internal/store"
 )
 
 // testHarness holds all the components needed for gRPC integration tests.
@@ -22,11 +25,12 @@ type testHarness struct {
 	t *testing.T
 
 	// Server components.
-	store       *db.Store
+	storage     store.Storage
 	mailSvc     *mail.Service
 	agentReg    *agent.Registry
 	identityMgr *agent.IdentityManager
 	server      *Server
+	actorSystem *actor.ActorSystem
 
 	// Client connections.
 	conn        *grpc.ClientConn
@@ -54,13 +58,34 @@ func newTestHarness(t *testing.T) *testHarness {
 	}, logger)
 	require.NoError(t, err)
 
-	store := sqliteStore.Store
+	// Create storage from the sql.DB.
+	storage := store.FromDB(sqliteStore.DB())
 
 	// Create services.
-	mailSvc := mail.NewService(store)
-	agentReg := agent.NewRegistry(store)
-	identityMgr, err := agent.NewIdentityManager(store, agentReg)
+	mailSvc := mail.NewService(storage)
+	agentReg := agent.NewRegistry(sqliteStore.Store)
+	identityMgr, err := agent.NewIdentityManager(sqliteStore.Store, agentReg)
 	require.NoError(t, err)
+
+	// Create actor system and actors.
+	actorSystem := actor.NewActorSystem()
+
+	mailRef := actor.RegisterWithSystem(
+		actorSystem,
+		"mail-service",
+		mail.MailServiceKey,
+		mailSvc,
+	)
+
+	activitySvc := activity.NewService(activity.ServiceConfig{
+		Store: storage,
+	})
+	activityRef := actor.RegisterWithSystem(
+		actorSystem,
+		"activity-service",
+		activity.ActivityServiceKey,
+		activitySvc,
+	)
 
 	// Create server config with a random port.
 	cfg := ServerConfig{
@@ -69,10 +94,12 @@ func newTestHarness(t *testing.T) *testHarness {
 		ServerPingTimeout:            1 * time.Minute,
 		ClientPingMinWait:            5 * time.Second,
 		ClientAllowPingWithoutStream: true,
+		MailRef:                      mailRef,
+		ActivityRef:                  activityRef,
 	}
 
 	// Create and start server.
-	server := NewServer(cfg, store, mailSvc, agentReg, identityMgr, nil)
+	server := NewServer(cfg, sqliteStore.Store, mailSvc, agentReg, identityMgr, nil)
 	err = server.Start()
 	require.NoError(t, err)
 
@@ -92,11 +119,12 @@ func newTestHarness(t *testing.T) *testHarness {
 
 	h := &testHarness{
 		t:           t,
-		store:       store,
+		storage:     storage,
 		mailSvc:     mailSvc,
 		agentReg:    agentReg,
 		identityMgr: identityMgr,
 		server:      server,
+		actorSystem: actorSystem,
 		conn:        conn,
 		mailClient:  mailClient,
 		agentClient: agentClient,
@@ -105,6 +133,7 @@ func newTestHarness(t *testing.T) *testHarness {
 	h.cleanup = func() {
 		conn.Close()
 		server.Stop()
+		actorSystem.Shutdown(context.Background())
 		sqliteStore.Close()
 		os.RemoveAll(tmpDir)
 	}

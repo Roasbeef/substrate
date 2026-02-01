@@ -1,8 +1,8 @@
 package mail
 
 import (
-	"github.com/lightninglabs/darepo-client/baselib/actor"
-	"github.com/roasbeef/subtrate/internal/db"
+	"github.com/roasbeef/subtrate/internal/baselib/actor"
+	"github.com/roasbeef/subtrate/internal/store"
 )
 
 // MailActorRef is the typed actor reference for the mail service.
@@ -16,8 +16,8 @@ type ActorConfig struct {
 	// ID is the unique identifier for the actor.
 	ID string
 
-	// Store is the database store.
-	Store *db.Store
+	// Store is the storage interface.
+	Store store.Storage
 
 	// MailboxSize is the buffer capacity for the actor's mailbox.
 	MailboxSize int

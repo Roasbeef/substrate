@@ -46,8 +46,8 @@ func init() {
 
 // hookDecision represents the JSON output for Claude Code Stop hooks.
 type hookDecision struct {
-	Decision *string `json:"decision"`          // "block" or null
-	Reason   string  `json:"reason,omitempty"`  // Explanation shown to Claude
+	Decision *string `json:"decision"`         // "block" or null
+	Reason   string  `json:"reason,omitempty"` // Explanation shown to Claude
 }
 
 func runPoll(cmd *cobra.Command, args []string) error {
@@ -147,9 +147,10 @@ func outputNoMessages(agentName string) error {
 	case "hook":
 		if pollAlwaysBlock {
 			// Persistent agent pattern: always block to stay alive.
+			// Instruct Claude to output text so it completes a response,
+			// which triggers the Stop hook again, creating a polling loop.
 			return outputHookDecisionBlock(
-				"No new messages. Agent staying alive (heartbeat). " +
-					"Use Ctrl+C to force exit.",
+				"No new messages. Say 'Standing by for messages.' and wait for the next check.",
 			)
 		}
 		// Allow exit when no messages.

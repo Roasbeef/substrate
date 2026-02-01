@@ -10,13 +10,15 @@ import (
 	"os/signal"
 	"syscall"
 
-	"github.com/lightninglabs/darepo-client/baselib/actor"
 	sdkmcp "github.com/modelcontextprotocol/go-sdk/mcp"
+	"github.com/roasbeef/subtrate/internal/activity"
 	"github.com/roasbeef/subtrate/internal/agent"
 	subtraterpc "github.com/roasbeef/subtrate/internal/api/grpc"
+	"github.com/roasbeef/subtrate/internal/baselib/actor"
 	"github.com/roasbeef/subtrate/internal/db"
 	"github.com/roasbeef/subtrate/internal/mail"
 	"github.com/roasbeef/subtrate/internal/mcp"
+	"github.com/roasbeef/subtrate/internal/store"
 	"github.com/roasbeef/subtrate/internal/web"
 )
 
@@ -52,20 +54,22 @@ func main() {
 	defer sqliteStore.Close()
 
 	// Get the underlying store for services.
-	store := sqliteStore.Store
+	dbStore := sqliteStore.Store
+	storage := store.FromDB(dbStore.DB())
 
 	// Create core services.
-	mailSvc := mail.NewService(store)
-	agentReg := agent.NewRegistry(store)
-	identityMgr, err := agent.NewIdentityManager(store, agentReg)
+	mailSvc := mail.NewService(storage)
+	agentReg := agent.NewRegistry(dbStore)
+	identityMgr, err := agent.NewIdentityManager(dbStore, agentReg)
 	if err != nil {
 		log.Fatalf("Failed to create identity manager: %v", err)
 	}
 
-	// Create the actor system and notification hub for gRPC streaming.
+	// Create the actor system and register core actors.
 	actorSystem := actor.NewActorSystem()
 	defer actorSystem.Shutdown(context.Background())
 
+	// Create and register the notification hub for gRPC streaming.
 	notificationHub := actor.RegisterWithSystem(
 		actorSystem,
 		"notification-hub",
@@ -74,10 +78,31 @@ func main() {
 	)
 	log.Println("NotificationHub actor started")
 
+	// Create and register the mail actor.
+	mailRef := actor.RegisterWithSystem(
+		actorSystem,
+		"mail-service",
+		mail.MailServiceKey,
+		mailSvc,
+	)
+	log.Println("Mail actor started")
+
+	// Create and register the activity actor.
+	activitySvc := activity.NewService(activity.ServiceConfig{
+		Store: storage,
+	})
+	activityRef := actor.RegisterWithSystem(
+		actorSystem,
+		"activity-service",
+		activity.ActivityServiceKey,
+		activitySvc,
+	)
+	log.Println("Activity actor started")
+
 	// Create the MCP server (unless web-only mode).
 	var mcpServer *mcp.Server
 	if !*webOnly {
-		mcpServer = mcp.NewServer(store)
+		mcpServer = mcp.NewServer(dbStore)
 	}
 
 	// Set up signal handling for graceful shutdown.
@@ -98,10 +123,12 @@ func main() {
 	if *grpcAddr != "" {
 		grpcCfg := subtraterpc.DefaultServerConfig()
 		grpcCfg.ListenAddr = *grpcAddr
+		grpcCfg.MailRef = mailRef
+		grpcCfg.ActivityRef = activityRef
 
 		// Pass the notification hub actor for gRPC streaming RPCs.
 		grpcServer = subtraterpc.NewServer(
-			grpcCfg, store, mailSvc, agentReg, identityMgr,
+			grpcCfg, dbStore, mailSvc, agentReg, identityMgr,
 			notificationHub,
 		)
 		if err := grpcServer.Start(); err != nil {
@@ -115,8 +142,10 @@ func main() {
 	if *webAddr != "" {
 		webCfg := web.DefaultConfig()
 		webCfg.Addr = *webAddr
+		webCfg.MailRef = mailRef
+		webCfg.ActivityRef = activityRef
 
-		webServer, err := web.NewServer(webCfg, store)
+		webServer, err := web.NewServer(webCfg, dbStore)
 		if err != nil {
 			log.Fatalf("Failed to create web server: %v", err)
 		}

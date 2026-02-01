@@ -9,6 +9,7 @@ import (
 )
 
 func TestThreadFSM_UnreadToRead(t *testing.T) {
+	t.Parallel()
 	ctx := context.Background()
 	manager := NewThreadFSMManager(DefaultTrashRetention)
 	fsm := manager.CreateFSM(1, 100, "thread-1")
@@ -34,6 +35,7 @@ func TestThreadFSM_UnreadToRead(t *testing.T) {
 }
 
 func TestThreadFSM_UnreadToStarred(t *testing.T) {
+	t.Parallel()
 	ctx := context.Background()
 	manager := NewThreadFSMManager(DefaultTrashRetention)
 	fsm := manager.CreateFSM(1, 100, "thread-1")
@@ -45,6 +47,7 @@ func TestThreadFSM_UnreadToStarred(t *testing.T) {
 }
 
 func TestThreadFSM_StarredToUnstarred(t *testing.T) {
+	t.Parallel()
 	ctx := context.Background()
 	manager := NewThreadFSMManager(DefaultTrashRetention)
 	fsm := manager.CreateFSM(1, 100, "thread-1")
@@ -62,6 +65,7 @@ func TestThreadFSM_StarredToUnstarred(t *testing.T) {
 }
 
 func TestThreadFSM_UnreadToSnoozed(t *testing.T) {
+	t.Parallel()
 	ctx := context.Background()
 	manager := NewThreadFSMManager(DefaultTrashRetention)
 	fsm := manager.CreateFSM(1, 100, "thread-1")
@@ -85,6 +89,7 @@ func TestThreadFSM_UnreadToSnoozed(t *testing.T) {
 }
 
 func TestThreadFSM_SnoozedToWake(t *testing.T) {
+	t.Parallel()
 	ctx := context.Background()
 	manager := NewThreadFSMManager(DefaultTrashRetention)
 	fsm := manager.CreateFSM(1, 100, "thread-1")
@@ -108,6 +113,7 @@ func TestThreadFSM_SnoozedToWake(t *testing.T) {
 }
 
 func TestThreadFSM_ReadToArchived(t *testing.T) {
+	t.Parallel()
 	ctx := context.Background()
 	manager := NewThreadFSMManager(DefaultTrashRetention)
 	fsm := manager.CreateFSM(1, 100, "thread-1")
@@ -124,6 +130,7 @@ func TestThreadFSM_ReadToArchived(t *testing.T) {
 }
 
 func TestThreadFSM_ArchivedToUnarchived(t *testing.T) {
+	t.Parallel()
 	ctx := context.Background()
 	manager := NewThreadFSMManager(DefaultTrashRetention)
 	fsm := manager.CreateFSM(1, 100, "thread-1")
@@ -142,6 +149,7 @@ func TestThreadFSM_ArchivedToUnarchived(t *testing.T) {
 }
 
 func TestThreadFSM_UnreadToTrash(t *testing.T) {
+	t.Parallel()
 	ctx := context.Background()
 	manager := NewThreadFSMManager(DefaultTrashRetention)
 	fsm := manager.CreateFSM(1, 100, "thread-1")
@@ -160,6 +168,7 @@ func TestThreadFSM_UnreadToTrash(t *testing.T) {
 }
 
 func TestThreadFSM_TrashToRestore(t *testing.T) {
+	t.Parallel()
 	ctx := context.Background()
 	manager := NewThreadFSMManager(DefaultTrashRetention)
 	fsm := manager.CreateFSM(1, 100, "thread-1")
@@ -179,6 +188,7 @@ func TestThreadFSM_TrashToRestore(t *testing.T) {
 }
 
 func TestThreadFSM_UnreadToAck(t *testing.T) {
+	t.Parallel()
 	ctx := context.Background()
 	manager := NewThreadFSMManager(DefaultTrashRetention)
 	fsm := manager.CreateFSM(1, 100, "thread-1")
@@ -197,6 +207,7 @@ func TestThreadFSM_UnreadToAck(t *testing.T) {
 }
 
 func TestThreadFSM_ReadToAck(t *testing.T) {
+	t.Parallel()
 	ctx := context.Background()
 	manager := NewThreadFSMManager(DefaultTrashRetention)
 	fsm := manager.CreateFSM(1, 100, "thread-1")
@@ -219,6 +230,7 @@ func TestThreadFSM_ReadToAck(t *testing.T) {
 }
 
 func TestThreadFSM_ReadAlreadyRead(t *testing.T) {
+	t.Parallel()
 	ctx := context.Background()
 	manager := NewThreadFSMManager(DefaultTrashRetention)
 	fsm := manager.CreateFSM(1, 100, "thread-1")

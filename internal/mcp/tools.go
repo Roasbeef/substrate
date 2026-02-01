@@ -7,7 +7,6 @@ import (
 	"time"
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
-	"github.com/roasbeef/subtrate/internal/db/sqlc"
 	"github.com/roasbeef/subtrate/internal/mail"
 )
 
@@ -39,8 +38,8 @@ type SendMailResult struct {
 }
 
 func (s *Server) handleSendMail(ctx context.Context,
-	req *mcp.CallToolRequest, args SendMailArgs) (*mcp.CallToolResult, SendMailResult, error) {
-
+	req *mcp.CallToolRequest, args SendMailArgs,
+) (*mcp.CallToolResult, SendMailResult, error) {
 	priority := mail.Priority(args.Priority)
 	if priority == "" {
 		priority = mail.PriorityNormal
@@ -55,13 +54,23 @@ func (s *Server) handleSendMail(ctx context.Context,
 		ThreadID:       args.ThreadID,
 	}
 
-	result := s.mailSvc.Receive(ctx, mailReq)
-	val, err := result.Unpack()
-	if err != nil {
-		return nil, SendMailResult{}, err
+	// Use actor system if available, otherwise fall back to direct service call.
+	var resp mail.SendMailResponse
+	if s.hasMailActor() {
+		var err error
+		resp, err = s.sendMailActor(ctx, mailReq)
+		if err != nil {
+			return nil, SendMailResult{}, err
+		}
+	} else {
+		result := s.mailSvc.Receive(ctx, mailReq)
+		val, err := result.Unpack()
+		if err != nil {
+			return nil, SendMailResult{}, err
+		}
+		resp = val.(mail.SendMailResponse)
 	}
 
-	resp := val.(mail.SendMailResponse)
 	if resp.Error != nil {
 		return nil, SendMailResult{}, resp.Error
 	}
@@ -97,8 +106,8 @@ type InboxMessageResult struct {
 }
 
 func (s *Server) handleFetchInbox(ctx context.Context,
-	req *mcp.CallToolRequest, args FetchInboxArgs) (*mcp.CallToolResult, FetchInboxResult, error) {
-
+	req *mcp.CallToolRequest, args FetchInboxArgs,
+) (*mcp.CallToolResult, FetchInboxResult, error) {
 	limit := args.Limit
 	if limit <= 0 {
 		limit = 50
@@ -110,13 +119,23 @@ func (s *Server) handleFetchInbox(ctx context.Context,
 		UnreadOnly: args.UnreadOnly,
 	}
 
-	result := s.mailSvc.Receive(ctx, mailReq)
-	val, err := result.Unpack()
-	if err != nil {
-		return nil, FetchInboxResult{}, err
+	// Use actor system if available, otherwise fall back to direct service call.
+	var resp mail.FetchInboxResponse
+	if s.hasMailActor() {
+		var err error
+		resp, err = s.fetchInboxActor(ctx, mailReq)
+		if err != nil {
+			return nil, FetchInboxResult{}, err
+		}
+	} else {
+		result := s.mailSvc.Receive(ctx, mailReq)
+		val, err := result.Unpack()
+		if err != nil {
+			return nil, FetchInboxResult{}, err
+		}
+		resp = val.(mail.FetchInboxResponse)
 	}
 
-	resp := val.(mail.FetchInboxResponse)
 	if resp.Error != nil {
 		return nil, FetchInboxResult{}, resp.Error
 	}
@@ -156,20 +175,29 @@ type ReadMessageResult struct {
 }
 
 func (s *Server) handleReadMessage(ctx context.Context,
-	req *mcp.CallToolRequest, args ReadMessageArgs) (*mcp.CallToolResult, ReadMessageResult, error) {
-
-	mailReq := mail.ReadMessageRequest{
-		AgentID:   args.AgentID,
-		MessageID: args.MessageID,
+	req *mcp.CallToolRequest, args ReadMessageArgs,
+) (*mcp.CallToolResult, ReadMessageResult, error) {
+	// Use actor system if available, otherwise fall back to direct service call.
+	var resp mail.ReadMessageResponse
+	if s.hasMailActor() {
+		var err error
+		resp, err = s.readMessageActor(ctx, args.AgentID, args.MessageID)
+		if err != nil {
+			return nil, ReadMessageResult{}, err
+		}
+	} else {
+		mailReq := mail.ReadMessageRequest{
+			AgentID:   args.AgentID,
+			MessageID: args.MessageID,
+		}
+		result := s.mailSvc.Receive(ctx, mailReq)
+		val, err := result.Unpack()
+		if err != nil {
+			return nil, ReadMessageResult{}, err
+		}
+		resp = val.(mail.ReadMessageResponse)
 	}
 
-	result := s.mailSvc.Receive(ctx, mailReq)
-	val, err := result.Unpack()
-	if err != nil {
-		return nil, ReadMessageResult{}, err
-	}
-
-	resp := val.(mail.ReadMessageResponse)
 	if resp.Error != nil {
 		return nil, ReadMessageResult{}, resp.Error
 	}
@@ -203,20 +231,29 @@ type AckMessageResult struct {
 }
 
 func (s *Server) handleAckMessage(ctx context.Context,
-	req *mcp.CallToolRequest, args AckMessageArgs) (*mcp.CallToolResult, AckMessageResult, error) {
-
-	mailReq := mail.AckMessageRequest{
-		AgentID:   args.AgentID,
-		MessageID: args.MessageID,
+	req *mcp.CallToolRequest, args AckMessageArgs,
+) (*mcp.CallToolResult, AckMessageResult, error) {
+	// Use actor system if available, otherwise fall back to direct service call.
+	var resp mail.AckMessageResponse
+	if s.hasMailActor() {
+		var err error
+		resp, err = s.ackMessageActor(ctx, args.AgentID, args.MessageID)
+		if err != nil {
+			return nil, AckMessageResult{}, err
+		}
+	} else {
+		mailReq := mail.AckMessageRequest{
+			AgentID:   args.AgentID,
+			MessageID: args.MessageID,
+		}
+		result := s.mailSvc.Receive(ctx, mailReq)
+		val, err := result.Unpack()
+		if err != nil {
+			return nil, AckMessageResult{}, err
+		}
+		resp = val.(mail.AckMessageResponse)
 	}
 
-	result := s.mailSvc.Receive(ctx, mailReq)
-	val, err := result.Unpack()
-	if err != nil {
-		return nil, AckMessageResult{}, err
-	}
-
-	resp := val.(mail.AckMessageResponse)
 	if resp.Error != nil {
 		return nil, AckMessageResult{}, resp.Error
 	}
@@ -236,14 +273,14 @@ type StateChangeResult struct {
 }
 
 func (s *Server) handleMarkRead(ctx context.Context,
-	req *mcp.CallToolRequest, args StateChangeArgs) (*mcp.CallToolResult, StateChangeResult, error) {
-
+	req *mcp.CallToolRequest, args StateChangeArgs,
+) (*mcp.CallToolResult, StateChangeResult, error) {
 	return s.updateState(ctx, args.AgentID, args.MessageID, "read", nil)
 }
 
 func (s *Server) handleStarMessage(ctx context.Context,
-	req *mcp.CallToolRequest, args StateChangeArgs) (*mcp.CallToolResult, StateChangeResult, error) {
-
+	req *mcp.CallToolRequest, args StateChangeArgs,
+) (*mcp.CallToolResult, StateChangeResult, error) {
 	return s.updateState(ctx, args.AgentID, args.MessageID, "starred", nil)
 }
 
@@ -255,8 +292,8 @@ type SnoozeArgs struct {
 }
 
 func (s *Server) handleSnoozeMessage(ctx context.Context,
-	req *mcp.CallToolRequest, args SnoozeArgs) (*mcp.CallToolResult, StateChangeResult, error) {
-
+	req *mcp.CallToolRequest, args SnoozeArgs,
+) (*mcp.CallToolResult, StateChangeResult, error) {
 	t, err := time.Parse(time.RFC3339, args.SnoozedUntil)
 	if err != nil {
 		return nil, StateChangeResult{}, fmt.Errorf("invalid snoozed_until format: %w", err)
@@ -266,34 +303,43 @@ func (s *Server) handleSnoozeMessage(ctx context.Context,
 }
 
 func (s *Server) handleArchiveMessage(ctx context.Context,
-	req *mcp.CallToolRequest, args StateChangeArgs) (*mcp.CallToolResult, StateChangeResult, error) {
-
+	req *mcp.CallToolRequest, args StateChangeArgs,
+) (*mcp.CallToolResult, StateChangeResult, error) {
 	return s.updateState(ctx, args.AgentID, args.MessageID, "archived", nil)
 }
 
 func (s *Server) handleTrashMessage(ctx context.Context,
-	req *mcp.CallToolRequest, args StateChangeArgs) (*mcp.CallToolResult, StateChangeResult, error) {
-
+	req *mcp.CallToolRequest, args StateChangeArgs,
+) (*mcp.CallToolResult, StateChangeResult, error) {
 	return s.updateState(ctx, args.AgentID, args.MessageID, "trash", nil)
 }
 
 func (s *Server) updateState(ctx context.Context, agentID, messageID int64,
-	newState string, snoozedUntil *time.Time) (*mcp.CallToolResult, StateChangeResult, error) {
-
-	mailReq := mail.UpdateStateRequest{
-		AgentID:      agentID,
-		MessageID:    messageID,
-		NewState:     newState,
-		SnoozedUntil: snoozedUntil,
+	newState string, snoozedUntil *time.Time,
+) (*mcp.CallToolResult, StateChangeResult, error) {
+	// Use actor system if available, otherwise fall back to direct service call.
+	var resp mail.UpdateStateResponse
+	if s.hasMailActor() {
+		var err error
+		resp, err = s.updateMessageStateActor(ctx, agentID, messageID, newState, snoozedUntil)
+		if err != nil {
+			return nil, StateChangeResult{}, err
+		}
+	} else {
+		mailReq := mail.UpdateStateRequest{
+			AgentID:      agentID,
+			MessageID:    messageID,
+			NewState:     newState,
+			SnoozedUntil: snoozedUntil,
+		}
+		result := s.mailSvc.Receive(ctx, mailReq)
+		val, err := result.Unpack()
+		if err != nil {
+			return nil, StateChangeResult{}, err
+		}
+		resp = val.(mail.UpdateStateResponse)
 	}
 
-	result := s.mailSvc.Receive(ctx, mailReq)
-	val, err := result.Unpack()
-	if err != nil {
-		return nil, StateChangeResult{}, err
-	}
-
-	resp := val.(mail.UpdateStateResponse)
 	if resp.Error != nil {
 		return nil, StateChangeResult{}, resp.Error
 	}
@@ -314,20 +360,16 @@ type SubscribeResult struct {
 }
 
 func (s *Server) handleSubscribe(ctx context.Context,
-	req *mcp.CallToolRequest, args SubscribeArgs) (*mcp.CallToolResult, SubscribeResult, error) {
-
+	req *mcp.CallToolRequest, args SubscribeArgs,
+) (*mcp.CallToolResult, SubscribeResult, error) {
 	// Get the topic.
-	topic, err := s.store.Queries().GetTopicByName(ctx, args.TopicName)
+	topic, err := s.storage.GetTopicByName(ctx, args.TopicName)
 	if err != nil {
 		return nil, SubscribeResult{}, fmt.Errorf("topic %q not found: %w", args.TopicName, err)
 	}
 
 	// Create subscription.
-	err = s.store.Queries().CreateSubscription(ctx, sqlc.CreateSubscriptionParams{
-		AgentID:      args.AgentID,
-		TopicID:      topic.ID,
-		SubscribedAt: time.Now().Unix(),
-	})
+	err = s.storage.CreateSubscription(ctx, args.AgentID, topic.ID)
 	if err != nil {
 		return nil, SubscribeResult{}, fmt.Errorf("failed to subscribe: %w", err)
 	}
@@ -345,19 +387,16 @@ type UnsubscribeArgs struct {
 }
 
 func (s *Server) handleUnsubscribe(ctx context.Context,
-	req *mcp.CallToolRequest, args UnsubscribeArgs) (*mcp.CallToolResult, SubscribeResult, error) {
-
+	req *mcp.CallToolRequest, args UnsubscribeArgs,
+) (*mcp.CallToolResult, SubscribeResult, error) {
 	// Get the topic.
-	topic, err := s.store.Queries().GetTopicByName(ctx, args.TopicName)
+	topic, err := s.storage.GetTopicByName(ctx, args.TopicName)
 	if err != nil {
 		return nil, SubscribeResult{}, fmt.Errorf("topic %q not found: %w", args.TopicName, err)
 	}
 
 	// Delete subscription.
-	err = s.store.Queries().DeleteSubscription(ctx, sqlc.DeleteSubscriptionParams{
-		AgentID: args.AgentID,
-		TopicID: topic.ID,
-	})
+	err = s.storage.DeleteSubscription(ctx, args.AgentID, topic.ID)
 	if err != nil {
 		return nil, SubscribeResult{}, fmt.Errorf("failed to unsubscribe: %w", err)
 	}
@@ -387,12 +426,12 @@ type ListTopicsResult struct {
 }
 
 func (s *Server) handleListTopics(ctx context.Context,
-	req *mcp.CallToolRequest, args ListTopicsArgs) (*mcp.CallToolResult, ListTopicsResult, error) {
-
+	req *mcp.CallToolRequest, args ListTopicsArgs,
+) (*mcp.CallToolResult, ListTopicsResult, error) {
 	var topicsResult []TopicInfo
 
 	if args.SubscribedOnly && args.AgentID > 0 {
-		subs, err := s.store.Queries().ListSubscriptionsByAgent(ctx, args.AgentID)
+		subs, err := s.storage.ListSubscriptionsByAgent(ctx, args.AgentID)
 		if err != nil {
 			return nil, ListTopicsResult{}, fmt.Errorf("failed to list subscriptions: %w", err)
 		}
@@ -405,7 +444,7 @@ func (s *Server) handleListTopics(ctx context.Context,
 			})
 		}
 	} else {
-		topics, err := s.store.Queries().ListTopics(ctx)
+		topics, err := s.storage.ListTopics(ctx)
 		if err != nil {
 			return nil, ListTopicsResult{}, fmt.Errorf("failed to list topics: %w", err)
 		}
@@ -438,14 +477,14 @@ type PublishResult struct {
 }
 
 func (s *Server) handlePublish(ctx context.Context,
-	req *mcp.CallToolRequest, args PublishArgs) (*mcp.CallToolResult, PublishResult, error) {
-
+	req *mcp.CallToolRequest, args PublishArgs,
+) (*mcp.CallToolResult, PublishResult, error) {
 	priority := mail.Priority(args.Priority)
 	if priority == "" {
 		priority = mail.PriorityNormal
 	}
 
-	mailReq := mail.PublishRequest{
+	pubReq := mail.PublishRequest{
 		SenderID:  args.AgentID,
 		TopicName: args.TopicName,
 		Subject:   args.Subject,
@@ -453,13 +492,23 @@ func (s *Server) handlePublish(ctx context.Context,
 		Priority:  priority,
 	}
 
-	result := s.mailSvc.Receive(ctx, mailReq)
-	val, err := result.Unpack()
-	if err != nil {
-		return nil, PublishResult{}, err
+	// Use actor system if available, otherwise fall back to direct service call.
+	var resp mail.PublishResponse
+	if s.hasMailActor() {
+		var err error
+		resp, err = s.publishMessageActor(ctx, pubReq)
+		if err != nil {
+			return nil, PublishResult{}, err
+		}
+	} else {
+		result := s.mailSvc.Receive(ctx, pubReq)
+		val, err := result.Unpack()
+		if err != nil {
+			return nil, PublishResult{}, err
+		}
+		resp = val.(mail.PublishResponse)
 	}
 
-	resp := val.(mail.PublishResponse)
 	if resp.Error != nil {
 		return nil, PublishResult{}, resp.Error
 	}
@@ -483,14 +532,16 @@ type SearchResult struct {
 }
 
 func (s *Server) handleSearch(ctx context.Context,
-	req *mcp.CallToolRequest, args SearchArgs) (*mcp.CallToolResult, SearchResult, error) {
-
+	req *mcp.CallToolRequest, args SearchArgs,
+) (*mcp.CallToolResult, SearchResult, error) {
 	limit := args.Limit
 	if limit <= 0 {
 		limit = 20
 	}
 
-	messages, err := s.store.SearchMessagesForAgent(ctx, args.Query, args.AgentID, limit)
+	messages, err := s.storage.SearchMessagesForAgent(
+		ctx, args.Query, args.AgentID, limit,
+	)
 	if err != nil {
 		return nil, SearchResult{}, fmt.Errorf("search failed: %w", err)
 	}
@@ -503,8 +554,8 @@ func (s *Server) handleSearch(ctx context.Context,
 			SenderID:  m.SenderID,
 			Subject:   m.Subject,
 			Priority:  m.Priority,
-			State:     m.State,
-			CreatedAt: time.Unix(m.CreatedAt, 0).Format(time.RFC3339),
+			State:     "", // Search returns store.Message which has no state.
+			CreatedAt: m.CreatedAt.Format(time.RFC3339),
 		})
 	}
 
@@ -525,19 +576,28 @@ type GetStatusResult struct {
 }
 
 func (s *Server) handleGetStatus(ctx context.Context,
-	req *mcp.CallToolRequest, args GetStatusArgs) (*mcp.CallToolResult, GetStatusResult, error) {
-
-	mailReq := mail.GetStatusRequest{
-		AgentID: args.AgentID,
+	req *mcp.CallToolRequest, args GetStatusArgs,
+) (*mcp.CallToolResult, GetStatusResult, error) {
+	// Use actor system if available, otherwise fall back to direct service call.
+	var resp mail.GetStatusResponse
+	if s.hasMailActor() {
+		var err error
+		resp, err = s.getAgentStatusActor(ctx, args.AgentID)
+		if err != nil {
+			return nil, GetStatusResult{}, err
+		}
+	} else {
+		mailReq := mail.GetStatusRequest{
+			AgentID: args.AgentID,
+		}
+		result := s.mailSvc.Receive(ctx, mailReq)
+		val, err := result.Unpack()
+		if err != nil {
+			return nil, GetStatusResult{}, err
+		}
+		resp = val.(mail.GetStatusResponse)
 	}
 
-	result := s.mailSvc.Receive(ctx, mailReq)
-	val, err := result.Unpack()
-	if err != nil {
-		return nil, GetStatusResult{}, err
-	}
-
-	resp := val.(mail.GetStatusResponse)
 	if resp.Error != nil {
 		return nil, GetStatusResult{}, resp.Error
 	}
@@ -552,8 +612,8 @@ func (s *Server) handleGetStatus(ctx context.Context,
 
 // PollChangesArgs are the arguments for the poll_changes tool.
 type PollChangesArgs struct {
-	AgentID      int64             `json:"agent_id" jsonschema:"ID of the agent"`
-	SinceOffsets map[string]int64  `json:"since_offsets,omitempty" jsonschema:"Last seen offset per topic ID (keys are topic IDs as strings)"`
+	AgentID      int64            `json:"agent_id" jsonschema:"ID of the agent"`
+	SinceOffsets map[string]int64 `json:"since_offsets,omitempty" jsonschema:"Last seen offset per topic ID (keys are topic IDs as strings)"`
 }
 
 // PollChangesResult is the result of the poll_changes tool.
@@ -563,8 +623,8 @@ type PollChangesResult struct {
 }
 
 func (s *Server) handlePollChanges(ctx context.Context,
-	req *mcp.CallToolRequest, args PollChangesArgs) (*mcp.CallToolResult, PollChangesResult, error) {
-
+	req *mcp.CallToolRequest, args PollChangesArgs,
+) (*mcp.CallToolResult, PollChangesResult, error) {
 	// Convert string-keyed map to int64-keyed map for the mail service.
 	sinceOffsets := make(map[int64]int64)
 	for k, v := range args.SinceOffsets {
@@ -577,18 +637,27 @@ func (s *Server) handlePollChanges(ctx context.Context,
 		sinceOffsets[topicID] = v
 	}
 
-	mailReq := mail.PollChangesRequest{
-		AgentID:      args.AgentID,
-		SinceOffsets: sinceOffsets,
+	// Use actor system if available, otherwise fall back to direct service call.
+	var resp mail.PollChangesResponse
+	if s.hasMailActor() {
+		var err error
+		resp, err = s.pollChangesActor(ctx, args.AgentID, sinceOffsets)
+		if err != nil {
+			return nil, PollChangesResult{}, err
+		}
+	} else {
+		mailReq := mail.PollChangesRequest{
+			AgentID:      args.AgentID,
+			SinceOffsets: sinceOffsets,
+		}
+		result := s.mailSvc.Receive(ctx, mailReq)
+		val, err := result.Unpack()
+		if err != nil {
+			return nil, PollChangesResult{}, err
+		}
+		resp = val.(mail.PollChangesResponse)
 	}
 
-	result := s.mailSvc.Receive(ctx, mailReq)
-	val, err := result.Unpack()
-	if err != nil {
-		return nil, PollChangesResult{}, err
-	}
-
-	resp := val.(mail.PollChangesResponse)
 	if resp.Error != nil {
 		return nil, PollChangesResult{}, resp.Error
 	}
@@ -631,8 +700,8 @@ type RegisterAgentResult struct {
 }
 
 func (s *Server) handleRegisterAgent(ctx context.Context,
-	req *mcp.CallToolRequest, args RegisterAgentArgs) (*mcp.CallToolResult, RegisterAgentResult, error) {
-
+	req *mcp.CallToolRequest, args RegisterAgentArgs,
+) (*mcp.CallToolResult, RegisterAgentResult, error) {
 	agent, err := s.registry.RegisterAgent(
 		ctx, args.Name, args.ProjectKey, args.GitBranch,
 	)
@@ -659,21 +728,16 @@ type WhoAmIResult struct {
 }
 
 func (s *Server) handleWhoAmI(ctx context.Context,
-	req *mcp.CallToolRequest, args WhoAmIArgs) (*mcp.CallToolResult, WhoAmIResult, error) {
-
-	agent, err := s.store.Queries().GetAgent(ctx, args.AgentID)
+	req *mcp.CallToolRequest, args WhoAmIArgs,
+) (*mcp.CallToolResult, WhoAmIResult, error) {
+	agent, err := s.storage.GetAgent(ctx, args.AgentID)
 	if err != nil {
 		return nil, WhoAmIResult{}, fmt.Errorf("agent not found: %w", err)
 	}
 
-	result := WhoAmIResult{
-		AgentID:   agent.ID,
-		AgentName: agent.Name,
-	}
-
-	if agent.ProjectKey.Valid {
-		result.ProjectKey = agent.ProjectKey.String
-	}
-
-	return nil, result, nil
+	return nil, WhoAmIResult{
+		AgentID:    agent.ID,
+		AgentName:  agent.Name,
+		ProjectKey: agent.ProjectKey,
+	}, nil
 }

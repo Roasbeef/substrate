@@ -7,9 +7,7 @@ import (
 	"github.com/spf13/cobra"
 )
 
-var (
-	topicsSubscribed bool
-)
+var topicsSubscribed bool
 
 // topicsCmd lists topics.
 var topicsCmd = &cobra.Command{

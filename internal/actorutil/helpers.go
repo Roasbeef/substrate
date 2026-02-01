@@ -6,8 +6,8 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/lightninglabs/darepo-client/baselib/actor"
 	"github.com/lightningnetwork/lnd/fn/v2"
+	"github.com/roasbeef/subtrate/internal/baselib/actor"
 )
 
 // AskAwait is a convenience function that sends an Ask message to an actor
@@ -18,7 +18,6 @@ func AskAwait[M actor.Message, R any](
 	ref actor.ActorRef[M, R],
 	msg M,
 ) (R, error) {
-
 	future := ref.Ask(ctx, msg)
 	result := future.Await(ctx)
 	return result.Unpack()
@@ -32,7 +31,6 @@ func AskAwaitTyped[M actor.Message, R any, T any](
 	ref actor.ActorRef[M, R],
 	msg M,
 ) (T, error) {
-
 	resp, err := AskAwait(ctx, ref, msg)
 	if err != nil {
 		var zero T
@@ -59,7 +57,6 @@ func TellAll[M actor.Message](
 	refs []actor.TellOnlyRef[M],
 	msg M,
 ) {
-
 	for _, ref := range refs {
 		ref.Tell(ctx, msg)
 	}
@@ -73,7 +70,6 @@ func ParallelAsk[M actor.Message, R any](
 	refs []actor.ActorRef[M, R],
 	msgs []M,
 ) []fn.Result[R] {
-
 	if len(refs) != len(msgs) {
 		panic("refs and msgs must have same length")
 	}
@@ -101,7 +97,6 @@ func ParallelAskSame[M actor.Message, R any](
 	refs []actor.ActorRef[M, R],
 	msg M,
 ) []fn.Result[R] {
-
 	// Send all Ask requests concurrently.
 	futures := make([]actor.Future[R], len(refs))
 	for i, ref := range refs {
@@ -125,7 +120,6 @@ func FirstSuccess[M actor.Message, R any](
 	refs []actor.ActorRef[M, R],
 	msg M,
 ) (R, error) {
-
 	if len(refs) == 0 {
 		var zero R
 		return zero, fmt.Errorf("no actors provided")
@@ -185,7 +179,6 @@ func MapResponses[R any, T any](
 	results []fn.Result[R],
 	mapFn func(R) T,
 ) []fn.Result[T] {
-
 	mapped := make([]fn.Result[T], len(results))
 	for i, r := range results {
 		val, err := r.Unpack()

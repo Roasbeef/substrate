@@ -6,7 +6,7 @@ import (
 	"sync"
 	"sync/atomic"
 
-	"github.com/lightninglabs/darepo-client/baselib/actor"
+	"github.com/roasbeef/subtrate/internal/baselib/actor"
 )
 
 // Pool distributes messages across multiple actor instances using round-robin
@@ -50,7 +50,6 @@ type PoolConfig[M actor.Message, R any] struct {
 func NewPool[M actor.Message, R any](
 	cfg PoolConfig[M, R],
 ) *Pool[M, R] {
-
 	if cfg.Size <= 0 {
 		cfg.Size = 1
 	}
@@ -156,7 +155,6 @@ type PoolRef[M actor.Message, R any] struct {
 func NewPoolRef[M actor.Message, R any](
 	pool *Pool[M, R],
 ) actor.ActorRef[M, R] {
-
 	return &PoolRef[M, R]{pool: pool}
 }
 

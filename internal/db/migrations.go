@@ -48,11 +48,9 @@ var (
 	}
 )
 
-var (
-	// ErrMigrationDowngrade is returned when a database downgrade is
-	// detected.
-	ErrMigrationDowngrade = errors.New("database downgrade detected")
-)
+// ErrMigrationDowngrade is returned when a database downgrade is
+// detected.
+var ErrMigrationDowngrade = errors.New("database downgrade detected")
 
 // migrateOptions holds options for migration execution.
 type migrateOptions struct {
@@ -101,8 +99,8 @@ func (m *migrationLogger) Verbose() bool {
 // name, up to or down to the given target version.
 func applyMigrations(fsys fs.FS, driver database.Driver, path, dbName string,
 	targetVersion MigrationTarget, opts *migrateOptions,
-	log *slog.Logger) error {
-
+	log *slog.Logger,
+) error {
 	// Create a new migration source using the embedded file system.
 	migrateFileServer, err := httpfs.New(http.FS(fsys), path)
 	if err != nil {
@@ -176,8 +174,8 @@ func applyMigrations(fsys fs.FS, driver database.Driver, path, dbName string,
 
 // backupSqliteDatabase creates a backup of the given SQLite database.
 func backupSqliteDatabase(srcDB *sql.DB, dbFullFilePath string,
-	log *slog.Logger) error {
-
+	log *slog.Logger,
+) error {
 	if srcDB == nil {
 		return fmt.Errorf("backup source database is nil")
 	}

@@ -3,8 +3,8 @@ package mail
 import (
 	"context"
 
-	"github.com/lightninglabs/darepo-client/baselib/actor"
 	"github.com/lightningnetwork/lnd/fn/v2"
+	"github.com/roasbeef/subtrate/internal/baselib/actor"
 )
 
 // NotificationHubKey is the service key for the notification hub actor.
@@ -43,8 +43,8 @@ func NewNotificationHub() *NotificationHub {
 // Receive implements actor.ActorBehavior by dispatching to type-specific
 // handlers.
 func (n *NotificationHub) Receive(ctx context.Context,
-	msg NotificationRequest) fn.Result[NotificationResponse] {
-
+	msg NotificationRequest,
+) fn.Result[NotificationResponse] {
 	switch m := msg.(type) {
 	case SubscribeAgentMsg:
 		resp := n.handleSubscribeAgent(m)
@@ -71,8 +71,8 @@ func (n *NotificationHub) Receive(ctx context.Context,
 
 // handleSubscribeAgent adds a subscriber for an agent.
 func (n *NotificationHub) handleSubscribeAgent(
-	msg SubscribeAgentMsg) SubscribeAgentResponse {
-
+	msg SubscribeAgentMsg,
+) SubscribeAgentResponse {
 	// Check if this subscriber already exists.
 	subs := n.agentSubscribers[msg.AgentID]
 	for _, s := range subs {
@@ -93,8 +93,8 @@ func (n *NotificationHub) handleSubscribeAgent(
 
 // handleUnsubscribeAgent removes a subscriber for an agent.
 func (n *NotificationHub) handleUnsubscribeAgent(
-	msg UnsubscribeAgentMsg) UnsubscribeAgentResponse {
-
+	msg UnsubscribeAgentMsg,
+) UnsubscribeAgentResponse {
 	subs := n.agentSubscribers[msg.AgentID]
 	for i, s := range subs {
 		if s.id == msg.SubscriberID {
@@ -118,8 +118,8 @@ func (n *NotificationHub) handleUnsubscribeAgent(
 
 // handleNotifyAgent sends a message to all subscribers for an agent.
 func (n *NotificationHub) handleNotifyAgent(
-	msg NotifyAgentMsg) NotifyAgentResponse {
-
+	msg NotifyAgentMsg,
+) NotifyAgentResponse {
 	deliveredCount := 0
 	for _, s := range n.agentSubscribers[msg.AgentID] {
 		// Non-blocking send. If the channel is full, we skip.
@@ -136,8 +136,8 @@ func (n *NotificationHub) handleNotifyAgent(
 
 // handleNotifyTopic sends a message to all subscribers for the given agents.
 func (n *NotificationHub) handleNotifyTopic(
-	msg NotifyTopicMsg) NotifyTopicResponse {
-
+	msg NotifyTopicMsg,
+) NotifyTopicResponse {
 	deliveredCount := 0
 	for _, agentID := range msg.AgentIDs {
 		for _, s := range n.agentSubscribers[agentID] {

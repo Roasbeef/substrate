@@ -67,7 +67,7 @@ func runHooksInstall(cmd *cobra.Command, args []string) error {
 
 	// 1. Create hook scripts directory.
 	scriptsDir := filepath.Join(claudeDir, "hooks", "substrate")
-	if err := os.MkdirAll(scriptsDir, 0755); err != nil {
+	if err := os.MkdirAll(scriptsDir, 0o755); err != nil {
 		return fmt.Errorf("failed to create hooks directory: %w", err)
 	}
 
@@ -77,7 +77,7 @@ func runHooksInstall(cmd *cobra.Command, args []string) error {
 		filename := hooks.ScriptNames[name]
 		scriptPath := filepath.Join(scriptsDir, filename)
 
-		if err := os.WriteFile(scriptPath, []byte(content), 0755); err != nil {
+		if err := os.WriteFile(scriptPath, []byte(content), 0o755); err != nil {
 			return fmt.Errorf("failed to write %s: %w", filename, err)
 		}
 	}
@@ -186,12 +186,12 @@ func runHooksStatus(cmd *cobra.Command, args []string) error {
 	switch outputFormat {
 	case "json":
 		return outputJSON(map[string]any{
-			"installed":      hooks.IsInstalled(settings),
-			"scripts_exist":  scriptFilesExist,
-			"skill_exists":   skillExists,
-			"hook_events":    installedEvents,
-			"scripts_dir":    scriptsDir,
-			"settings_path":  filepath.Join(claudeDir, "settings.json"),
+			"installed":     hooks.IsInstalled(settings),
+			"scripts_exist": scriptFilesExist,
+			"skill_exists":  skillExists,
+			"hook_events":   installedEvents,
+			"scripts_dir":   scriptsDir,
+			"settings_path": filepath.Join(claudeDir, "settings.json"),
 		})
 	default:
 		fmt.Println("Subtrate Hooks Status")
@@ -249,10 +249,10 @@ func getClaudeDir() string {
 // installSkill installs the Subtrate skill to ~/.claude/skills/substrate/.
 func installSkill(claudeDir string) error {
 	skillDir := filepath.Join(claudeDir, "skills", "substrate")
-	if err := os.MkdirAll(skillDir, 0755); err != nil {
+	if err := os.MkdirAll(skillDir, 0o755); err != nil {
 		return err
 	}
 
 	skillPath := filepath.Join(skillDir, "SKILL.md")
-	return os.WriteFile(skillPath, []byte(hooks.SkillContent), 0644)
+	return os.WriteFile(skillPath, []byte(hooks.SkillContent), 0o644)
 }

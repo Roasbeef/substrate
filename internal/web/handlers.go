@@ -12,8 +12,10 @@ import (
 	"strings"
 	"time"
 
+	"github.com/roasbeef/subtrate/internal/activity"
 	"github.com/roasbeef/subtrate/internal/agent"
 	"github.com/roasbeef/subtrate/internal/db/sqlc"
+	"github.com/roasbeef/subtrate/internal/mail"
 )
 
 // PageData holds common data for page templates.
@@ -349,7 +351,7 @@ func (s *Server) handleInbox(w http.ResponseWriter, r *http.Request) {
 	pageSize := 50
 
 	// Build messages endpoint with agent filter.
-	messagesEndpoint := "/inbox/messages"
+	var messagesEndpoint string
 	if currentAgentID == 0 {
 		messagesEndpoint = "/inbox/messages?agent_id=all"
 	} else {
@@ -550,7 +552,7 @@ func (s *Server) handleSent(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Build endpoint with agent_id parameter.
-	endpoint := "/sent/messages"
+	var endpoint string
 	if currentAgentID > 0 {
 		endpoint = fmt.Sprintf("/sent/messages?agent_id=%d", currentAgentID)
 	} else {
@@ -1503,7 +1505,7 @@ func (s *Server) handleAPIStatus(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 
 	// Try to get first agent for status.
-	var agentName string = "no agents"
+	agentName := "no agents"
 	var unreadCount, urgentCount int64
 
 	agents, err := s.store.Queries().ListAgents(ctx)
@@ -1757,7 +1759,7 @@ func (s *Server) handleAPISessionCreate(w http.ResponseWriter, r *http.Request) 
 
 	// Use agent's project key as work dir if not specified.
 	if workDir == "" && agent.ProjectKey.Valid {
-		workDir = agent.ProjectKey.String
+		_ = agent.ProjectKey.String // workDir is not used yet.
 	}
 
 	// Generate session ID.
@@ -1876,20 +1878,6 @@ func (s *Server) sendAgentStatusEvent(w http.ResponseWriter, flusher http.Flushe
 	}
 
 	flusher.Flush()
-}
-
-// statusColor returns the CSS class for an agent status color.
-func statusColor(status string) string {
-	switch status {
-	case "active":
-		return "bg-green-500"
-	case "busy":
-		return "bg-yellow-500"
-	case "idle":
-		return "bg-gray-400"
-	default:
-		return "bg-red-500"
-	}
 }
 
 // handleSSEActivity streams activity updates via SSE.
@@ -2699,13 +2687,6 @@ func (s *Server) handleMessageSend(w http.ResponseWriter, r *http.Request) {
 		priority = "normal"
 	}
 
-	// Find the recipient agent.
-	recipient, err := s.store.Queries().GetAgentByName(ctx, to)
-	if err != nil {
-		http.Error(w, "Recipient agent not found: "+to, http.StatusBadRequest)
-		return
-	}
-
 	// Use User agent as sender.
 	senderID := s.getUserAgentID(ctx)
 	if senderID == 0 {
@@ -2713,68 +2694,28 @@ func (s *Server) handleMessageSend(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Get or create the topic for the recipient's inbox.
-	topicName := "agent/" + to + "/inbox"
-	topic, err := s.store.Queries().GetTopicByName(ctx, topicName)
-	if err != nil {
-		// Create the topic if it doesn't exist.
-		topic, err = s.store.Queries().CreateTopic(ctx, sqlc.CreateTopicParams{
-			Name:             topicName,
-			TopicType:        "direct",
-			RetentionSeconds: sql.NullInt64{Int64: 604800, Valid: true},
-			CreatedAt:        time.Now().Unix(),
-		})
-		if err != nil {
-			http.Error(w, "Failed to create topic: "+err.Error(), http.StatusInternalServerError)
-			return
-		}
-	}
-
-	// Generate thread ID for new message.
-	threadID := fmt.Sprintf("thread-%d-%d", time.Now().UnixNano(), senderID)
-
-	// Get next log offset.
-	maxOffsetResult, err := s.store.Queries().GetMaxLogOffset(ctx, topic.ID)
-	var nextOffset int64 = 1
-	if err == nil && maxOffsetResult != nil {
-		if offset, ok := maxOffsetResult.(int64); ok {
-			nextOffset = offset + 1
-		}
-	}
-
-	// Create the message.
-	msg, err := s.store.Queries().CreateMessage(ctx, sqlc.CreateMessageParams{
-		ThreadID:  threadID,
-		TopicID:   topic.ID,
-		LogOffset: nextOffset,
-		SenderID:  senderID,
-		Subject:   subject,
-		BodyMd:    body,
-		Priority:  priority,
-		CreatedAt: time.Now().Unix(),
+	// Send via actor system.
+	resp, err := s.sendMail(ctx, mail.SendMailRequest{
+		SenderID:       senderID,
+		RecipientNames: []string{to},
+		Subject:        subject,
+		Body:           body,
+		Priority:       mail.Priority(priority),
 	})
 	if err != nil {
-		http.Error(w, "Failed to create message: "+err.Error(), http.StatusInternalServerError)
+		http.Error(w, "Failed to send message: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+	if resp.Error != nil {
+		http.Error(w, "Failed to send message: "+resp.Error.Error(), http.StatusInternalServerError)
 		return
 	}
 
-	// Create recipient entry.
-	err = s.store.Queries().CreateMessageRecipient(ctx, sqlc.CreateMessageRecipientParams{
-		MessageID: msg.ID,
-		AgentID:   recipient.ID,
-	})
-	if err != nil {
-		http.Error(w, "Failed to add recipient: "+err.Error(), http.StatusInternalServerError)
-		return
-	}
-
-	// Record activity for the message.
-	_, _ = s.store.Queries().CreateActivity(ctx, sqlc.CreateActivityParams{
+	// Record activity via actor system (fire and forget).
+	s.recordActivity(ctx, activity.RecordActivityRequest{
 		AgentID:      senderID,
 		ActivityType: "message",
 		Description:  fmt.Sprintf("Sent \"%s\" to %s", subject, to),
-		Metadata:     sql.NullString{},
-		CreatedAt:    time.Now().Unix(),
 	})
 
 	// Return success with HX-Trigger to close modal and refresh.
@@ -2868,30 +2809,23 @@ func (s *Server) handleMessageStar(
 		return
 	}
 
-	// Get current state.
-	recipient, err := s.store.Queries().GetMessageRecipient(ctx, sqlc.GetMessageRecipientParams{
-		MessageID: messageID,
-		AgentID:   agentID,
-	})
-	if err != nil {
+	// Get current state by reading the message.
+	readResp, err := s.readMessage(ctx, agentID, messageID)
+	if err != nil || readResp.Error != nil || readResp.Message == nil {
 		http.Error(w, "Message not found", http.StatusNotFound)
 		return
 	}
+	currentState := readResp.Message.State
 
 	// Toggle star state.
 	newState := "starred"
-	if recipient.State == "starred" {
+	if currentState == "starred" {
 		newState = "read"
 	}
 
-	_, err = s.store.Queries().UpdateRecipientState(ctx, sqlc.UpdateRecipientStateParams{
-		State:     newState,
-		Column2:   newState,
-		ReadAt:    sql.NullInt64{Int64: time.Now().Unix(), Valid: true},
-		MessageID: messageID,
-		AgentID:   agentID,
-	})
-	if err != nil {
+	// Update state.
+	resp, err := s.updateMessageState(ctx, agentID, messageID, newState, nil)
+	if err != nil || resp.Error != nil {
 		http.Error(w, "Failed to update state", http.StatusInternalServerError)
 		return
 	}
@@ -2924,14 +2858,8 @@ func (s *Server) handleMessageArchive(
 		return
 	}
 
-	_, err := s.store.Queries().UpdateRecipientState(ctx, sqlc.UpdateRecipientStateParams{
-		State:     "archived",
-		Column2:   "archived",
-		ReadAt:    sql.NullInt64{Int64: time.Now().Unix(), Valid: true},
-		MessageID: messageID,
-		AgentID:   agentID,
-	})
-	if err != nil {
+	resp, err := s.updateMessageState(ctx, agentID, messageID, "archived", nil)
+	if err != nil || resp.Error != nil {
 		http.Error(w, "Failed to archive message", http.StatusInternalServerError)
 		return
 	}
@@ -3024,14 +2952,10 @@ func (s *Server) handleMessageSnooze(
 		return
 	}
 
-	snoozedUntil := time.Now().Add(duration).Unix()
+	snoozedUntil := time.Now().Add(duration)
 
-	err = s.store.Queries().UpdateRecipientSnoozed(ctx, sqlc.UpdateRecipientSnoozedParams{
-		SnoozedUntil: sql.NullInt64{Int64: snoozedUntil, Valid: true},
-		MessageID:    messageID,
-		AgentID:      agentID,
-	})
-	if err != nil {
+	resp, err := s.updateMessageState(ctx, agentID, messageID, "snoozed", &snoozedUntil)
+	if err != nil || resp.Error != nil {
 		http.Error(w, "Failed to snooze message", http.StatusInternalServerError)
 		return
 	}
@@ -3081,15 +3005,9 @@ func (s *Server) handleMessageTrash(
 		return
 	}
 
-	// Otherwise, update recipient state.
-	_, err = s.store.Queries().UpdateRecipientState(ctx, sqlc.UpdateRecipientStateParams{
-		State:     "trash",
-		Column2:   "trash",
-		ReadAt:    sql.NullInt64{Int64: time.Now().Unix(), Valid: true},
-		MessageID: messageID,
-		AgentID:   agentID,
-	})
-	if err != nil {
+	// Update recipient state via actor.
+	resp, err := s.updateMessageState(ctx, agentID, messageID, "trash", nil)
+	if err != nil || resp.Error != nil {
 		http.Error(w, "Failed to trash message", http.StatusInternalServerError)
 		return
 	}
@@ -3110,12 +3028,8 @@ func (s *Server) handleMessageAck(
 		return
 	}
 
-	err := s.store.Queries().UpdateRecipientAcked(ctx, sqlc.UpdateRecipientAckedParams{
-		AckedAt:   sql.NullInt64{Int64: time.Now().Unix(), Valid: true},
-		MessageID: messageID,
-		AgentID:   agentID,
-	})
-	if err != nil {
+	resp, err := s.ackMessage(ctx, agentID, messageID)
+	if err != nil || resp.Error != nil {
 		http.Error(w, "Failed to acknowledge message", http.StatusInternalServerError)
 		return
 	}

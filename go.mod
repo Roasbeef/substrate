@@ -3,13 +3,13 @@ module github.com/roasbeef/subtrate
 go 1.25
 
 require (
+	github.com/btcsuite/btclog/v2 v2.0.1-0.20250728225537-6090e87c6c5b
 	github.com/golang-migrate/migrate/v4 v4.19.1
 	github.com/google/uuid v1.6.0
-	github.com/lightninglabs/darepo-client/baselib v0.0.0
 	github.com/lightningnetwork/lnd/fn/v2 v2.0.9
 	github.com/mattn/go-sqlite3 v1.14.24
 	github.com/modelcontextprotocol/go-sdk v1.2.0
-	github.com/roasbeef/claude-agent-sdk-go v0.0.0
+	github.com/roasbeef/claude-agent-sdk-go v1.0.3
 	github.com/spf13/cobra v1.10.2
 	github.com/stretchr/testify v1.11.1
 	github.com/yuin/goldmark v1.7.16
@@ -20,12 +20,10 @@ require (
 
 require (
 	github.com/btcsuite/btclog v0.0.0-20241003133417-09c4e92e319c // indirect
-	github.com/btcsuite/btclog/v2 v2.0.1-0.20250728225537-6090e87c6c5b // indirect
 	github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc // indirect
 	github.com/google/jsonschema-go v0.3.0 // indirect
 	github.com/inconshreveable/mousetrap v1.1.0 // indirect
 	github.com/kballard/go-shellquote v0.0.0-20180428030007-95032a82bc51 // indirect
-	github.com/kr/text v0.2.0 // indirect
 	github.com/mattn/go-isatty v0.0.16 // indirect
 	github.com/pmezard/go-difflib v1.0.1-0.20181226105442-5d4384ee4fb2 // indirect
 	github.com/remyoudompheng/bigfft v0.0.0-20200410134404-eec4a21b6bb0 // indirect
@@ -52,7 +50,3 @@ require (
 	modernc.org/strutil v1.1.3 // indirect
 	modernc.org/token v1.0.0 // indirect
 )
-
-replace github.com/lightninglabs/darepo-client/baselib => /Users/roasbeef/gocode/src/github.com/lightninglabs/darepo-client/baselib
-
-replace github.com/roasbeef/claude-agent-sdk-go => /Users/roasbeef/gocode/src/github.com/Roasbeef/claude-agent-sdk-go

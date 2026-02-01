@@ -45,8 +45,10 @@ var agentDeleteCmd = &cobra.Command{
 	RunE:  runAgentDelete,
 }
 
-var registerProject string
-var forceDelete bool
+var (
+	registerProject string
+	forceDelete     bool
+)
 
 func init() {
 	agentCmd.AddCommand(agentRegisterCmd)

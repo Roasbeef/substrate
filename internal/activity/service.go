@@ -4,8 +4,8 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/lightninglabs/darepo-client/baselib/actor"
 	"github.com/lightningnetwork/lnd/fn/v2"
+	"github.com/roasbeef/subtrate/internal/baselib/actor"
 	"github.com/roasbeef/subtrate/internal/store"
 )
 
@@ -32,7 +32,6 @@ func NewService(cfg ServiceConfig) *Service {
 func (s *Service) Receive(
 	ctx context.Context, msg ActivityRequest,
 ) fn.Result[ActivityResponse] {
-
 	switch m := msg.(type) {
 	case RecordActivityRequest:
 		resp := s.handleRecordActivity(ctx, m)
@@ -65,7 +64,6 @@ func (s *Service) Receive(
 func (s *Service) handleRecordActivity(
 	ctx context.Context, req RecordActivityRequest,
 ) RecordActivityResponse {
-
 	err := s.store.CreateActivity(ctx, store.CreateActivityParams{
 		AgentID:      req.AgentID,
 		ActivityType: req.ActivityType,
@@ -80,7 +78,6 @@ func (s *Service) handleRecordActivity(
 func (s *Service) handleListRecent(
 	ctx context.Context, req ListRecentRequest,
 ) ListRecentResponse {
-
 	limit := req.Limit
 	if limit <= 0 {
 		limit = 50
@@ -100,7 +97,6 @@ func (s *Service) handleListRecent(
 func (s *Service) handleListByAgent(
 	ctx context.Context, req ListByAgentRequest,
 ) ListByAgentResponse {
-
 	limit := req.Limit
 	if limit <= 0 {
 		limit = 50
@@ -120,7 +116,6 @@ func (s *Service) handleListByAgent(
 func (s *Service) handleListSince(
 	ctx context.Context, req ListSinceRequest,
 ) ListSinceResponse {
-
 	limit := req.Limit
 	if limit <= 0 {
 		limit = 50
@@ -140,7 +135,6 @@ func (s *Service) handleListSince(
 func (s *Service) handleCleanup(
 	ctx context.Context, req CleanupRequest,
 ) CleanupResponse {
-
 	err := s.store.DeleteOldActivities(ctx, req.OlderThan)
 	return CleanupResponse{Error: err}
 }

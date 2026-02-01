@@ -18,8 +18,8 @@ type ClaudeSettings struct {
 
 // HookEntry represents a hook configuration in settings.json.
 type HookEntry struct {
-	Matcher string          `json:"matcher"`
-	Hooks   []HookCommand   `json:"hooks"`
+	Matcher string        `json:"matcher"`
+	Hooks   []HookCommand `json:"hooks"`
 }
 
 // HookCommand represents a single hook command.
@@ -173,11 +173,11 @@ func SaveSettings(claudeDir string, settings *ClaudeSettings) error {
 	}
 
 	// Ensure directory exists.
-	if err := os.MkdirAll(claudeDir, 0755); err != nil {
+	if err := os.MkdirAll(claudeDir, 0o755); err != nil {
 		return fmt.Errorf("failed to create directory: %w", err)
 	}
 
-	if err := os.WriteFile(settingsPath, data, 0644); err != nil {
+	if err := os.WriteFile(settingsPath, data, 0o644); err != nil {
 		return fmt.Errorf("failed to write settings: %w", err)
 	}
 

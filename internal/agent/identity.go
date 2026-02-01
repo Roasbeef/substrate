@@ -24,20 +24,20 @@ type IdentityManager struct {
 
 // IdentityFile represents the JSON structure stored in identity files.
 type IdentityFile struct {
-	SessionID       string            `json:"session_id"`
-	AgentName       string            `json:"agent_name"`
-	AgentID         int64             `json:"agent_id"`
-	ProjectKey      string            `json:"project_key,omitempty"`
-	GitBranch       string            `json:"git_branch,omitempty"`
-	CreatedAt       time.Time         `json:"created_at"`
-	LastActiveAt    time.Time         `json:"last_active_at"`
-	ConsumerOffsets map[string]int64  `json:"consumer_offsets,omitempty"`
+	SessionID       string           `json:"session_id"`
+	AgentName       string           `json:"agent_name"`
+	AgentID         int64            `json:"agent_id"`
+	ProjectKey      string           `json:"project_key,omitempty"`
+	GitBranch       string           `json:"git_branch,omitempty"`
+	CreatedAt       time.Time        `json:"created_at"`
+	LastActiveAt    time.Time        `json:"last_active_at"`
+	ConsumerOffsets map[string]int64 `json:"consumer_offsets,omitempty"`
 }
 
 // NewIdentityManager creates a new identity manager.
 func NewIdentityManager(store *db.Store, registry *Registry) (*IdentityManager,
-	error) {
-
+	error,
+) {
 	// Get home directory for identity storage.
 	home, err := os.UserHomeDir()
 	if err != nil {
@@ -52,7 +52,7 @@ func NewIdentityManager(store *db.Store, registry *Registry) (*IdentityManager,
 		filepath.Join(identityDir, "by-project"),
 	}
 	for _, dir := range dirs {
-		if err := os.MkdirAll(dir, 0700); err != nil {
+		if err := os.MkdirAll(dir, 0o700); err != nil {
 			return nil, fmt.Errorf("failed to create dir %s: %w",
 				dir, err)
 		}
@@ -70,8 +70,8 @@ func NewIdentityManager(store *db.Store, registry *Registry) (*IdentityManager,
 // existing identity is restored, the project_key and git_branch are updated
 // to reflect the current session's context.
 func (m *IdentityManager) EnsureIdentity(ctx context.Context, sessionID string,
-	projectKey string, gitBranch string) (*IdentityFile, error) {
-
+	projectKey string, gitBranch string,
+) (*IdentityFile, error) {
 	// Try to restore existing identity.
 	identity, err := m.RestoreIdentity(ctx, sessionID)
 	if err == nil {
@@ -158,8 +158,8 @@ func (m *IdentityManager) EnsureIdentity(ctx context.Context, sessionID string,
 
 // RestoreIdentity restores an agent identity from the session ID.
 func (m *IdentityManager) RestoreIdentity(ctx context.Context,
-	sessionID string) (*IdentityFile, error) {
-
+	sessionID string,
+) (*IdentityFile, error) {
 	// First try file-based storage.
 	filePath := filepath.Join(
 		m.identityDir, "by-session", sessionID+".json",
@@ -225,8 +225,8 @@ func (m *IdentityManager) RestoreIdentity(ctx context.Context,
 
 // SaveIdentity persists the current identity state (including offsets).
 func (m *IdentityManager) SaveIdentity(ctx context.Context,
-	identity *IdentityFile) error {
-
+	identity *IdentityFile,
+) error {
 	identity.LastActiveAt = time.Now()
 
 	if err := m.saveIdentityFile(identity); err != nil {
@@ -262,8 +262,8 @@ func (m *IdentityManager) SaveIdentity(ctx context.Context,
 
 // GetProjectDefaultIdentity returns the default agent for a project.
 func (m *IdentityManager) GetProjectDefaultIdentity(ctx context.Context,
-	projectKey string) (*IdentityFile, error) {
-
+	projectKey string,
+) (*IdentityFile, error) {
 	// Try file-based storage first.
 	hash := hashProjectKey(projectKey)
 	filePath := filepath.Join(
@@ -314,8 +314,8 @@ func (m *IdentityManager) GetProjectDefaultIdentity(ctx context.Context,
 
 // SetProjectDefault sets the default agent for a project.
 func (m *IdentityManager) SetProjectDefault(ctx context.Context,
-	projectKey string, agentName string) error {
-
+	projectKey string, agentName string,
+) error {
 	agent, err := m.registry.GetAgentByName(ctx, agentName)
 	if err != nil {
 		return fmt.Errorf("agent not found: %w", err)
@@ -341,7 +341,7 @@ func (m *IdentityManager) SetProjectDefault(ctx context.Context,
 		return fmt.Errorf("failed to marshal identity: %w", err)
 	}
 
-	if err := os.WriteFile(filePath, data, 0600); err != nil {
+	if err := os.WriteFile(filePath, data, 0o600); err != nil {
 		return fmt.Errorf("failed to write identity file: %w", err)
 	}
 
@@ -350,15 +350,15 @@ func (m *IdentityManager) SetProjectDefault(ctx context.Context,
 
 // CurrentIdentity returns the current agent identity for output.
 func (m *IdentityManager) CurrentIdentity(ctx context.Context,
-	sessionID string) (*IdentityFile, error) {
-
+	sessionID string,
+) (*IdentityFile, error) {
 	return m.RestoreIdentity(ctx, sessionID)
 }
 
 // ListIdentities returns all known identities.
 func (m *IdentityManager) ListIdentities(ctx context.Context) ([]IdentityFile,
-	error) {
-
+	error,
+) {
 	var identities []IdentityFile
 
 	// Read from by-session directory.
@@ -405,7 +405,7 @@ func (m *IdentityManager) saveIdentityFile(identity *IdentityFile) error {
 		return fmt.Errorf("failed to marshal identity: %w", err)
 	}
 
-	if err := os.WriteFile(filePath, data, 0600); err != nil {
+	if err := os.WriteFile(filePath, data, 0o600); err != nil {
 		return fmt.Errorf("failed to write identity file: %w", err)
 	}
 
@@ -414,8 +414,8 @@ func (m *IdentityManager) saveIdentityFile(identity *IdentityFile) error {
 
 // saveSessionDB saves the session identity to the database.
 func (m *IdentityManager) saveSessionDB(ctx context.Context,
-	identity *IdentityFile) error {
-
+	identity *IdentityFile,
+) error {
 	if identity.SessionID == "" {
 		return nil
 	}
@@ -442,8 +442,8 @@ func (m *IdentityManager) saveSessionDB(ctx context.Context,
 // project context. This ensures the agent's git_branch and project_key reflect
 // the current session, which may change between sessions.
 func (m *IdentityManager) updateAgentContext(ctx context.Context,
-	identity *IdentityFile, projectKey string, gitBranch string) error {
-
+	identity *IdentityFile, projectKey string, gitBranch string,
+) error {
 	// Update identity fields.
 	if projectKey != "" {
 		identity.ProjectKey = projectKey

@@ -96,7 +96,6 @@ type SpawnedProcess struct {
 	Prompt    string
 	Response  *SpawnResponse
 	Error     error
-	client    *claudeagent.Client
 }
 
 // NewSpawner creates a new agent spawner.
@@ -203,7 +202,6 @@ func (s *Spawner) Spawn(ctx context.Context, prompt string) (*SpawnResponse, err
 func (s *Spawner) SpawnWithResume(
 	ctx context.Context, sessionID, prompt string,
 ) (*SpawnResponse, error) {
-
 	opts := s.buildClientOptions()
 	opts = append(opts, claudeagent.WithResume(sessionID))
 
@@ -252,7 +250,6 @@ func (s *Spawner) SpawnWithResume(
 func (s *Spawner) SpawnAsync(
 	ctx context.Context, sessionID, prompt string,
 ) error {
-
 	proc := &SpawnedProcess{
 		SessionID: sessionID,
 		StartedAt: time.Now(),
@@ -304,7 +301,6 @@ func (s *Spawner) SpawnWithHook(
 	agentID int64,
 	prompt string,
 ) (*SpawnResponse, error) {
-
 	// Record heartbeat at start.
 	if heartbeatMgr != nil {
 		heartbeatMgr.RecordHeartbeat(ctx, agentID)
@@ -327,7 +323,6 @@ func (s *Spawner) StreamingSpawn(
 	prompt string,
 	callback func(msg claudeagent.Message),
 ) (*SpawnResponse, error) {
-
 	opts := s.buildClientOptions()
 
 	client, err := claudeagent.NewClient(opts...)
@@ -380,7 +375,6 @@ func (s *Spawner) StreamingSpawn(
 func (s *Spawner) SpawnInteractive(
 	ctx context.Context,
 ) (*InteractiveSession, error) {
-
 	opts := s.buildClientOptions()
 
 	client, err := claudeagent.NewClient(opts...)
