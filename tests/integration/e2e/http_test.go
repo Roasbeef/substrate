@@ -3,7 +3,6 @@ package e2e_test
 import (
 	"context"
 	"encoding/json"
-	"fmt"
 	"io"
 	"net"
 	"net/http"
@@ -258,7 +257,7 @@ func waitForServer(t *testing.T, addr string) {
 	t.Fatal("Server did not start in time")
 }
 
-// TestHTTP_IndexPage tests that the index page loads.
+// TestHTTP_IndexPage tests that the React SPA shell is served.
 func TestHTTP_IndexPage(t *testing.T) {
 	env := newHTTPTestEnv(t)
 	defer env.cleanup()
@@ -267,28 +266,27 @@ func TestHTTP_IndexPage(t *testing.T) {
 	require.Equal(t, http.StatusOK, resp.StatusCode)
 
 	body := readBody(t, resp)
-	require.Contains(t, body, "Substrate")
+	// React SPA shell should contain the root div and JS/CSS assets.
+	require.Contains(t, body, `<div id="root">`)
+	require.Contains(t, body, "assets/js")
 }
 
-// TestHTTP_InboxPage tests the inbox page.
+// TestHTTP_InboxPage tests that the SPA is served for client-side routes.
 func TestHTTP_InboxPage(t *testing.T) {
 	env := newHTTPTestEnv(t)
 	defer env.cleanup()
 
-	// Create test data.
-	env.createAgent("Alice")
-	env.createAgent("Bob")
-	env.sendMessage("Alice", "Bob", "Hello Bob", "Test message content", mail.PriorityNormal)
-
+	// SPA routing: /inbox should serve the React shell which handles routing.
 	resp := env.get("/inbox")
 	require.Equal(t, http.StatusOK, resp.StatusCode)
 
 	body := readBody(t, resp)
-	require.Contains(t, body, "Inbox")
+	// React SPA shell should be served for all routes.
+	require.Contains(t, body, `<div id="root">`)
 }
 
-// TestHTTP_InboxMessages tests the inbox messages API endpoint.
-func TestHTTP_InboxMessages(t *testing.T) {
+// TestHTTP_APIV1Messages tests the API v1 messages endpoint.
+func TestHTTP_APIV1Messages(t *testing.T) {
 	env := newHTTPTestEnv(t)
 	defer env.cleanup()
 
@@ -298,22 +296,21 @@ func TestHTTP_InboxMessages(t *testing.T) {
 	env.sendMessage("Sender", "Receiver", "Test Subject", "Test body", mail.PriorityNormal)
 	env.sendMessage("Sender", "Receiver", "Urgent Task", "Do this now!", mail.PriorityUrgent)
 
-	// Get inbox messages for receiver.
-	receiver := env.agents["Receiver"]
-	resp := env.get(fmt.Sprintf("/inbox/messages?agent_id=%d", receiver.ID))
+	// Get inbox messages via API v1.
+	resp := env.get("/api/v1/messages")
 	require.Equal(t, http.StatusOK, resp.StatusCode)
 
 	body := readBody(t, resp)
 
-	// Should contain both messages.
+	// Should contain both messages in JSON response.
 	require.Contains(t, body, "Test Subject")
 	require.Contains(t, body, "Urgent Task")
 
-	t.Logf("Inbox messages response: %s", body[:min(200, len(body))])
+	t.Logf("API v1 messages response: %s", body[:min(300, len(body))])
 }
 
-// TestHTTP_AgentsDashboard tests the agents dashboard page.
-func TestHTTP_AgentsDashboard(t *testing.T) {
+// TestHTTP_APIV1Agents tests the API v1 agents endpoint.
+func TestHTTP_APIV1Agents(t *testing.T) {
 	env := newHTTPTestEnv(t)
 	defer env.cleanup()
 
@@ -322,15 +319,18 @@ func TestHTTP_AgentsDashboard(t *testing.T) {
 	env.createAgent("WorkerB")
 	env.createAgent("Manager")
 
-	resp := env.get("/agents")
+	resp := env.get("/api/v1/agents")
 	require.Equal(t, http.StatusOK, resp.StatusCode)
 
 	body := readBody(t, resp)
-	require.Contains(t, body, "Agents")
+	// Should contain agent names in JSON response.
+	require.Contains(t, body, "WorkerA")
+	require.Contains(t, body, "WorkerB")
+	require.Contains(t, body, "Manager")
 }
 
-// TestHTTP_APITopics tests the topics API endpoint.
-func TestHTTP_APITopics(t *testing.T) {
+// TestHTTP_APIV1Topics tests the API v1 topics endpoint.
+func TestHTTP_APIV1Topics(t *testing.T) {
 	env := newHTTPTestEnv(t)
 	defer env.cleanup()
 
@@ -339,40 +339,42 @@ func TestHTTP_APITopics(t *testing.T) {
 	env.createTopic("direct-channel", "direct")
 	env.createTopic("task-queue", "queue")
 
-	resp := env.get("/api/topics")
+	resp := env.get("/api/v1/topics")
 	require.Equal(t, http.StatusOK, resp.StatusCode)
 
 	body := readBody(t, resp)
 
-	// Should contain topic names.
+	// Should contain topic names in JSON response.
 	require.Contains(t, body, "announcements")
 	require.Contains(t, body, "direct-channel")
 	require.Contains(t, body, "task-queue")
 
-	t.Logf("Topics response: %s", body[:min(200, len(body))])
+	t.Logf("API v1 topics response: %s", body[:min(200, len(body))])
 }
 
-// TestHTTP_APIStatus tests the status API endpoint.
-func TestHTTP_APIStatus(t *testing.T) {
+// TestHTTP_APIV1AgentStatus tests the API v1 agent status endpoint.
+func TestHTTP_APIV1AgentStatus(t *testing.T) {
 	env := newHTTPTestEnv(t)
 	defer env.cleanup()
 
-	// Create test data.
+	// Create test agents.
 	env.createAgent("StatusTestSender")
 	env.createAgent("StatusTestReceiver")
-	env.sendMessage("StatusTestSender", "StatusTestReceiver", "Msg 1", "Body 1", mail.PriorityNormal)
-	env.sendMessage("StatusTestSender", "StatusTestReceiver", "Msg 2", "Body 2", mail.PriorityUrgent)
 
-	receiver := env.agents["StatusTestReceiver"]
-	resp := env.get(fmt.Sprintf("/api/status?agent_id=%d", receiver.ID))
+	resp := env.get("/api/v1/agents/status")
 	require.Equal(t, http.StatusOK, resp.StatusCode)
 
 	body := readBody(t, resp)
-	t.Logf("Status response: %s", body)
+	// Should contain agent names in status response.
+	require.Contains(t, body, "StatusTestSender")
+	require.Contains(t, body, "StatusTestReceiver")
+
+	t.Logf("API v1 agent status response: %s", body)
 }
 
-// TestHTTP_ThreadView tests the thread view endpoint.
-func TestHTTP_ThreadView(t *testing.T) {
+// TestHTTP_APIV1MessagesInThread tests that messages in a thread can be
+// retrieved via the messages API.
+func TestHTTP_APIV1MessagesInThread(t *testing.T) {
 	env := newHTTPTestEnv(t)
 	defer env.cleanup()
 
@@ -413,46 +415,44 @@ func TestHTTP_ThreadView(t *testing.T) {
 	_, err = result.Unpack()
 	require.NoError(t, err)
 
-	// Fetch thread view.
-	resp := env.get(fmt.Sprintf("/thread/%s", threadID))
+	// Fetch messages via API v1 - messages in same thread share thread_id.
+	resp := env.get("/api/v1/messages")
 	require.Equal(t, http.StatusOK, resp.StatusCode)
 
 	body := readBody(t, resp)
 
-	// Should contain both messages.
+	// Should contain both messages and their thread ID.
 	require.Contains(t, body, "First message in thread")
 	require.Contains(t, body, "Reply message")
+	require.Contains(t, body, threadID)
 
-	t.Logf("Thread view response: %s", body[:min(300, len(body))])
+	t.Logf("API v1 messages with thread response: %s", body[:min(400, len(body))])
 }
 
-// TestHTTP_Heartbeat tests the heartbeat API endpoint.
-func TestHTTP_Heartbeat(t *testing.T) {
+// TestHTTP_APIV1Heartbeat tests the API v1 heartbeat endpoint.
+func TestHTTP_APIV1Heartbeat(t *testing.T) {
 	env := newHTTPTestEnv(t)
 	defer env.cleanup()
 
 	// Create an agent.
 	env.createAgent("HeartbeatAgent")
 
-	// Send heartbeat.
+	// Send heartbeat via API v1. Heartbeat returns 204 No Content.
 	data := map[string]string{"agent_name": "HeartbeatAgent"}
-	resp := env.postJSON("/api/heartbeat", data)
+	resp := env.postJSON("/api/v1/agents/heartbeat", data)
+	require.Equal(t, http.StatusNoContent, resp.StatusCode)
+
+	// Check agent status via API v1.
+	resp = env.get("/api/v1/agents/status")
 	require.Equal(t, http.StatusOK, resp.StatusCode)
 
 	body := readBody(t, resp)
-	t.Logf("Heartbeat response: %s", body)
-
-	// Check agent status.
-	resp = env.get("/api/agents/status")
-	require.Equal(t, http.StatusOK, resp.StatusCode)
-
-	body = readBody(t, resp)
 	require.Contains(t, body, "HeartbeatAgent")
 
 	t.Logf("Agents status response: %s", body[:min(200, len(body))])
 }
 
-// TestHTTP_E2EFlow tests a complete end-to-end flow via HTTP.
+// TestHTTP_E2EFlow tests a complete end-to-end flow via HTTP using API v1.
 func TestHTTP_E2EFlow(t *testing.T) {
 	env := newHTTPTestEnv(t)
 	defer env.cleanup()
@@ -469,50 +469,51 @@ func TestHTTP_E2EFlow(t *testing.T) {
 
 	t.Log("Step 2: Sent 2 messages from WebUser to WebWorker")
 
-	// Step 3: Verify inbox page shows messages.
-	worker := env.agents["WebWorker"]
-	resp := env.get(fmt.Sprintf("/inbox/messages?agent_id=%d", worker.ID))
+	// Step 3: Verify API v1 messages endpoint returns messages.
+	resp := env.get("/api/v1/messages")
 	require.Equal(t, http.StatusOK, resp.StatusCode)
 
 	body := readBody(t, resp)
 	require.Contains(t, body, "Task Assignment")
 	require.Contains(t, body, "Urgent Update")
 
-	t.Log("Step 3: Verified inbox shows both messages")
+	t.Log("Step 3: Verified API v1 messages returns both messages")
 
-	// Step 4: Create topics and verify topics API.
+	// Step 4: Create topics and verify topics API v1.
 	env.createTopic("project-updates", "broadcast")
 	env.createTopic("alerts", "queue")
 
-	resp = env.get("/api/topics")
+	resp = env.get("/api/v1/topics")
 	require.Equal(t, http.StatusOK, resp.StatusCode)
 
 	body = readBody(t, resp)
 	require.Contains(t, body, "project-updates")
 	require.Contains(t, body, "alerts")
 
-	t.Log("Step 4: Created and verified topics")
+	t.Log("Step 4: Created and verified topics via API v1")
 
-	// Step 5: Test heartbeat flow.
-	resp = env.postJSON("/api/heartbeat", map[string]string{"agent_name": "WebWorker"})
-	require.Equal(t, http.StatusOK, resp.StatusCode)
+	// Step 5: Test heartbeat flow via API v1. Heartbeat returns 204 No Content.
+	resp = env.postJSON("/api/v1/agents/heartbeat", map[string]string{"agent_name": "WebWorker"})
+	require.Equal(t, http.StatusNoContent, resp.StatusCode)
 
-	resp = env.get("/api/agents/status")
+	resp = env.get("/api/v1/agents/status")
 	require.Equal(t, http.StatusOK, resp.StatusCode)
 
 	body = readBody(t, resp)
 	require.Contains(t, body, "WebWorker")
 
-	t.Log("Step 5: Heartbeat flow working")
+	t.Log("Step 5: Heartbeat flow working via API v1")
 
-	// Step 6: Verify pages render without error.
+	// Step 6: Verify SPA shell is served for all routes.
 	pages := []string{"/", "/inbox", "/agents"}
 	for _, page := range pages {
 		resp = env.get(page)
 		require.Equal(t, http.StatusOK, resp.StatusCode, "Page %s should return 200", page)
+		body = readBody(t, resp)
+		require.Contains(t, body, `<div id="root">`, "Page %s should serve React shell", page)
 	}
 
-	t.Log("Step 6: All main pages render successfully")
+	t.Log("Step 6: SPA shell served for all routes")
 
 	t.Log("E2E HTTP flow complete!")
 }
