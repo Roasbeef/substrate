@@ -18,6 +18,19 @@ func (s *Server) sendMail(
 	](ctx, s.mailRef, req)
 }
 
+// fetchInbox fetches inbox messages via the actor system.
+func (s *Server) fetchInbox(
+	ctx context.Context, req mail.FetchInboxRequest,
+) (mail.FetchInboxResponse, error) {
+	if s.mailRef == nil {
+		return mail.FetchInboxResponse{}, nil
+	}
+
+	return actorutil.AskAwaitTyped[
+		mail.MailRequest, mail.MailResponse, mail.FetchInboxResponse,
+	](ctx, s.mailRef, req)
+}
+
 // readMessage reads a message via the actor system and marks it as read.
 func (s *Server) readMessage(
 	ctx context.Context, agentID, messageID int64,
@@ -68,16 +81,51 @@ func (s *Server) getAgentStatus(
 	})
 }
 
+// pollChanges polls for new messages via the actor system.
+func (s *Server) pollChanges(
+	ctx context.Context, agentID int64, sinceOffsets map[int64]int64,
+) (mail.PollChangesResponse, error) {
+	if s.mailRef == nil {
+		return mail.PollChangesResponse{}, nil
+	}
+
+	return actorutil.AskAwaitTyped[
+		mail.MailRequest, mail.MailResponse, mail.PollChangesResponse,
+	](ctx, s.mailRef, mail.PollChangesRequest{
+		AgentID:      agentID,
+		SinceOffsets: sinceOffsets,
+	})
+}
+
+// publishMessage publishes a message to a topic via the actor system.
+func (s *Server) publishMessage(
+	ctx context.Context, req mail.PublishRequest,
+) (mail.PublishResponse, error) {
+	if s.mailRef == nil {
+		return mail.PublishResponse{}, nil
+	}
+
+	return actorutil.AskAwaitTyped[
+		mail.MailRequest, mail.MailResponse, mail.PublishResponse,
+	](ctx, s.mailRef, req)
+}
+
 // recordActivity records an activity event via the actor system.
 func (s *Server) recordActivity(ctx context.Context, req activity.RecordActivityRequest) {
-	// Fire and forget.
-	s.activityRef.Tell(ctx, req)
+	if s.activityRef != nil {
+		// Fire and forget.
+		s.activityRef.Tell(ctx, req)
+	}
 }
 
 // listRecentActivities lists recent activities via the actor system.
 func (s *Server) listRecentActivities(
 	ctx context.Context, limit int,
 ) ([]activity.Activity, error) {
+	if s.activityRef == nil {
+		return nil, nil
+	}
+
 	resp, err := actorutil.AskAwaitTyped[
 		activity.ActivityRequest, activity.ActivityResponse,
 		activity.ListRecentResponse,

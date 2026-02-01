@@ -478,7 +478,7 @@ func (s *Server) handleAPIV1Messages(w http.ResponseWriter, r *http.Request) {
 		}
 
 		// Use actor system to send message.
-		if s.actorRefs.HasMailActor() {
+		if s.mailRef != nil {
 			resp, err := s.sendMail(ctx, mail.SendMailRequest{
 				SenderID:       s.getUserAgentID(ctx),
 				RecipientNames: recipientNames,
@@ -635,7 +635,7 @@ func (s *Server) handleAPIV1MessageByID(w http.ResponseWriter, r *http.Request) 
 
 	if r.Method == http.MethodGet {
 		// Use actor system to read message (marks as read).
-		if s.actorRefs.HasMailActor() {
+		if s.mailRef != nil {
 			agentID := s.getUserAgentID(ctx)
 			resp, err := s.readMessage(ctx, agentID, msgID)
 			if err != nil || resp.Error != nil {
@@ -708,7 +708,7 @@ func (s *Server) handleMessageAction(w http.ResponseWriter, r *http.Request, msg
 
 	switch action {
 	case "star":
-		if s.actorRefs.HasMailActor() {
+		if s.mailRef != nil {
 			_, err := s.updateMessageState(ctx, agentID, msgID, "starred", nil)
 			if err != nil {
 				writeError(w, http.StatusInternalServerError, "action_failed", "Failed to star message")
@@ -724,7 +724,7 @@ func (s *Server) handleMessageAction(w http.ResponseWriter, r *http.Request, msg
 		writeJSON(w, http.StatusOK, map[string]string{"status": "starred"})
 
 	case "archive":
-		if s.actorRefs.HasMailActor() {
+		if s.mailRef != nil {
 			_, err := s.updateMessageState(ctx, agentID, msgID, "archived", nil)
 			if err != nil {
 				writeError(w, http.StatusInternalServerError, "action_failed", "Failed to archive message")
@@ -753,7 +753,7 @@ func (s *Server) handleMessageAction(w http.ResponseWriter, r *http.Request, msg
 			snoozedUntil = &t
 		}
 
-		if s.actorRefs.HasMailActor() {
+		if s.mailRef != nil {
 			_, err := s.updateMessageState(ctx, agentID, msgID, "snoozed", snoozedUntil)
 			if err != nil {
 				writeError(w, http.StatusInternalServerError, "action_failed", "Failed to snooze message")
@@ -768,7 +768,7 @@ func (s *Server) handleMessageAction(w http.ResponseWriter, r *http.Request, msg
 		})
 
 	case "ack":
-		if s.actorRefs.HasMailActor() {
+		if s.mailRef != nil {
 			_, err := s.ackMessage(ctx, agentID, msgID)
 			if err != nil {
 				writeError(w, http.StatusInternalServerError, "action_failed", "Failed to ack message")
@@ -780,7 +780,7 @@ func (s *Server) handleMessageAction(w http.ResponseWriter, r *http.Request, msg
 		writeJSON(w, http.StatusOK, map[string]string{"status": "acknowledged"})
 
 	case "read":
-		if s.actorRefs.HasMailActor() {
+		if s.mailRef != nil {
 			_, err := s.readMessage(ctx, agentID, msgID)
 			if err != nil {
 				writeError(w, http.StatusInternalServerError, "action_failed", "Failed to mark message as read")
@@ -793,7 +793,7 @@ func (s *Server) handleMessageAction(w http.ResponseWriter, r *http.Request, msg
 
 	case "unread":
 		// Mark as unread (reset state).
-		if s.actorRefs.HasMailActor() {
+		if s.mailRef != nil {
 			_, err := s.updateMessageState(ctx, agentID, msgID, "unread", nil)
 			if err != nil {
 				writeError(w, http.StatusInternalServerError, "action_failed", "Failed to mark message as unread")
@@ -1160,7 +1160,7 @@ func (s *Server) handleAPIV1Activities(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Use actor system for activities if available.
-	if s.actorRefs.HasActivityActor() {
+	if s.activityRef != nil {
 		activityItems, err := s.listRecentActivities(ctx, pageSize)
 		if err == nil {
 			result := make([]APIV1Activity, 0, len(activityItems))
