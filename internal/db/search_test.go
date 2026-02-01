@@ -18,9 +18,11 @@ func TestSearchMessages(t *testing.T) {
 	ctx := context.Background()
 
 	// Create an agent and topic.
+	now := time.Now().Unix()
 	agent, err := store.Queries().CreateAgent(ctx, sqlc.CreateAgentParams{
-		Name:      "Searcher",
-		CreatedAt: time.Now().Unix(),
+		Name:         "Searcher",
+		CreatedAt:    now,
+		LastActiveAt: now,
 	})
 	require.NoError(t, err)
 
@@ -82,21 +84,25 @@ func TestSearchMessagesForAgent(t *testing.T) {
 	ctx := context.Background()
 
 	// Create agents.
+	now := time.Now().Unix()
 	sender, err := store.Queries().CreateAgent(ctx, sqlc.CreateAgentParams{
-		Name:      "Sender",
-		CreatedAt: time.Now().Unix(),
+		Name:         "Sender",
+		CreatedAt:    now,
+		LastActiveAt: now,
 	})
 	require.NoError(t, err)
 
 	recipient1, err := store.Queries().CreateAgent(ctx, sqlc.CreateAgentParams{
-		Name:      "Recipient1",
-		CreatedAt: time.Now().Unix(),
+		Name:         "Recipient1",
+		CreatedAt:    now,
+		LastActiveAt: now,
 	})
 	require.NoError(t, err)
 
 	recipient2, err := store.Queries().CreateAgent(ctx, sqlc.CreateAgentParams{
-		Name:      "Recipient2",
-		CreatedAt: time.Now().Unix(),
+		Name:         "Recipient2",
+		CreatedAt:    now,
+		LastActiveAt: now,
 	})
 	require.NoError(t, err)
 

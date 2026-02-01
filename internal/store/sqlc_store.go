@@ -695,10 +695,13 @@ func (s *SqlcStore) GetMessagesByTopic(ctx context.Context,
 func (s *SqlcStore) CreateAgent(ctx context.Context,
 	params CreateAgentParams,
 ) (Agent, error) {
+	now := time.Now().Unix()
 	agent, err := s.db.CreateAgent(ctx, sqlc.CreateAgentParams{
-		Name:       params.Name,
-		ProjectKey: ToSqlcNullString(params.ProjectKey),
-		GitBranch:  ToSqlcNullString(params.GitBranch),
+		Name:         params.Name,
+		ProjectKey:   ToSqlcNullString(params.ProjectKey),
+		GitBranch:    ToSqlcNullString(params.GitBranch),
+		CreatedAt:    now,
+		LastActiveAt: now,
 	})
 	if err != nil {
 		return Agent{}, err

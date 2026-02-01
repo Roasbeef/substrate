@@ -8,10 +8,6 @@ import { TextInput } from '@/components/ui/Input.js';
 import { Button } from '@/components/ui/Button.js';
 import type { StartSessionRequest } from '@/types/api.js';
 
-// Combine clsx and tailwind-merge for class name handling.
-// function cn(...inputs: (string | undefined | null | false)[]) {
-  return twMerge(clsx(inputs));
-}
 
 // Form state for new session.
 interface StartSessionFormState {

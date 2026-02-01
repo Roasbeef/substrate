@@ -188,9 +188,11 @@ func readBody(t *testing.T, resp *http.Response) string {
 func (e *httpTestEnv) createAgent(name string) sqlc.Agent {
 	e.t.Helper()
 
+	now := time.Now().Unix()
 	agent, err := e.store.Queries().CreateAgent(context.Background(), sqlc.CreateAgentParams{
-		Name:      name,
-		CreatedAt: time.Now().Unix(),
+		Name:         name,
+		CreatedAt:    now,
+		LastActiveAt: now,
 	})
 	require.NoError(e.t, err)
 
