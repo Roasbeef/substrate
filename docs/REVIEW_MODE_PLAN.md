@@ -1,0 +1,1142 @@
+# Native Review Mode - Implementation Plan
+
+> **Status**: Planning
+> **Goal**: Autonomous PR review and iteration with specialized reviewer agents
+
+## Executive Summary
+
+Native review mode enables agents to request PR reviews from specialized reviewer personas, receive structured feedback, iterate on changes, and reach approval - all autonomously within Substrate's messaging system. The entire review conversation is visible in the web UI as a special thread type.
+
+---
+
+## Architecture Overview
+
+```
+┌─────────────────────────────────────────────────────────────────────────┐
+│                         Review Flow                                      │
+│                                                                         │
+│  ┌──────────────┐    ReviewRequest    ┌──────────────────┐              │
+│  │ Agent (PR    │ ─────────────────▶  │ ReviewerService  │              │
+│  │ Author)      │                     │ (Actor)          │              │
+│  │              │ ◀───────────────── │                  │              │
+│  │              │    ReviewResponse   │   ┌──────────┐   │              │
+│  └──────────────┘                     │   │ Spawner  │   │              │
+│         │                             │   │ (Claude  │   │              │
+│         │ Iterates                    │   │ SDK)     │   │              │
+│         ▼                             │   └──────────┘   │              │
+│  ┌──────────────┐                     └──────────────────┘              │
+│  │ Pushes fixes │                              │                        │
+│  │ Re-requests  │                              │                        │
+│  │ review       │                              ▼                        │
+│  └──────────────┘                     ┌──────────────────┐              │
+│                                       │ Multi-Reviewer   │              │
+│                                       │ Topic (optional) │              │
+│                                       │                  │              │
+│                                       │ ┌────┐ ┌────┐    │              │
+│                                       │ │Sec │ │Perf│    │              │
+│                                       │ │Rev │ │Rev │    │              │
+│                                       │ └────┘ └────┘    │              │
+│                                       └──────────────────┘              │
+└─────────────────────────────────────────────────────────────────────────┘
+```
+
+---
+
+## 1. Core Components
+
+### 1.1 ReviewerService (Actor)
+
+**Location**: `internal/review/service.go`
+
+A dedicated actor that handles review workflows:
+
+```go
+package review
+
+import (
+    "context"
+    "github.com/Roasbeef/claude-agent-sdk-go/claudeagent"
+    "github.com/lightningnetwork/lnd/fn/v2"
+)
+
+// ReviewRequest is sent by agents requesting a PR review.
+type ReviewRequest struct {
+    actor.BaseMessage
+
+    RequesterID   int64     // Agent requesting review
+    ThreadID      string    // Thread to post reviews in (or empty for new)
+
+    // PR Information
+    PRNumber      int       // GitHub PR number (if applicable)
+    Branch        string    // Branch name
+    BaseBranch    string    // Base branch (main, master, etc.)
+    CommitSHA     string    // Specific commit to review
+    RepoPath      string    // Local repo path for analysis
+
+    // Review Configuration
+    ReviewType    ReviewType    // full, incremental, security, performance
+    Reviewers     []string      // Specific reviewer personas to use
+    Priority      Priority      // urgent, normal, low
+
+    // Context
+    Description   string        // PR description/context
+    ChangedFiles  []string      // List of changed files (optional hint)
+}
+
+// ReviewResponse contains the structured review feedback.
+type ReviewResponse struct {
+    actor.BaseMessage
+
+    ReviewID      string
+    ThreadID      string
+    ReviewerName  string        // Which reviewer persona
+
+    // Review Results
+    Decision      ReviewDecision  // approve, request_changes, comment
+    Summary       string          // Overall summary
+    Issues        []ReviewIssue   // Specific issues found
+    Suggestions   []Suggestion    // Optional improvements (non-blocking)
+
+    // Metadata
+    FilesReviewed int
+    LinesAnalyzed int
+    ReviewedAt    time.Time
+    DurationMS    int64
+    CostUSD       float64
+}
+
+// ReviewDecision indicates the review outcome.
+type ReviewDecision string
+
+const (
+    DecisionApprove        ReviewDecision = "approve"
+    DecisionRequestChanges ReviewDecision = "request_changes"
+    DecisionComment        ReviewDecision = "comment"
+)
+
+// ReviewIssue represents a specific issue found during review.
+type ReviewIssue struct {
+    ID          string
+    Type        IssueType     // bug, security, claude_md_violation, logic_error
+    Severity    Severity      // critical, high, medium, low
+    File        string
+    LineStart   int
+    LineEnd     int
+    Title       string
+    Description string
+    CodeSnippet string        // Relevant code
+    Suggestion  string        // Fix suggestion (optional)
+    ClaudeMDRef string        // CLAUDE.md rule citation (if applicable)
+}
+
+// Service handles all review operations.
+type Service struct {
+    store     store.Storage
+    spawner   *agent.Spawner
+    mailSvc   *mail.Service
+
+    // Reviewer configurations
+    reviewers map[string]*ReviewerConfig
+
+    // Active review sessions (for interactive mode)
+    sessions  map[string]*ReviewSession
+}
+
+// Receive implements ActorBehavior for the review service.
+func (s *Service) Receive(ctx context.Context, msg ReviewMessage) fn.Result[ReviewResponse] {
+    switch m := msg.(type) {
+    case ReviewRequest:
+        return s.handleReviewRequest(ctx, m)
+    case ReviewIterationRequest:
+        return s.handleIteration(ctx, m)
+    case ReviewApprovalCheck:
+        return s.handleApprovalCheck(ctx, m)
+    default:
+        return fn.Err[ReviewResponse](fmt.Errorf("unknown message type: %T", msg))
+    }
+}
+```
+
+### 1.2 ReviewerConfig (Personas)
+
+**Location**: `internal/review/config.go`
+
+```go
+// ReviewerConfig defines a specialized reviewer persona.
+type ReviewerConfig struct {
+    Name           string            // "SecurityReviewer", "PerformanceReviewer"
+    SystemPrompt   string            // Base system prompt
+    FocusAreas     []string          // What to look for
+    IgnorePatterns []string          // Files/patterns to skip
+    MaxConcurrent  int               // Max concurrent reviews
+    Model          string            // claude-opus-4-5-20251101, sonnet, etc.
+    Timeout        time.Duration
+}
+
+// DefaultReviewerConfig returns the standard code reviewer configuration.
+func DefaultReviewerConfig() *ReviewerConfig {
+    return &ReviewerConfig{
+        Name: "CodeReviewer",
+        SystemPrompt: ReviewSystemPrompt, // See section 2
+        FocusAreas: []string{
+            "bugs",
+            "logic_errors",
+            "security_vulnerabilities",
+            "claude_md_compliance",
+        },
+        Model:   "claude-opus-4-5-20251101",
+        Timeout: 10 * time.Minute,
+    }
+}
+
+// SpecializedReviewers returns additional persona configurations.
+func SpecializedReviewers() map[string]*ReviewerConfig {
+    return map[string]*ReviewerConfig{
+        "security": {
+            Name: "SecurityReviewer",
+            FocusAreas: []string{
+                "injection_vulnerabilities",
+                "authentication_bypass",
+                "authorization_flaws",
+                "sensitive_data_exposure",
+                "cryptographic_issues",
+            },
+            Model: "claude-opus-4-5-20251101",
+        },
+        "performance": {
+            Name: "PerformanceReviewer",
+            FocusAreas: []string{
+                "n_plus_one_queries",
+                "memory_leaks",
+                "inefficient_algorithms",
+                "unnecessary_allocations",
+                "blocking_operations",
+            },
+            Model: "claude-sonnet-4-20250514",
+        },
+        "architecture": {
+            Name: "ArchitectureReviewer",
+            FocusAreas: []string{
+                "separation_of_concerns",
+                "interface_design",
+                "dependency_management",
+                "testability",
+            },
+            Model: "claude-opus-4-5-20251101",
+        },
+    }
+}
+```
+
+### 1.3 Review State Machine
+
+**Location**: `internal/review/fsm.go`
+
+```go
+// ReviewState represents the current state of a review.
+type ReviewState string
+
+const (
+    StateNew              ReviewState = "new"
+    StatePendingReview    ReviewState = "pending_review"
+    StateUnderReview      ReviewState = "under_review"
+    StateChangesRequested ReviewState = "changes_requested"
+    StateReReview         ReviewState = "re_review"
+    StateApproved         ReviewState = "approved"
+    StateRejected         ReviewState = "rejected"
+    StateCancelled        ReviewState = "cancelled"
+)
+
+// ReviewEvent triggers state transitions.
+type ReviewEvent interface {
+    reviewEventMarker()
+}
+
+type (
+    SubmitForReviewEvent   struct{ RequesterID int64 }
+    StartReviewEvent       struct{ ReviewerID string }
+    RequestChangesEvent    struct{ Issues []ReviewIssue }
+    ResubmitEvent          struct{ NewCommitSHA string }
+    ApproveEvent           struct{ ReviewerID string }
+    RejectEvent            struct{ Reason string }
+    CancelEvent            struct{ Reason string }
+)
+
+// ReviewFSM manages review state transitions.
+type ReviewFSM struct {
+    ReviewID    string
+    ThreadID    string
+    CurrentState ReviewState
+
+    // History for debugging/UI
+    Transitions []StateTransition
+
+    // Multi-reviewer tracking
+    ReviewerStates map[string]ReviewerState
+}
+
+// ReviewerState tracks per-reviewer status in multi-reviewer mode.
+type ReviewerState struct {
+    ReviewerID  string
+    Decision    ReviewDecision
+    ReviewedAt  time.Time
+    Issues      []ReviewIssue
+}
+
+// ProcessEvent handles a review event and returns the new state.
+func (fsm *ReviewFSM) ProcessEvent(ctx context.Context, event ReviewEvent) (ReviewState, error) {
+    // State transition logic...
+}
+```
+
+---
+
+## 2. System Prompt (Enhanced)
+
+**Location**: `internal/review/prompt.go`
+
+Based on the Claude Code review plugin but enhanced for Substrate:
+
+```go
+const ReviewSystemPrompt = `# Code Review Agent Instructions
+
+You are a specialized code reviewer operating within the Substrate agent system.
+Your role is to review pull requests for bugs, security issues, and CLAUDE.md compliance.
+
+## Core Principles
+
+**HIGH-SIGNAL ISSUES ONLY**: Flag only issues that matter:
+- Code that fails to compile or parse (syntax errors, type errors, import errors)
+- Clear logic errors that will produce incorrect results
+- Security vulnerabilities (injection, auth bypass, data exposure)
+- Unambiguous CLAUDE.md violations (cite the specific rule)
+
+**DO NOT FLAG**:
+- Code style or formatting preferences
+- Potential issues that depend on specific inputs
+- Subjective "improvements" or refactoring suggestions
+- Pre-existing issues not introduced by this PR
+- Issues that linters or type checkers would catch
+
+## Review Process
+
+1. **Understand Context**: Read the PR description and CLAUDE.md files
+2. **Analyze Changes**: Review each changed file systematically
+3. **Identify Issues**: Focus on bugs and violations only
+4. **Validate Findings**: Confirm each issue is real and high-signal
+5. **Structure Response**: Use the structured format below
+
+## Response Format
+
+Provide your review in this exact structure:
+
+### Decision
+[APPROVE | REQUEST_CHANGES | COMMENT]
+
+### Summary
+[1-2 sentence summary of the review]
+
+### Issues (if any)
+For each issue:
+- **File**: path/to/file.go:123-145
+- **Type**: [bug | security | claude_md_violation | logic_error]
+- **Severity**: [critical | high | medium | low]
+- **Description**: Clear explanation of the problem
+- **Code**:
+` + "```" + `
+relevant code snippet
+` + "```" + `
+- **Suggestion**: How to fix it (only if fix is straightforward)
+- **CLAUDE.md Reference**: (if applicable) "Violates: [rule]"
+
+### Non-Blocking Suggestions (optional)
+Minor improvements that don't block approval.
+
+## CLAUDE.md Compliance
+
+When reviewing, check for violations of project-specific rules in CLAUDE.md files:
+- Root CLAUDE.md rules apply to entire project
+- Directory-specific CLAUDE.md files apply to that subtree
+- Always cite the specific rule being violated
+
+## Iteration Protocol
+
+When changes are requested:
+1. The author will push fixes and re-request review
+2. Focus ONLY on previously flagged issues + new changes
+3. Acknowledge fixed issues explicitly
+4. Do not introduce new unrelated feedback
+5. Approve when all flagged issues are resolved
+
+## Multi-Reviewer Mode
+
+When operating as a specialized reviewer (security, performance, etc.):
+- Stay focused on your specialty area
+- Do not duplicate findings from other reviewers
+- Clearly identify your reviewer persona in responses
+`
+```
+
+---
+
+## 3. Database Schema Extensions
+
+**Location**: `internal/db/migrations/000008_reviews.up.sql`
+
+```sql
+-- Review requests table
+CREATE TABLE reviews (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    review_id TEXT NOT NULL UNIQUE,           -- UUID
+    thread_id TEXT NOT NULL,                  -- Links to message thread
+    requester_id INTEGER NOT NULL REFERENCES agents(id),
+
+    -- PR Information
+    pr_number INTEGER,
+    branch TEXT NOT NULL,
+    base_branch TEXT NOT NULL DEFAULT 'main',
+    commit_sha TEXT NOT NULL,
+    repo_path TEXT NOT NULL,
+
+    -- Configuration
+    review_type TEXT NOT NULL DEFAULT 'full', -- full, incremental, security, performance
+    priority TEXT NOT NULL DEFAULT 'normal',
+
+    -- State
+    state TEXT NOT NULL DEFAULT 'new',
+
+    -- Timestamps
+    created_at INTEGER NOT NULL,
+    updated_at INTEGER NOT NULL,
+    completed_at INTEGER,
+
+    FOREIGN KEY (thread_id) REFERENCES messages(thread_id)
+);
+
+-- Review iterations (each round of review)
+CREATE TABLE review_iterations (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    review_id TEXT NOT NULL REFERENCES reviews(review_id),
+    iteration_num INTEGER NOT NULL,
+
+    -- Reviewer info
+    reviewer_id TEXT NOT NULL,                -- Reviewer persona name
+    reviewer_session_id TEXT,                 -- Claude session ID for this review
+
+    -- Results
+    decision TEXT NOT NULL,                   -- approve, request_changes, comment
+    summary TEXT NOT NULL,
+    issues_json TEXT,                         -- JSON array of ReviewIssue
+    suggestions_json TEXT,                    -- JSON array of Suggestion
+
+    -- Metrics
+    files_reviewed INTEGER NOT NULL DEFAULT 0,
+    lines_analyzed INTEGER NOT NULL DEFAULT 0,
+    duration_ms INTEGER NOT NULL DEFAULT 0,
+    cost_usd REAL NOT NULL DEFAULT 0,
+
+    -- Timestamps
+    started_at INTEGER NOT NULL,
+    completed_at INTEGER,
+
+    UNIQUE(review_id, iteration_num, reviewer_id)
+);
+
+-- Review issues (denormalized for querying)
+CREATE TABLE review_issues (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    review_id TEXT NOT NULL REFERENCES reviews(review_id),
+    iteration_num INTEGER NOT NULL,
+
+    issue_type TEXT NOT NULL,                 -- bug, security, claude_md_violation, logic_error
+    severity TEXT NOT NULL,                   -- critical, high, medium, low
+
+    file_path TEXT NOT NULL,
+    line_start INTEGER NOT NULL,
+    line_end INTEGER,
+
+    title TEXT NOT NULL,
+    description TEXT NOT NULL,
+    code_snippet TEXT,
+    suggestion TEXT,
+    claude_md_ref TEXT,
+
+    -- Resolution tracking
+    status TEXT NOT NULL DEFAULT 'open',      -- open, fixed, wont_fix, duplicate
+    resolved_at INTEGER,
+    resolved_in_iteration INTEGER,
+
+    created_at INTEGER NOT NULL
+);
+
+-- Indexes for common queries
+CREATE INDEX idx_reviews_state ON reviews(state);
+CREATE INDEX idx_reviews_requester ON reviews(requester_id);
+CREATE INDEX idx_reviews_thread ON reviews(thread_id);
+CREATE INDEX idx_review_iterations_review ON review_iterations(review_id);
+CREATE INDEX idx_review_issues_review ON review_issues(review_id);
+CREATE INDEX idx_review_issues_status ON review_issues(status);
+```
+
+---
+
+## 4. Multi-Reviewer Topic System
+
+**Location**: `internal/review/multi_reviewer.go`
+
+For reviews that need multiple specialized perspectives:
+
+```go
+// MultiReviewConfig configures a multi-reviewer setup.
+type MultiReviewConfig struct {
+    // Topic where review requests are published
+    TopicName string
+
+    // Reviewers subscribed to this topic
+    Reviewers []string  // ["security", "performance", "architecture"]
+
+    // Consensus rules
+    RequireAll      bool  // All must approve vs majority
+    MinApprovals    int   // Minimum approvals needed
+    BlockOnCritical bool  // Any critical issue blocks
+}
+
+// PublishReviewRequest publishes a review to the multi-reviewer topic.
+func (s *Service) PublishReviewRequest(ctx context.Context, req ReviewRequest, config MultiReviewConfig) error {
+    // Publish to topic - all subscribed reviewers receive it
+    return s.mailSvc.Publish(ctx, mail.PublishRequest{
+        TopicName: config.TopicName,
+        Message: mail.TopicMessage{
+            Subject: fmt.Sprintf("Review Request: %s", req.Branch),
+            Body:    s.formatReviewRequestBody(req),
+            Metadata: map[string]string{
+                "review_id":   req.ReviewID,
+                "review_type": "multi",
+            },
+        },
+    })
+}
+
+// AggregateReviews combines reviews from multiple reviewers.
+func (s *Service) AggregateReviews(ctx context.Context, reviewID string) (*AggregatedReview, error) {
+    iterations, err := s.store.GetReviewIterations(ctx, reviewID)
+    if err != nil {
+        return nil, err
+    }
+
+    agg := &AggregatedReview{
+        ReviewID:   reviewID,
+        Reviewers:  make(map[string]ReviewerSummary),
+        AllIssues:  make([]ReviewIssue, 0),
+    }
+
+    for _, iter := range iterations {
+        agg.Reviewers[iter.ReviewerID] = ReviewerSummary{
+            Decision: iter.Decision,
+            Issues:   len(iter.Issues),
+        }
+        agg.AllIssues = append(agg.AllIssues, iter.Issues...)
+    }
+
+    // Compute consensus
+    agg.ConsensusDecision = s.computeConsensus(agg)
+
+    return agg, nil
+}
+```
+
+---
+
+## 5. Web UI Extensions
+
+### 5.1 Review Thread Template
+
+**Location**: `web/templates/partials/review-thread.html`
+
+```html
+{{define "review-thread"}}
+<div id="review-thread-{{.ReviewID}}" class="review-thread">
+    <!-- Review Header -->
+    <div class="review-header bg-gradient-to-r from-purple-50 to-indigo-50 p-4 rounded-t-lg border-b">
+        <div class="flex items-center justify-between">
+            <div class="flex items-center space-x-3">
+                <div class="w-10 h-10 rounded-full bg-purple-600 flex items-center justify-center">
+                    <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                              d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                    </svg>
+                </div>
+                <div>
+                    <h2 class="text-lg font-semibold text-gray-900">PR Review: {{.Branch}}</h2>
+                    <p class="text-sm text-gray-500">
+                        Requested by {{.RequesterName}} &bull; {{.RelativeTime}}
+                    </p>
+                </div>
+            </div>
+            <div class="flex items-center space-x-2">
+                {{template "review-status-badge" .State}}
+            </div>
+        </div>
+
+        <!-- Review Progress (multi-reviewer) -->
+        {{if .IsMultiReviewer}}
+        <div class="mt-4 flex items-center space-x-4">
+            {{range .ReviewerStatuses}}
+            <div class="flex items-center space-x-2">
+                <span class="w-2 h-2 rounded-full {{if eq .Decision "approve"}}bg-green-500{{else if eq .Decision "request_changes"}}bg-red-500{{else}}bg-gray-300{{end}}"></span>
+                <span class="text-sm text-gray-600">{{.ReviewerName}}</span>
+            </div>
+            {{end}}
+        </div>
+        {{end}}
+    </div>
+
+    <!-- Review Conversation -->
+    <div class="review-conversation divide-y divide-gray-100">
+        {{range .Messages}}
+        <div class="review-message p-4 {{if .IsReviewer}}bg-purple-50{{else}}bg-white{{end}}">
+            <div class="flex items-start space-x-3">
+                <!-- Avatar -->
+                <div class="w-8 h-8 rounded-full {{if .IsReviewer}}bg-purple-600{{else}}bg-blue-600{{end}} flex items-center justify-center text-white text-sm font-medium">
+                    {{.SenderInitials}}
+                </div>
+
+                <div class="flex-1">
+                    <div class="flex items-center space-x-2 mb-1">
+                        <span class="font-medium text-gray-900">{{.SenderName}}</span>
+                        {{if .IsReviewer}}
+                        <span class="px-2 py-0.5 text-xs rounded-full bg-purple-100 text-purple-700">
+                            Reviewer
+                        </span>
+                        {{end}}
+                        <span class="text-sm text-gray-500">{{.RelativeTime}}</span>
+                    </div>
+
+                    <!-- Message Body -->
+                    <div class="prose prose-sm max-w-none">
+                        {{.HTMLBody}}
+                    </div>
+
+                    <!-- Review Decision Badge (for review messages) -->
+                    {{if .ReviewDecision}}
+                    <div class="mt-3">
+                        {{template "review-decision-badge" .ReviewDecision}}
+                    </div>
+                    {{end}}
+
+                    <!-- Issues List (for reviews with issues) -->
+                    {{if .Issues}}
+                    <div class="mt-4 space-y-3">
+                        {{range .Issues}}
+                        {{template "review-issue-card" .}}
+                        {{end}}
+                    </div>
+                    {{end}}
+                </div>
+            </div>
+        </div>
+        {{end}}
+    </div>
+
+    <!-- Action Bar -->
+    <div class="review-actions bg-gray-50 p-4 rounded-b-lg border-t">
+        {{if eq .State "changes_requested"}}
+        <div class="flex items-center justify-between">
+            <p class="text-sm text-gray-600">
+                {{.OpenIssueCount}} issue(s) need to be addressed
+            </p>
+            <button hx-post="/api/reviews/{{.ReviewID}}/resubmit"
+                    hx-target="#review-thread-{{.ReviewID}}"
+                    hx-swap="outerHTML"
+                    class="px-4 py-2 bg-purple-600 text-white rounded-md hover:bg-purple-700 text-sm">
+                Re-request Review
+            </button>
+        </div>
+        {{else if eq .State "approved"}}
+        <div class="flex items-center space-x-2 text-green-700">
+            <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
+                <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z"/>
+            </svg>
+            <span class="font-medium">Review approved - ready to merge</span>
+        </div>
+        {{end}}
+    </div>
+</div>
+{{end}}
+
+{{define "review-issue-card"}}
+<div class="review-issue border rounded-lg overflow-hidden {{if eq .Severity "critical"}}border-red-300 bg-red-50{{else if eq .Severity "high"}}border-orange-300 bg-orange-50{{else}}border-yellow-300 bg-yellow-50{{end}}">
+    <div class="px-3 py-2 flex items-center justify-between">
+        <div class="flex items-center space-x-2">
+            <span class="px-2 py-0.5 text-xs font-medium rounded {{if eq .Severity "critical"}}bg-red-100 text-red-800{{else if eq .Severity "high"}}bg-orange-100 text-orange-800{{else}}bg-yellow-100 text-yellow-800{{end}}">
+                {{.Severity}}
+            </span>
+            <span class="text-sm font-medium text-gray-900">{{.Title}}</span>
+        </div>
+        <a href="#" class="text-sm text-blue-600 hover:underline">
+            {{.File}}:{{.LineStart}}
+        </a>
+    </div>
+    <div class="px-3 py-2 border-t bg-white">
+        <p class="text-sm text-gray-700">{{.Description}}</p>
+        {{if .CodeSnippet}}
+        <pre class="mt-2 p-2 bg-gray-800 text-gray-100 rounded text-xs overflow-x-auto"><code>{{.CodeSnippet}}</code></pre>
+        {{end}}
+        {{if .Suggestion}}
+        <div class="mt-2 p-2 bg-green-50 border border-green-200 rounded">
+            <p class="text-sm text-green-800"><strong>Suggested fix:</strong> {{.Suggestion}}</p>
+        </div>
+        {{end}}
+    </div>
+</div>
+{{end}}
+
+{{define "review-status-badge"}}
+{{if eq . "approved"}}
+<span class="px-3 py-1 text-sm font-medium rounded-full bg-green-100 text-green-800">
+    Approved
+</span>
+{{else if eq . "changes_requested"}}
+<span class="px-3 py-1 text-sm font-medium rounded-full bg-red-100 text-red-800">
+    Changes Requested
+</span>
+{{else if eq . "under_review"}}
+<span class="px-3 py-1 text-sm font-medium rounded-full bg-purple-100 text-purple-800">
+    Under Review
+</span>
+{{else if eq . "pending_review"}}
+<span class="px-3 py-1 text-sm font-medium rounded-full bg-yellow-100 text-yellow-800">
+    Pending Review
+</span>
+{{else}}
+<span class="px-3 py-1 text-sm font-medium rounded-full bg-gray-100 text-gray-800">
+    {{.}}
+</span>
+{{end}}
+{{end}}
+```
+
+### 5.2 Reviews List Page
+
+**Location**: `web/templates/reviews.html`
+
+```html
+{{template "layout" .}}
+{{define "content"}}
+<div class="reviews-page">
+    <div class="flex items-center justify-between mb-6">
+        <h1 class="text-2xl font-bold text-gray-900">Code Reviews</h1>
+        <div class="flex items-center space-x-2">
+            <select hx-get="/api/reviews" hx-target="#reviews-list" hx-trigger="change"
+                    name="filter" class="rounded-md border-gray-300 text-sm">
+                <option value="all">All Reviews</option>
+                <option value="pending">Pending</option>
+                <option value="in_progress">In Progress</option>
+                <option value="changes_requested">Changes Requested</option>
+                <option value="approved">Approved</option>
+            </select>
+        </div>
+    </div>
+
+    <div id="reviews-list" hx-get="/api/reviews" hx-trigger="load" hx-swap="innerHTML">
+        <div class="animate-pulse">Loading reviews...</div>
+    </div>
+</div>
+{{end}}
+```
+
+---
+
+## 6. CLI Commands
+
+**Location**: `cmd/substrate/cmd_review.go`
+
+```go
+package main
+
+import (
+    "github.com/spf13/cobra"
+)
+
+var reviewCmd = &cobra.Command{
+    Use:   "review",
+    Short: "Code review operations",
+    Long:  "Request, manage, and respond to code reviews",
+}
+
+var reviewRequestCmd = &cobra.Command{
+    Use:   "request",
+    Short: "Request a code review",
+    Long: `Request a code review for the current branch.
+
+Examples:
+  # Request review for current branch
+  substrate review request
+
+  # Request review with specific reviewers
+  substrate review request --reviewers security,performance
+
+  # Request review for specific commit
+  substrate review request --commit abc123
+
+  # Request incremental review (only new changes)
+  substrate review request --incremental
+`,
+    RunE: runReviewRequest,
+}
+
+var reviewStatusCmd = &cobra.Command{
+    Use:   "status [review-id]",
+    Short: "Check review status",
+    RunE:  runReviewStatus,
+}
+
+var reviewListCmd = &cobra.Command{
+    Use:   "list",
+    Short: "List pending reviews",
+    RunE:  runReviewList,
+}
+
+var reviewRespondCmd = &cobra.Command{
+    Use:   "respond [review-id]",
+    Short: "Respond to a review (for reviewer agents)",
+    RunE:  runReviewRespond,
+}
+
+func init() {
+    reviewRequestCmd.Flags().StringSlice("reviewers", nil, "Specific reviewers to request")
+    reviewRequestCmd.Flags().String("commit", "", "Specific commit SHA to review")
+    reviewRequestCmd.Flags().String("base", "main", "Base branch to compare against")
+    reviewRequestCmd.Flags().Bool("incremental", false, "Only review new changes since last review")
+    reviewRequestCmd.Flags().String("priority", "normal", "Review priority (urgent, normal, low)")
+
+    reviewListCmd.Flags().String("filter", "all", "Filter reviews (pending, approved, etc.)")
+    reviewListCmd.Flags().Bool("mine", false, "Only show my review requests")
+
+    reviewCmd.AddCommand(reviewRequestCmd, reviewStatusCmd, reviewListCmd, reviewRespondCmd)
+    rootCmd.AddCommand(reviewCmd)
+}
+
+func runReviewRequest(cmd *cobra.Command, args []string) error {
+    // 1. Get current git context (branch, commit, repo path)
+    // 2. Build ReviewRequest
+    // 3. Send to ReviewerService
+    // 4. Display review ID and status
+}
+```
+
+---
+
+## 7. Hook Extensions
+
+### 7.1 Reviewer Hook Configuration
+
+**Location**: `internal/hooks/reviewer_hooks.go`
+
+```go
+// ReviewerHooks configures hooks for reviewer agents.
+type ReviewerHooks struct {
+    // SessionStart: Load pending reviews to process
+    SessionStart HookConfig
+
+    // Stop: Check for more reviews before exiting
+    Stop HookConfig
+}
+
+// InstallReviewerHooks sets up hooks for a reviewer agent.
+func InstallReviewerHooks(configDir string, reviewerType string) error {
+    hooks := ReviewerHooks{
+        SessionStart: HookConfig{
+            Script: fmt.Sprintf(`#!/bin/bash
+# Reviewer session start hook
+substrate review list --filter pending --reviewer %s --format context
+`, reviewerType),
+        },
+        Stop: HookConfig{
+            Script: `#!/bin/bash
+# Check for pending reviews before allowing exit
+result=$(substrate review list --filter pending --format hook)
+if [ "$(echo "$result" | jq -r '.has_pending')" = "true" ]; then
+    echo "$result"
+    exit 1  # Block exit
+fi
+exit 0  # Allow exit
+`,
+        },
+    }
+
+    return writeHookScripts(configDir, hooks)
+}
+```
+
+### 7.2 Author Agent Hook Updates
+
+Update existing hooks to check for review responses:
+
+```go
+// In stop.sh, add review check:
+`
+# Check for review responses
+reviews=$(substrate review status --mine --format json)
+if [ "$(echo "$reviews" | jq -r '.has_responses')" = "true" ]; then
+    echo "You have review feedback to address:"
+    echo "$reviews" | jq -r '.reviews[] | "- \(.reviewer): \(.decision) - \(.summary)"'
+    # Return block decision
+    echo '{"decision": "block", "reason": "Review feedback received"}'
+    exit 0
+fi
+`
+```
+
+---
+
+## 8. CLAUDE.md Extensions
+
+### 8.1 Project CLAUDE.md Updates
+
+Add to `/home/user/substrate/CLAUDE.md`:
+
+```markdown
+## Code Review System
+
+Substrate includes a native code review system for autonomous PR review.
+
+### Requesting Reviews
+
+When you complete a PR and need review:
+1. Commit and push your changes
+2. Run `substrate review request` to submit for review
+3. Wait for review feedback (delivered as mail messages)
+4. Address any issues and re-request review
+5. Proceed when approved
+
+### Review Commands
+- `substrate review request` - Request review for current branch
+- `substrate review status` - Check review status
+- `substrate review list` - List pending reviews
+
+### As a Reviewer
+
+If you're operating as a specialized reviewer:
+1. Reviews are delivered as priority messages
+2. Use the review tools to analyze the PR
+3. Respond with structured feedback
+4. Focus on high-signal issues only (see review guidelines)
+
+### Multi-Reviewer Setup
+
+For thorough reviews, multiple specialized reviewers analyze PRs:
+- **CodeReviewer**: General bugs and logic errors
+- **SecurityReviewer**: Security vulnerabilities
+- **PerformanceReviewer**: Performance issues
+- **ArchitectureReviewer**: Design and structure
+
+Reviews aggregate and require consensus before approval.
+```
+
+### 8.2 Reviewer Agent CLAUDE.md
+
+Create `~/.subtrate/reviewers/CLAUDE.md`:
+
+```markdown
+# Reviewer Agent Instructions
+
+You are a specialized code reviewer operating within Substrate.
+
+## Your Role
+
+Review pull requests submitted by other agents. Focus on:
+- Bugs that would cause runtime errors
+- Security vulnerabilities
+- CLAUDE.md compliance violations
+- Logic errors that produce wrong results
+
+## What NOT to Flag
+
+- Style preferences
+- Potential issues that depend on inputs
+- Pre-existing issues
+- Anything linters would catch
+
+## Review Process
+
+1. Receive review request via mail
+2. Analyze the changes using available tools
+3. Structure findings as issues with:
+   - File and line numbers
+   - Clear description
+   - Severity rating
+   - Fix suggestion (if straightforward)
+4. Send review response
+5. If approved, state clearly
+6. If changes needed, list specific issues
+
+## Iteration
+
+When re-reviewing after changes:
+- Only check previously flagged issues
+- Acknowledge fixed issues
+- Don't introduce new feedback
+- Approve when all issues resolved
+
+## Output Format
+
+Use the structured review format in all responses.
+```
+
+---
+
+## 9. Implementation Phases
+
+### Phase 1: Foundation (Week 1)
+
+1. **Database Schema**
+   - Create migration for reviews tables
+   - Add sqlc queries
+   - Implement store methods
+
+2. **Review Service Core**
+   - Basic ReviewRequest/Response types
+   - Service struct with spawner integration
+   - Single-reviewer workflow
+
+3. **CLI Commands**
+   - `substrate review request`
+   - `substrate review status`
+   - `substrate review list`
+
+### Phase 2: Reviewer Agent (Week 2)
+
+1. **System Prompt**
+   - Port and enhance Claude Code review prompt
+   - Add Substrate-specific context
+
+2. **Spawner Integration**
+   - Configure spawner for review sessions
+   - Handle streaming responses
+   - Parse structured review output
+
+3. **Review State Machine**
+   - Implement FSM
+   - State persistence
+   - Transition handling
+
+### Phase 3: Web UI (Week 3)
+
+1. **Review Thread Template**
+   - Specialized review thread view
+   - Issue cards with severity
+   - Decision badges
+
+2. **Reviews List Page**
+   - Filter and sort
+   - Status indicators
+   - Quick actions
+
+3. **Real-time Updates**
+   - SSE for review progress
+   - Live status changes
+
+### Phase 4: Multi-Reviewer (Week 4)
+
+1. **Topic-Based Distribution**
+   - Review request topic
+   - Reviewer subscriptions
+   - Consensus aggregation
+
+2. **Specialized Reviewers**
+   - Security reviewer config
+   - Performance reviewer config
+   - Architecture reviewer config
+
+3. **Consensus Logic**
+   - Approval requirements
+   - Critical issue blocking
+   - Final decision computation
+
+### Phase 5: Integration & Polish (Week 5)
+
+1. **Hook Integration**
+   - Reviewer agent hooks
+   - Author notification hooks
+   - Session tracking
+
+2. **CLAUDE.md Documentation**
+   - Project-level docs
+   - Reviewer agent docs
+   - User guide
+
+3. **Testing**
+   - Unit tests for review service
+   - Integration tests for full flow
+   - Multi-reviewer scenarios
+
+---
+
+## 10. API Endpoints
+
+```
+POST   /api/reviews                    - Create review request
+GET    /api/reviews                    - List reviews (with filters)
+GET    /api/reviews/{id}               - Get review details
+POST   /api/reviews/{id}/resubmit      - Re-request review after changes
+DELETE /api/reviews/{id}               - Cancel review
+
+GET    /api/reviews/{id}/iterations    - Get all review iterations
+POST   /api/reviews/{id}/respond       - Submit review response (for reviewers)
+
+GET    /api/reviews/{id}/thread        - Get review thread (HTML partial)
+GET    /api/reviews/{id}/issues        - Get all issues for review
+PATCH  /api/reviews/{id}/issues/{iid}  - Update issue status
+
+# SSE endpoints
+GET    /api/reviews/{id}/stream        - Stream review updates
+```
+
+---
+
+## 11. Message Types
+
+Extend the mail system with review-specific message metadata:
+
+```go
+// MessageType constants for reviews
+const (
+    MessageTypeReviewRequest  = "review_request"
+    MessageTypeReviewResponse = "review_response"
+    MessageTypeReviewApproval = "review_approval"
+)
+
+// Review metadata stored in message.Metadata JSON field
+type ReviewMetadata struct {
+    ReviewID     string         `json:"review_id"`
+    ReviewType   string         `json:"review_type"`
+    Decision     ReviewDecision `json:"decision,omitempty"`
+    IssueCount   int            `json:"issue_count,omitempty"`
+    ReviewerName string         `json:"reviewer_name,omitempty"`
+}
+```
+
+---
+
+## 12. Open Questions
+
+1. **Review Scope**: Should reviews be per-commit or per-PR? (Recommend: per-commit with incremental option)
+
+2. **Reviewer Persistence**: Should reviewer agents be long-running or spawned per-review? (Recommend: spawned per-review for isolation)
+
+3. **GitHub Integration**: Should we post reviews to GitHub PRs? (Recommend: optional integration via `--github` flag)
+
+4. **Cost Tracking**: How to attribute review costs? (Recommend: track per-review, aggregate per-agent)
+
+5. **Rate Limiting**: How to prevent review spam? (Recommend: configurable cooldown between requests)
+
+---
+
+## 13. Success Metrics
+
+- **Review Turnaround**: Time from request to first response
+- **Iteration Count**: Average iterations before approval
+- **Issue Accuracy**: False positive rate for flagged issues
+- **Agent Satisfaction**: Feedback on review quality
+- **Cost Efficiency**: Cost per review vs manual review time saved
