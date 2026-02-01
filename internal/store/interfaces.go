@@ -79,6 +79,30 @@ type MessageStore interface {
 	SearchMessagesForAgent(
 		ctx context.Context, query string, agentID int64, limit int,
 	) ([]Message, error)
+
+	// GetAllInboxMessages retrieves inbox messages across all agents (global view).
+	GetAllInboxMessages(
+		ctx context.Context, limit, offset int,
+	) ([]InboxMessage, error)
+
+	// GetMessageRecipients retrieves all recipients for a message.
+	GetMessageRecipients(
+		ctx context.Context, messageID int64,
+	) ([]MessageRecipientWithAgent, error)
+
+	// GetMessageRecipientsBulk retrieves recipients for multiple messages in a
+	// single query. Returns a map of message ID to recipients.
+	GetMessageRecipientsBulk(
+		ctx context.Context, messageIDs []int64,
+	) (map[int64][]MessageRecipientWithAgent, error)
+
+	// SearchMessages performs global search across all messages.
+	SearchMessages(
+		ctx context.Context, query string, limit int,
+	) ([]InboxMessage, error)
+
+	// GetMessagesByTopic retrieves all messages for a topic.
+	GetMessagesByTopic(ctx context.Context, topicID int64) ([]Message, error)
 }
 
 // AgentStore handles agent persistence operations.
@@ -108,6 +132,9 @@ type AgentStore interface {
 
 	// UpdateSession updates the session ID for an agent.
 	UpdateSession(ctx context.Context, id int64, sessionID string) error
+
+	// UpdateAgentName updates an agent's display name.
+	UpdateAgentName(ctx context.Context, id int64, name string) error
 
 	// DeleteAgent deletes an agent by its ID.
 	DeleteAgent(ctx context.Context, id int64) error
@@ -244,6 +271,12 @@ type MessageRecipient struct {
 	SnoozedUntil *time.Time
 	ReadAt       *time.Time
 	AckedAt      *time.Time
+}
+
+// MessageRecipientWithAgent extends MessageRecipient with agent name.
+type MessageRecipientWithAgent struct {
+	MessageRecipient
+	AgentName string
 }
 
 // InboxMessage represents a message in an agent's inbox with metadata.

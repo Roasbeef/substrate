@@ -453,6 +453,165 @@ func (m *MockStore) SearchMessagesForAgent(
 	return results, nil
 }
 
+// GetAllInboxMessages retrieves inbox messages across all agents (global view).
+func (m *MockStore) GetAllInboxMessages(
+	ctx context.Context, limit, offset int,
+) ([]InboxMessage, error) {
+
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+
+	var results []InboxMessage
+	count := 0
+	skipped := 0
+
+	for msgID, msg := range m.messages {
+		recipients, ok := m.messageRecipients[msgID]
+		if !ok {
+			continue
+		}
+
+		// Find first non-archived recipient.
+		for agentID, recip := range recipients {
+			if recip.State == "archived" || recip.State == "trash" {
+				continue
+			}
+
+			if skipped < offset {
+				skipped++
+				continue
+			}
+
+			// Get sender name.
+			var senderName string
+			if sender, ok := m.agents[msg.SenderID]; ok {
+				senderName = sender.Name
+			}
+
+			results = append(results, InboxMessage{
+				Message:      msg,
+				SenderName:   senderName,
+				State:        recip.State,
+				SnoozedUntil: recip.SnoozedUntil,
+				ReadAt:       recip.ReadAt,
+				AckedAt:      recip.AckedAt,
+			})
+			_ = agentID
+			count++
+			break
+		}
+
+		if count >= limit {
+			break
+		}
+	}
+
+	return results, nil
+}
+
+// GetMessageRecipients retrieves all recipients for a message.
+func (m *MockStore) GetMessageRecipients(
+	ctx context.Context, messageID int64,
+) ([]MessageRecipientWithAgent, error) {
+
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+
+	recipients, ok := m.messageRecipients[messageID]
+	if !ok {
+		return nil, nil
+	}
+
+	var results []MessageRecipientWithAgent
+	for agentID, recip := range recipients {
+		var agentName string
+		if agent, ok := m.agents[agentID]; ok {
+			agentName = agent.Name
+		}
+		results = append(results, MessageRecipientWithAgent{
+			MessageRecipient: recip,
+			AgentName:        agentName,
+		})
+	}
+	return results, nil
+}
+
+// GetMessageRecipientsBulk retrieves recipients for multiple messages.
+func (m *MockStore) GetMessageRecipientsBulk(
+	ctx context.Context, messageIDs []int64,
+) (map[int64][]MessageRecipientWithAgent, error) {
+
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+
+	result := make(map[int64][]MessageRecipientWithAgent)
+	for _, msgID := range messageIDs {
+		recipients, ok := m.messageRecipients[msgID]
+		if !ok {
+			continue
+		}
+		for agentID, recip := range recipients {
+			var agentName string
+			if agent, ok := m.agents[agentID]; ok {
+				agentName = agent.Name
+			}
+			result[msgID] = append(result[msgID], MessageRecipientWithAgent{
+				MessageRecipient: recip,
+				AgentName:        agentName,
+			})
+		}
+	}
+	return result, nil
+}
+
+// SearchMessages performs global search across all messages.
+func (m *MockStore) SearchMessages(
+	ctx context.Context, query string, limit int,
+) ([]InboxMessage, error) {
+
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+
+	var results []InboxMessage
+	for _, msg := range m.messages {
+		if !contains(msg.Subject, query) && !contains(msg.Body, query) {
+			continue
+		}
+
+		var senderName string
+		if sender, ok := m.agents[msg.SenderID]; ok {
+			senderName = sender.Name
+		}
+
+		results = append(results, InboxMessage{
+			Message:    msg,
+			SenderName: senderName,
+		})
+
+		if len(results) >= limit {
+			break
+		}
+	}
+	return results, nil
+}
+
+// GetMessagesByTopic retrieves all messages for a topic.
+func (m *MockStore) GetMessagesByTopic(
+	ctx context.Context, topicID int64,
+) ([]Message, error) {
+
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+
+	var results []Message
+	for _, msg := range m.messages {
+		if msg.TopicID == topicID {
+			results = append(results, msg)
+		}
+	}
+	return results, nil
+}
+
 // contains checks if s contains substr (case-insensitive).
 func contains(s, substr string) bool {
 	return len(s) >= len(substr) &&
@@ -592,6 +751,30 @@ func (m *MockStore) UpdateSession(
 	if sessionID != "" {
 		m.agentsBySession[sessionID] = id
 	}
+
+	return nil
+}
+
+// UpdateAgentName updates an agent's display name.
+func (m *MockStore) UpdateAgentName(
+	ctx context.Context, id int64, name string,
+) error {
+
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	agent, ok := m.agents[id]
+	if !ok {
+		return sql.ErrNoRows
+	}
+
+	// Remove old name mapping.
+	delete(m.agentsByName, agent.Name)
+
+	// Update agent name.
+	agent.Name = name
+	m.agents[id] = agent
+	m.agentsByName[name] = id
 
 	return nil
 }
