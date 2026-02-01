@@ -779,9 +779,10 @@ func (s *Service) AggregateReviews(ctx context.Context, reviewID string) (*Aggre
 
 ---
 
-## 5. Web UI Extensions
+## 5. Web UI Extensions (React)
 
-The UI provides multiple views leveraging both mail threads and review tables:
+The UI is built with React + TypeScript following the patterns in `web/frontend/`.
+Review components integrate with the existing architecture (TanStack Query, Zustand, Tailwind).
 
 ```
 ┌─────────────────────────────────────────────────────────────────────────┐
@@ -797,11 +798,11 @@ The UI provides multiple views leveraging both mail threads and review tables:
 │            │                                    │                       │
 │            ▼                                    ▼                       │
 │  ┌─────────────────────────────────────────────────────────────────┐   │
-│  │                        UI Views                                  │   │
+│  │                     React Components                             │   │
 │  ├──────────────────┬──────────────────┬───────────────────────────┤   │
-│  │ Conversation     │ Review Dashboard │ Issue Tracker             │   │
+│  │ ReviewThread     │ ReviewDashboard  │ IssueTracker              │   │
 │  │                  │                  │                           │   │
-│  │ • Mail thread    │ • State timeline │ • All issues by review    │   │
+│  │ • Conversation   │ • State timeline │ • All issues by review    │   │
 │  │ • Author/reviewer│ • Iteration diffs│ • Filter: open/fixed      │   │
 │  │   back & forth   │ • Reviewer votes │ • Group by file/severity  │   │
 │  │ • Inline replies │ • Consensus view │ • Resolution time stats   │   │
@@ -810,8 +811,8 @@ The UI provides multiple views leveraging both mail threads and review tables:
 │                                                                         │
 │  Additional Views:                                                      │
 │  ┌──────────────────┬──────────────────┬───────────────────────────┐   │
-│  │ Diff Annotations │ Reviewer Status  │ Review History            │   │
-│  │                  │                  │                           │   │
+│  │ DiffViewer       │ ReviewerStatus   │ ReviewHistory             │   │
+│  │ (@pierre/diffs)  │                  │                           │   │
 │  │ • Side-by-side   │ • Active reviewers│ • Past reviews by repo   │   │
 │  │ • Issues inline  │ • Queue depth    │ • Approval rate           │   │
 │  │ • Suggestions    │ • Avg turnaround │ • Issue trends            │   │
@@ -819,605 +820,1066 @@ The UI provides multiple views leveraging both mail threads and review tables:
 └─────────────────────────────────────────────────────────────────────────┘
 ```
 
-### 5.1 Review Thread Template
+### 5.1 Project Structure
 
-**Location**: `web/templates/partials/review-thread.html`
-
-```html
-{{define "review-thread"}}
-<div id="review-thread-{{.ReviewID}}" class="review-thread">
-    <!-- Review Header -->
-    <div class="review-header bg-gradient-to-r from-purple-50 to-indigo-50 p-4 rounded-t-lg border-b">
-        <div class="flex items-center justify-between">
-            <div class="flex items-center space-x-3">
-                <div class="w-10 h-10 rounded-full bg-purple-600 flex items-center justify-center">
-                    <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                              d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
-                    </svg>
-                </div>
-                <div>
-                    <h2 class="text-lg font-semibold text-gray-900">PR Review: {{.Branch}}</h2>
-                    <p class="text-sm text-gray-500">
-                        Requested by {{.RequesterName}} &bull; {{.RelativeTime}}
-                    </p>
-                </div>
-            </div>
-            <div class="flex items-center space-x-2">
-                {{template "review-status-badge" .State}}
-            </div>
-        </div>
-
-        <!-- Review Progress (multi-reviewer) -->
-        {{if .IsMultiReviewer}}
-        <div class="mt-4 flex items-center space-x-4">
-            {{range .ReviewerStatuses}}
-            <div class="flex items-center space-x-2">
-                <span class="w-2 h-2 rounded-full {{if eq .Decision "approve"}}bg-green-500{{else if eq .Decision "request_changes"}}bg-red-500{{else}}bg-gray-300{{end}}"></span>
-                <span class="text-sm text-gray-600">{{.ReviewerName}}</span>
-            </div>
-            {{end}}
-        </div>
-        {{end}}
-    </div>
-
-    <!-- Review Conversation -->
-    <div class="review-conversation divide-y divide-gray-100">
-        {{range .Messages}}
-        <div class="review-message p-4 {{if .IsReviewer}}bg-purple-50{{else}}bg-white{{end}}">
-            <div class="flex items-start space-x-3">
-                <!-- Avatar -->
-                <div class="w-8 h-8 rounded-full {{if .IsReviewer}}bg-purple-600{{else}}bg-blue-600{{end}} flex items-center justify-center text-white text-sm font-medium">
-                    {{.SenderInitials}}
-                </div>
-
-                <div class="flex-1">
-                    <div class="flex items-center space-x-2 mb-1">
-                        <span class="font-medium text-gray-900">{{.SenderName}}</span>
-                        {{if .IsReviewer}}
-                        <span class="px-2 py-0.5 text-xs rounded-full bg-purple-100 text-purple-700">
-                            Reviewer
-                        </span>
-                        {{end}}
-                        <span class="text-sm text-gray-500">{{.RelativeTime}}</span>
-                    </div>
-
-                    <!-- Message Body -->
-                    <div class="prose prose-sm max-w-none">
-                        {{.HTMLBody}}
-                    </div>
-
-                    <!-- Review Decision Badge (for review messages) -->
-                    {{if .ReviewDecision}}
-                    <div class="mt-3">
-                        {{template "review-decision-badge" .ReviewDecision}}
-                    </div>
-                    {{end}}
-
-                    <!-- Issues List (for reviews with issues) -->
-                    {{if .Issues}}
-                    <div class="mt-4 space-y-3">
-                        {{range .Issues}}
-                        {{template "review-issue-card" .}}
-                        {{end}}
-                    </div>
-                    {{end}}
-                </div>
-            </div>
-        </div>
-        {{end}}
-    </div>
-
-    <!-- Action Bar -->
-    <div class="review-actions bg-gray-50 p-4 rounded-b-lg border-t">
-        {{if eq .State "changes_requested"}}
-        <div class="flex items-center justify-between">
-            <p class="text-sm text-gray-600">
-                {{.OpenIssueCount}} issue(s) need to be addressed
-            </p>
-            <button hx-post="/api/reviews/{{.ReviewID}}/resubmit"
-                    hx-target="#review-thread-{{.ReviewID}}"
-                    hx-swap="outerHTML"
-                    class="px-4 py-2 bg-purple-600 text-white rounded-md hover:bg-purple-700 text-sm">
-                Re-request Review
-            </button>
-        </div>
-        {{else if eq .State "approved"}}
-        <div class="flex items-center space-x-2 text-green-700">
-            <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
-                <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z"/>
-            </svg>
-            <span class="font-medium">Review approved - ready to merge</span>
-        </div>
-        {{end}}
-    </div>
-</div>
-{{end}}
-
-{{define "review-issue-card"}}
-<div class="review-issue border rounded-lg overflow-hidden {{if eq .Severity "critical"}}border-red-300 bg-red-50{{else if eq .Severity "high"}}border-orange-300 bg-orange-50{{else}}border-yellow-300 bg-yellow-50{{end}}">
-    <div class="px-3 py-2 flex items-center justify-between">
-        <div class="flex items-center space-x-2">
-            <span class="px-2 py-0.5 text-xs font-medium rounded {{if eq .Severity "critical"}}bg-red-100 text-red-800{{else if eq .Severity "high"}}bg-orange-100 text-orange-800{{else}}bg-yellow-100 text-yellow-800{{end}}">
-                {{.Severity}}
-            </span>
-            <span class="text-sm font-medium text-gray-900">{{.Title}}</span>
-        </div>
-        <a href="#" class="text-sm text-blue-600 hover:underline">
-            {{.File}}:{{.LineStart}}
-        </a>
-    </div>
-    <div class="px-3 py-2 border-t bg-white">
-        <p class="text-sm text-gray-700">{{.Description}}</p>
-        {{if .CodeSnippet}}
-        <pre class="mt-2 p-2 bg-gray-800 text-gray-100 rounded text-xs overflow-x-auto"><code>{{.CodeSnippet}}</code></pre>
-        {{end}}
-        {{if .Suggestion}}
-        <div class="mt-2 p-2 bg-green-50 border border-green-200 rounded">
-            <p class="text-sm text-green-800"><strong>Suggested fix:</strong> {{.Suggestion}}</p>
-        </div>
-        {{end}}
-    </div>
-</div>
-{{end}}
-
-{{define "review-status-badge"}}
-{{if eq . "approved"}}
-<span class="px-3 py-1 text-sm font-medium rounded-full bg-green-100 text-green-800">
-    Approved
-</span>
-{{else if eq . "changes_requested"}}
-<span class="px-3 py-1 text-sm font-medium rounded-full bg-red-100 text-red-800">
-    Changes Requested
-</span>
-{{else if eq . "under_review"}}
-<span class="px-3 py-1 text-sm font-medium rounded-full bg-purple-100 text-purple-800">
-    Under Review
-</span>
-{{else if eq . "pending_review"}}
-<span class="px-3 py-1 text-sm font-medium rounded-full bg-yellow-100 text-yellow-800">
-    Pending Review
-</span>
-{{else}}
-<span class="px-3 py-1 text-sm font-medium rounded-full bg-gray-100 text-gray-800">
-    {{.}}
-</span>
-{{end}}
-{{end}}
+```
+web/frontend/src/
+├── api/
+│   └── reviews.ts              # Review API client
+├── components/
+│   └── reviews/
+│       ├── ReviewThread.tsx    # Main review conversation view
+│       ├── ReviewMessage.tsx   # Single review message
+│       ├── ReviewHeader.tsx    # Review status header
+│       ├── ReviewDashboard.tsx # State timeline + metrics
+│       ├── ReviewerStatus.tsx  # Multi-reviewer progress
+│       ├── IssueCard.tsx       # Issue display with severity
+│       ├── IssueTracker.tsx    # Issue list with filters
+│       ├── DiffViewer.tsx      # @pierre/diffs integration
+│       ├── DecisionBadge.tsx   # Approve/Request Changes badge
+│       └── index.ts
+├── hooks/
+│   ├── useReviews.ts           # Review queries
+│   ├── useReviewActions.ts     # Mutations (resubmit, resolve)
+│   └── useReviewsRealtime.ts   # WebSocket updates
+├── pages/
+│   └── ReviewsPage.tsx         # /reviews route
+└── types/
+    └── reviews.ts              # Review TypeScript types
 ```
 
-### 5.2 Diff Rendering with diffs.com
+### 5.2 TypeScript Types
+
+**Location**: `web/frontend/src/types/reviews.ts`
+
+```typescript
+export type ReviewState =
+  | 'new'
+  | 'pending_review'
+  | 'under_review'
+  | 'changes_requested'
+  | 're_review'
+  | 'approved'
+  | 'rejected'
+  | 'cancelled';
+
+export type ReviewDecision = 'approve' | 'request_changes' | 'comment';
+
+export type IssueSeverity = 'critical' | 'high' | 'medium' | 'low';
+
+export type IssueType = 'bug' | 'security' | 'claude_md_violation' | 'logic_error';
+
+export type IssueStatus = 'open' | 'fixed' | 'wont_fix' | 'duplicate';
+
+export interface Review {
+  id: number;
+  reviewId: string;
+  threadId: string;
+  requesterId: number;
+  requesterName: string;
+
+  // PR info
+  prNumber?: number;
+  branch: string;
+  baseBranch: string;
+  commitSha: string;
+  repoPath: string;
+
+  // Config
+  reviewType: 'full' | 'incremental' | 'security' | 'performance';
+  priority: 'urgent' | 'normal' | 'low';
+  state: ReviewState;
+
+  // Timestamps
+  createdAt: string;
+  updatedAt: string;
+  completedAt?: string;
+}
+
+export interface ReviewIteration {
+  id: number;
+  reviewId: string;
+  iterationNum: number;
+  reviewerId: string;
+  reviewerSessionId?: string;
+
+  decision: ReviewDecision;
+  summary: string;
+  issues: ReviewIssue[];
+  suggestions: Suggestion[];
+
+  // Metrics
+  filesReviewed: number;
+  linesAnalyzed: number;
+  durationMs: number;
+  costUsd: number;
+
+  startedAt: string;
+  completedAt?: string;
+}
+
+export interface ReviewIssue {
+  id: number;
+  reviewId: string;
+  iterationNum: number;
+
+  type: IssueType;
+  severity: IssueSeverity;
+
+  filePath: string;
+  lineStart: number;
+  lineEnd?: number;
+
+  title: string;
+  description: string;
+  codeSnippet?: string;
+  suggestion?: string;
+  claudeMdRef?: string;
+
+  status: IssueStatus;
+  resolvedAt?: string;
+  resolvedInIteration?: number;
+}
+
+export interface Suggestion {
+  title: string;
+  description: string;
+  filePath?: string;
+}
+
+export interface ReviewerStatus {
+  reviewerId: string;
+  reviewerName: string;
+  status: 'pending' | 'reviewing' | 'completed';
+  decision?: ReviewDecision;
+  issueCount: number;
+}
+```
+
+### 5.3 API Client
+
+**Location**: `web/frontend/src/api/reviews.ts`
+
+```typescript
+import { apiClient } from './client';
+import type {
+  Review,
+  ReviewIteration,
+  ReviewIssue,
+  ReviewState,
+  IssueStatus,
+} from '@/types/reviews';
+
+export interface ListReviewsParams {
+  filter?: ReviewState | 'all';
+  requesterId?: number;
+  limit?: number;
+  offset?: number;
+}
+
+export interface CreateReviewParams {
+  branch: string;
+  baseBranch?: string;
+  commitSha: string;
+  repoPath: string;
+  prNumber?: number;
+  reviewType?: 'full' | 'incremental' | 'security' | 'performance';
+  priority?: 'urgent' | 'normal' | 'low';
+  reviewers?: string[];
+  description?: string;
+}
+
+export const reviewsApi = {
+  // List reviews with filters
+  list: async (params?: ListReviewsParams): Promise<Review[]> => {
+    const searchParams = new URLSearchParams();
+    if (params?.filter && params.filter !== 'all') {
+      searchParams.set('filter', params.filter);
+    }
+    if (params?.requesterId) {
+      searchParams.set('requester_id', params.requesterId.toString());
+    }
+    if (params?.limit) {
+      searchParams.set('limit', params.limit.toString());
+    }
+    if (params?.offset) {
+      searchParams.set('offset', params.offset.toString());
+    }
+    return apiClient.get(`/api/v1/reviews?${searchParams}`);
+  },
+
+  // Get single review with iterations
+  get: async (reviewId: string): Promise<Review & { iterations: ReviewIteration[] }> => {
+    return apiClient.get(`/api/v1/reviews/${reviewId}`);
+  },
+
+  // Create new review request
+  create: async (params: CreateReviewParams): Promise<Review> => {
+    return apiClient.post('/api/v1/reviews', params);
+  },
+
+  // Re-request review after changes
+  resubmit: async (reviewId: string, commitSha: string): Promise<Review> => {
+    return apiClient.post(`/api/v1/reviews/${reviewId}/resubmit`, { commitSha });
+  },
+
+  // Cancel a review
+  cancel: async (reviewId: string): Promise<void> => {
+    return apiClient.delete(`/api/v1/reviews/${reviewId}`);
+  },
+
+  // Get all issues for a review
+  getIssues: async (reviewId: string): Promise<ReviewIssue[]> => {
+    return apiClient.get(`/api/v1/reviews/${reviewId}/issues`);
+  },
+
+  // Update issue status
+  updateIssueStatus: async (
+    reviewId: string,
+    issueId: number,
+    status: IssueStatus
+  ): Promise<ReviewIssue> => {
+    return apiClient.patch(`/api/v1/reviews/${reviewId}/issues/${issueId}`, { status });
+  },
+
+  // Get diff for a file in the review
+  getDiff: async (reviewId: string, filePath: string): Promise<{
+    oldContent: string;
+    newContent: string;
+    issues: ReviewIssue[];
+  }> => {
+    return apiClient.get(`/api/v1/reviews/${reviewId}/diff?file=${encodeURIComponent(filePath)}`);
+  },
+};
+```
+
+### 5.4 React Hooks
+
+**Location**: `web/frontend/src/hooks/useReviews.ts`
+
+```typescript
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { reviewsApi, ListReviewsParams, CreateReviewParams } from '@/api/reviews';
+import type { IssueStatus } from '@/types/reviews';
+
+export const reviewKeys = {
+  all: ['reviews'] as const,
+  lists: () => [...reviewKeys.all, 'list'] as const,
+  list: (params?: ListReviewsParams) => [...reviewKeys.lists(), params] as const,
+  details: () => [...reviewKeys.all, 'detail'] as const,
+  detail: (id: string) => [...reviewKeys.details(), id] as const,
+  issues: (id: string) => [...reviewKeys.detail(id), 'issues'] as const,
+};
+
+export function useReviews(params?: ListReviewsParams) {
+  return useQuery({
+    queryKey: reviewKeys.list(params),
+    queryFn: () => reviewsApi.list(params),
+  });
+}
+
+export function useReview(reviewId: string) {
+  return useQuery({
+    queryKey: reviewKeys.detail(reviewId),
+    queryFn: () => reviewsApi.get(reviewId),
+    enabled: !!reviewId,
+  });
+}
+
+export function useReviewIssues(reviewId: string) {
+  return useQuery({
+    queryKey: reviewKeys.issues(reviewId),
+    queryFn: () => reviewsApi.getIssues(reviewId),
+    enabled: !!reviewId,
+  });
+}
+
+export function useCreateReview() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (params: CreateReviewParams) => reviewsApi.create(params),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: reviewKeys.lists() });
+    },
+  });
+}
+
+export function useResubmitReview() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({ reviewId, commitSha }: { reviewId: string; commitSha: string }) =>
+      reviewsApi.resubmit(reviewId, commitSha),
+    onSuccess: (_, { reviewId }) => {
+      queryClient.invalidateQueries({ queryKey: reviewKeys.detail(reviewId) });
+      queryClient.invalidateQueries({ queryKey: reviewKeys.lists() });
+    },
+  });
+}
+
+export function useUpdateIssueStatus() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({
+      reviewId,
+      issueId,
+      status,
+    }: {
+      reviewId: string;
+      issueId: number;
+      status: IssueStatus;
+    }) => reviewsApi.updateIssueStatus(reviewId, issueId, status),
+    onSuccess: (_, { reviewId }) => {
+      queryClient.invalidateQueries({ queryKey: reviewKeys.issues(reviewId) });
+    },
+  });
+}
+```
+
+**Location**: `web/frontend/src/hooks/useReviewsRealtime.ts`
+
+```typescript
+import { useEffect } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
+import { useWebSocket } from './useWebSocket';
+import { reviewKeys } from './useReviews';
+
+export function useReviewsRealtime(reviewId?: string) {
+  const queryClient = useQueryClient();
+  const { lastMessage } = useWebSocket();
+
+  useEffect(() => {
+    if (!lastMessage) return;
+
+    const { type, payload } = lastMessage;
+
+    if (type === 'review_updated') {
+      // Invalidate specific review
+      if (payload.reviewId) {
+        queryClient.invalidateQueries({
+          queryKey: reviewKeys.detail(payload.reviewId),
+        });
+      }
+      // Always invalidate lists
+      queryClient.invalidateQueries({ queryKey: reviewKeys.lists() });
+    }
+
+    if (type === 'review_iteration_added' && payload.reviewId === reviewId) {
+      queryClient.invalidateQueries({
+        queryKey: reviewKeys.detail(payload.reviewId),
+      });
+    }
+
+    if (type === 'issue_resolved' && payload.reviewId === reviewId) {
+      queryClient.invalidateQueries({
+        queryKey: reviewKeys.issues(payload.reviewId),
+      });
+    }
+  }, [lastMessage, reviewId, queryClient]);
+}
+```
+
+### 5.5 Review Thread Component
+
+**Location**: `web/frontend/src/components/reviews/ReviewThread.tsx`
+
+```tsx
+import { useState } from 'react';
+import { useReview, useResubmitReview } from '@/hooks/useReviews';
+import { useReviewsRealtime } from '@/hooks/useReviewsRealtime';
+import { ReviewHeader } from './ReviewHeader';
+import { ReviewMessage } from './ReviewMessage';
+import { ReviewerStatus } from './ReviewerStatus';
+import { Button } from '@/components/ui/Button';
+import { Spinner } from '@/components/ui/Spinner';
+import type { ReviewIteration } from '@/types/reviews';
+
+interface ReviewThreadProps {
+  reviewId: string;
+}
+
+export function ReviewThread({ reviewId }: ReviewThreadProps) {
+  const { data: review, isLoading, error } = useReview(reviewId);
+  const resubmit = useResubmitReview();
+  const [replyText, setReplyText] = useState('');
+
+  // Subscribe to real-time updates
+  useReviewsRealtime(reviewId);
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <Spinner size="lg" />
+      </div>
+    );
+  }
+
+  if (error || !review) {
+    return (
+      <div className="p-4 bg-red-50 text-red-700 rounded-lg">
+        Failed to load review
+      </div>
+    );
+  }
+
+  const handleResubmit = async () => {
+    // Get current commit SHA from git
+    const commitSha = await getCurrentCommitSha();
+    resubmit.mutate({ reviewId, commitSha });
+  };
+
+  return (
+    <div className="review-thread border rounded-lg overflow-hidden">
+      {/* Header with status */}
+      <ReviewHeader review={review} />
+
+      {/* Multi-reviewer status (if applicable) */}
+      {review.iterations.length > 0 && (
+        <ReviewerStatus iterations={review.iterations} />
+      )}
+
+      {/* Conversation messages */}
+      <div className="divide-y divide-gray-100">
+        {review.iterations.map((iteration) => (
+          <ReviewMessage key={iteration.id} iteration={iteration} />
+        ))}
+      </div>
+
+      {/* Action bar */}
+      <div className="bg-gray-50 p-4 border-t">
+        {review.state === 'changes_requested' && (
+          <div className="flex items-center justify-between">
+            <p className="text-sm text-gray-600">
+              {review.iterations.flatMap((i) => i.issues).filter((i) => i.status === 'open').length}{' '}
+              issue(s) need to be addressed
+            </p>
+            <Button
+              onClick={handleResubmit}
+              loading={resubmit.isPending}
+              className="bg-purple-600 hover:bg-purple-700"
+            >
+              Re-request Review
+            </Button>
+          </div>
+        )}
+
+        {review.state === 'approved' && (
+          <div className="flex items-center space-x-2 text-green-700">
+            <CheckCircleIcon className="w-5 h-5" />
+            <span className="font-medium">Review approved - ready to merge</span>
+          </div>
+        )}
+
+        {/* Reply input for discussion */}
+        {['pending_review', 'under_review', 'changes_requested'].includes(review.state) && (
+          <div className="mt-4">
+            <textarea
+              value={replyText}
+              onChange={(e) => setReplyText(e.target.value)}
+              placeholder="Add a comment or clarification..."
+              className="w-full p-3 border rounded-lg resize-none focus:ring-2 focus:ring-purple-500"
+              rows={3}
+            />
+            <div className="mt-2 flex justify-end">
+              <Button
+                disabled={!replyText.trim()}
+                onClick={() => {/* Send reply via mail */}}
+              >
+                Send Reply
+              </Button>
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function CheckCircleIcon({ className }: { className?: string }) {
+  return (
+    <svg className={className} fill="currentColor" viewBox="0 0 20 20">
+      <path
+        fillRule="evenodd"
+        d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z"
+        clipRule="evenodd"
+      />
+    </svg>
+  );
+}
+```
+
+### 5.6 Review Message Component
+
+**Location**: `web/frontend/src/components/reviews/ReviewMessage.tsx`
+
+```tsx
+import { formatDistanceToNow } from 'date-fns';
+import { DecisionBadge } from './DecisionBadge';
+import { IssueCard } from './IssueCard';
+import { Avatar } from '@/components/ui/Avatar';
+import type { ReviewIteration } from '@/types/reviews';
+
+interface ReviewMessageProps {
+  iteration: ReviewIteration;
+}
+
+export function ReviewMessage({ iteration }: ReviewMessageProps) {
+  const isReviewer = true; // Iterations are always from reviewers
+
+  return (
+    <div className={`p-4 ${isReviewer ? 'bg-purple-50' : 'bg-white'}`}>
+      <div className="flex items-start space-x-3">
+        {/* Avatar */}
+        <Avatar
+          name={iteration.reviewerId}
+          className={isReviewer ? 'bg-purple-600' : 'bg-blue-600'}
+        />
+
+        <div className="flex-1">
+          {/* Header */}
+          <div className="flex items-center space-x-2 mb-1">
+            <span className="font-medium text-gray-900">{iteration.reviewerId}</span>
+            {isReviewer && (
+              <span className="px-2 py-0.5 text-xs rounded-full bg-purple-100 text-purple-700">
+                Reviewer
+              </span>
+            )}
+            <span className="text-sm text-gray-500">
+              {formatDistanceToNow(new Date(iteration.completedAt || iteration.startedAt), {
+                addSuffix: true,
+              })}
+            </span>
+          </div>
+
+          {/* Summary */}
+          <div className="prose prose-sm max-w-none">
+            <p>{iteration.summary}</p>
+          </div>
+
+          {/* Decision badge */}
+          <div className="mt-3">
+            <DecisionBadge decision={iteration.decision} />
+          </div>
+
+          {/* Issues list */}
+          {iteration.issues.length > 0 && (
+            <div className="mt-4 space-y-3">
+              {iteration.issues.map((issue) => (
+                <IssueCard key={issue.id} issue={issue} />
+              ))}
+            </div>
+          )}
+
+          {/* Suggestions (non-blocking) */}
+          {iteration.suggestions.length > 0 && (
+            <div className="mt-4 p-3 bg-blue-50 rounded-lg">
+              <h4 className="text-sm font-medium text-blue-900 mb-2">
+                Non-blocking suggestions
+              </h4>
+              <ul className="text-sm text-blue-800 space-y-1">
+                {iteration.suggestions.map((s, i) => (
+                  <li key={i}>• {s.title}</li>
+                ))}
+              </ul>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+```
+
+### 5.7 Issue Card Component
+
+**Location**: `web/frontend/src/components/reviews/IssueCard.tsx`
+
+```tsx
+import { useState } from 'react';
+import { useUpdateIssueStatus } from '@/hooks/useReviews';
+import type { ReviewIssue, IssueStatus } from '@/types/reviews';
+
+interface IssueCardProps {
+  issue: ReviewIssue;
+}
+
+const severityStyles = {
+  critical: 'border-red-300 bg-red-50',
+  high: 'border-orange-300 bg-orange-50',
+  medium: 'border-yellow-300 bg-yellow-50',
+  low: 'border-blue-300 bg-blue-50',
+};
+
+const severityBadgeStyles = {
+  critical: 'bg-red-100 text-red-800',
+  high: 'bg-orange-100 text-orange-800',
+  medium: 'bg-yellow-100 text-yellow-800',
+  low: 'bg-blue-100 text-blue-800',
+};
+
+export function IssueCard({ issue }: IssueCardProps) {
+  const [expanded, setExpanded] = useState(false);
+  const updateStatus = useUpdateIssueStatus();
+
+  const handleMarkFixed = () => {
+    updateStatus.mutate({
+      reviewId: issue.reviewId,
+      issueId: issue.id,
+      status: 'fixed',
+    });
+  };
+
+  return (
+    <div
+      className={`border rounded-lg overflow-hidden ${severityStyles[issue.severity]}`}
+    >
+      {/* Header */}
+      <div
+        className="px-3 py-2 flex items-center justify-between cursor-pointer"
+        onClick={() => setExpanded(!expanded)}
+      >
+        <div className="flex items-center space-x-2">
+          <span
+            className={`px-2 py-0.5 text-xs font-medium rounded ${
+              severityBadgeStyles[issue.severity]
+            }`}
+          >
+            {issue.severity}
+          </span>
+          <span className="text-sm font-medium text-gray-900">{issue.title}</span>
+          {issue.status === 'fixed' && (
+            <span className="px-2 py-0.5 text-xs rounded bg-green-100 text-green-800">
+              Fixed
+            </span>
+          )}
+        </div>
+        <a
+          href={`#file-${encodeURIComponent(issue.filePath)}`}
+          className="text-sm text-blue-600 hover:underline"
+          onClick={(e) => e.stopPropagation()}
+        >
+          {issue.filePath}:{issue.lineStart}
+        </a>
+      </div>
+
+      {/* Expanded content */}
+      {expanded && (
+        <div className="px-3 py-2 border-t bg-white">
+          <p className="text-sm text-gray-700">{issue.description}</p>
+
+          {issue.codeSnippet && (
+            <pre className="mt-2 p-2 bg-gray-800 text-gray-100 rounded text-xs overflow-x-auto">
+              <code>{issue.codeSnippet}</code>
+            </pre>
+          )}
+
+          {issue.suggestion && (
+            <div className="mt-2 p-2 bg-green-50 border border-green-200 rounded">
+              <p className="text-sm text-green-800">
+                <strong>Suggested fix:</strong> {issue.suggestion}
+              </p>
+            </div>
+          )}
+
+          {issue.claudeMdRef && (
+            <p className="mt-2 text-xs text-gray-500">
+              CLAUDE.md reference: {issue.claudeMdRef}
+            </p>
+          )}
+
+          {/* Actions */}
+          {issue.status === 'open' && (
+            <div className="mt-3 flex space-x-2">
+              <button
+                onClick={handleMarkFixed}
+                disabled={updateStatus.isPending}
+                className="px-3 py-1 text-xs bg-green-600 text-white rounded hover:bg-green-700"
+              >
+                Mark as Fixed
+              </button>
+              <button
+                onClick={() =>
+                  updateStatus.mutate({
+                    reviewId: issue.reviewId,
+                    issueId: issue.id,
+                    status: 'wont_fix',
+                  })
+                }
+                className="px-3 py-1 text-xs bg-gray-200 text-gray-700 rounded hover:bg-gray-300"
+              >
+                Won't Fix
+              </button>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+```
+
+### 5.8 Diff Viewer Component with @pierre/diffs
 
 **Library**: `@pierre/diffs` from https://diffs.com/
 
-The UI uses the diffs.com library for professional diff rendering with syntax highlighting,
-theming, and issue annotations. This provides a GitHub-quality diff experience.
+The UI uses the diffs.com React components for professional diff rendering.
 
 **Installation:**
 ```bash
-bun add @pierre/diffs
+cd web/frontend && bun add @pierre/diffs
 ```
 
-**Integration Options:**
+**Location**: `web/frontend/src/components/reviews/DiffViewer.tsx`
 
-1. **React Components** (for complex interactive views)
-2. **Vanilla JS** (for HTMX partial rendering)
-3. **SSR** (for server-side pre-rendering)
+```tsx
+import { useState, useEffect } from 'react';
+import { MultiFileDiff, FileDiff, PatchDiff, registerCustomTheme } from '@pierre/diffs/react';
+import { useQuery } from '@tanstack/react-query';
+import { reviewsApi } from '@/api/reviews';
+import { IssueCard } from './IssueCard';
+import type { ReviewIssue } from '@/types/reviews';
 
-#### 5.2.1 Vanilla JS Integration for HTMX
-
-Since the Substrate UI is HTMX-based, we use the vanilla JS API with SSR pre-rendering:
-
-**Location**: `internal/web/diff_renderer.go`
-
-```go
-package web
-
-import (
-    "bytes"
-    "os/exec"
-)
-
-// DiffRenderer handles diff rendering using the diffs.com library.
-type DiffRenderer struct {
-    scriptPath string  // Path to Node.js render script
-}
-
-// RenderDiff generates HTML for a file diff using @pierre/diffs.
-func (r *DiffRenderer) RenderDiff(oldContent, newContent, filename string, issues []ReviewIssue) (string, error) {
-    // Call Node.js script that uses @pierre/diffs
-    cmd := exec.Command("bun", "run", r.scriptPath,
-        "--old", oldContent,
-        "--new", newContent,
-        "--filename", filename,
-        "--issues", marshalIssues(issues),
-    )
-
-    var out bytes.Buffer
-    cmd.Stdout = &out
-    if err := cmd.Run(); err != nil {
-        return "", err
-    }
-
-    return out.String(), nil
-}
-```
-
-**Location**: `web/scripts/render-diff.ts`
-
-```typescript
-import { FileDiff, parseDiffFromFile, registerCustomTheme } from '@pierre/diffs';
-import { preloadFileDiff } from '@pierre/diffs/ssr';
-
-interface ReviewIssue {
-  lineStart: number;
-  lineEnd: number;
-  severity: 'critical' | 'high' | 'medium' | 'low';
-  title: string;
-  description: string;
-  suggestion?: string;
-  reviewerName: string;
-}
-
-interface RenderOptions {
-  old: string;
-  new: string;
-  filename: string;
-  issues: ReviewIssue[];
-  theme?: 'light' | 'dark';
-}
-
-async function renderDiff(options: RenderOptions): Promise<string> {
-  const { old: oldContent, new: newContent, filename, issues, theme = 'light' } = options;
-
-  // Parse the diff
-  const diffMetadata = parseDiffFromFile(
-    { name: filename, contents: oldContent },
-    { name: filename, contents: newContent }
-  );
-
-  // Pre-render for SSR (returns HTML string)
-  const html = await preloadFileDiff({
-    diff: diffMetadata,
-    theme: theme === 'dark' ? 'pierre-dark' : 'pierre-light',
-  });
-
-  // Wrap with issue annotations
-  return wrapWithIssueAnnotations(html, issues);
-}
-
-function wrapWithIssueAnnotations(diffHtml: string, issues: ReviewIssue[]): string {
-  // The diff HTML uses CSS grid - we inject issue annotations after specific lines
-  // This is done via custom elements that position themselves relative to line numbers
-
-  const issueAnnotationsHtml = issues.map(issue => `
-    <div class="review-issue-annotation"
-         data-line-start="${issue.lineStart}"
-         data-line-end="${issue.lineEnd || issue.lineStart}"
-         data-severity="${issue.severity}">
-      <div class="issue-header">
-        <span class="severity-badge severity-${issue.severity}">${issue.severity}</span>
-        <span class="issue-title">${escapeHtml(issue.title)}</span>
-        <span class="reviewer-name">by ${escapeHtml(issue.reviewerName)}</span>
-      </div>
-      <p class="issue-description">${escapeHtml(issue.description)}</p>
-      ${issue.suggestion ? `
-        <div class="issue-suggestion">
-          <strong>Suggestion:</strong> ${escapeHtml(issue.suggestion)}
-        </div>
-      ` : ''}
-    </div>
-  `).join('\n');
-
-  return `
-    <div class="review-diff-container">
-      <div class="diff-content">
-        ${diffHtml}
-      </div>
-      <div class="issue-annotations" id="issue-annotations">
-        ${issueAnnotationsHtml}
-      </div>
-    </div>
-    <script>
-      // Position issue annotations relative to line numbers
-      document.querySelectorAll('.review-issue-annotation').forEach(el => {
-        const lineStart = parseInt(el.dataset.lineStart);
-        const lineEl = document.querySelector(\`[data-line-number="\${lineStart}"]\`);
-        if (lineEl) {
-          el.style.top = lineEl.offsetTop + lineEl.offsetHeight + 'px';
-        }
-      });
-    </script>
-  `;
-}
-
-function escapeHtml(str: string): string {
-  return str
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;');
-}
-
-// CLI entry point
-const args = process.argv.slice(2);
-// Parse args and call renderDiff...
-```
-
-#### 5.2.2 Multi-File Diff View
-
-For PRs with multiple changed files:
-
-```typescript
-import { PatchDiff } from '@pierre/diffs/react';
-// or for vanilla:
-import { parsePatchFiles } from '@pierre/diffs';
-
-// Parse unified diff output from git
-const patchContent = `diff --git a/src/auth.go b/src/auth.go
-index abc123..def456 100644
---- a/src/auth.go
-+++ b/src/auth.go
-@@ -145,6 +145,9 @@ func validateToken(token string) error {
-+    if token == "" {
-+        return ErrEmptyToken
-+    }
-     // ... rest of diff
-`;
-
-// Render all files from patch
-const files = parsePatchFiles(patchContent);
-// Render each file with preloadFileDiff for SSR
-```
-
-#### 5.2.3 Custom Theme for Review UI
-
-```typescript
-import { registerCustomTheme } from '@pierre/diffs';
-
-// Register Substrate review theme
+// Register custom theme on module load
 registerCustomTheme('substrate-review', {
-  // Base on pierre-light
   extends: 'pierre-light',
-
-  // Custom colors for review annotations
   colors: {
     'review.critical': '#dc2626',
     'review.high': '#ea580c',
     'review.medium': '#ca8a04',
     'review.low': '#2563eb',
   },
-
-  // Highlight lines with issues
   lineHighlight: {
     critical: 'rgba(220, 38, 38, 0.1)',
     high: 'rgba(234, 88, 12, 0.1)',
   },
 });
-```
 
-#### 5.2.4 CSS Styles for Issue Annotations
-
-**Location**: `web/static/css/review-diff.css`
-
-```css
-.review-diff-container {
-  position: relative;
+interface DiffViewerProps {
+  reviewId: string;
+  filePath: string;
 }
 
-.review-issue-annotation {
-  position: absolute;
-  left: 4rem;
-  right: 1rem;
-  margin: 0.5rem 0;
-  padding: 0.75rem;
-  border-radius: 0.5rem;
-  border-left: 4px solid;
-  background: white;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
-  z-index: 10;
-}
+export function DiffViewer({ reviewId, filePath }: DiffViewerProps) {
+  const [theme, setTheme] = useState<'light' | 'dark'>('light');
 
-.review-issue-annotation[data-severity="critical"] {
-  border-left-color: #dc2626;
-  background: #fef2f2;
-}
+  const { data, isLoading, error } = useQuery({
+    queryKey: ['review-diff', reviewId, filePath],
+    queryFn: () => reviewsApi.getDiff(reviewId, filePath),
+  });
 
-.review-issue-annotation[data-severity="high"] {
-  border-left-color: #ea580c;
-  background: #fff7ed;
-}
+  if (isLoading) {
+    return (
+      <div className="animate-pulse bg-gray-100 h-64 rounded flex items-center justify-center">
+        <span className="text-gray-500">Loading diff...</span>
+      </div>
+    );
+  }
 
-.review-issue-annotation[data-severity="medium"] {
-  border-left-color: #ca8a04;
-  background: #fefce8;
-}
+  if (error || !data) {
+    return (
+      <div className="p-4 bg-red-50 text-red-700 rounded">
+        Failed to load diff
+      </div>
+    );
+  }
 
-.review-issue-annotation[data-severity="low"] {
-  border-left-color: #2563eb;
-  background: #eff6ff;
-}
-
-.severity-badge {
-  display: inline-block;
-  padding: 0.125rem 0.5rem;
-  font-size: 0.75rem;
-  font-weight: 500;
-  border-radius: 9999px;
-}
-
-.severity-critical { background: #fee2e2; color: #991b1b; }
-.severity-high { background: #ffedd5; color: #9a3412; }
-.severity-medium { background: #fef9c3; color: #854d0e; }
-.severity-low { background: #dbeafe; color: #1e40af; }
-
-.issue-title {
-  font-weight: 500;
-  color: #111827;
-}
-
-.reviewer-name {
-  font-size: 0.75rem;
-  color: #6b7280;
-}
-
-.issue-description {
-  margin-top: 0.5rem;
-  font-size: 0.875rem;
-  color: #374151;
-}
-
-.issue-suggestion {
-  margin-top: 0.5rem;
-  padding: 0.5rem;
-  background: #ecfdf5;
-  border: 1px solid #a7f3d0;
-  border-radius: 0.25rem;
-  font-size: 0.875rem;
-  color: #065f46;
-}
-```
-
-#### 5.2.5 HTMX Template Integration
-
-**Location**: `web/templates/partials/review-diff.html`
-
-```html
-{{define "review-diff"}}
-<div class="review-diff-wrapper"
-     hx-get="/api/reviews/{{.ReviewID}}/diff/{{.FileIndex}}"
-     hx-trigger="load"
-     hx-swap="innerHTML">
-    <div class="animate-pulse bg-gray-100 h-64 rounded flex items-center justify-center">
-        <span class="text-gray-500">Loading diff...</span>
-    </div>
-</div>
-{{end}}
-
-{{define "review-diff-content"}}
-{{/* This is rendered server-side using the diffs.com library */}}
-<div class="diff-file border rounded-lg overflow-hidden">
-    <div class="diff-file-header bg-gray-100 px-4 py-2 flex justify-between items-center">
-        <span class="font-mono text-sm">{{.Filename}}</span>
-        <div class="flex items-center gap-4 text-sm">
-            <span class="text-green-600">+{{.Additions}}</span>
-            <span class="text-red-600">-{{.Deletions}}</span>
-            {{if .IssueCount}}
-            <span class="px-2 py-0.5 bg-yellow-100 text-yellow-800 rounded-full text-xs">
-                {{.IssueCount}} issue(s)
+  return (
+    <div className="diff-viewer border rounded-lg overflow-hidden">
+      {/* Header */}
+      <div className="bg-gray-100 px-4 py-2 flex justify-between items-center border-b">
+        <span className="font-mono text-sm">{filePath}</span>
+        <div className="flex items-center gap-4">
+          {data.issues.length > 0 && (
+            <span className="px-2 py-0.5 bg-yellow-100 text-yellow-800 rounded-full text-xs">
+              {data.issues.length} issue(s)
             </span>
-            {{end}}
+          )}
+          <button
+            onClick={() => setTheme(theme === 'light' ? 'dark' : 'light')}
+            className="text-sm text-gray-600 hover:text-gray-900"
+          >
+            {theme === 'light' ? '🌙' : '☀️'}
+          </button>
         </div>
-    </div>
+      </div>
 
-    {{/* Pre-rendered diff HTML from diffs.com */}}
-    {{.DiffHTML | safeHTML}}
-</div>
-{{end}}
+      {/* Diff content */}
+      <div className="relative">
+        <MultiFileDiff
+          oldFile={{ name: filePath, contents: data.oldContent }}
+          newFile={{ name: filePath, contents: data.newContent }}
+          theme={theme === 'dark' ? 'pierre-dark' : 'substrate-review'}
+        />
+
+        {/* Inline issue annotations */}
+        <IssueAnnotations issues={data.issues} />
+      </div>
+    </div>
+  );
+}
+
+interface IssueAnnotationsProps {
+  issues: ReviewIssue[];
+}
+
+function IssueAnnotations({ issues }: IssueAnnotationsProps) {
+  const [positions, setPositions] = useState<Map<number, number>>(new Map());
+
+  useEffect(() => {
+    // Calculate positions after diff renders
+    const timer = setTimeout(() => {
+      const newPositions = new Map<number, number>();
+      issues.forEach((issue) => {
+        const lineEl = document.querySelector(`[data-line-number="${issue.lineStart}"]`);
+        if (lineEl) {
+          const rect = lineEl.getBoundingClientRect();
+          const container = lineEl.closest('.diff-viewer');
+          if (container) {
+            const containerRect = container.getBoundingClientRect();
+            newPositions.set(issue.id, rect.bottom - containerRect.top);
+          }
+        }
+      });
+      setPositions(newPositions);
+    }, 100);
+
+    return () => clearTimeout(timer);
+  }, [issues]);
+
+  return (
+    <div className="issue-annotations">
+      {issues.map((issue) => {
+        const top = positions.get(issue.id);
+        if (!top) return null;
+
+        return (
+          <div
+            key={issue.id}
+            className="absolute left-16 right-4 z-10"
+            style={{ top: `${top}px` }}
+          >
+            <IssueCard issue={issue} compact />
+          </div>
+        );
+      })}
+    </div>
+  );
+}
 ```
 
-### 5.3 Review Dashboard
+### 5.9 Multi-File Diff Page
 
-**Location**: `web/templates/partials/review-dashboard.html`
+**Location**: `web/frontend/src/components/reviews/ReviewDiffPage.tsx`
 
-Shows review state, iterations, and multi-reviewer consensus:
+```tsx
+import { useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
+import { PatchDiff, parsePatchFiles } from '@pierre/diffs/react';
+import { reviewsApi } from '@/api/reviews';
+import { DiffViewer } from './DiffViewer';
+import type { Review } from '@/types/reviews';
 
-```html
-{{define "review-dashboard"}}
-<div class="review-dashboard grid grid-cols-3 gap-4">
-    <!-- State Timeline -->
-    <div class="col-span-2 bg-white rounded-lg border p-4">
-        <h3 class="font-semibold mb-4">Review Timeline</h3>
-        <div class="space-y-4">
-            {{range .Iterations}}
-            <div class="flex items-start gap-4">
-                <div class="w-10 h-10 rounded-full flex items-center justify-center
-                            {{if eq .Decision "approve"}}bg-green-100 text-green-600
-                            {{else if eq .Decision "request_changes"}}bg-red-100 text-red-600
-                            {{else}}bg-gray-100 text-gray-600{{end}}">
-                    {{.IterationNum}}
-                </div>
-                <div class="flex-1">
-                    <div class="flex items-center gap-2">
-                        <span class="font-medium">{{.ReviewerName}}</span>
-                        <span class="text-sm text-gray-500">{{.RelativeTime}}</span>
-                        {{template "review-decision-badge" .Decision}}
-                    </div>
-                    <p class="text-sm text-gray-600 mt-1">{{.Summary}}</p>
-                    {{if .Issues}}
-                    <div class="mt-2 text-sm text-gray-500">
-                        {{len .Issues}} issue(s) flagged
-                    </div>
-                    {{end}}
-                </div>
-            </div>
-            {{end}}
+interface ReviewDiffPageProps {
+  review: Review;
+}
+
+export function ReviewDiffPage({ review }: ReviewDiffPageProps) {
+  const [selectedFile, setSelectedFile] = useState<string | null>(null);
+
+  // Fetch the full patch
+  const { data: patch, isLoading } = useQuery({
+    queryKey: ['review-patch', review.reviewId],
+    queryFn: () => reviewsApi.getPatch(review.reviewId),
+  });
+
+  if (isLoading) {
+    return <div className="animate-pulse">Loading files...</div>;
+  }
+
+  // Parse patch to get file list
+  const files = patch ? parsePatchFiles(patch.content) : [];
+
+  return (
+    <div className="review-diff-page flex h-full">
+      {/* File tree sidebar */}
+      <div className="w-64 border-r bg-gray-50 overflow-y-auto">
+        <div className="p-3 border-b bg-white">
+          <h3 className="font-medium text-sm text-gray-700">
+            Changed Files ({files.length})
+          </h3>
         </div>
+        <div className="p-2">
+          {files.map((file) => (
+            <button
+              key={file.name}
+              onClick={() => setSelectedFile(file.name)}
+              className={`w-full text-left px-3 py-2 rounded text-sm truncate ${
+                selectedFile === file.name
+                  ? 'bg-purple-100 text-purple-900'
+                  : 'hover:bg-gray-100 text-gray-700'
+              }`}
+            >
+              <span className="font-mono">{file.name}</span>
+              <span className="ml-2 text-xs text-gray-500">
+                +{file.additions} -{file.deletions}
+              </span>
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* Diff viewer */}
+      <div className="flex-1 overflow-y-auto p-4">
+        {selectedFile ? (
+          <DiffViewer reviewId={review.reviewId} filePath={selectedFile} />
+        ) : (
+          <div className="text-center text-gray-500 py-12">
+            Select a file to view changes
+          </div>
+        )}
+      </div>
     </div>
-
-    <!-- Multi-Reviewer Status -->
-    <div class="bg-white rounded-lg border p-4">
-        <h3 class="font-semibold mb-4">Reviewer Status</h3>
-        {{range .ReviewerStatuses}}
-        <div class="flex items-center justify-between py-2 border-b last:border-0">
-            <span class="text-sm">{{.ReviewerName}}</span>
-            <div class="flex items-center gap-2">
-                {{if eq .Status "pending"}}
-                <span class="w-2 h-2 rounded-full bg-gray-300"></span>
-                <span class="text-xs text-gray-500">Pending</span>
-                {{else if eq .Status "reviewing"}}
-                <span class="w-2 h-2 rounded-full bg-yellow-400 animate-pulse"></span>
-                <span class="text-xs text-yellow-600">Reviewing</span>
-                {{else if eq .Decision "approve"}}
-                <span class="w-2 h-2 rounded-full bg-green-500"></span>
-                <span class="text-xs text-green-600">Approved</span>
-                {{else}}
-                <span class="w-2 h-2 rounded-full bg-red-500"></span>
-                <span class="text-xs text-red-600">Changes</span>
-                {{end}}
-            </div>
-        </div>
-        {{end}}
-
-        <!-- Consensus -->
-        <div class="mt-4 pt-4 border-t">
-            <div class="text-sm text-gray-500">Consensus</div>
-            <div class="mt-1">
-                {{template "review-status-badge" .ConsensusDecision}}
-            </div>
-        </div>
-    </div>
-</div>
-{{end}}
+  );
+}
 ```
 
-### 5.4 Reviews List Page
+### 5.10 Reviews Page
 
-**Location**: `web/templates/reviews.html`
+**Location**: `web/frontend/src/pages/ReviewsPage.tsx`
 
-```html
-{{template "layout" .}}
-{{define "content"}}
-<div class="reviews-page">
-    <div class="flex items-center justify-between mb-6">
-        <h1 class="text-2xl font-bold text-gray-900">Code Reviews</h1>
-        <div class="flex items-center space-x-2">
-            <select hx-get="/api/reviews" hx-target="#reviews-list" hx-trigger="change"
-                    name="filter" class="rounded-md border-gray-300 text-sm">
-                <option value="all">All Reviews</option>
-                <option value="pending">Pending</option>
-                <option value="in_progress">In Progress</option>
-                <option value="changes_requested">Changes Requested</option>
-                <option value="approved">Approved</option>
-            </select>
+```tsx
+import { useState } from 'react';
+import { useReviews } from '@/hooks/useReviews';
+import { useReviewsRealtime } from '@/hooks/useReviewsRealtime';
+import { ReviewThread } from '@/components/reviews/ReviewThread';
+import { Spinner } from '@/components/ui/Spinner';
+import { Badge } from '@/components/ui/Badge';
+import type { ReviewState } from '@/types/reviews';
+
+type FilterType = ReviewState | 'all';
+
+export function ReviewsPage() {
+  const [filter, setFilter] = useState<FilterType>('all');
+  const [selectedReviewId, setSelectedReviewId] = useState<string | null>(null);
+
+  const { data: reviews, isLoading } = useReviews({
+    filter: filter === 'all' ? undefined : filter,
+  });
+
+  useReviewsRealtime();
+
+  const filterOptions: { value: FilterType; label: string }[] = [
+    { value: 'all', label: 'All Reviews' },
+    { value: 'pending_review', label: 'Pending' },
+    { value: 'under_review', label: 'In Progress' },
+    { value: 'changes_requested', label: 'Changes Requested' },
+    { value: 'approved', label: 'Approved' },
+  ];
+
+  return (
+    <div className="reviews-page h-full flex">
+      {/* Reviews list */}
+      <div className="w-96 border-r flex flex-col">
+        <div className="p-4 border-b">
+          <h1 className="text-xl font-bold text-gray-900 mb-3">Code Reviews</h1>
+          <select
+            value={filter}
+            onChange={(e) => setFilter(e.target.value as FilterType)}
+            className="w-full rounded-md border-gray-300 text-sm"
+          >
+            {filterOptions.map((opt) => (
+              <option key={opt.value} value={opt.value}>
+                {opt.label}
+              </option>
+            ))}
+          </select>
         </div>
-    </div>
 
-    <div id="reviews-list" hx-get="/api/reviews" hx-trigger="load" hx-swap="innerHTML">
-        <div class="animate-pulse">Loading reviews...</div>
+        <div className="flex-1 overflow-y-auto">
+          {isLoading ? (
+            <div className="flex justify-center py-8">
+              <Spinner />
+            </div>
+          ) : reviews?.length === 0 ? (
+            <div className="text-center py-8 text-gray-500">
+              No reviews found
+            </div>
+          ) : (
+            <div className="divide-y">
+              {reviews?.map((review) => (
+                <button
+                  key={review.reviewId}
+                  onClick={() => setSelectedReviewId(review.reviewId)}
+                  className={`w-full text-left p-4 hover:bg-gray-50 ${
+                    selectedReviewId === review.reviewId ? 'bg-purple-50' : ''
+                  }`}
+                >
+                  <div className="flex items-center justify-between mb-1">
+                    <span className="font-medium text-gray-900 truncate">
+                      {review.branch}
+                    </span>
+                    <ReviewStateBadge state={review.state} />
+                  </div>
+                  <p className="text-sm text-gray-500">
+                    by {review.requesterName}
+                  </p>
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Review detail */}
+      <div className="flex-1 overflow-y-auto p-4">
+        {selectedReviewId ? (
+          <ReviewThread reviewId={selectedReviewId} />
+        ) : (
+          <div className="flex items-center justify-center h-full text-gray-500">
+            Select a review to view details
+          </div>
+        )}
+      </div>
     </div>
-</div>
-{{end}}
+  );
+}
+
+function ReviewStateBadge({ state }: { state: ReviewState }) {
+  const variants: Record<ReviewState, { color: string; label: string }> = {
+    new: { color: 'gray', label: 'New' },
+    pending_review: { color: 'yellow', label: 'Pending' },
+    under_review: { color: 'purple', label: 'Reviewing' },
+    changes_requested: { color: 'red', label: 'Changes' },
+    re_review: { color: 'yellow', label: 'Re-review' },
+    approved: { color: 'green', label: 'Approved' },
+    rejected: { color: 'red', label: 'Rejected' },
+    cancelled: { color: 'gray', label: 'Cancelled' },
+  };
+
+  const { color, label } = variants[state] || { color: 'gray', label: state };
+
+  return <Badge color={color}>{label}</Badge>;
+}
+```
+
+### 5.11 Router Integration
+
+**Location**: `web/frontend/src/router.tsx` (add to existing)
+
+```tsx
+import { ReviewsPage } from '@/pages/ReviewsPage';
+
+// Add to routes array:
+{
+  path: '/reviews',
+  element: <ReviewsPage />,
+},
+{
+  path: '/reviews/:reviewId',
+  element: <ReviewsPage />,
+},
 ```
 
 ---
