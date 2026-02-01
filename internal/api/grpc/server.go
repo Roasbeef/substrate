@@ -18,6 +18,7 @@ import (
 	"github.com/roasbeef/subtrate/internal/agent"
 	"github.com/roasbeef/subtrate/internal/db"
 	"github.com/roasbeef/subtrate/internal/mail"
+	"github.com/roasbeef/subtrate/internal/mailclient"
 )
 
 // ServerConfig holds configuration for the gRPC server.
@@ -62,9 +63,9 @@ func DefaultServerConfig() ServerConfig {
 type Server struct {
 	cfg         ServerConfig
 	store       *db.Store
-	mailSvc     *mail.Service
-	mailRef     mail.MailActorRef         // Mail actor reference (required).
-	activityRef activity.ActivityActorRef // Activity actor reference (required).
+	mailSvc     *mail.Service             // Direct service for operations not via actor.
+	mailClient  *mailclient.Client        // Shared mail client (required).
+	actClient   *mailclient.ActivityClient // Shared activity client (required).
 	agentReg    *agent.Registry
 	identityMgr *agent.IdentityManager
 
@@ -99,8 +100,8 @@ func NewServer(
 		cfg:             cfg,
 		store:           store,
 		mailSvc:         mailSvc,
-		mailRef:         cfg.MailRef,
-		activityRef:     cfg.ActivityRef,
+		mailClient:      mailclient.NewClient(cfg.MailRef),
+		actClient:       mailclient.NewActivityClient(cfg.ActivityRef),
 		agentReg:        agentReg,
 		identityMgr:     identityMgr,
 		notificationHub: notificationHub,

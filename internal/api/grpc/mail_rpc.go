@@ -54,27 +54,16 @@ func (s *Server) SendMail(ctx context.Context, req *SendMailRequest) (*SendMailR
 		Attachments:    req.AttachmentsJson,
 	}
 
-	// Use actor system if available, otherwise fall back to direct service call.
-	var messageID int64
-	var threadID string
-	if s.mailRef != nil {
-		resp, err := s.sendMailActor(ctx, sendReq)
-		if err != nil {
-			return nil, status.Errorf(codes.Internal, "failed to send mail: %v", err)
-		}
-		if resp.Error != nil {
-			return nil, status.Errorf(codes.Internal, "failed to send mail: %v", resp.Error)
-		}
-		messageID = resp.MessageID
-		threadID = resp.ThreadID
-	} else {
-		resp, err := s.mailSvc.Send(ctx, sendReq)
-		if err != nil {
-			return nil, status.Errorf(codes.Internal, "failed to send mail: %v", err)
-		}
-		messageID = resp.MessageID
-		threadID = resp.ThreadID
+	// Send via the shared mail client (actor system).
+	resp, err := s.sendMailActor(ctx, sendReq)
+	if err != nil {
+		return nil, status.Errorf(codes.Internal, "failed to send mail: %v", err)
 	}
+	if resp.Error != nil {
+		return nil, status.Errorf(codes.Internal, "failed to send mail: %v", resp.Error)
+	}
+	messageID := resp.MessageID
+	threadID := resp.ThreadID
 
 	// Record activity for the message.
 	recipientsList := ""
@@ -126,24 +115,15 @@ func (s *Server) FetchInbox(ctx context.Context, req *FetchInboxRequest) (*Fetch
 		StateFilter: stateFilter,
 	}
 
-	// Use actor system if available, otherwise fall back to direct service call.
-	var msgs []mail.InboxMessage
-	if s.mailRef != nil {
-		resp, err := s.fetchInboxActor(ctx, fetchReq)
-		if err != nil {
-			return nil, status.Errorf(codes.Internal, "failed to fetch inbox: %v", err)
-		}
-		if resp.Error != nil {
-			return nil, status.Errorf(codes.Internal, "failed to fetch inbox: %v", resp.Error)
-		}
-		msgs = resp.Messages
-	} else {
-		var err error
-		msgs, err = s.mailSvc.FetchInbox(ctx, fetchReq)
-		if err != nil {
-			return nil, status.Errorf(codes.Internal, "failed to fetch inbox: %v", err)
-		}
+	// Fetch via the shared mail client (actor system).
+	resp, err := s.fetchInboxActor(ctx, fetchReq)
+	if err != nil {
+		return nil, status.Errorf(codes.Internal, "failed to fetch inbox: %v", err)
 	}
+	if resp.Error != nil {
+		return nil, status.Errorf(codes.Internal, "failed to fetch inbox: %v", resp.Error)
+	}
+	msgs := resp.Messages
 
 	return &FetchInboxResponse{
 		Messages: convertMessages(msgs),
@@ -159,24 +139,15 @@ func (s *Server) ReadMessage(ctx context.Context, req *ReadMessageRequest) (*Rea
 		return nil, status.Error(codes.InvalidArgument, "message_id is required")
 	}
 
-	// Use actor system if available, otherwise fall back to direct service call.
-	var msg *mail.InboxMessage
-	if s.mailRef != nil {
-		resp, err := s.readMessageActor(ctx, req.AgentId, req.MessageId)
-		if err != nil {
-			return nil, status.Errorf(codes.Internal, "failed to read message: %v", err)
-		}
-		if resp.Error != nil {
-			return nil, status.Errorf(codes.Internal, "failed to read message: %v", resp.Error)
-		}
-		msg = resp.Message
-	} else {
-		var err error
-		msg, err = s.mailSvc.ReadMessage(ctx, req.AgentId, req.MessageId)
-		if err != nil {
-			return nil, status.Errorf(codes.Internal, "failed to read message: %v", err)
-		}
+	// Read via the shared mail client (actor system).
+	resp, err := s.readMessageActor(ctx, req.AgentId, req.MessageId)
+	if err != nil {
+		return nil, status.Errorf(codes.Internal, "failed to read message: %v", err)
 	}
+	if resp.Error != nil {
+		return nil, status.Errorf(codes.Internal, "failed to read message: %v", resp.Error)
+	}
+	msg := resp.Message
 
 	return &ReadMessageResponse{
 		Message: convertMessage(msg),
@@ -224,27 +195,15 @@ func (s *Server) UpdateState(ctx context.Context, req *UpdateStateRequest) (*Upd
 		snoozedUntil = &t
 	}
 
-	// Use actor system if available, otherwise fall back to direct service call.
-	if s.mailRef != nil {
-		resp, err := s.updateMessageStateActor(
-			ctx, req.AgentId, req.MessageId, newState, snoozedUntil,
-		)
-		if err != nil {
-			return nil, status.Errorf(codes.Internal, "failed to update state: %v", err)
-		}
-		if resp.Error != nil {
-			return nil, status.Errorf(codes.Internal, "failed to update state: %v", resp.Error)
-		}
-	} else {
-		err := s.mailSvc.UpdateState(ctx, mail.UpdateStateRequest{
-			AgentID:      req.AgentId,
-			MessageID:    req.MessageId,
-			NewState:     newState,
-			SnoozedUntil: snoozedUntil,
-		})
-		if err != nil {
-			return nil, status.Errorf(codes.Internal, "failed to update state: %v", err)
-		}
+	// Update state via the shared mail client (actor system).
+	resp, err := s.updateMessageStateActor(
+		ctx, req.AgentId, req.MessageId, newState, snoozedUntil,
+	)
+	if err != nil {
+		return nil, status.Errorf(codes.Internal, "failed to update state: %v", err)
+	}
+	if resp.Error != nil {
+		return nil, status.Errorf(codes.Internal, "failed to update state: %v", resp.Error)
 	}
 
 	return &UpdateStateResponse{Success: true}, nil
@@ -259,20 +218,13 @@ func (s *Server) AckMessage(ctx context.Context, req *AckMessageRequest) (*AckMe
 		return nil, status.Error(codes.InvalidArgument, "message_id is required")
 	}
 
-	// Use actor system if available, otherwise fall back to direct service call.
-	if s.mailRef != nil {
-		resp, err := s.ackMessageActor(ctx, req.AgentId, req.MessageId)
-		if err != nil {
-			return nil, status.Errorf(codes.Internal, "failed to ack message: %v", err)
-		}
-		if resp.Error != nil {
-			return nil, status.Errorf(codes.Internal, "failed to ack message: %v", resp.Error)
-		}
-	} else {
-		err := s.mailSvc.AckMessage(ctx, req.AgentId, req.MessageId)
-		if err != nil {
-			return nil, status.Errorf(codes.Internal, "failed to ack message: %v", err)
-		}
+	// Ack via the shared mail client (actor system).
+	resp, err := s.ackMessageActor(ctx, req.AgentId, req.MessageId)
+	if err != nil {
+		return nil, status.Errorf(codes.Internal, "failed to ack message: %v", err)
+	}
+	if resp.Error != nil {
+		return nil, status.Errorf(codes.Internal, "failed to ack message: %v", resp.Error)
 	}
 
 	return &AckMessageResponse{Success: true}, nil
@@ -284,24 +236,15 @@ func (s *Server) GetStatus(ctx context.Context, req *GetStatusRequest) (*GetStat
 		return nil, status.Error(codes.InvalidArgument, "agent_id is required")
 	}
 
-	// Use actor system if available, otherwise fall back to direct service call.
-	var stat mail.AgentStatus
-	if s.mailRef != nil {
-		resp, err := s.getAgentStatusActor(ctx, req.AgentId)
-		if err != nil {
-			return nil, status.Errorf(codes.Internal, "failed to get status: %v", err)
-		}
-		if resp.Error != nil {
-			return nil, status.Errorf(codes.Internal, "failed to get status: %v", resp.Error)
-		}
-		stat = resp.Status
-	} else {
-		var err error
-		stat, err = s.mailSvc.GetStatus(ctx, req.AgentId)
-		if err != nil {
-			return nil, status.Errorf(codes.Internal, "failed to get status: %v", err)
-		}
+	// Get status via the shared mail client (actor system).
+	resp, err := s.getAgentStatusActor(ctx, req.AgentId)
+	if err != nil {
+		return nil, status.Errorf(codes.Internal, "failed to get status: %v", err)
 	}
+	if resp.Error != nil {
+		return nil, status.Errorf(codes.Internal, "failed to get status: %v", resp.Error)
+	}
+	stat := resp.Status
 
 	return &GetStatusResponse{
 		AgentId:      stat.AgentID,
@@ -319,30 +262,16 @@ func (s *Server) PollChanges(ctx context.Context, req *PollChangesRequest) (*Pol
 		return nil, status.Error(codes.InvalidArgument, "agent_id is required")
 	}
 
-	// Use actor system if available, otherwise fall back to direct service call.
-	var newMessages []mail.InboxMessage
-	var newOffsets map[int64]int64
-	if s.mailRef != nil {
-		resp, err := s.pollChangesActor(ctx, req.AgentId, req.SinceOffsets)
-		if err != nil {
-			return nil, status.Errorf(codes.Internal, "failed to poll changes: %v", err)
-		}
-		if resp.Error != nil {
-			return nil, status.Errorf(codes.Internal, "failed to poll changes: %v", resp.Error)
-		}
-		newMessages = resp.NewMessages
-		newOffsets = resp.NewOffsets
-	} else {
-		resp, err := s.mailSvc.PollChanges(ctx, mail.PollChangesRequest{
-			AgentID:      req.AgentId,
-			SinceOffsets: req.SinceOffsets,
-		})
-		if err != nil {
-			return nil, status.Errorf(codes.Internal, "failed to poll changes: %v", err)
-		}
-		newMessages = resp.NewMessages
-		newOffsets = resp.NewOffsets
+	// Poll changes via the shared mail client (actor system).
+	resp, err := s.pollChangesActor(ctx, req.AgentId, req.SinceOffsets)
+	if err != nil {
+		return nil, status.Errorf(codes.Internal, "failed to poll changes: %v", err)
 	}
+	if resp.Error != nil {
+		return nil, status.Errorf(codes.Internal, "failed to poll changes: %v", resp.Error)
+	}
+	newMessages := resp.NewMessages
+	newOffsets := resp.NewOffsets
 
 	return &PollChangesResponse{
 		NewMessages: convertMessages(newMessages),
@@ -434,27 +363,16 @@ func (s *Server) Publish(ctx context.Context, req *PublishRequest) (*PublishResp
 		Priority:  priority,
 	}
 
-	// Use actor system if available, otherwise fall back to direct service call.
-	var messageID int64
-	var recipientsCount int
-	if s.mailRef != nil {
-		resp, err := s.publishMessageActor(ctx, pubReq)
-		if err != nil {
-			return nil, status.Errorf(codes.Internal, "failed to publish: %v", err)
-		}
-		if resp.Error != nil {
-			return nil, status.Errorf(codes.Internal, "failed to publish: %v", resp.Error)
-		}
-		messageID = resp.MessageID
-		recipientsCount = resp.RecipientsCount
-	} else {
-		resp, err := s.mailSvc.Publish(ctx, pubReq)
-		if err != nil {
-			return nil, status.Errorf(codes.Internal, "failed to publish: %v", err)
-		}
-		messageID = resp.MessageID
-		recipientsCount = resp.RecipientsCount
+	// Publish via the shared mail client (actor system).
+	resp, err := s.publishMessageActor(ctx, pubReq)
+	if err != nil {
+		return nil, status.Errorf(codes.Internal, "failed to publish: %v", err)
 	}
+	if resp.Error != nil {
+		return nil, status.Errorf(codes.Internal, "failed to publish: %v", resp.Error)
+	}
+	messageID := resp.MessageID
+	recipientsCount := resp.RecipientsCount
 
 	return &PublishResponse{
 		MessageId:       messageID,

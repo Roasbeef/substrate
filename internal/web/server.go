@@ -11,6 +11,7 @@ import (
 	"github.com/roasbeef/subtrate/internal/activity"
 	"github.com/roasbeef/subtrate/internal/agent"
 	"github.com/roasbeef/subtrate/internal/mail"
+	"github.com/roasbeef/subtrate/internal/mailclient"
 	"github.com/roasbeef/subtrate/internal/store"
 )
 
@@ -22,11 +23,11 @@ type Server struct {
 	store        store.Storage
 	registry     *agent.Registry
 	heartbeatMgr *agent.HeartbeatManager
-	mailRef      mail.MailActorRef         // Mail actor reference (required).
-	activityRef  activity.ActivityActorRef // Activity actor reference (required).
-	notifHubRef  NotificationHubRef        // Notification hub reference (optional).
-	hub          *Hub                      // WebSocket hub for real-time updates.
-	notifBridge  *HubNotificationBridge    // Bridge for actor notifications to WebSocket.
+	mailClient   *mailclient.Client         // Shared mail client (required).
+	actClient    *mailclient.ActivityClient // Shared activity client (required).
+	notifHubRef  NotificationHubRef         // Notification hub reference (optional).
+	hub          *Hub                       // WebSocket hub for real-time updates.
+	notifBridge  *HubNotificationBridge     // Bridge for actor notifications to WebSocket.
 	mux          *http.ServeMux
 	srv          *http.Server
 	addr         string
@@ -74,8 +75,8 @@ func NewServer(cfg *Config, st store.Storage,
 		store:        st,
 		registry:     registry,
 		heartbeatMgr: heartbeatMgr,
-		mailRef:      cfg.MailRef,
-		activityRef:  cfg.ActivityRef,
+		mailClient:   mailclient.NewClient(cfg.MailRef),
+		actClient:    mailclient.NewActivityClient(cfg.ActivityRef),
 		notifHubRef:  cfg.NotificationHubRef,
 		mux:          http.NewServeMux(),
 		addr:         cfg.Addr,
