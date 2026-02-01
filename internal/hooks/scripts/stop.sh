@@ -171,18 +171,28 @@ fi
 
     # Strategy 1: Use claude -p with haiku to summarize session log.
     # SUBSTRATE_SUMMARIZING=1 prevents recursion (checked at top of script).
+    # Run in subshell with redirected stdio to isolate from parent terminal.
     if command -v claude >/dev/null 2>&1 && [ -n "$session_id" ]; then
-        echo "Strategy 1: Running claude -p" >> "$debug_log"
+        echo "Strategy 1: Running claude -p (file-based)" >> "$debug_log"
 
         session_log="$claude_projects_dir/$session_id.jsonl"
         if [ -f "$session_log" ]; then
             echo "Found session log: $session_log" >> "$debug_log"
 
-            # Set SUBSTRATE_SUMMARIZING to prevent recursive hooks.
-            summary=$(tail -10 "$session_log" 2>/dev/null | head -c 50000 | \
+            # Use temp files for input/output to fully isolate from parent process.
+            tmp_in=$(mktemp)
+            tmp_out=$(mktemp)
+            tail -10 "$session_log" 2>/dev/null | head -c 50000 > "$tmp_in"
+
+            # Run in subshell with all stdio redirected to files.
+            (
                 SUBSTRATE_SUMMARIZING=1 claude -p \
-                "Summarize what this Claude Code agent accomplished in 2-3 brief bullet points. Be very concise." \
-                --model haiku 2>/dev/null || echo "")
+                    "Summarize what this Claude Code agent accomplished in 2-3 brief bullet points. Be very concise." \
+                    --model haiku < "$tmp_in" > "$tmp_out" 2>/dev/null
+            ) </dev/null >/dev/null 2>/dev/null
+
+            summary=$(cat "$tmp_out" 2>/dev/null || echo "")
+            rm -f "$tmp_in" "$tmp_out"
 
             if [ -n "$summary" ]; then
                 echo "Generated summary with claude -p haiku" >> "$debug_log"
@@ -244,12 +254,12 @@ $summary
     echo "Attempting to send status update..." >> "$debug_log"
     echo "Subject: [Status] $agent_name - Standing By" >> "$debug_log"
 
-    # Send to User
+    # Send to User (redirect stdout to prevent corrupting hook JSON output).
     if substrate send $session_args \
         --to User \
         --subject "[Status] $agent_name - Standing By" \
         --body "$status_body" \
-        2>>"$debug_log"; then
+        >>"$debug_log" 2>&1; then
             # Update deduplication flag
             mkdir -p "$(dirname "$status_flag")"
             echo "$now" > "$status_flag"
@@ -266,5 +276,25 @@ $summary
 # No mail, no tasks - do a longer poll to keep agent alive
 # --always-block ensures we output block decision even with no messages.
 # This keeps the agent alive indefinitely, continuously checking for work.
-substrate poll $session_args --wait=55s --format hook --always-block 2>/dev/null || \
-    echo '{"decision": "block", "reason": "Error resolving agent identity. Agent staying alive."}'
+
+# Debug log for poll.
+debug_log="$HOME/.subtrate/stop_hook_trace.log"
+mkdir -p "$(dirname "$debug_log")"
+echo "=== Stop Hook Step 4: $(date) ===" >> "$debug_log"
+echo "session_args: [$session_args]" >> "$debug_log"
+
+poll_output=$(substrate poll $session_args --wait=55s --format hook --always-block 2>&1)
+poll_exit=$?
+echo "poll_exit: $poll_exit, output: $poll_output" >> "$debug_log"
+
+# Generate unique poll UUID to prevent output deduplication by Claude Code.
+poll_uuid=$(uuidgen | tr '[:upper:]' '[:lower:]' | cut -d'-' -f1)
+echo "poll_uuid: $poll_uuid" >> "$debug_log"
+
+if [ $poll_exit -eq 0 ]; then
+    # Replace the reason with one that includes the UUID for Claude to echo.
+    echo "$poll_output" | jq -c --arg uuid "$poll_uuid" \
+        '.reason = "No new messages. Say: Standing by [" + $uuid + "]"'
+else
+    echo '{"decision": "block", "reason": "Error - say: Standing by ['"$poll_uuid"']"}'
+fi
