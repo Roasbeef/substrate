@@ -6,276 +6,1002 @@
 
 ## Executive Summary
 
-This document outlines a comprehensive plan to integrate DSPy-inspired prompt engineering capabilities into Substrate. The integration will provide type-safe, composable prompt handling with automatic optimization, leveraging the existing actor system and Claude Agent SDK as the inference backend.
+This document outlines a plan to integrate **actual DSPy** (the Python library) into Substrate via a Go wrapper/bridge architecture. Rather than recreating DSPy in Go, we leverage the mature Python DSPy library for all prompt engineering and optimization, while using Go for the actor system integration and the Claude Agent SDK as the inference backend.
 
 ## Table of Contents
 
-1. [Goals and Requirements](#goals-and-requirements)
-2. [Architecture Overview](#architecture-overview)
-3. [Core Components](#core-components)
-4. [Implementation Phases](#implementation-phases)
-5. [Detailed Design](#detailed-design)
-6. [Database Schema](#database-schema)
-7. [API Design](#api-design)
-8. [Testing Strategy](#testing-strategy)
-9. [Migration Path](#migration-path)
-
----
-
-## Goals and Requirements
-
-### Primary Goals
-
-1. **Type-Safe Prompt Templates** - Strongly typed input/output signatures for prompts
-2. **Composable Modules** - Chain-of-thought, retrieval-augmented, and multi-step reasoning
-3. **Prompt Optimization** - Automatic prompt tuning via bootstrapping and teleprompters
-4. **Actor-Based Execution** - Integrate with existing actor system for concurrent execution
-5. **Claude SDK Backend** - Use Go Claude Agent SDK for all LLM inference
-
-### Non-Goals
-
-- Python interop (pure Go implementation)
-- Direct DSPy API compatibility (inspired by, not a port of)
-- Support for non-Claude models initially
-
-### Key Requirements
-
-| Requirement | Description | Priority |
-|-------------|-------------|----------|
-| Type Safety | Compile-time validation of prompt signatures | P0 |
-| Composability | Modules can be nested and chained | P0 |
-| Persistence | Store optimized prompts and traces | P0 |
-| Observability | Full tracing of prompt execution | P1 |
-| Optimization | Bootstrap few-shot examples from traces | P1 |
-| Caching | Cache responses for identical inputs | P2 |
+1. [Architecture Overview](#architecture-overview)
+2. [Bridge Design Options](#bridge-design-options)
+3. [Custom LM Backend](#custom-lm-backend)
+4. [Go Wrapper Types](#go-wrapper-types)
+5. [Python DSPy Server](#python-dspy-server)
+6. [Implementation Phases](#implementation-phases)
+7. [Example Usage](#example-usage)
 
 ---
 
 ## Architecture Overview
 
 ```
-┌─────────────────────────────────────────────────────────────────────────┐
-│                           Applications                                   │
-│  (Agentic Review, Mail Summarization, Code Analysis, etc.)              │
-└────────────────────────────────┬────────────────────────────────────────┘
-                                 │
-┌────────────────────────────────▼────────────────────────────────────────┐
-│                         DSPy Actor Service                               │
-│  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐    │
-│  │  Predict    │  │   ChainOf   │  │  ReAct      │  │  Program    │    │
-│  │  Actor      │  │   Thought   │  │  Actor      │  │  Compose    │    │
-│  └──────┬──────┘  └──────┬──────┘  └──────┬──────┘  └──────┬──────┘    │
-│         │                │                │                │            │
-│         └────────────────┴────────────────┴────────────────┘            │
-│                                 │                                        │
-│  ┌──────────────────────────────▼──────────────────────────────────┐    │
-│  │                    Module Execution Engine                       │    │
-│  │  - Signature validation                                          │    │
-│  │  - Template rendering                                            │    │
-│  │  - Output parsing                                                │    │
-│  │  - Retry/fallback handling                                       │    │
-│  └──────────────────────────────┬──────────────────────────────────┘    │
-│                                 │                                        │
-└─────────────────────────────────┼────────────────────────────────────────┘
-                                  │
-┌─────────────────────────────────▼────────────────────────────────────────┐
-│                         Inference Layer                                   │
-│  ┌──────────────────────────────────────────────────────────────────┐    │
-│  │                    Claude Agent SDK Adapter                       │    │
-│  │  - Spawner integration                                            │    │
-│  │  - Session management                                             │    │
-│  │  - Streaming support                                              │    │
-│  │  - Token tracking                                                 │    │
-│  └──────────────────────────────┬──────────────────────────────────┘    │
-│                                 │                                        │
-└─────────────────────────────────┼────────────────────────────────────────┘
-                                  │
-┌─────────────────────────────────▼────────────────────────────────────────┐
-│                         Optimization Layer                                │
-│  ┌─────────────────┐  ┌─────────────────┐  ┌─────────────────────────┐  │
-│  │  Trace Store    │  │  Bootstrapper   │  │  Teleprompter           │  │
-│  │  (Examples DB)  │  │  (Few-shot Gen) │  │  (Prompt Optimizer)     │  │
-│  └─────────────────┘  └─────────────────┘  └─────────────────────────┘  │
-│                                                                          │
-└──────────────────────────────────────────────────────────────────────────┘
-                                  │
-┌─────────────────────────────────▼────────────────────────────────────────┐
-│                         Storage Layer                                     │
-│  ┌─────────────────┐  ┌─────────────────┐  ┌─────────────────────────┐  │
-│  │  Signatures     │  │  Traces         │  │  Optimized Prompts      │  │
-│  │  (Templates)    │  │  (Executions)   │  │  (Compiled Programs)    │  │
-│  └─────────────────┘  └─────────────────┘  └─────────────────────────┘  │
-│                                                                          │
-└──────────────────────────────────────────────────────────────────────────┘
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                              Go (Substrate)                                  │
+│  ┌─────────────────────────────────────────────────────────────────────┐    │
+│  │                         Applications                                 │    │
+│  │   (Agentic Review, Mail Summarization, Code Analysis, etc.)         │    │
+│  └────────────────────────────────┬────────────────────────────────────┘    │
+│                                   │                                          │
+│  ┌────────────────────────────────▼────────────────────────────────────┐    │
+│  │                      DSPy Go Client                                  │    │
+│  │   - Type-safe wrapper structs (Signature, Module, Example)          │    │
+│  │   - Actor message types for async execution                         │    │
+│  │   - Marshals Go types ↔ JSON for Python bridge                      │    │
+│  └────────────────────────────────┬────────────────────────────────────┘    │
+│                                   │                                          │
+│  ┌────────────────────────────────▼────────────────────────────────────┐    │
+│  │                      Bridge Layer (gRPC/HTTP)                        │    │
+│  │   - Connects to Python DSPy server                                  │    │
+│  │   - Request/response serialization                                  │    │
+│  │   - Connection pooling & health checks                              │    │
+│  └────────────────────────────────┬────────────────────────────────────┘    │
+│                                   │                                          │
+│  ┌────────────────────────────────▼────────────────────────────────────┐    │
+│  │                     LM Callback Server                               │    │
+│  │   - HTTP server for DSPy LM callbacks                               │    │
+│  │   - Routes inference requests to Claude Agent SDK                   │    │
+│  │   - Spawner integration for actual Claude calls                     │    │
+│  └─────────────────────────────────────────────────────────────────────┘    │
+│                                                                              │
+└──────────────────────────────────────┬───────────────────────────────────────┘
+                                       │ gRPC / HTTP
+                                       │
+┌──────────────────────────────────────▼───────────────────────────────────────┐
+│                              Python (DSPy Server)                             │
+│  ┌─────────────────────────────────────────────────────────────────────┐    │
+│  │                        DSPy gRPC/HTTP Server                         │    │
+│  │   - Exposes DSPy operations: predict, optimize, compile             │    │
+│  │   - Manages DSPy modules and programs                               │    │
+│  │   - Handles signature definitions                                   │    │
+│  └────────────────────────────────┬────────────────────────────────────┘    │
+│                                   │                                          │
+│  ┌────────────────────────────────▼────────────────────────────────────┐    │
+│  │                         Actual DSPy Library                          │    │
+│  │   - dspy.Predict, dspy.ChainOfThought, dspy.ReAct                   │    │
+│  │   - dspy.teleprompt.BootstrapFewShot, MIPRO, etc.                   │    │
+│  │   - Full optimization and compilation                               │    │
+│  └────────────────────────────────┬────────────────────────────────────┘    │
+│                                   │                                          │
+│  ┌────────────────────────────────▼────────────────────────────────────┐    │
+│  │                      Custom LM (ClaudeAgentLM)                       │    │
+│  │   - Subclass of dspy.LM                                             │    │
+│  │   - Makes HTTP callbacks to Go LM server                            │    │
+│  │   - Go server uses Claude Agent SDK for inference                   │    │
+│  └─────────────────────────────────────────────────────────────────────┘    │
+│                                                                              │
+└──────────────────────────────────────────────────────────────────────────────┘
+```
+
+### Key Design Principles
+
+1. **Use Real DSPy** - Don't reinvent the wheel; DSPy's optimizers (MIPRO, BootstrapFewShot) are sophisticated
+2. **Go for Orchestration** - Actor system, persistence, API exposure remain in Go
+3. **Claude SDK as Backend** - Custom DSPy LM class calls back to Go for actual inference
+4. **Type-Safe Go Wrapper** - Thin Go types that marshal to/from DSPy's Python types
+
+---
+
+## Bridge Design Options
+
+### Option A: gRPC Bridge (Recommended)
+
+```
+Go Client  ←──gRPC──→  Python Server
+```
+
+**Pros:**
+- Strong typing via protobuf
+- Streaming support for long-running optimization
+- Efficient binary serialization
+- Built-in health checks and load balancing
+
+**Cons:**
+- Requires protobuf definitions
+- More complex setup
+
+### Option B: HTTP/JSON Bridge
+
+```
+Go Client  ←──HTTP/JSON──→  Python FastAPI Server
+```
+
+**Pros:**
+- Simpler to implement and debug
+- Easy to test with curl
+- No protobuf tooling needed
+
+**Cons:**
+- Less efficient than gRPC
+- No streaming (would need SSE or WebSocket)
+
+### Option C: Subprocess with stdio JSON-RPC
+
+```
+Go  ──spawns──→  Python subprocess  ←──stdio JSON──→
+```
+
+**Pros:**
+- No network configuration
+- Process lifecycle managed by Go
+- Simple for single-instance deployments
+
+**Cons:**
+- One process per Go instance
+- Harder to scale horizontally
+
+### Recommendation
+
+**Start with HTTP/JSON** for simplicity during development, then migrate to **gRPC** for production. The Go wrapper types should be protocol-agnostic.
+
+---
+
+## Custom LM Backend
+
+The key to using Claude Agent SDK with DSPy is a custom LM class that calls back to Go.
+
+### Python: ClaudeAgentLM
+
+```python
+# dspy_server/lm.py
+
+import dspy
+import httpx
+from typing import List, Optional
+
+class ClaudeAgentLM(dspy.LM):
+    """Custom DSPy LM that delegates inference to Go Claude Agent SDK."""
+
+    def __init__(
+        self,
+        callback_url: str = "http://localhost:9090/v1/inference",
+        model: str = "claude-opus-4-5-20251101",
+        **kwargs
+    ):
+        super().__init__(model=model, **kwargs)
+        self.callback_url = callback_url
+        self.client = httpx.Client(timeout=300.0)  # 5 min for long generations
+
+    def __call__(
+        self,
+        prompt: str,
+        **kwargs
+    ) -> List[str]:
+        """Execute inference via Go callback server."""
+
+        response = self.client.post(
+            self.callback_url,
+            json={
+                "prompt": prompt,
+                "model": self.model,
+                "temperature": kwargs.get("temperature", 0.7),
+                "max_tokens": kwargs.get("max_tokens", 4096),
+                "n": kwargs.get("n", 1),  # Number of completions
+            }
+        )
+        response.raise_for_status()
+
+        result = response.json()
+
+        # Track usage for cost monitoring
+        self._update_usage(result.get("usage", {}))
+
+        # Return list of completions
+        return result["completions"]
+
+    def _update_usage(self, usage: dict):
+        """Track token usage and costs."""
+        # DSPy tracks this internally
+        pass
+
+
+# Configure DSPy to use our custom LM
+def configure_dspy(callback_url: str, model: str = "claude-opus-4-5-20251101"):
+    """Initialize DSPy with Claude Agent backend."""
+    lm = ClaudeAgentLM(callback_url=callback_url, model=model)
+    dspy.configure(lm=lm)
+    return lm
+```
+
+### Go: LM Callback Server
+
+```go
+// internal/dspy/lm_server.go
+
+package dspy
+
+import (
+    "context"
+    "encoding/json"
+    "net/http"
+
+    "github.com/Roasbeef/substrate/internal/agent"
+)
+
+// LMCallbackServer handles inference requests from Python DSPy.
+type LMCallbackServer struct {
+    spawner *agent.Spawner
+    addr    string
+}
+
+// InferenceRequest from Python DSPy LM.
+type InferenceRequest struct {
+    Prompt      string  `json:"prompt"`
+    Model       string  `json:"model"`
+    Temperature float64 `json:"temperature"`
+    MaxTokens   int     `json:"max_tokens"`
+    N           int     `json:"n"`  // Number of completions
+}
+
+// InferenceResponse to Python DSPy LM.
+type InferenceResponse struct {
+    Completions []string       `json:"completions"`
+    Usage       *UsageInfo     `json:"usage,omitempty"`
+    Error       string         `json:"error,omitempty"`
+}
+
+// UsageInfo tracks token usage for cost monitoring.
+type UsageInfo struct {
+    PromptTokens     int     `json:"prompt_tokens"`
+    CompletionTokens int     `json:"completion_tokens"`
+    TotalTokens      int     `json:"total_tokens"`
+    CostUSD          float64 `json:"cost_usd"`
+}
+
+// NewLMCallbackServer creates a new callback server.
+func NewLMCallbackServer(spawner *agent.Spawner, addr string) *LMCallbackServer {
+    return &LMCallbackServer{
+        spawner: spawner,
+        addr:    addr,
+    }
+}
+
+// Start begins serving inference requests.
+func (s *LMCallbackServer) Start(ctx context.Context) error {
+    mux := http.NewServeMux()
+    mux.HandleFunc("/v1/inference", s.handleInference)
+    mux.HandleFunc("/health", s.handleHealth)
+
+    server := &http.Server{
+        Addr:    s.addr,
+        Handler: mux,
+    }
+
+    go func() {
+        <-ctx.Done()
+        server.Shutdown(context.Background())
+    }()
+
+    return server.ListenAndServe()
+}
+
+// handleInference processes a single inference request.
+func (s *LMCallbackServer) handleInference(w http.ResponseWriter, r *http.Request) {
+    var req InferenceRequest
+    if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+        http.Error(w, err.Error(), http.StatusBadRequest)
+        return
+    }
+
+    // Configure spawner for this request.
+    cfg := agent.DefaultSpawnConfig()
+    cfg.Model = req.Model
+
+    spawner := agent.NewSpawner(cfg)
+
+    // Generate N completions (for optimization scenarios).
+    completions := make([]string, 0, req.N)
+    var totalUsage UsageInfo
+
+    for i := 0; i < req.N; i++ {
+        resp, err := spawner.Spawn(r.Context(), req.Prompt)
+        if err != nil {
+            json.NewEncoder(w).Encode(InferenceResponse{
+                Error: err.Error(),
+            })
+            return
+        }
+
+        completions = append(completions, resp.Result)
+
+        if resp.Usage != nil {
+            totalUsage.PromptTokens += int(resp.Usage.InputTokens)
+            totalUsage.CompletionTokens += int(resp.Usage.OutputTokens)
+            totalUsage.CostUSD += resp.CostUSD
+        }
+    }
+
+    totalUsage.TotalTokens = totalUsage.PromptTokens + totalUsage.CompletionTokens
+
+    json.NewEncoder(w).Encode(InferenceResponse{
+        Completions: completions,
+        Usage:       &totalUsage,
+    })
+}
+
+func (s *LMCallbackServer) handleHealth(w http.ResponseWriter, r *http.Request) {
+    w.WriteHeader(http.StatusOK)
+    w.Write([]byte("ok"))
+}
 ```
 
 ---
 
-## Core Components
+## Go Wrapper Types
 
-### 1. Signatures (Type-Safe Templates)
-
-Signatures define the contract for a prompt module - its inputs, outputs, and documentation.
+Type-safe Go structs that map to DSPy concepts.
 
 ```go
-// internal/dspy/signature.go
+// internal/dspy/types.go
 
-// FieldType represents the type of a signature field.
-type FieldType string
+package dspy
+
+import "time"
+
+// Signature defines input/output fields for a DSPy module.
+// Maps to: dspy.Signature
+type Signature struct {
+    Name         string  `json:"name"`
+    Description  string  `json:"description"`
+    Instructions string  `json:"instructions,omitempty"`
+    InputFields  []Field `json:"input_fields"`
+    OutputFields []Field `json:"output_fields"`
+}
+
+// Field represents a single input or output field.
+// Maps to: dspy.InputField / dspy.OutputField
+type Field struct {
+    Name        string `json:"name"`
+    Description string `json:"desc,omitempty"`
+    Prefix      string `json:"prefix,omitempty"`  // For output parsing
+    Type        string `json:"type,omitempty"`    // "str", "int", "list", etc.
+}
+
+// Example is a single input/output demonstration.
+// Maps to: dspy.Example
+type Example struct {
+    Inputs  map[string]any `json:"inputs"`
+    Outputs map[string]any `json:"outputs,omitempty"`
+}
+
+// ModuleType identifies the DSPy module to use.
+type ModuleType string
 
 const (
-    FieldTypeString   FieldType = "string"
-    FieldTypeInt      FieldType = "int"
-    FieldTypeBool     FieldType = "bool"
-    FieldTypeList     FieldType = "list"
-    FieldTypeJSON     FieldType = "json"
-    FieldTypeMarkdown FieldType = "markdown"
+    ModulePredict        ModuleType = "Predict"
+    ModuleChainOfThought ModuleType = "ChainOfThought"
+    ModuleReAct          ModuleType = "ReAct"
+    ModuleProgramOfThought ModuleType = "ProgramOfThought"
 )
 
-// Field defines a single input or output field.
-type Field struct {
-    Name        string
-    Type        FieldType
-    Description string
-    Required    bool
-    Default     any
-    Prefix      string  // Output parsing prefix (e.g., "Answer:")
+// PredictRequest asks DSPy to run a prediction.
+type PredictRequest struct {
+    Signature  Signature      `json:"signature"`
+    ModuleType ModuleType     `json:"module_type"`
+    Inputs     map[string]any `json:"inputs"`
+    Config     *PredictConfig `json:"config,omitempty"`
 }
 
-// Signature defines the input/output contract for a module.
-type Signature struct {
-    Name        string
-    Description string
-    Inputs      []Field
-    Outputs     []Field
-
-    // Instructions are injected into the prompt.
-    Instructions string
-
-    // Examples are few-shot demonstrations.
-    Examples []Example
+// PredictConfig contains optional prediction parameters.
+type PredictConfig struct {
+    Temperature float64 `json:"temperature,omitempty"`
+    MaxTokens   int     `json:"max_tokens,omitempty"`
 }
 
-// Example represents a single input/output demonstration.
-type Example struct {
-    Inputs  map[string]any
-    Outputs map[string]any
+// PredictResponse contains the prediction result.
+type PredictResponse struct {
+    Outputs   map[string]any `json:"outputs"`
+    Rationale string         `json:"rationale,omitempty"`  // If CoT
+    TraceID   string         `json:"trace_id,omitempty"`
+    Usage     *UsageInfo     `json:"usage,omitempty"`
+}
 
-    // Metadata for tracing.
-    Source    string    // "manual", "bootstrapped", "optimized"
-    Score     float64   // Quality score from evaluation
-    CreatedAt time.Time
+// OptimizeStrategy identifies the teleprompter to use.
+type OptimizeStrategy string
+
+const (
+    StrategyBootstrapFewShot     OptimizeStrategy = "BootstrapFewShot"
+    StrategyBootstrapFewShotRS   OptimizeStrategy = "BootstrapFewShotWithRandomSearch"
+    StrategyMIPRO                OptimizeStrategy = "MIPRO"
+    StrategyMIPROv2              OptimizeStrategy = "MIPROv2"
+    StrategyKNNFewShot           OptimizeStrategy = "KNNFewShot"
+    StrategyCOPRO                OptimizeStrategy = "COPRO"
+)
+
+// OptimizeRequest asks DSPy to optimize a module.
+type OptimizeRequest struct {
+    Signature    Signature        `json:"signature"`
+    ModuleType   ModuleType       `json:"module_type"`
+    Strategy     OptimizeStrategy `json:"strategy"`
+    TrainSet     []Example        `json:"train_set"`
+    ValSet       []Example        `json:"val_set,omitempty"`
+    Metric       string           `json:"metric"`  // Python metric function name
+    Config       *OptimizeConfig  `json:"config,omitempty"`
+}
+
+// OptimizeConfig contains optimization parameters.
+type OptimizeConfig struct {
+    MaxBootstrappedDemos int     `json:"max_bootstrapped_demos,omitempty"`
+    MaxLabeledDemos      int     `json:"max_labeled_demos,omitempty"`
+    NumCandidates        int     `json:"num_candidates,omitempty"`
+    MaxErrors            int     `json:"max_errors,omitempty"`
+    Temperature          float64 `json:"temperature,omitempty"`
+}
+
+// OptimizeResponse contains the optimized program.
+type OptimizeResponse struct {
+    // The optimized program can be serialized and reloaded.
+    ProgramJSON string  `json:"program_json"`
+
+    // Metrics from optimization.
+    TrainScore  float64 `json:"train_score"`
+    ValScore    float64 `json:"val_score,omitempty"`
+
+    // Selected examples after optimization.
+    SelectedDemos []Example `json:"selected_demos"`
+
+    // Cost tracking.
+    TotalCost   float64       `json:"total_cost"`
+    TotalTokens int           `json:"total_tokens"`
+    Duration    time.Duration `json:"duration"`
+}
+
+// CompileRequest asks DSPy to compile a program for inference.
+type CompileRequest struct {
+    ProgramJSON string `json:"program_json"`
+}
+
+// CompileResponse returns the compiled program ID.
+type CompileResponse struct {
+    ProgramID string `json:"program_id"`
 }
 ```
 
-### 2. Modules (Composable Units)
+---
 
-Modules are the execution units that process inputs through a signature.
+## Python DSPy Server
+
+The Python server that wraps actual DSPy.
+
+### Project Structure
+
+```
+dspy_server/
+├── pyproject.toml
+├── dspy_server/
+│   ├── __init__.py
+│   ├── server.py          # FastAPI/gRPC server
+│   ├── lm.py              # ClaudeAgentLM custom backend
+│   ├── modules.py         # Module factory and registry
+│   ├── metrics.py         # Common metric functions
+│   └── programs.py        # Program compilation and storage
+└── tests/
+    └── test_server.py
+```
+
+### FastAPI Server Implementation
+
+```python
+# dspy_server/server.py
+
+import dspy
+from fastapi import FastAPI, HTTPException
+from pydantic import BaseModel
+from typing import Dict, Any, List, Optional
+import json
+import uuid
+
+from .lm import ClaudeAgentLM, configure_dspy
+from .modules import create_module, ModuleType
+from .metrics import get_metric
+
+app = FastAPI(title="DSPy Server", version="1.0.0")
+
+# In-memory program storage (use Redis/DB in production)
+_programs: Dict[str, dspy.Module] = {}
+
+
+class Field(BaseModel):
+    name: str
+    desc: Optional[str] = None
+    prefix: Optional[str] = None
+    type: Optional[str] = "str"
+
+
+class Signature(BaseModel):
+    name: str
+    description: str
+    instructions: Optional[str] = None
+    input_fields: List[Field]
+    output_fields: List[Field]
+
+
+class Example(BaseModel):
+    inputs: Dict[str, Any]
+    outputs: Optional[Dict[str, Any]] = None
+
+
+class PredictConfig(BaseModel):
+    temperature: Optional[float] = 0.7
+    max_tokens: Optional[int] = 4096
+
+
+class PredictRequest(BaseModel):
+    signature: Signature
+    module_type: str = "Predict"
+    inputs: Dict[str, Any]
+    config: Optional[PredictConfig] = None
+
+
+class PredictResponse(BaseModel):
+    outputs: Dict[str, Any]
+    rationale: Optional[str] = None
+    trace_id: Optional[str] = None
+
+
+class OptimizeConfig(BaseModel):
+    max_bootstrapped_demos: Optional[int] = 4
+    max_labeled_demos: Optional[int] = 4
+    num_candidates: Optional[int] = 10
+    max_errors: Optional[int] = 5
+    temperature: Optional[float] = 0.7
+
+
+class OptimizeRequest(BaseModel):
+    signature: Signature
+    module_type: str = "Predict"
+    strategy: str = "BootstrapFewShot"
+    train_set: List[Example]
+    val_set: Optional[List[Example]] = None
+    metric: str = "exact_match"
+    config: Optional[OptimizeConfig] = None
+
+
+class OptimizeResponse(BaseModel):
+    program_json: str
+    train_score: float
+    val_score: Optional[float] = None
+    selected_demos: List[Example]
+    total_cost: float
+    total_tokens: int
+    duration: float
+
+
+@app.on_event("startup")
+async def startup():
+    """Configure DSPy on server start."""
+    # The callback URL is where Go's LM server listens
+    configure_dspy(
+        callback_url="http://localhost:9090/v1/inference",
+        model="claude-opus-4-5-20251101"
+    )
+
+
+def signature_to_dspy(sig: Signature) -> dspy.Signature:
+    """Convert API signature to DSPy signature."""
+    # Build signature string: "input1, input2 -> output1, output2"
+    inputs = ", ".join(f.name for f in sig.input_fields)
+    outputs = ", ".join(f.name for f in sig.output_fields)
+    sig_str = f"{inputs} -> {outputs}"
+
+    # Create signature class dynamically
+    class DynamicSignature(dspy.Signature):
+        pass
+
+    DynamicSignature.__doc__ = sig.description
+    if sig.instructions:
+        DynamicSignature.__doc__ += f"\n\n{sig.instructions}"
+
+    # Add input fields
+    for field in sig.input_fields:
+        setattr(DynamicSignature, field.name, dspy.InputField(
+            desc=field.desc or field.name
+        ))
+
+    # Add output fields
+    for field in sig.output_fields:
+        setattr(DynamicSignature, field.name, dspy.OutputField(
+            desc=field.desc or field.name,
+            prefix=field.prefix or f"{field.name}:"
+        ))
+
+    return DynamicSignature
+
+
+@app.post("/predict", response_model=PredictResponse)
+async def predict(request: PredictRequest):
+    """Execute a DSPy prediction."""
+    try:
+        # Convert signature
+        sig_class = signature_to_dspy(request.signature)
+
+        # Create module
+        module = create_module(request.module_type, sig_class)
+
+        # Create example from inputs
+        example = dspy.Example(**request.inputs).with_inputs(*request.inputs.keys())
+
+        # Run prediction
+        with dspy.context(temperature=request.config.temperature if request.config else 0.7):
+            result = module(example)
+
+        # Extract outputs
+        outputs = {}
+        for field in request.signature.output_fields:
+            if hasattr(result, field.name):
+                outputs[field.name] = getattr(result, field.name)
+
+        # Extract rationale for CoT
+        rationale = None
+        if hasattr(result, "rationale"):
+            rationale = result.rationale
+
+        return PredictResponse(
+            outputs=outputs,
+            rationale=rationale,
+            trace_id=str(uuid.uuid4())
+        )
+
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/optimize", response_model=OptimizeResponse)
+async def optimize(request: OptimizeRequest):
+    """Optimize a DSPy module using a teleprompter."""
+    import time
+    start_time = time.time()
+
+    try:
+        # Convert signature
+        sig_class = signature_to_dspy(request.signature)
+
+        # Create module
+        module = create_module(request.module_type, sig_class)
+
+        # Convert examples to DSPy format
+        trainset = [
+            dspy.Example(**ex.inputs, **ex.outputs).with_inputs(*ex.inputs.keys())
+            for ex in request.train_set
+        ]
+
+        valset = None
+        if request.val_set:
+            valset = [
+                dspy.Example(**ex.inputs, **ex.outputs).with_inputs(*ex.inputs.keys())
+                for ex in request.val_set
+            ]
+
+        # Get metric function
+        metric = get_metric(request.metric)
+
+        # Get teleprompter
+        config = request.config or OptimizeConfig()
+        teleprompter = get_teleprompter(
+            request.strategy,
+            metric=metric,
+            max_bootstrapped_demos=config.max_bootstrapped_demos,
+            max_labeled_demos=config.max_labeled_demos,
+            num_candidates=config.num_candidates,
+        )
+
+        # Run optimization
+        optimized = teleprompter.compile(
+            module,
+            trainset=trainset,
+            valset=valset,
+        )
+
+        # Evaluate
+        from dspy.evaluate import Evaluate
+        evaluator = Evaluate(devset=trainset, metric=metric)
+        train_score = evaluator(optimized)
+
+        val_score = None
+        if valset:
+            val_evaluator = Evaluate(devset=valset, metric=metric)
+            val_score = val_evaluator(optimized)
+
+        # Serialize program
+        program_json = optimized.save(path=None)  # Returns JSON string
+
+        # Extract selected demos
+        selected_demos = []
+        if hasattr(optimized, "demos"):
+            for demo in optimized.demos:
+                selected_demos.append(Example(
+                    inputs={k: getattr(demo, k) for k in demo._input_keys},
+                    outputs={k: getattr(demo, k) for k in demo._output_keys if hasattr(demo, k)}
+                ))
+
+        duration = time.time() - start_time
+
+        return OptimizeResponse(
+            program_json=program_json,
+            train_score=train_score,
+            val_score=val_score,
+            selected_demos=selected_demos,
+            total_cost=0.0,  # TODO: Track from LM
+            total_tokens=0,  # TODO: Track from LM
+            duration=duration
+        )
+
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+def get_teleprompter(strategy: str, **kwargs):
+    """Get the appropriate teleprompter by name."""
+    from dspy.teleprompt import (
+        BootstrapFewShot,
+        BootstrapFewShotWithRandomSearch,
+        MIPRO,
+        KNNFewShot,
+        COPRO,
+    )
+
+    teleprompters = {
+        "BootstrapFewShot": BootstrapFewShot,
+        "BootstrapFewShotWithRandomSearch": BootstrapFewShotWithRandomSearch,
+        "MIPRO": MIPRO,
+        "KNNFewShot": KNNFewShot,
+        "COPRO": COPRO,
+    }
+
+    tp_class = teleprompters.get(strategy)
+    if not tp_class:
+        raise ValueError(f"Unknown strategy: {strategy}")
+
+    return tp_class(**kwargs)
+
+
+@app.post("/compile")
+async def compile_program(program_json: str):
+    """Load and compile a saved program for fast inference."""
+    program_id = str(uuid.uuid4())
+
+    # Load the program
+    program = dspy.Module()
+    program.load(path=None, data=program_json)
+
+    _programs[program_id] = program
+
+    return {"program_id": program_id}
+
+
+@app.post("/infer/{program_id}")
+async def infer(program_id: str, inputs: Dict[str, Any]):
+    """Run inference on a compiled program."""
+    if program_id not in _programs:
+        raise HTTPException(status_code=404, detail="Program not found")
+
+    program = _programs[program_id]
+    example = dspy.Example(**inputs).with_inputs(*inputs.keys())
+
+    result = program(example)
+
+    return {"outputs": dict(result)}
+
+
+@app.get("/health")
+async def health():
+    return {"status": "ok"}
+```
+
+### Module Factory
+
+```python
+# dspy_server/modules.py
+
+import dspy
+
+
+def create_module(module_type: str, signature) -> dspy.Module:
+    """Create a DSPy module by type name."""
+
+    if module_type == "Predict":
+        return dspy.Predict(signature)
+
+    elif module_type == "ChainOfThought":
+        return dspy.ChainOfThought(signature)
+
+    elif module_type == "ReAct":
+        # ReAct requires tools - would need to extend API
+        return dspy.ReAct(signature, tools=[])
+
+    elif module_type == "ProgramOfThought":
+        return dspy.ProgramOfThought(signature)
+
+    else:
+        raise ValueError(f"Unknown module type: {module_type}")
+```
+
+### Common Metrics
+
+```python
+# dspy_server/metrics.py
+
+import dspy
+
+
+def exact_match(example, prediction, trace=None):
+    """Check if prediction exactly matches expected output."""
+    for key in example._output_keys:
+        expected = getattr(example, key, None)
+        predicted = getattr(prediction, key, None)
+        if expected != predicted:
+            return False
+    return True
+
+
+def contains_match(example, prediction, trace=None):
+    """Check if expected output is contained in prediction."""
+    for key in example._output_keys:
+        expected = str(getattr(example, key, ""))
+        predicted = str(getattr(prediction, key, ""))
+        if expected.lower() not in predicted.lower():
+            return False
+    return True
+
+
+def llm_as_judge(example, prediction, trace=None):
+    """Use LLM to judge quality (expensive but flexible)."""
+    judge = dspy.ChainOfThought("context, expected, predicted -> score: float")
+    result = judge(
+        context=str(example),
+        expected=str({k: getattr(example, k) for k in example._output_keys}),
+        predicted=str({k: getattr(prediction, k) for k in example._output_keys if hasattr(prediction, k)})
+    )
+    return float(result.score) >= 0.5
+
+
+_METRICS = {
+    "exact_match": exact_match,
+    "contains_match": contains_match,
+    "llm_as_judge": llm_as_judge,
+}
+
+
+def get_metric(name: str):
+    """Get metric function by name."""
+    if name not in _METRICS:
+        raise ValueError(f"Unknown metric: {name}. Available: {list(_METRICS.keys())}")
+    return _METRICS[name]
+```
+
+---
+
+## Go DSPy Client
+
+The Go client that calls the Python server.
 
 ```go
-// internal/dspy/module.go
+// internal/dspy/client.go
 
-// Module is the base interface for all DSPy modules.
-type Module interface {
-    // Forward executes the module with the given inputs.
-    Forward(ctx context.Context, inputs map[string]any) fn.Result[map[string]any]
+package dspy
 
-    // Signature returns the module's type signature.
-    Signature() *Signature
+import (
+    "bytes"
+    "context"
+    "encoding/json"
+    "fmt"
+    "net/http"
+    "time"
+)
 
-    // Trace returns execution traces for optimization.
-    Traces() []Trace
+// Client communicates with the Python DSPy server.
+type Client struct {
+    baseURL    string
+    httpClient *http.Client
 }
 
-// Predict is the basic module that executes a single LLM call.
-type Predict struct {
-    sig      *Signature
-    lm       LanguageModel
-    traces   []Trace
-    tracesMu sync.RWMutex
+// NewClient creates a new DSPy client.
+func NewClient(baseURL string) *Client {
+    return &Client{
+        baseURL: baseURL,
+        httpClient: &http.Client{
+            Timeout: 10 * time.Minute, // Long timeout for optimization
+        },
+    }
 }
 
-// ChainOfThought wraps a module with reasoning steps.
-type ChainOfThought struct {
-    inner Module
-
-    // Extended signature with rationale field.
-    extendedSig *Signature
+// Predict executes a prediction using DSPy.
+func (c *Client) Predict(ctx context.Context, req *PredictRequest) (*PredictResponse, error) {
+    return doRequest[PredictResponse](ctx, c, "POST", "/predict", req)
 }
 
-// ReAct implements reasoning + acting with tool use.
-type ReAct struct {
-    inner   Module
-    tools   []Tool
-    maxIter int
+// Optimize runs prompt optimization using DSPy teleprompters.
+func (c *Client) Optimize(ctx context.Context, req *OptimizeRequest) (*OptimizeResponse, error) {
+    return doRequest[OptimizeResponse](ctx, c, "POST", "/optimize", req)
 }
 
-// ProgramOfThought generates and executes code.
-type ProgramOfThought struct {
-    inner    Module
-    executor CodeExecutor
+// Compile loads a saved program for fast inference.
+func (c *Client) Compile(ctx context.Context, req *CompileRequest) (*CompileResponse, error) {
+    return doRequest[CompileResponse](ctx, c, "POST", "/compile", req)
+}
+
+// Infer runs inference on a compiled program.
+func (c *Client) Infer(ctx context.Context, programID string, inputs map[string]any) (map[string]any, error) {
+    resp, err := doRequest[map[string]any](ctx, c, "POST", fmt.Sprintf("/infer/%s", programID), inputs)
+    if err != nil {
+        return nil, err
+    }
+    return *resp, nil
+}
+
+// Health checks if the DSPy server is running.
+func (c *Client) Health(ctx context.Context) error {
+    _, err := doRequest[map[string]any](ctx, c, "GET", "/health", nil)
+    return err
+}
+
+// doRequest is a generic HTTP request helper.
+func doRequest[T any](ctx context.Context, c *Client, method, path string, body any) (*T, error) {
+    var reqBody []byte
+    var err error
+
+    if body != nil {
+        reqBody, err = json.Marshal(body)
+        if err != nil {
+            return nil, fmt.Errorf("marshal request: %w", err)
+        }
+    }
+
+    req, err := http.NewRequestWithContext(ctx, method, c.baseURL+path, bytes.NewReader(reqBody))
+    if err != nil {
+        return nil, fmt.Errorf("create request: %w", err)
+    }
+
+    req.Header.Set("Content-Type", "application/json")
+
+    resp, err := c.httpClient.Do(req)
+    if err != nil {
+        return nil, fmt.Errorf("do request: %w", err)
+    }
+    defer resp.Body.Close()
+
+    if resp.StatusCode >= 400 {
+        var errResp struct {
+            Detail string `json:"detail"`
+        }
+        json.NewDecoder(resp.Body).Decode(&errResp)
+        return nil, fmt.Errorf("server error (%d): %s", resp.StatusCode, errResp.Detail)
+    }
+
+    var result T
+    if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+        return nil, fmt.Errorf("decode response: %w", err)
+    }
+
+    return &result, nil
 }
 ```
 
-### 3. Language Model Adapter
+---
 
-Bridges the DSPy module system to the Claude Agent SDK.
+## Actor Integration
 
-```go
-// internal/dspy/lm.go
-
-// LanguageModel abstracts the LLM backend.
-type LanguageModel interface {
-    // Generate produces a completion for the given prompt.
-    Generate(ctx context.Context, prompt string, opts GenerateOpts) fn.Result[Generation]
-
-    // GenerateN produces multiple completions.
-    GenerateN(ctx context.Context, prompt string, n int, opts GenerateOpts) fn.Result[[]Generation]
-}
-
-// GenerateOpts configures generation behavior.
-type GenerateOpts struct {
-    Temperature   float64
-    MaxTokens     int
-    StopSequences []string
-    SystemPrompt  string
-}
-
-// Generation represents a single LLM output.
-type Generation struct {
-    Text       string
-    TokensIn   int
-    TokensOut  int
-    CostUSD    float64
-    DurationMS int64
-    Model      string
-}
-
-// ClaudeLM implements LanguageModel using the Claude Agent SDK.
-type ClaudeLM struct {
-    spawner *agent.Spawner
-    config  *ClaudeLMConfig
-}
-
-// ClaudeLMConfig configures the Claude language model.
-type ClaudeLMConfig struct {
-    Model            string // e.g., "claude-opus-4-5-20251101"
-    DefaultMaxTokens int
-    DefaultTemp      float64
-    Timeout          time.Duration
-
-    // Session management for multi-turn.
-    EnableSessions bool
-    SessionTTL     time.Duration
-}
-```
-
-### 4. Actor Integration
-
-DSPy modules wrapped as actors for concurrent execution.
+Wrap the DSPy client in an actor for async execution.
 
 ```go
 // internal/dspy/actor.go
+
+package dspy
+
+import (
+    "context"
+    "fmt"
+
+    "github.com/Roasbeef/substrate/internal/baselib/actor"
+    "github.com/lightningnetwork/lnd/fn/v2"
+)
 
 // DSPyRequest is the sealed union of all DSPy actor requests.
 type DSPyRequest interface {
@@ -283,218 +1009,73 @@ type DSPyRequest interface {
     isDSPyRequest()
 }
 
-// PredictRequest executes a basic prediction.
-type PredictRequest struct {
-    actor.BaseMessage
-
-    SignatureID string         // Reference to stored signature
-    Inputs      map[string]any
-    Options     *PredictOptions
-}
-
-func (PredictRequest) isDSPyRequest() {}
-
-// PredictOptions configures prediction behavior.
-type PredictOptions struct {
-    Temperature   float64
-    MaxTokens     int
-    NumCompletions int
-    UseCache      bool
-}
-
-// ChainOfThoughtRequest adds reasoning before prediction.
-type ChainOfThoughtRequest struct {
-    actor.BaseMessage
-
-    SignatureID string
-    Inputs      map[string]any
-    RationaleHint string  // Optional hint for reasoning direction
-}
-
-func (ChainOfThoughtRequest) isDSPyRequest() {}
-
-// OptimizeRequest triggers prompt optimization.
-type OptimizeRequest struct {
-    actor.BaseMessage
-
-    SignatureID string
-    TrainSet    []Example
-    Metric      string      // Evaluation metric name
-    Strategy    OptStrategy // bootstrap, mipro, etc.
-}
-
-func (OptimizeRequest) isDSPyRequest() {}
-
-// DSPyResponse is the sealed union of all responses.
+// DSPyResponse is the sealed union of all DSPy actor responses.
 type DSPyResponse interface {
     isDSPyResponse()
 }
 
-// PredictResponse contains prediction results.
-type PredictResponse struct {
-    Outputs    map[string]any
-    Rationale  string  // If ChainOfThought was used
-    TraceID    string
-    TokensUsed int
-    CostUSD    float64
-    Cached     bool
+// Ensure request types implement the interface.
+func (PredictRequest) isDSPyRequest()  {}
+func (OptimizeRequest) isDSPyRequest() {}
+
+// Ensure response types implement the interface.
+func (PredictResponse) isDSPyResponse()  {}
+func (OptimizeResponse) isDSPyResponse() {}
+
+// Service implements actor behavior for DSPy operations.
+type Service struct {
+    client *Client
 }
 
-func (PredictResponse) isDSPyResponse() {}
-
-// DSPyService implements the actor behavior.
-type DSPyService struct {
-    store     store.Storage
-    lm        LanguageModel
-    registry  *SignatureRegistry
-    optimizer *Optimizer
-    cache     *ResponseCache
+// NewService creates a new DSPy service.
+func NewService(client *Client) *Service {
+    return &Service{client: client}
 }
 
-// Receive dispatches requests to handlers.
-func (s *DSPyService) Receive(ctx context.Context, msg DSPyRequest) fn.Result[DSPyResponse] {
+// Receive handles incoming DSPy requests.
+func (s *Service) Receive(ctx context.Context, msg DSPyRequest) fn.Result[DSPyResponse] {
     switch m := msg.(type) {
     case PredictRequest:
-        return s.handlePredict(ctx, m)
-    case ChainOfThoughtRequest:
-        return s.handleChainOfThought(ctx, m)
+        resp, err := s.client.Predict(ctx, &m)
+        if err != nil {
+            return fn.Err[DSPyResponse](err)
+        }
+        return fn.Ok[DSPyResponse](*resp)
+
     case OptimizeRequest:
-        return s.handleOptimize(ctx, m)
+        resp, err := s.client.Optimize(ctx, &m)
+        if err != nil {
+            return fn.Err[DSPyResponse](err)
+        }
+        return fn.Ok[DSPyResponse](*resp)
+
     default:
         return fn.Err[DSPyResponse](fmt.Errorf("unknown request type: %T", msg))
     }
 }
-```
 
-### 5. Optimization System
-
-The heart of DSPy - automatic prompt optimization.
-
-```go
-// internal/dspy/optimize.go
-
-// OptStrategy defines the optimization approach.
-type OptStrategy string
-
-const (
-    // BootstrapFewShot generates examples from successful traces.
-    BootstrapFewShot OptStrategy = "bootstrap_few_shot"
-
-    // BootstrapFewShotWithRandomSearch adds hyperparameter tuning.
-    BootstrapFewShotWithRandomSearch OptStrategy = "bootstrap_random"
-
-    // MIPRO uses instruction generation + optimization.
-    MIPRO OptStrategy = "mipro"
-
-    // KNNFewShot uses semantic similarity for example selection.
-    KNNFewShot OptStrategy = "knn_few_shot"
-)
-
-// Optimizer handles prompt optimization workflows.
-type Optimizer struct {
-    store      store.Storage
-    lm         LanguageModel
-    embedder   Embedder  // For KNN-based selection
-    evaluator  Evaluator
-}
-
-// OptimizeConfig configures an optimization run.
-type OptimizeConfig struct {
-    Strategy      OptStrategy
-    TrainSet      []Example
-    ValSet        []Example
-    Metric        MetricFunc
-    MaxBootstraps int
-    MaxRounds     int
-    Temperature   float64
-}
-
-// MetricFunc evaluates a prediction against expected output.
-type MetricFunc func(prediction, expected map[string]any) float64
-
-// OptimizeResult contains optimization outcomes.
-type OptimizeResult struct {
-    OptimizedSignature *Signature
-    BestExamples       []Example
-    Scores             []float64
-    TotalCost          float64
-    Iterations         int
-}
-
-// Optimize runs the optimization loop.
-func (o *Optimizer) Optimize(
-    ctx context.Context,
-    sig *Signature,
-    cfg OptimizeConfig,
-) fn.Result[*OptimizeResult] {
-    switch cfg.Strategy {
-    case BootstrapFewShot:
-        return o.bootstrapFewShot(ctx, sig, cfg)
-    case MIPRO:
-        return o.mipro(ctx, sig, cfg)
-    case KNNFewShot:
-        return o.knnFewShot(ctx, sig, cfg)
-    default:
-        return fn.Err[*OptimizeResult](fmt.Errorf("unknown strategy: %s", cfg.Strategy))
-    }
-}
-```
-
-### 6. Trace Storage
-
-Persistent storage for execution traces enabling optimization.
-
-```go
-// internal/dspy/trace.go
-
-// Trace captures a single execution for analysis.
-type Trace struct {
+// DSPyActorConfig configures the DSPy actor.
+type DSPyActorConfig struct {
     ID          string
-    SignatureID string
-    ModuleType  string  // "predict", "chain_of_thought", "react"
-
-    // Input/output snapshots.
-    Inputs  map[string]any
-    Outputs map[string]any
-
-    // Intermediate steps (for CoT, ReAct).
-    Steps []TraceStep
-
-    // Metrics.
-    Success    bool
-    Score      float64
-    TokensIn   int
-    TokensOut  int
-    CostUSD    float64
-    DurationMS int64
-
-    // Metadata.
-    Model     string
-    CreatedAt time.Time
-    Tags      []string
+    Client      *Client
+    MailboxSize int
 }
 
-// TraceStep captures an intermediate step.
-type TraceStep struct {
-    Type       string  // "thought", "action", "observation"
-    Content    string
-    TokensUsed int
-    Timestamp  time.Time
+// NewDSPyActor creates a new DSPy actor.
+func NewDSPyActor(cfg DSPyActorConfig) *actor.Actor[DSPyRequest, DSPyResponse] {
+    svc := NewService(cfg.Client)
+    return actor.NewActor(actor.ActorConfig[DSPyRequest, DSPyResponse]{
+        ID:          cfg.ID,
+        Behavior:    svc,
+        MailboxSize: cfg.MailboxSize,
+    })
 }
 
-// TraceStore persists and queries traces.
-type TraceStore interface {
-    // SaveTrace persists a trace.
-    SaveTrace(ctx context.Context, trace *Trace) error
-
-    // GetTracesBySignature retrieves traces for a signature.
-    GetTracesBySignature(ctx context.Context, sigID string, opts TraceQueryOpts) ([]Trace, error)
-
-    // GetSuccessfulExamples returns high-quality examples for bootstrapping.
-    GetSuccessfulExamples(ctx context.Context, sigID string, limit int, minScore float64) ([]Example, error)
-
-    // GetSimilarExamples finds semantically similar traces (for KNN).
-    GetSimilarExamples(ctx context.Context, sigID string, inputs map[string]any, k int) ([]Example, error)
+// StartDSPyActor creates and starts a DSPy actor.
+func StartDSPyActor(cfg DSPyActorConfig) *actor.ActorRef[DSPyRequest, DSPyResponse] {
+    a := NewDSPyActor(cfg)
+    a.Start()
+    return a.Ref()
 }
 ```
 
@@ -502,773 +1083,229 @@ type TraceStore interface {
 
 ## Implementation Phases
 
-### Phase 1: Foundation (Week 1-2)
-
-**Goal**: Core DSPy primitives and basic prediction.
+### Phase 1: Bridge Foundation (Week 1)
 
 | Task | Description | Deliverable |
 |------|-------------|-------------|
-| 1.1 | Define signature types | `internal/dspy/signature.go` |
-| 1.2 | Implement field validation | `internal/dspy/validate.go` |
-| 1.3 | Create template renderer | `internal/dspy/template.go` |
-| 1.4 | Build output parser | `internal/dspy/parser.go` |
-| 1.5 | Implement Claude LM adapter | `internal/dspy/lm_claude.go` |
-| 1.6 | Create basic Predict module | `internal/dspy/predict.go` |
-| 1.7 | Add database migrations | `internal/db/migrations/` |
-| 1.8 | Unit tests for all components | `internal/dspy/*_test.go` |
+| 1.1 | Set up Python DSPy server project | `dspy_server/` |
+| 1.2 | Implement ClaudeAgentLM custom backend | `dspy_server/lm.py` |
+| 1.3 | Implement Go LM callback server | `internal/dspy/lm_server.go` |
+| 1.4 | Basic predict endpoint (Python) | `dspy_server/server.py` |
+| 1.5 | Go client types and HTTP client | `internal/dspy/client.go` |
+| 1.6 | Integration test: Go → Python → Go → Claude | `tests/integration/dspy/` |
 
-**Database Tables**:
-- `dspy_signatures` - Signature definitions
-- `dspy_examples` - Few-shot examples
-- `dspy_traces` - Execution traces
-
-### Phase 2: Actor Integration (Week 3)
-
-**Goal**: Integrate DSPy with the actor system.
+### Phase 2: Full DSPy Features (Week 2)
 
 | Task | Description | Deliverable |
 |------|-------------|-------------|
-| 2.1 | Define actor message types | `internal/dspy/messages.go` |
-| 2.2 | Implement DSPyService | `internal/dspy/service.go` |
-| 2.3 | Create DSPy actor factory | `internal/dspy/actor.go` |
-| 2.4 | Add to MCP tool registry | `internal/mcp/tools_dspy.go` |
-| 2.5 | Integration tests | `tests/integration/dspy/` |
+| 2.1 | ChainOfThought, ReAct modules | `dspy_server/modules.py` |
+| 2.2 | Optimization endpoints (BootstrapFewShot) | `dspy_server/server.py` |
+| 2.3 | Program save/load/compile | `dspy_server/programs.py` |
+| 2.4 | Common metrics | `dspy_server/metrics.py` |
+| 2.5 | Go client optimization methods | `internal/dspy/client.go` |
 
-### Phase 3: Advanced Modules (Week 4)
-
-**Goal**: Chain-of-thought and multi-step reasoning.
+### Phase 3: Actor Integration (Week 3)
 
 | Task | Description | Deliverable |
 |------|-------------|-------------|
-| 3.1 | Implement ChainOfThought | `internal/dspy/chain_of_thought.go` |
-| 3.2 | Implement ReAct | `internal/dspy/react.go` |
-| 3.3 | Implement ProgramOfThought | `internal/dspy/program_of_thought.go` |
-| 3.4 | Add module composition | `internal/dspy/compose.go` |
-| 3.5 | Tests for advanced modules | `internal/dspy/*_test.go` |
+| 3.1 | DSPy actor message types | `internal/dspy/messages.go` |
+| 3.2 | DSPy actor service | `internal/dspy/actor.go` |
+| 3.3 | MCP tools for DSPy | `internal/mcp/tools_dspy.go` |
+| 3.4 | CLI commands | `cmd/substrate/dspy.go` |
+| 3.5 | Process management (start/stop Python server) | `internal/dspy/process.go` |
 
-### Phase 4: Optimization (Week 5-6)
-
-**Goal**: Prompt optimization via bootstrapping.
+### Phase 4: Applications (Week 4)
 
 | Task | Description | Deliverable |
 |------|-------------|-------------|
-| 4.1 | Implement trace storage | `internal/dspy/trace_store.go` |
-| 4.2 | Build evaluator framework | `internal/dspy/evaluate.go` |
-| 4.3 | Implement BootstrapFewShot | `internal/dspy/bootstrap.go` |
-| 4.4 | Implement MIPRO optimizer | `internal/dspy/mipro.go` |
-| 4.5 | Add embedding support | `internal/dspy/embed.go` |
-| 4.6 | Implement KNNFewShot | `internal/dspy/knn.go` |
-| 4.7 | Optimization tests | `internal/dspy/optimize_test.go` |
-
-### Phase 5: Applications (Week 7-8)
-
-**Goal**: Build real applications using DSPy.
-
-| Task | Description | Deliverable |
-|------|-------------|-------------|
-| 5.1 | Agentic Review module | `internal/apps/review/` |
-| 5.2 | Mail summarization | `internal/apps/summarize/` |
-| 5.3 | Code analysis | `internal/apps/codeqa/` |
-| 5.4 | CLI integration | `cmd/substrate/dspy.go` |
-| 5.5 | Web UI for signatures | `internal/web/templates/dspy/` |
+| 4.1 | Agentic Review using DSPy | `internal/apps/review/` |
+| 4.2 | Mail summarization | `internal/apps/summarize/` |
+| 4.3 | Persistence (save optimized programs to DB) | `internal/store/dspy.go` |
+| 4.4 | Web UI for managing signatures | `internal/web/templates/dspy/` |
 
 ---
 
-## Detailed Design
+## Example Usage
 
-### Template Rendering
-
-Templates convert signatures + inputs into prompts.
+### Go Application Code
 
 ```go
-// internal/dspy/template.go
+// Example: Using DSPy for code review
 
-// TemplateRenderer generates prompts from signatures.
-type TemplateRenderer struct {
-    // Templates can be customized per signature.
-    customTemplates map[string]*template.Template
-
-    // Default template for standard signatures.
-    defaultTemplate *template.Template
-}
-
-// Render produces a prompt string from signature and inputs.
-func (r *TemplateRenderer) Render(sig *Signature, inputs map[string]any) (string, error) {
-    data := TemplateData{
-        Name:         sig.Name,
-        Description:  sig.Description,
-        Instructions: sig.Instructions,
-        InputFields:  sig.Inputs,
-        OutputFields: sig.Outputs,
-        InputValues:  inputs,
-        Examples:     sig.Examples,
-    }
-
-    tmpl := r.getTemplate(sig.Name)
-    var buf bytes.Buffer
-    if err := tmpl.Execute(&buf, data); err != nil {
-        return "", err
-    }
-    return buf.String(), nil
-}
-
-// Default prompt template structure:
-const defaultPromptTemplate = `{{.Description}}
-
-{{if .Instructions}}Instructions: {{.Instructions}}{{end}}
-
-{{range .Examples}}
----
-{{range $field := $.InputFields}}{{$field.Name}}: {{index $.InputValues $field.Name}}
-{{end}}
-{{range $field := $.OutputFields}}{{$field.Prefix}} {{index .Outputs $field.Name}}
-{{end}}
----
-{{end}}
-
-{{range $field := .InputFields}}{{$field.Name}}: {{index $.InputValues $field.Name}}
-{{end}}
-
-{{range $field := .OutputFields}}{{$field.Prefix}}{{end}}`
-```
-
-### Output Parsing
-
-Extract structured outputs from LLM responses.
-
-```go
-// internal/dspy/parser.go
-
-// OutputParser extracts structured data from completions.
-type OutputParser struct {
-    // Fallback strategies when primary parsing fails.
-    fallbacks []ParsingStrategy
-}
-
-// ParsingStrategy defines how to extract outputs.
-type ParsingStrategy interface {
-    Parse(response string, fields []Field) (map[string]any, error)
-}
-
-// PrefixParser looks for field prefixes (e.g., "Answer: ...")
-type PrefixParser struct{}
-
-func (p *PrefixParser) Parse(response string, fields []Field) (map[string]any, error) {
-    result := make(map[string]any)
-
-    for _, field := range fields {
-        prefix := field.Prefix
-        if prefix == "" {
-            prefix = field.Name + ":"
-        }
-
-        // Find the prefix and extract until next prefix or end.
-        idx := strings.Index(response, prefix)
-        if idx == -1 {
-            if field.Required {
-                return nil, fmt.Errorf("required field %q not found", field.Name)
-            }
-            continue
-        }
-
-        // Extract value between this prefix and next.
-        value := extractFieldValue(response[idx+len(prefix):], fields)
-
-        // Convert to appropriate type.
-        typed, err := convertValue(value, field.Type)
-        if err != nil {
-            return nil, fmt.Errorf("field %q: %w", field.Name, err)
-        }
-        result[field.Name] = typed
-    }
-
-    return result, nil
-}
-
-// JSONParser extracts JSON from markdown code blocks.
-type JSONParser struct{}
-
-// RegexParser uses custom regex patterns per field.
-type RegexParser struct {
-    Patterns map[string]*regexp.Regexp
-}
-```
-
-### Response Caching
-
-Cache identical requests to reduce costs.
-
-```go
-// internal/dspy/cache.go
-
-// ResponseCache caches LLM responses by input hash.
-type ResponseCache struct {
-    store store.Storage
-    ttl   time.Duration
-}
-
-// CacheKey generates a deterministic key from signature + inputs.
-func (c *ResponseCache) CacheKey(sigID string, inputs map[string]any, opts GenerateOpts) string {
-    h := sha256.New()
-    h.Write([]byte(sigID))
-
-    // Sort keys for deterministic ordering.
-    keys := maps.Keys(inputs)
-    sort.Strings(keys)
-    for _, k := range keys {
-        h.Write([]byte(k))
-        h.Write([]byte(fmt.Sprintf("%v", inputs[k])))
-    }
-
-    // Include relevant options.
-    h.Write([]byte(fmt.Sprintf("%.2f", opts.Temperature)))
-    h.Write([]byte(fmt.Sprintf("%d", opts.MaxTokens)))
-
-    return hex.EncodeToString(h.Sum(nil))
-}
-
-// Get retrieves a cached response.
-func (c *ResponseCache) Get(ctx context.Context, key string) (*Generation, bool) {
-    // Query from database...
-}
-
-// Set stores a response in cache.
-func (c *ResponseCache) Set(ctx context.Context, key string, gen *Generation) error {
-    // Store in database with TTL...
-}
-```
-
-### Bootstrap Optimization Algorithm
-
-```go
-// internal/dspy/bootstrap.go
-
-// bootstrapFewShot implements the core DSPy optimization loop.
-func (o *Optimizer) bootstrapFewShot(
-    ctx context.Context,
-    sig *Signature,
-    cfg OptimizeConfig,
-) fn.Result[*OptimizeResult] {
-
-    // 1. Generate initial traces by running on train set.
-    traces := make([]Trace, 0, len(cfg.TrainSet))
-    for _, example := range cfg.TrainSet {
-        // Run prediction without few-shot examples.
-        pred := NewPredict(sig, o.lm)
-        result, err := pred.Forward(ctx, example.Inputs).Unpack()
-        if err != nil {
-            continue
-        }
-
-        // Evaluate against expected output.
-        score := cfg.Metric(result, example.Outputs)
-
-        trace := Trace{
-            SignatureID: sig.Name,
-            Inputs:      example.Inputs,
-            Outputs:     result,
-            Score:       score,
-            Success:     score >= 0.5,
-        }
-        traces = append(traces, trace)
-    }
-
-    // 2. Select high-quality examples for bootstrapping.
-    successfulTraces := filterSuccessful(traces, cfg.MaxBootstraps)
-
-    // 3. Create optimized signature with examples.
-    optimizedSig := sig.Clone()
-    for _, trace := range successfulTraces {
-        optimizedSig.Examples = append(optimizedSig.Examples, Example{
-            Inputs:  trace.Inputs,
-            Outputs: trace.Outputs,
-            Source:  "bootstrapped",
-            Score:   trace.Score,
-        })
-    }
-
-    // 4. Evaluate on validation set.
-    valScores := make([]float64, 0, len(cfg.ValSet))
-    for _, example := range cfg.ValSet {
-        pred := NewPredict(optimizedSig, o.lm)
-        result, err := pred.Forward(ctx, example.Inputs).Unpack()
-        if err != nil {
-            valScores = append(valScores, 0)
-            continue
-        }
-        score := cfg.Metric(result, example.Outputs)
-        valScores = append(valScores, score)
-    }
-
-    return fn.Ok(&OptimizeResult{
-        OptimizedSignature: optimizedSig,
-        BestExamples:       optimizedSig.Examples,
-        Scores:             valScores,
-    })
-}
-```
-
----
-
-## Database Schema
-
-### Migrations
-
-```sql
--- internal/db/migrations/000008_dspy_tables.up.sql
-
--- Signature definitions
-CREATE TABLE dspy_signatures (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    name TEXT NOT NULL UNIQUE,
-    description TEXT,
-    instructions TEXT,
-    input_schema TEXT NOT NULL,   -- JSON array of Field
-    output_schema TEXT NOT NULL,  -- JSON array of Field
-    version INTEGER DEFAULT 1,
-    created_at INTEGER NOT NULL,
-    updated_at INTEGER NOT NULL
-);
-
-CREATE INDEX idx_signatures_name ON dspy_signatures(name);
-
--- Few-shot examples (can be manual or bootstrapped)
-CREATE TABLE dspy_examples (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    signature_id INTEGER NOT NULL REFERENCES dspy_signatures(id),
-    inputs TEXT NOT NULL,        -- JSON object
-    outputs TEXT NOT NULL,       -- JSON object
-    source TEXT NOT NULL,        -- 'manual', 'bootstrapped', 'optimized'
-    score REAL DEFAULT 0.0,
-    active INTEGER DEFAULT 1,    -- Whether included in prompts
-    created_at INTEGER NOT NULL,
-
-    FOREIGN KEY (signature_id) REFERENCES dspy_signatures(id) ON DELETE CASCADE
-);
-
-CREATE INDEX idx_examples_signature ON dspy_examples(signature_id);
-CREATE INDEX idx_examples_score ON dspy_examples(score DESC);
-
--- Execution traces for analysis and optimization
-CREATE TABLE dspy_traces (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    trace_id TEXT NOT NULL UNIQUE,
-    signature_id INTEGER NOT NULL,
-    module_type TEXT NOT NULL,
-    inputs TEXT NOT NULL,         -- JSON object
-    outputs TEXT,                 -- JSON object (null if failed)
-    steps TEXT,                   -- JSON array of TraceStep
-    success INTEGER NOT NULL,
-    score REAL,
-    tokens_in INTEGER,
-    tokens_out INTEGER,
-    cost_usd REAL,
-    duration_ms INTEGER,
-    model TEXT,
-    created_at INTEGER NOT NULL,
-    tags TEXT,                    -- JSON array of strings
-
-    FOREIGN KEY (signature_id) REFERENCES dspy_signatures(id) ON DELETE CASCADE
-);
-
-CREATE INDEX idx_traces_signature ON dspy_traces(signature_id);
-CREATE INDEX idx_traces_success ON dspy_traces(success);
-CREATE INDEX idx_traces_score ON dspy_traces(score DESC);
-CREATE INDEX idx_traces_created ON dspy_traces(created_at DESC);
-
--- Optimization runs
-CREATE TABLE dspy_optimizations (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    signature_id INTEGER NOT NULL,
-    strategy TEXT NOT NULL,       -- 'bootstrap_few_shot', 'mipro', etc.
-    config TEXT NOT NULL,         -- JSON OptimizeConfig
-    result TEXT,                  -- JSON OptimizeResult
-    status TEXT NOT NULL,         -- 'pending', 'running', 'completed', 'failed'
-    train_size INTEGER,
-    val_size INTEGER,
-    best_score REAL,
-    total_cost REAL,
-    started_at INTEGER,
-    completed_at INTEGER,
-    created_at INTEGER NOT NULL,
-
-    FOREIGN KEY (signature_id) REFERENCES dspy_signatures(id) ON DELETE CASCADE
-);
-
-CREATE INDEX idx_optimizations_signature ON dspy_optimizations(signature_id);
-CREATE INDEX idx_optimizations_status ON dspy_optimizations(status);
-
--- Response cache
-CREATE TABLE dspy_cache (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    cache_key TEXT NOT NULL UNIQUE,
-    signature_id INTEGER NOT NULL,
-    inputs_hash TEXT NOT NULL,
-    response TEXT NOT NULL,       -- JSON Generation
-    tokens_in INTEGER,
-    tokens_out INTEGER,
-    cost_usd REAL,
-    hits INTEGER DEFAULT 0,
-    created_at INTEGER NOT NULL,
-    expires_at INTEGER NOT NULL,
-
-    FOREIGN KEY (signature_id) REFERENCES dspy_signatures(id) ON DELETE CASCADE
-);
-
-CREATE INDEX idx_cache_key ON dspy_cache(cache_key);
-CREATE INDEX idx_cache_expires ON dspy_cache(expires_at);
-```
-
----
-
-## API Design
-
-### MCP Tools
-
-```go
-// internal/mcp/tools_dspy.go
-
-// DSPy tools exposed via MCP.
-func (s *Server) registerDSPyTools() {
-    // Create or update a signature.
-    mcp.AddTool(s.server, &mcp.Tool{
-        Name: "dspy_create_signature",
-        Description: "Define a new DSPy signature for type-safe prompting",
-    }, s.handleCreateSignature)
-
-    // Execute a prediction.
-    mcp.AddTool(s.server, &mcp.Tool{
-        Name: "dspy_predict",
-        Description: "Run a prediction using a defined signature",
-    }, s.handleDSPyPredict)
-
-    // Chain of thought reasoning.
-    mcp.AddTool(s.server, &mcp.Tool{
-        Name: "dspy_chain_of_thought",
-        Description: "Run prediction with step-by-step reasoning",
-    }, s.handleChainOfThought)
-
-    // Optimize a signature.
-    mcp.AddTool(s.server, &mcp.Tool{
-        Name: "dspy_optimize",
-        Description: "Optimize a signature using bootstrapping",
-    }, s.handleOptimize)
-
-    // Add examples to a signature.
-    mcp.AddTool(s.server, &mcp.Tool{
-        Name: "dspy_add_example",
-        Description: "Add a few-shot example to a signature",
-    }, s.handleAddExample)
-
-    // Query traces.
-    mcp.AddTool(s.server, &mcp.Tool{
-        Name: "dspy_list_traces",
-        Description: "List execution traces for analysis",
-    }, s.handleListTraces)
-}
-```
-
-### CLI Commands
-
-```bash
-# Signature management
-substrate dspy signature create --name "review" --input "code:string" --output "feedback:markdown"
-substrate dspy signature list
-substrate dspy signature show review
-
-# Prediction
-substrate dspy predict --signature review --input code="func foo() {}"
-substrate dspy cot --signature review --input code="..."  # Chain of thought
-
-# Examples
-substrate dspy example add --signature review --input code="..." --output feedback="..."
-substrate dspy example list --signature review
-
-# Optimization
-substrate dspy optimize --signature review --train-file train.json --strategy bootstrap
-substrate dspy optimize status <optimization-id>
-
-# Traces
-substrate dspy trace list --signature review --limit 100
-substrate dspy trace show <trace-id>
-```
-
-### gRPC Service
-
-```protobuf
-// internal/api/grpc/dspy.proto
-
-service DSPy {
-    // Signature management
-    rpc CreateSignature(CreateSignatureRequest) returns (Signature);
-    rpc GetSignature(GetSignatureRequest) returns (Signature);
-    rpc ListSignatures(ListSignaturesRequest) returns (ListSignaturesResponse);
-
-    // Prediction
-    rpc Predict(PredictRequest) returns (PredictResponse);
-    rpc ChainOfThought(ChainOfThoughtRequest) returns (ChainOfThoughtResponse);
-    rpc StreamPredict(PredictRequest) returns (stream PredictChunk);
-
-    // Optimization
-    rpc StartOptimization(OptimizationRequest) returns (OptimizationStatus);
-    rpc GetOptimizationStatus(OptimizationStatusRequest) returns (OptimizationStatus);
-
-    // Traces
-    rpc ListTraces(ListTracesRequest) returns (ListTracesResponse);
-    rpc GetTrace(GetTraceRequest) returns (Trace);
-}
-```
-
----
-
-## Testing Strategy
-
-### Unit Tests
-
-```go
-// internal/dspy/predict_test.go
-
-func TestPredict_Forward(t *testing.T) {
-    t.Parallel()
-
-    // Create mock LM.
-    mockLM := &MockLanguageModel{
-        response: "Answer: This is a test response.",
-    }
-
-    sig := &Signature{
-        Name: "test_sig",
-        Inputs: []Field{
-            {Name: "question", Type: FieldTypeString, Required: true},
-        },
-        Outputs: []Field{
-            {Name: "answer", Type: FieldTypeString, Prefix: "Answer:"},
-        },
-    }
-
-    pred := NewPredict(sig, mockLM)
-
-    result, err := pred.Forward(context.Background(), map[string]any{
-        "question": "What is 2+2?",
-    }).Unpack()
-
-    require.NoError(t, err)
-    require.Equal(t, "This is a test response.", result["answer"])
-}
-
-func TestChainOfThought_AddsRationale(t *testing.T) {
-    t.Parallel()
-
-    mockLM := &MockLanguageModel{
-        response: `Reasoning: Let me think step by step...
-Answer: 4`,
-    }
-
-    sig := &Signature{
-        Name: "math",
-        Inputs: []Field{
-            {Name: "question", Type: FieldTypeString},
-        },
-        Outputs: []Field{
-            {Name: "answer", Type: FieldTypeString, Prefix: "Answer:"},
-        },
-    }
-
-    cot := NewChainOfThought(sig, mockLM)
-
-    result, err := cot.Forward(context.Background(), map[string]any{
-        "question": "What is 2+2?",
-    }).Unpack()
-
-    require.NoError(t, err)
-    require.Equal(t, "4", result["answer"])
-    require.Contains(t, result["rationale"], "step by step")
-}
-```
-
-### Integration Tests
-
-```go
-// tests/integration/dspy/dspy_test.go
-
-func TestDSPyIntegration_EndToEnd(t *testing.T) {
-    if testing.Short() {
-        t.Skip("skipping integration test")
-    }
-
-    store, cleanup := testDB(t)
-    defer cleanup()
-
-    // Create signature.
-    sig := &dspy.Signature{
-        Name:        "summarize",
-        Description: "Summarize the given text concisely.",
-        Inputs: []dspy.Field{
-            {Name: "text", Type: dspy.FieldTypeString, Required: true},
-        },
-        Outputs: []dspy.Field{
-            {Name: "summary", Type: dspy.FieldTypeString, Prefix: "Summary:"},
-        },
-    }
-
-    // Create service with real Claude LM.
-    spawner := agent.NewSpawner(agent.DefaultSpawnConfig())
-    lm := dspy.NewClaudeLM(spawner, nil)
-    svc := dspy.NewService(store, lm)
-
-    // Run prediction.
-    resp, err := svc.Predict(context.Background(), sig, map[string]any{
-        "text": "The quick brown fox jumps over the lazy dog.",
-    })
-
-    require.NoError(t, err)
-    require.NotEmpty(t, resp.Outputs["summary"])
-}
-```
-
-### Property-Based Tests
-
-```go
-// internal/dspy/parser_test.go
-
-func TestOutputParser_Properties(t *testing.T) {
-    rapid.Check(t, func(t *rapid.T) {
-        // Generate random field names and values.
-        fieldName := rapid.StringMatching(`[a-z][a-z_]{2,10}`).Draw(t, "fieldName")
-        fieldValue := rapid.String().Draw(t, "fieldValue")
-
-        field := dspy.Field{
-            Name:   fieldName,
-            Type:   dspy.FieldTypeString,
-            Prefix: fieldName + ":",
-        }
-
-        // Create response with the field.
-        response := fmt.Sprintf("%s: %s", fieldName, fieldValue)
-
-        // Parse should extract the value.
-        parser := &dspy.PrefixParser{}
-        result, err := parser.Parse(response, []dspy.Field{field})
-
-        if err != nil {
-            t.Fatalf("unexpected error: %v", err)
-        }
-
-        if result[fieldName] != strings.TrimSpace(fieldValue) {
-            t.Fatalf("expected %q, got %q", fieldValue, result[fieldName])
-        }
-    })
-}
-```
-
----
-
-## Migration Path
-
-### Existing Code Integration
-
-For extensions like Agentic Review that currently use raw prompts:
-
-**Before (raw prompts)**:
-```go
-func (r *ReviewService) Review(ctx context.Context, code string) (string, error) {
-    prompt := fmt.Sprintf(`Review this code and provide feedback:
-
-%s
-
-Provide specific, actionable feedback.`, code)
-
-    resp, err := r.spawner.Spawn(ctx, prompt)
-    return resp.Result, err
-}
-```
-
-**After (DSPy integration)**:
-```go
 func (r *ReviewService) Review(ctx context.Context, code string) (*ReviewResult, error) {
-    // Use pre-defined, optimized signature.
-    result, err := r.dspy.Predict(ctx, "code_review", map[string]any{
-        "code":     code,
-        "language": detectLanguage(code),
-    }).Unpack()
+    // Define the signature
+    sig := dspy.Signature{
+        Name:        "code_review",
+        Description: "Review code and provide actionable feedback.",
+        InputFields: []dspy.Field{
+            {Name: "code", Description: "The code to review"},
+            {Name: "language", Description: "Programming language"},
+        },
+        OutputFields: []dspy.Field{
+            {Name: "issues", Description: "List of issues found", Prefix: "Issues:"},
+            {Name: "suggestions", Description: "Improvement suggestions", Prefix: "Suggestions:"},
+            {Name: "score", Description: "Quality score 1-10", Prefix: "Score:"},
+        },
+    }
+
+    // Run prediction through DSPy actor
+    req := dspy.PredictRequest{
+        Signature:  sig,
+        ModuleType: dspy.ModuleChainOfThought,  // Use CoT for reasoning
+        Inputs: map[string]any{
+            "code":     code,
+            "language": detectLanguage(code),
+        },
+    }
+
+    // Send to actor and await response
+    future := r.dspyActor.Ask(ctx, req)
+    resp, err := future.Await(ctx)
     if err != nil {
         return nil, err
     }
 
+    predictResp := resp.(dspy.PredictResponse)
+
     return &ReviewResult{
-        Feedback:    result["feedback"].(string),
-        Severity:    result["severity"].(string),
-        Suggestions: result["suggestions"].([]string),
+        Issues:      predictResp.Outputs["issues"].(string),
+        Suggestions: predictResp.Outputs["suggestions"].(string),
+        Score:       predictResp.Outputs["score"].(string),
+        Rationale:   predictResp.Rationale,
     }, nil
 }
 ```
 
-### Gradual Adoption
+### Running Optimization
 
-1. **Phase 1**: Add DSPy alongside existing prompts (feature flag)
-2. **Phase 2**: Migrate high-value prompts to signatures
-3. **Phase 3**: Optimize signatures with production traces
-4. **Phase 4**: Remove legacy prompt code
+```go
+// Optimize the code review module with examples
 
----
+func (r *ReviewService) OptimizeReviewer(ctx context.Context) error {
+    // Load training examples from database
+    examples, err := r.store.GetReviewExamples(ctx, 100)
+    if err != nil {
+        return err
+    }
 
-## Appendix A: DSPy Concepts Reference
+    // Convert to DSPy examples
+    trainSet := make([]dspy.Example, len(examples))
+    for i, ex := range examples {
+        trainSet[i] = dspy.Example{
+            Inputs: map[string]any{
+                "code":     ex.Code,
+                "language": ex.Language,
+            },
+            Outputs: map[string]any{
+                "issues":      ex.Issues,
+                "suggestions": ex.Suggestions,
+                "score":       ex.Score,
+            },
+        }
+    }
 
-| DSPy Concept | Go Implementation | Description |
-|--------------|-------------------|-------------|
-| Signature | `dspy.Signature` | Input/output specification |
-| Module | `dspy.Module` interface | Executable prompt unit |
-| Predict | `dspy.Predict` | Basic LLM call |
-| ChainOfThought | `dspy.ChainOfThought` | Adds reasoning step |
-| ReAct | `dspy.ReAct` | Reasoning + tool use |
-| Teleprompter | `dspy.Optimizer` | Prompt optimization |
-| BootstrapFewShot | `dspy.bootstrapFewShot()` | Example generation |
-| Trace | `dspy.Trace` | Execution record |
-| Example | `dspy.Example` | Few-shot demonstration |
+    // Split into train/val
+    trainSet, valSet := splitExamples(trainSet, 0.8)
 
-## Appendix B: File Structure
+    // Run optimization
+    req := dspy.OptimizeRequest{
+        Signature:  codeReviewSignature,
+        ModuleType: dspy.ModuleChainOfThought,
+        Strategy:   dspy.StrategyMIPRO,
+        TrainSet:   trainSet,
+        ValSet:     valSet,
+        Metric:     "llm_as_judge",
+        Config: &dspy.OptimizeConfig{
+            MaxBootstrappedDemos: 4,
+            NumCandidates:        10,
+        },
+    }
 
-```
-internal/dspy/
-├── signature.go       # Signature and Field types
-├── validate.go        # Input validation
-├── template.go        # Prompt template rendering
-├── parser.go          # Output parsing strategies
-├── module.go          # Module interface
-├── predict.go         # Basic Predict module
-├── chain_of_thought.go # CoT wrapper module
-├── react.go           # ReAct implementation
-├── compose.go         # Module composition
-├── lm.go              # LanguageModel interface
-├── lm_claude.go       # Claude SDK adapter
-├── cache.go           # Response caching
-├── trace.go           # Trace types
-├── trace_store.go     # Trace persistence
-├── evaluate.go        # Evaluation metrics
-├── optimize.go        # Optimizer coordinator
-├── bootstrap.go       # BootstrapFewShot
-├── mipro.go           # MIPRO optimizer
-├── knn.go             # KNN-based selection
-├── messages.go        # Actor message types
-├── service.go         # DSPyService behavior
-├── actor.go           # Actor instantiation
-└── *_test.go          # Tests for each file
+    future := r.dspyActor.Ask(ctx, req)
+    resp, err := future.Await(ctx)
+    if err != nil {
+        return err
+    }
 
-internal/db/queries/
-└── dspy.sql           # sqlc queries for DSPy tables
+    optResp := resp.(dspy.OptimizeResponse)
 
-internal/mcp/
-└── tools_dspy.go      # MCP tool handlers
-
-cmd/substrate/
-└── dspy.go            # CLI commands
+    // Save optimized program
+    return r.store.SaveOptimizedProgram(ctx, "code_review", optResp.ProgramJSON)
+}
 ```
 
 ---
 
-## Next Steps
+## Deployment
 
-1. Review and approve this design document
-2. Create tracking issues for Phase 1 tasks
-3. Begin implementation with signature types
-4. Set up CI for DSPy package tests
+### Docker Compose
+
+```yaml
+version: "3.8"
+
+services:
+  substrate:
+    build: .
+    ports:
+      - "8080:8080"   # Web UI
+      - "9090:9090"   # LM callback server
+    environment:
+      - DSPY_SERVER_URL=http://dspy:8000
+      - LM_CALLBACK_ADDR=:9090
+    depends_on:
+      - dspy
+
+  dspy:
+    build: ./dspy_server
+    ports:
+      - "8000:8000"
+    environment:
+      - LM_CALLBACK_URL=http://substrate:9090/v1/inference
+```
+
+### Process Management (Single Binary)
+
+For simpler deployments, embed Python server management in Go:
+
+```go
+// internal/dspy/process.go
+
+type DSPyProcess struct {
+    cmd     *exec.Cmd
+    baseURL string
+}
+
+func StartDSPyServer(ctx context.Context, port int) (*DSPyProcess, error) {
+    cmd := exec.CommandContext(ctx, "python", "-m", "dspy_server", "--port", fmt.Sprint(port))
+    cmd.Env = append(os.Environ(),
+        fmt.Sprintf("LM_CALLBACK_URL=http://localhost:%d/v1/inference", lmPort),
+    )
+
+    if err := cmd.Start(); err != nil {
+        return nil, err
+    }
+
+    // Wait for health check
+    baseURL := fmt.Sprintf("http://localhost:%d", port)
+    if err := waitForHealth(ctx, baseURL); err != nil {
+        cmd.Process.Kill()
+        return nil, err
+    }
+
+    return &DSPyProcess{cmd: cmd, baseURL: baseURL}, nil
+}
+```
+
+---
+
+## Summary
+
+This revised plan uses **actual DSPy** via a Python server with:
+
+1. **Custom LM Backend** (`ClaudeAgentLM`) that calls back to Go
+2. **Go Wrapper Types** for type safety without reimplementing DSPy
+3. **HTTP Bridge** (upgradable to gRPC) between Go and Python
+4. **Actor Integration** for async execution in Substrate
+5. **Full DSPy Features** - optimization, compilation, all module types
+
+This approach gives us DSPy's sophisticated prompt optimization (MIPRO, BootstrapFewShot, etc.) while keeping orchestration in Go and using the Claude Agent SDK for inference.
