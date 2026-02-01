@@ -986,70 +986,332 @@ The UI provides multiple views leveraging both mail threads and review tables:
 {{end}}
 ```
 
-### 5.2 Diff Annotation View
+### 5.2 Diff Rendering with diffs.com
+
+**Library**: `@pierre/diffs` from https://diffs.com/
+
+The UI uses the diffs.com library for professional diff rendering with syntax highlighting,
+theming, and issue annotations. This provides a GitHub-quality diff experience.
+
+**Installation:**
+```bash
+bun add @pierre/diffs
+```
+
+**Integration Options:**
+
+1. **React Components** (for complex interactive views)
+2. **Vanilla JS** (for HTMX partial rendering)
+3. **SSR** (for server-side pre-rendering)
+
+#### 5.2.1 Vanilla JS Integration for HTMX
+
+Since the Substrate UI is HTMX-based, we use the vanilla JS API with SSR pre-rendering:
+
+**Location**: `internal/web/diff_renderer.go`
+
+```go
+package web
+
+import (
+    "bytes"
+    "os/exec"
+)
+
+// DiffRenderer handles diff rendering using the diffs.com library.
+type DiffRenderer struct {
+    scriptPath string  // Path to Node.js render script
+}
+
+// RenderDiff generates HTML for a file diff using @pierre/diffs.
+func (r *DiffRenderer) RenderDiff(oldContent, newContent, filename string, issues []ReviewIssue) (string, error) {
+    // Call Node.js script that uses @pierre/diffs
+    cmd := exec.Command("bun", "run", r.scriptPath,
+        "--old", oldContent,
+        "--new", newContent,
+        "--filename", filename,
+        "--issues", marshalIssues(issues),
+    )
+
+    var out bytes.Buffer
+    cmd.Stdout = &out
+    if err := cmd.Run(); err != nil {
+        return "", err
+    }
+
+    return out.String(), nil
+}
+```
+
+**Location**: `web/scripts/render-diff.ts`
+
+```typescript
+import { FileDiff, parseDiffFromFile, registerCustomTheme } from '@pierre/diffs';
+import { preloadFileDiff } from '@pierre/diffs/ssr';
+
+interface ReviewIssue {
+  lineStart: number;
+  lineEnd: number;
+  severity: 'critical' | 'high' | 'medium' | 'low';
+  title: string;
+  description: string;
+  suggestion?: string;
+  reviewerName: string;
+}
+
+interface RenderOptions {
+  old: string;
+  new: string;
+  filename: string;
+  issues: ReviewIssue[];
+  theme?: 'light' | 'dark';
+}
+
+async function renderDiff(options: RenderOptions): Promise<string> {
+  const { old: oldContent, new: newContent, filename, issues, theme = 'light' } = options;
+
+  // Parse the diff
+  const diffMetadata = parseDiffFromFile(
+    { name: filename, contents: oldContent },
+    { name: filename, contents: newContent }
+  );
+
+  // Pre-render for SSR (returns HTML string)
+  const html = await preloadFileDiff({
+    diff: diffMetadata,
+    theme: theme === 'dark' ? 'pierre-dark' : 'pierre-light',
+  });
+
+  // Wrap with issue annotations
+  return wrapWithIssueAnnotations(html, issues);
+}
+
+function wrapWithIssueAnnotations(diffHtml: string, issues: ReviewIssue[]): string {
+  // The diff HTML uses CSS grid - we inject issue annotations after specific lines
+  // This is done via custom elements that position themselves relative to line numbers
+
+  const issueAnnotationsHtml = issues.map(issue => `
+    <div class="review-issue-annotation"
+         data-line-start="${issue.lineStart}"
+         data-line-end="${issue.lineEnd || issue.lineStart}"
+         data-severity="${issue.severity}">
+      <div class="issue-header">
+        <span class="severity-badge severity-${issue.severity}">${issue.severity}</span>
+        <span class="issue-title">${escapeHtml(issue.title)}</span>
+        <span class="reviewer-name">by ${escapeHtml(issue.reviewerName)}</span>
+      </div>
+      <p class="issue-description">${escapeHtml(issue.description)}</p>
+      ${issue.suggestion ? `
+        <div class="issue-suggestion">
+          <strong>Suggestion:</strong> ${escapeHtml(issue.suggestion)}
+        </div>
+      ` : ''}
+    </div>
+  `).join('\n');
+
+  return `
+    <div class="review-diff-container">
+      <div class="diff-content">
+        ${diffHtml}
+      </div>
+      <div class="issue-annotations" id="issue-annotations">
+        ${issueAnnotationsHtml}
+      </div>
+    </div>
+    <script>
+      // Position issue annotations relative to line numbers
+      document.querySelectorAll('.review-issue-annotation').forEach(el => {
+        const lineStart = parseInt(el.dataset.lineStart);
+        const lineEl = document.querySelector(\`[data-line-number="\${lineStart}"]\`);
+        if (lineEl) {
+          el.style.top = lineEl.offsetTop + lineEl.offsetHeight + 'px';
+        }
+      });
+    </script>
+  `;
+}
+
+function escapeHtml(str: string): string {
+  return str
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
+}
+
+// CLI entry point
+const args = process.argv.slice(2);
+// Parse args and call renderDiff...
+```
+
+#### 5.2.2 Multi-File Diff View
+
+For PRs with multiple changed files:
+
+```typescript
+import { PatchDiff } from '@pierre/diffs/react';
+// or for vanilla:
+import { parsePatchFiles } from '@pierre/diffs';
+
+// Parse unified diff output from git
+const patchContent = `diff --git a/src/auth.go b/src/auth.go
+index abc123..def456 100644
+--- a/src/auth.go
++++ b/src/auth.go
+@@ -145,6 +145,9 @@ func validateToken(token string) error {
++    if token == "" {
++        return ErrEmptyToken
++    }
+     // ... rest of diff
+`;
+
+// Render all files from patch
+const files = parsePatchFiles(patchContent);
+// Render each file with preloadFileDiff for SSR
+```
+
+#### 5.2.3 Custom Theme for Review UI
+
+```typescript
+import { registerCustomTheme } from '@pierre/diffs';
+
+// Register Substrate review theme
+registerCustomTheme('substrate-review', {
+  // Base on pierre-light
+  extends: 'pierre-light',
+
+  // Custom colors for review annotations
+  colors: {
+    'review.critical': '#dc2626',
+    'review.high': '#ea580c',
+    'review.medium': '#ca8a04',
+    'review.low': '#2563eb',
+  },
+
+  // Highlight lines with issues
+  lineHighlight: {
+    critical: 'rgba(220, 38, 38, 0.1)',
+    high: 'rgba(234, 88, 12, 0.1)',
+  },
+});
+```
+
+#### 5.2.4 CSS Styles for Issue Annotations
+
+**Location**: `web/static/css/review-diff.css`
+
+```css
+.review-diff-container {
+  position: relative;
+}
+
+.review-issue-annotation {
+  position: absolute;
+  left: 4rem;
+  right: 1rem;
+  margin: 0.5rem 0;
+  padding: 0.75rem;
+  border-radius: 0.5rem;
+  border-left: 4px solid;
+  background: white;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+  z-index: 10;
+}
+
+.review-issue-annotation[data-severity="critical"] {
+  border-left-color: #dc2626;
+  background: #fef2f2;
+}
+
+.review-issue-annotation[data-severity="high"] {
+  border-left-color: #ea580c;
+  background: #fff7ed;
+}
+
+.review-issue-annotation[data-severity="medium"] {
+  border-left-color: #ca8a04;
+  background: #fefce8;
+}
+
+.review-issue-annotation[data-severity="low"] {
+  border-left-color: #2563eb;
+  background: #eff6ff;
+}
+
+.severity-badge {
+  display: inline-block;
+  padding: 0.125rem 0.5rem;
+  font-size: 0.75rem;
+  font-weight: 500;
+  border-radius: 9999px;
+}
+
+.severity-critical { background: #fee2e2; color: #991b1b; }
+.severity-high { background: #ffedd5; color: #9a3412; }
+.severity-medium { background: #fef9c3; color: #854d0e; }
+.severity-low { background: #dbeafe; color: #1e40af; }
+
+.issue-title {
+  font-weight: 500;
+  color: #111827;
+}
+
+.reviewer-name {
+  font-size: 0.75rem;
+  color: #6b7280;
+}
+
+.issue-description {
+  margin-top: 0.5rem;
+  font-size: 0.875rem;
+  color: #374151;
+}
+
+.issue-suggestion {
+  margin-top: 0.5rem;
+  padding: 0.5rem;
+  background: #ecfdf5;
+  border: 1px solid #a7f3d0;
+  border-radius: 0.25rem;
+  font-size: 0.875rem;
+  color: #065f46;
+}
+```
+
+#### 5.2.5 HTMX Template Integration
 
 **Location**: `web/templates/partials/review-diff.html`
 
-Shows the diff with review issues annotated inline:
-
 ```html
 {{define "review-diff"}}
-<div class="review-diff">
-    {{range .Files}}
-    <div class="diff-file border rounded-lg mb-4">
-        <div class="diff-file-header bg-gray-100 px-4 py-2 flex justify-between">
-            <span class="font-mono text-sm">{{.Path}}</span>
-            <span class="text-sm text-gray-500">+{{.Additions}} -{{.Deletions}}</span>
-        </div>
+<div class="review-diff-wrapper"
+     hx-get="/api/reviews/{{.ReviewID}}/diff/{{.FileIndex}}"
+     hx-trigger="load"
+     hx-swap="innerHTML">
+    <div class="animate-pulse bg-gray-100 h-64 rounded flex items-center justify-center">
+        <span class="text-gray-500">Loading diff...</span>
+    </div>
+</div>
+{{end}}
 
-        <div class="diff-content font-mono text-sm">
-            {{range .Hunks}}
-            <div class="diff-hunk">
-                <div class="hunk-header bg-blue-50 px-4 py-1 text-blue-700">
-                    @@ -{{.OldStart}},{{.OldLines}} +{{.NewStart}},{{.NewLines}} @@
-                </div>
-
-                {{range .Lines}}
-                <div class="diff-line flex {{if .IsAddition}}bg-green-50{{else if .IsDeletion}}bg-red-50{{end}}">
-                    <span class="line-num w-12 text-right pr-2 text-gray-400 select-none">{{.Number}}</span>
-                    <span class="line-indicator w-4 {{if .IsAddition}}text-green-600{{else if .IsDeletion}}text-red-600{{end}}">
-                        {{if .IsAddition}}+{{else if .IsDeletion}}-{{else}} {{end}}
-                    </span>
-                    <span class="line-content flex-1 px-2">{{.Content}}</span>
-                </div>
-
-                {{/* Inline issue annotation */}}
-                {{if .Issues}}
-                {{range .Issues}}
-                <div class="issue-annotation mx-4 my-2 p-3 rounded border-l-4
-                            {{if eq .Severity "critical"}}border-red-500 bg-red-50
-                            {{else if eq .Severity "high"}}border-orange-500 bg-orange-50
-                            {{else}}border-yellow-500 bg-yellow-50{{end}}">
-                    <div class="flex items-center gap-2 mb-1">
-                        <span class="px-2 py-0.5 text-xs font-medium rounded
-                                    {{if eq .Severity "critical"}}bg-red-100 text-red-800
-                                    {{else if eq .Severity "high"}}bg-orange-100 text-orange-800
-                                    {{else}}bg-yellow-100 text-yellow-800{{end}}">
-                            {{.Severity}}
-                        </span>
-                        <span class="font-medium text-gray-900">{{.Title}}</span>
-                        <span class="text-xs text-gray-500">by {{.ReviewerName}}</span>
-                    </div>
-                    <p class="text-sm text-gray-700">{{.Description}}</p>
-                    {{if .Suggestion}}
-                    <div class="mt-2 p-2 bg-green-50 border border-green-200 rounded text-sm">
-                        <strong>Suggestion:</strong> {{.Suggestion}}
-                    </div>
-                    {{end}}
-                </div>
-                {{end}}
-                {{end}}
-                {{end}}
-            </div>
+{{define "review-diff-content"}}
+{{/* This is rendered server-side using the diffs.com library */}}
+<div class="diff-file border rounded-lg overflow-hidden">
+    <div class="diff-file-header bg-gray-100 px-4 py-2 flex justify-between items-center">
+        <span class="font-mono text-sm">{{.Filename}}</span>
+        <div class="flex items-center gap-4 text-sm">
+            <span class="text-green-600">+{{.Additions}}</span>
+            <span class="text-red-600">-{{.Deletions}}</span>
+            {{if .IssueCount}}
+            <span class="px-2 py-0.5 bg-yellow-100 text-yellow-800 rounded-full text-xs">
+                {{.IssueCount}} issue(s)
+            </span>
             {{end}}
         </div>
     </div>
-    {{end}}
+
+    {{/* Pre-rendered diff HTML from diffs.com */}}
+    {{.DiffHTML | safeHTML}}
 </div>
 {{end}}
 ```
@@ -1509,7 +1771,38 @@ type ReviewerRegistration struct {
 
 ---
 
-## 10. Implementation Phases
+## 10. Dependencies
+
+### 10.1 JavaScript/TypeScript
+
+```bash
+# Diff rendering (https://diffs.com)
+bun add @pierre/diffs
+
+# Already in project
+# - htmx for interactivity
+# - tailwindcss for styling
+```
+
+### 10.2 Go
+
+```go
+// go.mod additions
+require (
+    github.com/Roasbeef/claude-agent-sdk-go  // Already present
+    // No new Go deps needed for diff rendering (uses bun subprocess)
+)
+```
+
+### 10.3 System Requirements
+
+- **bun** - For running the diff render script
+- **git** - For diff generation and branch checkout
+- **gh** (optional) - For GitHub PR integration
+
+---
+
+## 11. Implementation Phases
 
 ### Phase 1: Foundation (Week 1)
 
