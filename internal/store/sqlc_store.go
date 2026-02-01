@@ -213,8 +213,8 @@ func NewWriteTx() *StorageTxOptions {
 
 // WithTx executes the given function within a database transaction.
 func (s *SqlcStore) WithTx(ctx context.Context,
-	fn func(ctx context.Context, store Storage) error) error {
-
+	fn func(ctx context.Context, store Storage) error,
+) error {
 	var writeTxOpts StorageTxOptions
 	return s.db.ExecTx(ctx, &writeTxOpts, func(q QueryStore) error {
 		// Create a txStore that wraps this transaction's queries.
@@ -235,8 +235,8 @@ type txSqlcStore struct {
 // WithTx for txSqlcStore returns an error since nested transactions are not
 // supported.
 func (s *txSqlcStore) WithTx(ctx context.Context,
-	fn func(ctx context.Context, store Storage) error) error {
-
+	fn func(ctx context.Context, store Storage) error,
+) error {
 	return fmt.Errorf("nested transactions not supported: already within " +
 		"a transaction context")
 }
@@ -252,8 +252,8 @@ func (s *txSqlcStore) Close() error {
 
 // CreateMessage creates a new message in the database.
 func (s *SqlcStore) CreateMessage(ctx context.Context,
-	params CreateMessageParams) (Message, error) {
-
+	params CreateMessageParams,
+) (Message, error) {
 	msg, err := s.db.CreateMessage(ctx, sqlc.CreateMessageParams{
 		ThreadID:    params.ThreadID,
 		TopicID:     params.TopicID,
@@ -283,8 +283,8 @@ func (s *SqlcStore) GetMessage(ctx context.Context, id int64) (Message, error) {
 
 // GetMessagesByThread retrieves all messages in a thread.
 func (s *SqlcStore) GetMessagesByThread(ctx context.Context,
-	threadID string) ([]Message, error) {
-
+	threadID string,
+) ([]Message, error) {
 	rows, err := s.db.GetMessagesByThread(ctx, threadID)
 	if err != nil {
 		return nil, err
@@ -298,8 +298,8 @@ func (s *SqlcStore) GetMessagesByThread(ctx context.Context,
 
 // GetInboxMessages retrieves inbox messages for an agent.
 func (s *SqlcStore) GetInboxMessages(ctx context.Context, agentID int64,
-	limit int) ([]InboxMessage, error) {
-
+	limit int,
+) ([]InboxMessage, error) {
 	rows, err := s.db.GetInboxMessages(ctx, sqlc.GetInboxMessagesParams{
 		AgentID: agentID,
 		Limit:   int64(limit),
@@ -312,8 +312,8 @@ func (s *SqlcStore) GetInboxMessages(ctx context.Context, agentID int64,
 
 // GetUnreadMessages retrieves unread messages for an agent.
 func (s *SqlcStore) GetUnreadMessages(ctx context.Context, agentID int64,
-	limit int) ([]InboxMessage, error) {
-
+	limit int,
+) ([]InboxMessage, error) {
 	rows, err := s.db.GetUnreadMessages(ctx, sqlc.GetUnreadMessagesParams{
 		AgentID: agentID,
 		Limit:   int64(limit),
@@ -326,8 +326,8 @@ func (s *SqlcStore) GetUnreadMessages(ctx context.Context, agentID int64,
 
 // GetArchivedMessages retrieves archived messages for an agent.
 func (s *SqlcStore) GetArchivedMessages(ctx context.Context, agentID int64,
-	limit int) ([]InboxMessage, error) {
-
+	limit int,
+) ([]InboxMessage, error) {
 	rows, err := s.db.GetArchivedMessages(ctx, sqlc.GetArchivedMessagesParams{
 		AgentID: agentID,
 		Limit:   int64(limit),
@@ -340,8 +340,8 @@ func (s *SqlcStore) GetArchivedMessages(ctx context.Context, agentID int64,
 
 // UpdateRecipientState updates the state of a message for a recipient.
 func (s *SqlcStore) UpdateRecipientState(ctx context.Context, messageID,
-	agentID int64, state string) error {
-
+	agentID int64, state string,
+) error {
 	_, err := s.db.UpdateRecipientState(ctx, sqlc.UpdateRecipientStateParams{
 		State:     state,
 		MessageID: messageID,
@@ -352,8 +352,8 @@ func (s *SqlcStore) UpdateRecipientState(ctx context.Context, messageID,
 
 // MarkMessageRead marks a message as read for a recipient.
 func (s *SqlcStore) MarkMessageRead(ctx context.Context, messageID,
-	agentID int64) error {
-
+	agentID int64,
+) error {
 	now := time.Now().Unix()
 	_, err := s.db.UpdateRecipientState(ctx, sqlc.UpdateRecipientStateParams{
 		State:     "read",
@@ -367,8 +367,8 @@ func (s *SqlcStore) MarkMessageRead(ctx context.Context, messageID,
 
 // AckMessage acknowledges a message for a recipient.
 func (s *SqlcStore) AckMessage(ctx context.Context, messageID,
-	agentID int64) error {
-
+	agentID int64,
+) error {
 	return s.db.UpdateRecipientAcked(ctx, sqlc.UpdateRecipientAckedParams{
 		AckedAt:   sql.NullInt64{Int64: time.Now().Unix(), Valid: true},
 		MessageID: messageID,
@@ -378,8 +378,8 @@ func (s *SqlcStore) AckMessage(ctx context.Context, messageID,
 
 // SnoozeMessage snoozes a message until the given time.
 func (s *SqlcStore) SnoozeMessage(ctx context.Context, messageID,
-	agentID int64, until time.Time) error {
-
+	agentID int64, until time.Time,
+) error {
 	return s.db.UpdateRecipientSnoozed(ctx, sqlc.UpdateRecipientSnoozedParams{
 		SnoozedUntil: sql.NullInt64{Int64: until.Unix(), Valid: true},
 		MessageID:    messageID,
@@ -389,8 +389,8 @@ func (s *SqlcStore) SnoozeMessage(ctx context.Context, messageID,
 
 // CreateMessageRecipient creates a recipient entry for a message.
 func (s *SqlcStore) CreateMessageRecipient(ctx context.Context, messageID,
-	agentID int64) error {
-
+	agentID int64,
+) error {
 	return s.db.CreateMessageRecipient(ctx, sqlc.CreateMessageRecipientParams{
 		MessageID: messageID,
 		AgentID:   agentID,
@@ -399,8 +399,8 @@ func (s *SqlcStore) CreateMessageRecipient(ctx context.Context, messageID,
 
 // GetMessageRecipient retrieves the recipient state for a message.
 func (s *SqlcStore) GetMessageRecipient(ctx context.Context, messageID,
-	agentID int64) (MessageRecipient, error) {
-
+	agentID int64,
+) (MessageRecipient, error) {
 	row, err := s.db.GetMessageRecipient(ctx, sqlc.GetMessageRecipientParams{
 		MessageID: messageID,
 		AgentID:   agentID,
@@ -413,22 +413,22 @@ func (s *SqlcStore) GetMessageRecipient(ctx context.Context, messageID,
 
 // CountUnreadByAgent counts unread messages for an agent.
 func (s *SqlcStore) CountUnreadByAgent(ctx context.Context,
-	agentID int64) (int64, error) {
-
+	agentID int64,
+) (int64, error) {
 	return s.db.CountUnreadByAgent(ctx, agentID)
 }
 
 // CountUnreadUrgentByAgent counts urgent unread messages for an agent.
 func (s *SqlcStore) CountUnreadUrgentByAgent(ctx context.Context,
-	agentID int64) (int64, error) {
-
+	agentID int64,
+) (int64, error) {
 	return s.db.CountUnreadUrgentByAgent(ctx, agentID)
 }
 
 // GetMessagesSinceOffset retrieves messages after a given log offset.
 func (s *SqlcStore) GetMessagesSinceOffset(ctx context.Context, topicID,
-	offset int64, limit int) ([]Message, error) {
-
+	offset int64, limit int,
+) ([]Message, error) {
 	rows, err := s.db.GetMessagesSinceOffset(ctx, sqlc.GetMessagesSinceOffsetParams{
 		TopicID:   topicID,
 		LogOffset: offset,
@@ -446,8 +446,8 @@ func (s *SqlcStore) GetMessagesSinceOffset(ctx context.Context, topicID,
 
 // NextLogOffset returns the next available log offset for a topic.
 func (s *SqlcStore) NextLogOffset(ctx context.Context,
-	topicID int64) (int64, error) {
-
+	topicID int64,
+) (int64, error) {
 	result, err := s.db.GetMaxLogOffset(ctx, topicID)
 	if err != nil {
 		return 0, fmt.Errorf("failed to get max log offset: %w", err)
@@ -471,8 +471,8 @@ func (s *SqlcStore) NextLogOffset(ctx context.Context,
 // SearchMessagesForAgent performs full-text search for messages visible to
 // a specific agent.
 func (s *SqlcStore) SearchMessagesForAgent(ctx context.Context, query string,
-	agentID int64, limit int) ([]Message, error) {
-
+	agentID int64, limit int,
+) ([]Message, error) {
 	// Use raw SQL for FTS5 search.
 	rows, err := s.sqlDB.QueryContext(ctx, `
 		SELECT m.id, m.thread_id, m.topic_id, m.log_offset, m.sender_id,
@@ -529,8 +529,8 @@ func (s *SqlcStore) SearchMessagesForAgent(ctx context.Context, query string,
 
 // CreateAgent creates a new agent in the database.
 func (s *SqlcStore) CreateAgent(ctx context.Context,
-	params CreateAgentParams) (Agent, error) {
-
+	params CreateAgentParams,
+) (Agent, error) {
 	now := time.Now().Unix()
 	agent, err := s.db.CreateAgent(ctx, sqlc.CreateAgentParams{
 		Name:         params.Name,
@@ -556,8 +556,8 @@ func (s *SqlcStore) GetAgent(ctx context.Context, id int64) (Agent, error) {
 
 // GetAgentByName retrieves an agent by its name.
 func (s *SqlcStore) GetAgentByName(ctx context.Context,
-	name string) (Agent, error) {
-
+	name string,
+) (Agent, error) {
 	agent, err := s.db.GetAgentByName(ctx, name)
 	if err != nil {
 		return Agent{}, err
@@ -567,8 +567,8 @@ func (s *SqlcStore) GetAgentByName(ctx context.Context,
 
 // GetAgentBySessionID retrieves an agent by session ID.
 func (s *SqlcStore) GetAgentBySessionID(ctx context.Context,
-	sessionID string) (Agent, error) {
-
+	sessionID string,
+) (Agent, error) {
 	agent, err := s.db.GetAgentBySessionID(ctx, sessionID)
 	if err != nil {
 		return Agent{}, err
@@ -591,8 +591,8 @@ func (s *SqlcStore) ListAgents(ctx context.Context) ([]Agent, error) {
 
 // ListAgentsByProject lists agents for a specific project.
 func (s *SqlcStore) ListAgentsByProject(ctx context.Context,
-	projectKey string) ([]Agent, error) {
-
+	projectKey string,
+) ([]Agent, error) {
 	rows, err := s.db.ListAgentsByProject(ctx, ToSqlcNullString(projectKey))
 	if err != nil {
 		return nil, err
@@ -606,8 +606,8 @@ func (s *SqlcStore) ListAgentsByProject(ctx context.Context,
 
 // UpdateLastActive updates the last active timestamp for an agent.
 func (s *SqlcStore) UpdateLastActive(ctx context.Context, id int64,
-	ts time.Time) error {
-
+	ts time.Time,
+) error {
 	return s.db.UpdateAgentLastActive(ctx, sqlc.UpdateAgentLastActiveParams{
 		LastActiveAt: ts.Unix(),
 		ID:           id,
@@ -616,8 +616,8 @@ func (s *SqlcStore) UpdateLastActive(ctx context.Context, id int64,
 
 // UpdateSession updates the session ID for an agent.
 func (s *SqlcStore) UpdateSession(ctx context.Context, id int64,
-	sessionID string) error {
-
+	sessionID string,
+) error {
 	return s.db.UpdateAgentSession(ctx, sqlc.UpdateAgentSessionParams{
 		CurrentSessionID: ToSqlcNullString(sessionID),
 		ID:               id,
@@ -635,8 +635,8 @@ func (s *SqlcStore) DeleteAgent(ctx context.Context, id int64) error {
 
 // CreateTopic creates a new topic.
 func (s *SqlcStore) CreateTopic(ctx context.Context,
-	params CreateTopicParams) (Topic, error) {
-
+	params CreateTopicParams,
+) (Topic, error) {
 	topic, err := s.db.CreateTopic(ctx, sqlc.CreateTopicParams{
 		Name:      params.Name,
 		TopicType: params.TopicType,
@@ -663,8 +663,8 @@ func (s *SqlcStore) GetTopic(ctx context.Context, id int64) (Topic, error) {
 
 // GetTopicByName retrieves a topic by its name.
 func (s *SqlcStore) GetTopicByName(ctx context.Context,
-	name string) (Topic, error) {
-
+	name string,
+) (Topic, error) {
 	topic, err := s.db.GetTopicByName(ctx, name)
 	if err != nil {
 		return Topic{}, err
@@ -674,8 +674,8 @@ func (s *SqlcStore) GetTopicByName(ctx context.Context,
 
 // GetOrCreateAgentInboxTopic gets or creates an agent's inbox topic.
 func (s *SqlcStore) GetOrCreateAgentInboxTopic(ctx context.Context,
-	agentName string) (Topic, error) {
-
+	agentName string,
+) (Topic, error) {
 	topic, err := s.db.GetOrCreateAgentInboxTopic(
 		ctx, sqlc.GetOrCreateAgentInboxTopicParams{
 			Column1:   sql.NullString{String: agentName, Valid: true},
@@ -690,8 +690,8 @@ func (s *SqlcStore) GetOrCreateAgentInboxTopic(ctx context.Context,
 
 // GetOrCreateTopic gets or creates a topic by name.
 func (s *SqlcStore) GetOrCreateTopic(ctx context.Context, name,
-	topicType string) (Topic, error) {
-
+	topicType string,
+) (Topic, error) {
 	topic, err := s.db.GetOrCreateTopic(ctx, sqlc.GetOrCreateTopicParams{
 		Name:      name,
 		TopicType: topicType,
@@ -718,8 +718,8 @@ func (s *SqlcStore) ListTopics(ctx context.Context) ([]Topic, error) {
 
 // ListTopicsByType lists topics of a specific type.
 func (s *SqlcStore) ListTopicsByType(ctx context.Context,
-	topicType string) ([]Topic, error) {
-
+	topicType string,
+) ([]Topic, error) {
 	rows, err := s.db.ListTopicsByType(ctx, topicType)
 	if err != nil {
 		return nil, err
@@ -733,8 +733,8 @@ func (s *SqlcStore) ListTopicsByType(ctx context.Context,
 
 // CreateSubscription subscribes an agent to a topic.
 func (s *SqlcStore) CreateSubscription(ctx context.Context, agentID,
-	topicID int64) error {
-
+	topicID int64,
+) error {
 	return s.db.CreateSubscription(ctx, sqlc.CreateSubscriptionParams{
 		AgentID:      agentID,
 		TopicID:      topicID,
@@ -744,8 +744,8 @@ func (s *SqlcStore) CreateSubscription(ctx context.Context, agentID,
 
 // DeleteSubscription unsubscribes an agent from a topic.
 func (s *SqlcStore) DeleteSubscription(ctx context.Context, agentID,
-	topicID int64) error {
-
+	topicID int64,
+) error {
 	return s.db.DeleteSubscription(ctx, sqlc.DeleteSubscriptionParams{
 		AgentID: agentID,
 		TopicID: topicID,
@@ -754,8 +754,8 @@ func (s *SqlcStore) DeleteSubscription(ctx context.Context, agentID,
 
 // ListSubscriptionsByAgent lists topics an agent is subscribed to.
 func (s *SqlcStore) ListSubscriptionsByAgent(ctx context.Context,
-	agentID int64) ([]Topic, error) {
-
+	agentID int64,
+) ([]Topic, error) {
 	rows, err := s.db.ListSubscriptionsByAgent(ctx, agentID)
 	if err != nil {
 		return nil, err
@@ -769,8 +769,8 @@ func (s *SqlcStore) ListSubscriptionsByAgent(ctx context.Context,
 
 // ListSubscriptionsByTopic lists agents subscribed to a topic.
 func (s *SqlcStore) ListSubscriptionsByTopic(ctx context.Context,
-	topicID int64) ([]Agent, error) {
-
+	topicID int64,
+) ([]Agent, error) {
 	rows, err := s.db.ListSubscriptionsByTopic(ctx, topicID)
 	if err != nil {
 		return nil, err
@@ -788,8 +788,8 @@ func (s *SqlcStore) ListSubscriptionsByTopic(ctx context.Context,
 
 // CreateActivity records a new activity event.
 func (s *SqlcStore) CreateActivity(ctx context.Context,
-	params CreateActivityParams) error {
-
+	params CreateActivityParams,
+) error {
 	_, err := s.db.CreateActivity(ctx, sqlc.CreateActivityParams{
 		AgentID:      params.AgentID,
 		ActivityType: params.ActivityType,
@@ -802,8 +802,8 @@ func (s *SqlcStore) CreateActivity(ctx context.Context,
 
 // ListRecentActivities lists the most recent activities.
 func (s *SqlcStore) ListRecentActivities(ctx context.Context,
-	limit int) ([]Activity, error) {
-
+	limit int,
+) ([]Activity, error) {
 	rows, err := s.db.ListRecentActivities(ctx, int64(limit))
 	if err != nil {
 		return nil, err
@@ -817,8 +817,8 @@ func (s *SqlcStore) ListRecentActivities(ctx context.Context,
 
 // ListActivitiesByAgent lists activities for a specific agent.
 func (s *SqlcStore) ListActivitiesByAgent(ctx context.Context, agentID int64,
-	limit int) ([]Activity, error) {
-
+	limit int,
+) ([]Activity, error) {
 	rows, err := s.db.ListActivitiesByAgent(ctx, sqlc.ListActivitiesByAgentParams{
 		AgentID: agentID,
 		Limit:   int64(limit),
@@ -835,8 +835,8 @@ func (s *SqlcStore) ListActivitiesByAgent(ctx context.Context, agentID int64,
 
 // ListActivitiesSince lists activities since a given timestamp.
 func (s *SqlcStore) ListActivitiesSince(ctx context.Context, since time.Time,
-	limit int) ([]Activity, error) {
-
+	limit int,
+) ([]Activity, error) {
 	rows, err := s.db.ListActivitiesSince(ctx, sqlc.ListActivitiesSinceParams{
 		CreatedAt: since.Unix(),
 		Limit:     int64(limit),
@@ -853,8 +853,8 @@ func (s *SqlcStore) ListActivitiesSince(ctx context.Context, since time.Time,
 
 // DeleteOldActivities removes activities older than a given time.
 func (s *SqlcStore) DeleteOldActivities(ctx context.Context,
-	olderThan time.Time) error {
-
+	olderThan time.Time,
+) error {
 	return s.db.DeleteOldActivities(ctx, olderThan.Unix())
 }
 
@@ -864,8 +864,8 @@ func (s *SqlcStore) DeleteOldActivities(ctx context.Context,
 
 // CreateSessionIdentity creates a new session identity mapping.
 func (s *SqlcStore) CreateSessionIdentity(ctx context.Context,
-	params CreateSessionIdentityParams) error {
-
+	params CreateSessionIdentityParams,
+) error {
 	return s.db.CreateSessionIdentity(ctx, sqlc.CreateSessionIdentityParams{
 		SessionID:  params.SessionID,
 		AgentID:    params.AgentID,
@@ -876,8 +876,8 @@ func (s *SqlcStore) CreateSessionIdentity(ctx context.Context,
 
 // GetSessionIdentity retrieves a session identity by session ID.
 func (s *SqlcStore) GetSessionIdentity(ctx context.Context,
-	sessionID string) (SessionIdentity, error) {
-
+	sessionID string,
+) (SessionIdentity, error) {
 	row, err := s.db.GetSessionIdentity(ctx, sessionID)
 	if err != nil {
 		return SessionIdentity{}, err
@@ -887,15 +887,15 @@ func (s *SqlcStore) GetSessionIdentity(ctx context.Context,
 
 // DeleteSessionIdentity removes a session identity.
 func (s *SqlcStore) DeleteSessionIdentity(ctx context.Context,
-	sessionID string) error {
-
+	sessionID string,
+) error {
 	return s.db.DeleteSessionIdentity(ctx, sessionID)
 }
 
 // ListSessionIdentitiesByAgent lists session identities for an agent.
 func (s *SqlcStore) ListSessionIdentitiesByAgent(ctx context.Context,
-	agentID int64) ([]SessionIdentity, error) {
-
+	agentID int64,
+) ([]SessionIdentity, error) {
 	rows, err := s.db.ListSessionIdentitiesByAgent(ctx, agentID)
 	if err != nil {
 		return nil, err
@@ -909,8 +909,8 @@ func (s *SqlcStore) ListSessionIdentitiesByAgent(ctx context.Context,
 
 // UpdateSessionIdentityLastActive updates the last active timestamp.
 func (s *SqlcStore) UpdateSessionIdentityLastActive(ctx context.Context,
-	sessionID string, ts time.Time) error {
-
+	sessionID string, ts time.Time,
+) error {
 	return s.db.UpdateSessionIdentityLastActive(
 		ctx, sqlc.UpdateSessionIdentityLastActiveParams{
 			LastActiveAt: ts.Unix(),
@@ -925,8 +925,8 @@ func (s *SqlcStore) UpdateSessionIdentityLastActive(ctx context.Context,
 
 // CreateMessage creates a new message in the database.
 func (s *txSqlcStore) CreateMessage(ctx context.Context,
-	params CreateMessageParams) (Message, error) {
-
+	params CreateMessageParams,
+) (Message, error) {
 	msg, err := s.queries.CreateMessage(ctx, sqlc.CreateMessageParams{
 		ThreadID:    params.ThreadID,
 		TopicID:     params.TopicID,
@@ -947,8 +947,8 @@ func (s *txSqlcStore) CreateMessage(ctx context.Context,
 
 // GetMessage retrieves a message by its ID.
 func (s *txSqlcStore) GetMessage(ctx context.Context,
-	id int64) (Message, error) {
-
+	id int64,
+) (Message, error) {
 	msg, err := s.queries.GetMessage(ctx, id)
 	if err != nil {
 		return Message{}, err
@@ -958,8 +958,8 @@ func (s *txSqlcStore) GetMessage(ctx context.Context,
 
 // GetMessagesByThread retrieves all messages in a thread.
 func (s *txSqlcStore) GetMessagesByThread(ctx context.Context,
-	threadID string) ([]Message, error) {
-
+	threadID string,
+) ([]Message, error) {
 	rows, err := s.queries.GetMessagesByThread(ctx, threadID)
 	if err != nil {
 		return nil, err
@@ -973,8 +973,8 @@ func (s *txSqlcStore) GetMessagesByThread(ctx context.Context,
 
 // GetInboxMessages retrieves inbox messages for an agent.
 func (s *txSqlcStore) GetInboxMessages(ctx context.Context, agentID int64,
-	limit int) ([]InboxMessage, error) {
-
+	limit int,
+) ([]InboxMessage, error) {
 	rows, err := s.queries.GetInboxMessages(ctx, sqlc.GetInboxMessagesParams{
 		AgentID: agentID,
 		Limit:   int64(limit),
@@ -987,8 +987,8 @@ func (s *txSqlcStore) GetInboxMessages(ctx context.Context, agentID int64,
 
 // GetUnreadMessages retrieves unread messages for an agent.
 func (s *txSqlcStore) GetUnreadMessages(ctx context.Context, agentID int64,
-	limit int) ([]InboxMessage, error) {
-
+	limit int,
+) ([]InboxMessage, error) {
 	rows, err := s.queries.GetUnreadMessages(ctx, sqlc.GetUnreadMessagesParams{
 		AgentID: agentID,
 		Limit:   int64(limit),
@@ -1001,8 +1001,8 @@ func (s *txSqlcStore) GetUnreadMessages(ctx context.Context, agentID int64,
 
 // GetArchivedMessages retrieves archived messages for an agent.
 func (s *txSqlcStore) GetArchivedMessages(ctx context.Context, agentID int64,
-	limit int) ([]InboxMessage, error) {
-
+	limit int,
+) ([]InboxMessage, error) {
 	rows, err := s.queries.GetArchivedMessages(ctx, sqlc.GetArchivedMessagesParams{
 		AgentID: agentID,
 		Limit:   int64(limit),
@@ -1015,8 +1015,8 @@ func (s *txSqlcStore) GetArchivedMessages(ctx context.Context, agentID int64,
 
 // UpdateRecipientState updates the state of a message for a recipient.
 func (s *txSqlcStore) UpdateRecipientState(ctx context.Context, messageID,
-	agentID int64, state string) error {
-
+	agentID int64, state string,
+) error {
 	_, err := s.queries.UpdateRecipientState(ctx, sqlc.UpdateRecipientStateParams{
 		State:     state,
 		MessageID: messageID,
@@ -1027,8 +1027,8 @@ func (s *txSqlcStore) UpdateRecipientState(ctx context.Context, messageID,
 
 // MarkMessageRead marks a message as read for a recipient.
 func (s *txSqlcStore) MarkMessageRead(ctx context.Context, messageID,
-	agentID int64) error {
-
+	agentID int64,
+) error {
 	now := time.Now().Unix()
 	_, err := s.queries.UpdateRecipientState(ctx, sqlc.UpdateRecipientStateParams{
 		State:     "read",
@@ -1042,8 +1042,8 @@ func (s *txSqlcStore) MarkMessageRead(ctx context.Context, messageID,
 
 // AckMessage acknowledges a message for a recipient.
 func (s *txSqlcStore) AckMessage(ctx context.Context, messageID,
-	agentID int64) error {
-
+	agentID int64,
+) error {
 	return s.queries.UpdateRecipientAcked(ctx, sqlc.UpdateRecipientAckedParams{
 		AckedAt:   sql.NullInt64{Int64: time.Now().Unix(), Valid: true},
 		MessageID: messageID,
@@ -1053,8 +1053,8 @@ func (s *txSqlcStore) AckMessage(ctx context.Context, messageID,
 
 // SnoozeMessage snoozes a message until the given time.
 func (s *txSqlcStore) SnoozeMessage(ctx context.Context, messageID,
-	agentID int64, until time.Time) error {
-
+	agentID int64, until time.Time,
+) error {
 	return s.queries.UpdateRecipientSnoozed(ctx, sqlc.UpdateRecipientSnoozedParams{
 		SnoozedUntil: sql.NullInt64{Int64: until.Unix(), Valid: true},
 		MessageID:    messageID,
@@ -1064,8 +1064,8 @@ func (s *txSqlcStore) SnoozeMessage(ctx context.Context, messageID,
 
 // CreateMessageRecipient creates a recipient entry for a message.
 func (s *txSqlcStore) CreateMessageRecipient(ctx context.Context, messageID,
-	agentID int64) error {
-
+	agentID int64,
+) error {
 	return s.queries.CreateMessageRecipient(ctx, sqlc.CreateMessageRecipientParams{
 		MessageID: messageID,
 		AgentID:   agentID,
@@ -1074,8 +1074,8 @@ func (s *txSqlcStore) CreateMessageRecipient(ctx context.Context, messageID,
 
 // GetMessageRecipient retrieves the recipient state for a message.
 func (s *txSqlcStore) GetMessageRecipient(ctx context.Context, messageID,
-	agentID int64) (MessageRecipient, error) {
-
+	agentID int64,
+) (MessageRecipient, error) {
 	row, err := s.queries.GetMessageRecipient(ctx, sqlc.GetMessageRecipientParams{
 		MessageID: messageID,
 		AgentID:   agentID,
@@ -1088,22 +1088,22 @@ func (s *txSqlcStore) GetMessageRecipient(ctx context.Context, messageID,
 
 // CountUnreadByAgent counts unread messages for an agent.
 func (s *txSqlcStore) CountUnreadByAgent(ctx context.Context,
-	agentID int64) (int64, error) {
-
+	agentID int64,
+) (int64, error) {
 	return s.queries.CountUnreadByAgent(ctx, agentID)
 }
 
 // CountUnreadUrgentByAgent counts urgent unread messages for an agent.
 func (s *txSqlcStore) CountUnreadUrgentByAgent(ctx context.Context,
-	agentID int64) (int64, error) {
-
+	agentID int64,
+) (int64, error) {
 	return s.queries.CountUnreadUrgentByAgent(ctx, agentID)
 }
 
 // GetMessagesSinceOffset retrieves messages after a given log offset.
 func (s *txSqlcStore) GetMessagesSinceOffset(ctx context.Context, topicID,
-	offset int64, limit int) ([]Message, error) {
-
+	offset int64, limit int,
+) ([]Message, error) {
 	rows, err := s.queries.GetMessagesSinceOffset(ctx, sqlc.GetMessagesSinceOffsetParams{
 		TopicID:   topicID,
 		LogOffset: offset,
@@ -1121,8 +1121,8 @@ func (s *txSqlcStore) GetMessagesSinceOffset(ctx context.Context, topicID,
 
 // NextLogOffset returns the next available log offset for a topic.
 func (s *txSqlcStore) NextLogOffset(ctx context.Context,
-	topicID int64) (int64, error) {
-
+	topicID int64,
+) (int64, error) {
 	result, err := s.queries.GetMaxLogOffset(ctx, topicID)
 	if err != nil {
 		return 0, fmt.Errorf("failed to get max log offset: %w", err)
@@ -1146,8 +1146,8 @@ func (s *txSqlcStore) NextLogOffset(ctx context.Context,
 // SearchMessagesForAgent performs full-text search for messages visible to
 // a specific agent.
 func (s *txSqlcStore) SearchMessagesForAgent(ctx context.Context, query string,
-	agentID int64, limit int) ([]Message, error) {
-
+	agentID int64, limit int,
+) ([]Message, error) {
 	// Use raw SQL for FTS5 search.
 	rows, err := s.sqlDB.QueryContext(ctx, `
 		SELECT m.id, m.thread_id, m.topic_id, m.log_offset, m.sender_id,
@@ -1200,8 +1200,8 @@ func (s *txSqlcStore) SearchMessagesForAgent(ctx context.Context, query string,
 
 // CreateAgent creates a new agent in the database.
 func (s *txSqlcStore) CreateAgent(ctx context.Context,
-	params CreateAgentParams) (Agent, error) {
-
+	params CreateAgentParams,
+) (Agent, error) {
 	now := time.Now().Unix()
 	agent, err := s.queries.CreateAgent(ctx, sqlc.CreateAgentParams{
 		Name:         params.Name,
@@ -1227,8 +1227,8 @@ func (s *txSqlcStore) GetAgent(ctx context.Context, id int64) (Agent, error) {
 
 // GetAgentByName retrieves an agent by its name.
 func (s *txSqlcStore) GetAgentByName(ctx context.Context,
-	name string) (Agent, error) {
-
+	name string,
+) (Agent, error) {
 	agent, err := s.queries.GetAgentByName(ctx, name)
 	if err != nil {
 		return Agent{}, err
@@ -1238,8 +1238,8 @@ func (s *txSqlcStore) GetAgentByName(ctx context.Context,
 
 // GetAgentBySessionID retrieves an agent by session ID.
 func (s *txSqlcStore) GetAgentBySessionID(ctx context.Context,
-	sessionID string) (Agent, error) {
-
+	sessionID string,
+) (Agent, error) {
 	agent, err := s.queries.GetAgentBySessionID(ctx, sessionID)
 	if err != nil {
 		return Agent{}, err
@@ -1262,8 +1262,8 @@ func (s *txSqlcStore) ListAgents(ctx context.Context) ([]Agent, error) {
 
 // ListAgentsByProject lists agents for a specific project.
 func (s *txSqlcStore) ListAgentsByProject(ctx context.Context,
-	projectKey string) ([]Agent, error) {
-
+	projectKey string,
+) ([]Agent, error) {
 	rows, err := s.queries.ListAgentsByProject(ctx, ToSqlcNullString(projectKey))
 	if err != nil {
 		return nil, err
@@ -1277,8 +1277,8 @@ func (s *txSqlcStore) ListAgentsByProject(ctx context.Context,
 
 // UpdateLastActive updates the last active timestamp for an agent.
 func (s *txSqlcStore) UpdateLastActive(ctx context.Context, id int64,
-	ts time.Time) error {
-
+	ts time.Time,
+) error {
 	return s.queries.UpdateAgentLastActive(ctx, sqlc.UpdateAgentLastActiveParams{
 		LastActiveAt: ts.Unix(),
 		ID:           id,
@@ -1287,8 +1287,8 @@ func (s *txSqlcStore) UpdateLastActive(ctx context.Context, id int64,
 
 // UpdateSession updates the session ID for an agent.
 func (s *txSqlcStore) UpdateSession(ctx context.Context, id int64,
-	sessionID string) error {
-
+	sessionID string,
+) error {
 	return s.queries.UpdateAgentSession(ctx, sqlc.UpdateAgentSessionParams{
 		CurrentSessionID: ToSqlcNullString(sessionID),
 		ID:               id,
@@ -1302,8 +1302,8 @@ func (s *txSqlcStore) DeleteAgent(ctx context.Context, id int64) error {
 
 // CreateTopic creates a new topic.
 func (s *txSqlcStore) CreateTopic(ctx context.Context,
-	params CreateTopicParams) (Topic, error) {
-
+	params CreateTopicParams,
+) (Topic, error) {
 	topic, err := s.queries.CreateTopic(ctx, sqlc.CreateTopicParams{
 		Name:      params.Name,
 		TopicType: params.TopicType,
@@ -1330,8 +1330,8 @@ func (s *txSqlcStore) GetTopic(ctx context.Context, id int64) (Topic, error) {
 
 // GetTopicByName retrieves a topic by its name.
 func (s *txSqlcStore) GetTopicByName(ctx context.Context,
-	name string) (Topic, error) {
-
+	name string,
+) (Topic, error) {
 	topic, err := s.queries.GetTopicByName(ctx, name)
 	if err != nil {
 		return Topic{}, err
@@ -1341,8 +1341,8 @@ func (s *txSqlcStore) GetTopicByName(ctx context.Context,
 
 // GetOrCreateAgentInboxTopic gets or creates an agent's inbox topic.
 func (s *txSqlcStore) GetOrCreateAgentInboxTopic(ctx context.Context,
-	agentName string) (Topic, error) {
-
+	agentName string,
+) (Topic, error) {
 	topic, err := s.queries.GetOrCreateAgentInboxTopic(
 		ctx, sqlc.GetOrCreateAgentInboxTopicParams{
 			Column1:   sql.NullString{String: agentName, Valid: true},
@@ -1357,8 +1357,8 @@ func (s *txSqlcStore) GetOrCreateAgentInboxTopic(ctx context.Context,
 
 // GetOrCreateTopic gets or creates a topic by name.
 func (s *txSqlcStore) GetOrCreateTopic(ctx context.Context, name,
-	topicType string) (Topic, error) {
-
+	topicType string,
+) (Topic, error) {
 	topic, err := s.queries.GetOrCreateTopic(ctx, sqlc.GetOrCreateTopicParams{
 		Name:      name,
 		TopicType: topicType,
@@ -1385,8 +1385,8 @@ func (s *txSqlcStore) ListTopics(ctx context.Context) ([]Topic, error) {
 
 // ListTopicsByType lists topics of a specific type.
 func (s *txSqlcStore) ListTopicsByType(ctx context.Context,
-	topicType string) ([]Topic, error) {
-
+	topicType string,
+) ([]Topic, error) {
 	rows, err := s.queries.ListTopicsByType(ctx, topicType)
 	if err != nil {
 		return nil, err
@@ -1400,8 +1400,8 @@ func (s *txSqlcStore) ListTopicsByType(ctx context.Context,
 
 // CreateSubscription subscribes an agent to a topic.
 func (s *txSqlcStore) CreateSubscription(ctx context.Context, agentID,
-	topicID int64) error {
-
+	topicID int64,
+) error {
 	return s.queries.CreateSubscription(ctx, sqlc.CreateSubscriptionParams{
 		AgentID:      agentID,
 		TopicID:      topicID,
@@ -1411,8 +1411,8 @@ func (s *txSqlcStore) CreateSubscription(ctx context.Context, agentID,
 
 // DeleteSubscription unsubscribes an agent from a topic.
 func (s *txSqlcStore) DeleteSubscription(ctx context.Context, agentID,
-	topicID int64) error {
-
+	topicID int64,
+) error {
 	return s.queries.DeleteSubscription(ctx, sqlc.DeleteSubscriptionParams{
 		AgentID: agentID,
 		TopicID: topicID,
@@ -1421,8 +1421,8 @@ func (s *txSqlcStore) DeleteSubscription(ctx context.Context, agentID,
 
 // ListSubscriptionsByAgent lists topics an agent is subscribed to.
 func (s *txSqlcStore) ListSubscriptionsByAgent(ctx context.Context,
-	agentID int64) ([]Topic, error) {
-
+	agentID int64,
+) ([]Topic, error) {
 	rows, err := s.queries.ListSubscriptionsByAgent(ctx, agentID)
 	if err != nil {
 		return nil, err
@@ -1436,8 +1436,8 @@ func (s *txSqlcStore) ListSubscriptionsByAgent(ctx context.Context,
 
 // ListSubscriptionsByTopic lists agents subscribed to a topic.
 func (s *txSqlcStore) ListSubscriptionsByTopic(ctx context.Context,
-	topicID int64) ([]Agent, error) {
-
+	topicID int64,
+) ([]Agent, error) {
 	rows, err := s.queries.ListSubscriptionsByTopic(ctx, topicID)
 	if err != nil {
 		return nil, err
@@ -1451,8 +1451,8 @@ func (s *txSqlcStore) ListSubscriptionsByTopic(ctx context.Context,
 
 // CreateActivity records a new activity event.
 func (s *txSqlcStore) CreateActivity(ctx context.Context,
-	params CreateActivityParams) error {
-
+	params CreateActivityParams,
+) error {
 	_, err := s.queries.CreateActivity(ctx, sqlc.CreateActivityParams{
 		AgentID:      params.AgentID,
 		ActivityType: params.ActivityType,
@@ -1465,8 +1465,8 @@ func (s *txSqlcStore) CreateActivity(ctx context.Context,
 
 // ListRecentActivities lists the most recent activities.
 func (s *txSqlcStore) ListRecentActivities(ctx context.Context,
-	limit int) ([]Activity, error) {
-
+	limit int,
+) ([]Activity, error) {
 	rows, err := s.queries.ListRecentActivities(ctx, int64(limit))
 	if err != nil {
 		return nil, err
@@ -1480,8 +1480,8 @@ func (s *txSqlcStore) ListRecentActivities(ctx context.Context,
 
 // ListActivitiesByAgent lists activities for a specific agent.
 func (s *txSqlcStore) ListActivitiesByAgent(ctx context.Context, agentID int64,
-	limit int) ([]Activity, error) {
-
+	limit int,
+) ([]Activity, error) {
 	rows, err := s.queries.ListActivitiesByAgent(ctx, sqlc.ListActivitiesByAgentParams{
 		AgentID: agentID,
 		Limit:   int64(limit),
@@ -1498,8 +1498,8 @@ func (s *txSqlcStore) ListActivitiesByAgent(ctx context.Context, agentID int64,
 
 // ListActivitiesSince lists activities since a given timestamp.
 func (s *txSqlcStore) ListActivitiesSince(ctx context.Context, since time.Time,
-	limit int) ([]Activity, error) {
-
+	limit int,
+) ([]Activity, error) {
 	rows, err := s.queries.ListActivitiesSince(ctx, sqlc.ListActivitiesSinceParams{
 		CreatedAt: since.Unix(),
 		Limit:     int64(limit),
@@ -1516,15 +1516,15 @@ func (s *txSqlcStore) ListActivitiesSince(ctx context.Context, since time.Time,
 
 // DeleteOldActivities removes activities older than a given time.
 func (s *txSqlcStore) DeleteOldActivities(ctx context.Context,
-	olderThan time.Time) error {
-
+	olderThan time.Time,
+) error {
 	return s.queries.DeleteOldActivities(ctx, olderThan.Unix())
 }
 
 // CreateSessionIdentity creates a new session identity mapping.
 func (s *txSqlcStore) CreateSessionIdentity(ctx context.Context,
-	params CreateSessionIdentityParams) error {
-
+	params CreateSessionIdentityParams,
+) error {
 	return s.queries.CreateSessionIdentity(ctx, sqlc.CreateSessionIdentityParams{
 		SessionID:  params.SessionID,
 		AgentID:    params.AgentID,
@@ -1535,8 +1535,8 @@ func (s *txSqlcStore) CreateSessionIdentity(ctx context.Context,
 
 // GetSessionIdentity retrieves a session identity by session ID.
 func (s *txSqlcStore) GetSessionIdentity(ctx context.Context,
-	sessionID string) (SessionIdentity, error) {
-
+	sessionID string,
+) (SessionIdentity, error) {
 	row, err := s.queries.GetSessionIdentity(ctx, sessionID)
 	if err != nil {
 		return SessionIdentity{}, err
@@ -1546,15 +1546,15 @@ func (s *txSqlcStore) GetSessionIdentity(ctx context.Context,
 
 // DeleteSessionIdentity removes a session identity.
 func (s *txSqlcStore) DeleteSessionIdentity(ctx context.Context,
-	sessionID string) error {
-
+	sessionID string,
+) error {
 	return s.queries.DeleteSessionIdentity(ctx, sessionID)
 }
 
 // ListSessionIdentitiesByAgent lists session identities for an agent.
 func (s *txSqlcStore) ListSessionIdentitiesByAgent(ctx context.Context,
-	agentID int64) ([]SessionIdentity, error) {
-
+	agentID int64,
+) ([]SessionIdentity, error) {
 	rows, err := s.queries.ListSessionIdentitiesByAgent(ctx, agentID)
 	if err != nil {
 		return nil, err
@@ -1568,8 +1568,8 @@ func (s *txSqlcStore) ListSessionIdentitiesByAgent(ctx context.Context,
 
 // UpdateSessionIdentityLastActive updates the last active timestamp.
 func (s *txSqlcStore) UpdateSessionIdentityLastActive(ctx context.Context,
-	sessionID string, ts time.Time) error {
-
+	sessionID string, ts time.Time,
+) error {
 	return s.queries.UpdateSessionIdentityLastActive(
 		ctx, sqlc.UpdateSessionIdentityLastActiveParams{
 			LastActiveAt: ts.Unix(),

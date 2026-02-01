@@ -19,8 +19,8 @@ type SearchResult struct {
 // The query should use FTS5 query syntax (e.g., "word1 word2" for AND,
 // "word1 OR word2" for OR).
 func (s *Store) SearchMessages(ctx context.Context, query string,
-	limit int) ([]SearchResult, error) {
-
+	limit int,
+) ([]SearchResult, error) {
 	rows, err := s.DB().QueryContext(ctx, `
 		SELECT m.id, m.thread_id, m.topic_id, m.log_offset, m.sender_id,
 		       m.subject, m.body_md, m.priority, m.deadline_at,
@@ -66,8 +66,8 @@ func (s *Store) SearchMessages(ctx context.Context, query string,
 // SearchMessagesForAgent performs a full-text search for messages visible to
 // a specific agent.
 func (s *Store) SearchMessagesForAgent(ctx context.Context, query string,
-	agentID int64, limit int) ([]SearchResult, error) {
-
+	agentID int64, limit int,
+) ([]SearchResult, error) {
 	rows, err := s.DB().QueryContext(ctx, `
 		SELECT m.id, m.thread_id, m.topic_id, m.log_offset, m.sender_id,
 		       m.subject, m.body_md, m.priority, m.deadline_at,

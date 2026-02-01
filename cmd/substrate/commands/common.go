@@ -47,8 +47,8 @@ func getStore() (*db.Store, error) {
 // getCurrentAgentWithClient returns the current agent ID using the Client
 // interface. It supports both gRPC and direct database access.
 func getCurrentAgentWithClient(ctx context.Context, client *Client) (int64,
-	string, error) {
-
+	string, error,
+) {
 	// If agent name is specified directly, use it.
 	if agentName != "" {
 		ag, err := client.GetAgentByName(ctx, agentName)

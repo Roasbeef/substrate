@@ -63,7 +63,6 @@ func (m *MockStore) WithTx(
 	ctx context.Context,
 	fn func(ctx context.Context, s Storage) error,
 ) error {
-
 	return fn(ctx, m)
 }
 
@@ -110,7 +109,6 @@ func (m *MockStore) IsConsistent() bool {
 func (m *MockStore) CreateMessage(
 	ctx context.Context, params CreateMessageParams,
 ) (Message, error) {
-
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
@@ -152,7 +150,6 @@ func (m *MockStore) GetMessage(ctx context.Context, id int64) (Message, error) {
 func (m *MockStore) GetMessagesByThread(
 	ctx context.Context, threadID string,
 ) ([]Message, error) {
-
 	m.mu.RLock()
 	defer m.mu.RUnlock()
 
@@ -169,7 +166,6 @@ func (m *MockStore) GetMessagesByThread(
 func (m *MockStore) GetInboxMessages(
 	ctx context.Context, agentID int64, limit int,
 ) ([]InboxMessage, error) {
-
 	m.mu.RLock()
 	defer m.mu.RUnlock()
 
@@ -200,7 +196,6 @@ func (m *MockStore) GetInboxMessages(
 func (m *MockStore) GetUnreadMessages(
 	ctx context.Context, agentID int64, limit int,
 ) ([]InboxMessage, error) {
-
 	m.mu.RLock()
 	defer m.mu.RUnlock()
 
@@ -229,7 +224,6 @@ func (m *MockStore) GetUnreadMessages(
 func (m *MockStore) GetArchivedMessages(
 	ctx context.Context, agentID int64, limit int,
 ) ([]InboxMessage, error) {
-
 	m.mu.RLock()
 	defer m.mu.RUnlock()
 
@@ -256,7 +250,6 @@ func (m *MockStore) GetArchivedMessages(
 func (m *MockStore) UpdateRecipientState(
 	ctx context.Context, messageID, agentID int64, state string,
 ) error {
-
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
@@ -281,7 +274,6 @@ func (m *MockStore) UpdateRecipientState(
 func (m *MockStore) MarkMessageRead(
 	ctx context.Context, messageID, agentID int64,
 ) error {
-
 	return m.UpdateRecipientState(ctx, messageID, agentID, "read")
 }
 
@@ -289,7 +281,6 @@ func (m *MockStore) MarkMessageRead(
 func (m *MockStore) AckMessage(
 	ctx context.Context, messageID, agentID int64,
 ) error {
-
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
@@ -313,7 +304,6 @@ func (m *MockStore) AckMessage(
 func (m *MockStore) SnoozeMessage(
 	ctx context.Context, messageID, agentID int64, until time.Time,
 ) error {
-
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
@@ -337,7 +327,6 @@ func (m *MockStore) SnoozeMessage(
 func (m *MockStore) CreateMessageRecipient(
 	ctx context.Context, messageID, agentID int64,
 ) error {
-
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
@@ -365,7 +354,6 @@ func (m *MockStore) CreateMessageRecipient(
 func (m *MockStore) GetMessageRecipient(
 	ctx context.Context, messageID, agentID int64,
 ) (MessageRecipient, error) {
-
 	m.mu.RLock()
 	defer m.mu.RUnlock()
 
@@ -384,7 +372,6 @@ func (m *MockStore) GetMessageRecipient(
 func (m *MockStore) CountUnreadByAgent(
 	ctx context.Context, agentID int64,
 ) (int64, error) {
-
 	m.mu.RLock()
 	defer m.mu.RUnlock()
 
@@ -401,7 +388,6 @@ func (m *MockStore) CountUnreadByAgent(
 func (m *MockStore) CountUnreadUrgentByAgent(
 	ctx context.Context, agentID int64,
 ) (int64, error) {
-
 	m.mu.RLock()
 	defer m.mu.RUnlock()
 
@@ -420,7 +406,6 @@ func (m *MockStore) CountUnreadUrgentByAgent(
 func (m *MockStore) GetMessagesSinceOffset(
 	ctx context.Context, topicID, offset int64, limit int,
 ) ([]Message, error) {
-
 	m.mu.RLock()
 	defer m.mu.RUnlock()
 
@@ -440,7 +425,6 @@ func (m *MockStore) GetMessagesSinceOffset(
 func (m *MockStore) NextLogOffset(
 	ctx context.Context, topicID int64,
 ) (int64, error) {
-
 	m.mu.RLock()
 	defer m.mu.RUnlock()
 
@@ -458,7 +442,6 @@ func (m *MockStore) NextLogOffset(
 func (m *MockStore) SearchMessagesForAgent(
 	ctx context.Context, query string, agentID int64, limit int,
 ) ([]Message, error) {
-
 	m.mu.RLock()
 	defer m.mu.RUnlock()
 
@@ -501,7 +484,6 @@ func contains(s, substr string) bool {
 func (m *MockStore) CreateAgent(
 	ctx context.Context, params CreateAgentParams,
 ) (Agent, error) {
-
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
@@ -541,7 +523,6 @@ func (m *MockStore) GetAgent(ctx context.Context, id int64) (Agent, error) {
 func (m *MockStore) GetAgentByName(
 	ctx context.Context, name string,
 ) (Agent, error) {
-
 	m.mu.RLock()
 	defer m.mu.RUnlock()
 
@@ -556,7 +537,6 @@ func (m *MockStore) GetAgentByName(
 func (m *MockStore) GetAgentBySessionID(
 	ctx context.Context, sessionID string,
 ) (Agent, error) {
-
 	m.mu.RLock()
 	defer m.mu.RUnlock()
 
@@ -583,7 +563,6 @@ func (m *MockStore) ListAgents(ctx context.Context) ([]Agent, error) {
 func (m *MockStore) ListAgentsByProject(
 	ctx context.Context, projectKey string,
 ) ([]Agent, error) {
-
 	m.mu.RLock()
 	defer m.mu.RUnlock()
 
@@ -600,7 +579,6 @@ func (m *MockStore) ListAgentsByProject(
 func (m *MockStore) UpdateLastActive(
 	ctx context.Context, id int64, ts time.Time,
 ) error {
-
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
@@ -617,7 +595,6 @@ func (m *MockStore) UpdateLastActive(
 func (m *MockStore) UpdateSession(
 	ctx context.Context, id int64, sessionID string,
 ) error {
-
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
@@ -668,7 +645,6 @@ func (m *MockStore) DeleteAgent(ctx context.Context, id int64) error {
 func (m *MockStore) CreateTopic(
 	ctx context.Context, params CreateTopicParams,
 ) (Topic, error) {
-
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
@@ -707,7 +683,6 @@ func (m *MockStore) GetTopic(ctx context.Context, id int64) (Topic, error) {
 func (m *MockStore) GetTopicByName(
 	ctx context.Context, name string,
 ) (Topic, error) {
-
 	m.mu.RLock()
 	defer m.mu.RUnlock()
 
@@ -722,7 +697,6 @@ func (m *MockStore) GetTopicByName(
 func (m *MockStore) GetOrCreateAgentInboxTopic(
 	ctx context.Context, agentName string,
 ) (Topic, error) {
-
 	topicName := fmt.Sprintf("inbox-%s", agentName)
 	return m.GetOrCreateTopic(ctx, topicName, "inbox")
 }
@@ -731,7 +705,6 @@ func (m *MockStore) GetOrCreateAgentInboxTopic(
 func (m *MockStore) GetOrCreateTopic(
 	ctx context.Context, name, topicType string,
 ) (Topic, error) {
-
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
@@ -769,7 +742,6 @@ func (m *MockStore) ListTopics(ctx context.Context) ([]Topic, error) {
 func (m *MockStore) ListTopicsByType(
 	ctx context.Context, topicType string,
 ) ([]Topic, error) {
-
 	m.mu.RLock()
 	defer m.mu.RUnlock()
 
@@ -786,7 +758,6 @@ func (m *MockStore) ListTopicsByType(
 func (m *MockStore) CreateSubscription(
 	ctx context.Context, agentID, topicID int64,
 ) error {
-
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
@@ -802,7 +773,6 @@ func (m *MockStore) CreateSubscription(
 func (m *MockStore) DeleteSubscription(
 	ctx context.Context, agentID, topicID int64,
 ) error {
-
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
@@ -816,7 +786,6 @@ func (m *MockStore) DeleteSubscription(
 func (m *MockStore) ListSubscriptionsByAgent(
 	ctx context.Context, agentID int64,
 ) ([]Topic, error) {
-
 	m.mu.RLock()
 	defer m.mu.RUnlock()
 
@@ -835,7 +804,6 @@ func (m *MockStore) ListSubscriptionsByAgent(
 func (m *MockStore) ListSubscriptionsByTopic(
 	ctx context.Context, topicID int64,
 ) ([]Agent, error) {
-
 	m.mu.RLock()
 	defer m.mu.RUnlock()
 
@@ -856,7 +824,6 @@ func (m *MockStore) ListSubscriptionsByTopic(
 func (m *MockStore) CreateActivity(
 	ctx context.Context, params CreateActivityParams,
 ) error {
-
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
@@ -879,7 +846,6 @@ func (m *MockStore) CreateActivity(
 func (m *MockStore) ListRecentActivities(
 	ctx context.Context, limit int,
 ) ([]Activity, error) {
-
 	m.mu.RLock()
 	defer m.mu.RUnlock()
 
@@ -899,7 +865,6 @@ func (m *MockStore) ListRecentActivities(
 func (m *MockStore) ListActivitiesByAgent(
 	ctx context.Context, agentID int64, limit int,
 ) ([]Activity, error) {
-
 	m.mu.RLock()
 	defer m.mu.RUnlock()
 
@@ -917,7 +882,6 @@ func (m *MockStore) ListActivitiesByAgent(
 func (m *MockStore) ListActivitiesSince(
 	ctx context.Context, since time.Time, limit int,
 ) ([]Activity, error) {
-
 	m.mu.RLock()
 	defer m.mu.RUnlock()
 
@@ -934,7 +898,6 @@ func (m *MockStore) ListActivitiesSince(
 func (m *MockStore) DeleteOldActivities(
 	ctx context.Context, olderThan time.Time,
 ) error {
-
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
@@ -954,7 +917,6 @@ func (m *MockStore) DeleteOldActivities(
 func (m *MockStore) CreateSessionIdentity(
 	ctx context.Context, params CreateSessionIdentityParams,
 ) error {
-
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
@@ -981,7 +943,6 @@ func (m *MockStore) CreateSessionIdentity(
 func (m *MockStore) GetSessionIdentity(
 	ctx context.Context, sessionID string,
 ) (SessionIdentity, error) {
-
 	m.mu.RLock()
 	defer m.mu.RUnlock()
 
@@ -996,7 +957,6 @@ func (m *MockStore) GetSessionIdentity(
 func (m *MockStore) DeleteSessionIdentity(
 	ctx context.Context, sessionID string,
 ) error {
-
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
@@ -1009,7 +969,6 @@ func (m *MockStore) DeleteSessionIdentity(
 func (m *MockStore) ListSessionIdentitiesByAgent(
 	ctx context.Context, agentID int64,
 ) ([]SessionIdentity, error) {
-
 	m.mu.RLock()
 	defer m.mu.RUnlock()
 
@@ -1026,7 +985,6 @@ func (m *MockStore) ListSessionIdentitiesByAgent(
 func (m *MockStore) UpdateSessionIdentityLastActive(
 	ctx context.Context, sessionID string, ts time.Time,
 ) error {
-
 	m.mu.Lock()
 	defer m.mu.Unlock()
 

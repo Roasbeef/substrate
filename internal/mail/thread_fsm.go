@@ -27,8 +27,8 @@ func NewThreadFSM(state ThreadState, env *ThreadEnvironment) *ThreadFSM {
 // representation.
 func NewThreadFSMFromDB(agentID, messageID int64, threadID string,
 	stateStr string, snoozedUntil *time.Time, readAt *time.Time,
-	ackedAt *time.Time, trashRetention time.Duration) *ThreadFSM {
-
+	ackedAt *time.Time, trashRetention time.Duration,
+) *ThreadFSM {
 	if trashRetention == 0 {
 		trashRetention = DefaultTrashRetention
 	}
@@ -113,8 +113,8 @@ func (f *ThreadFSM) IsTerminal() bool {
 // ProcessEvent processes an event and returns the outbox events that should
 // be dispatched to external actors.
 func (f *ThreadFSM) ProcessEvent(ctx context.Context,
-	event ThreadEvent) ([]ThreadOutboxEvent, error) {
-
+	event ThreadEvent,
+) ([]ThreadOutboxEvent, error) {
 	transition, err := f.state.ProcessEvent(ctx, event, f.env)
 	if err != nil {
 		return nil, fmt.Errorf("process event %T: %w", event, err)
@@ -154,8 +154,8 @@ func NewThreadFSMManager(trashRetention time.Duration) *ThreadFSMManager {
 // CreateFSM creates a new FSM for a message recipient pair with the initial
 // unread state.
 func (m *ThreadFSMManager) CreateFSM(agentID, messageID int64,
-	threadID string) *ThreadFSM {
-
+	threadID string,
+) *ThreadFSM {
 	return NewThreadFSM(&StateUnread{}, &ThreadEnvironment{
 		AgentID:        agentID,
 		MessageID:      messageID,
@@ -167,8 +167,8 @@ func (m *ThreadFSMManager) CreateFSM(agentID, messageID int64,
 // LoadFSM loads an FSM from database state.
 func (m *ThreadFSMManager) LoadFSM(agentID, messageID int64, threadID string,
 	stateStr string, snoozedUntil *time.Time, readAt *time.Time,
-	ackedAt *time.Time) *ThreadFSM {
-
+	ackedAt *time.Time,
+) *ThreadFSM {
 	return NewThreadFSMFromDB(
 		agentID, messageID, threadID, stateStr,
 		snoozedUntil, readAt, ackedAt, m.trashRetention,
@@ -177,8 +177,8 @@ func (m *ThreadFSMManager) LoadFSM(agentID, messageID int64, threadID string,
 
 // MarkRead creates a ReadEvent and returns the outbox events.
 func (m *ThreadFSMManager) MarkRead(ctx context.Context,
-	fsm *ThreadFSM) ([]ThreadOutboxEvent, error) {
-
+	fsm *ThreadFSM,
+) ([]ThreadOutboxEvent, error) {
 	return fsm.ProcessEvent(ctx, ReadEvent{
 		AgentID:   fsm.env.AgentID,
 		MessageID: fsm.env.MessageID,
@@ -188,8 +188,8 @@ func (m *ThreadFSMManager) MarkRead(ctx context.Context,
 
 // Star creates a StarEvent and returns the outbox events.
 func (m *ThreadFSMManager) Star(ctx context.Context,
-	fsm *ThreadFSM) ([]ThreadOutboxEvent, error) {
-
+	fsm *ThreadFSM,
+) ([]ThreadOutboxEvent, error) {
 	return fsm.ProcessEvent(ctx, StarEvent{
 		AgentID:   fsm.env.AgentID,
 		MessageID: fsm.env.MessageID,
@@ -198,8 +198,8 @@ func (m *ThreadFSMManager) Star(ctx context.Context,
 
 // Unstar creates an UnstarEvent and returns the outbox events.
 func (m *ThreadFSMManager) Unstar(ctx context.Context,
-	fsm *ThreadFSM) ([]ThreadOutboxEvent, error) {
-
+	fsm *ThreadFSM,
+) ([]ThreadOutboxEvent, error) {
 	return fsm.ProcessEvent(ctx, UnstarEvent{
 		AgentID:   fsm.env.AgentID,
 		MessageID: fsm.env.MessageID,
@@ -208,8 +208,8 @@ func (m *ThreadFSMManager) Unstar(ctx context.Context,
 
 // Snooze creates a SnoozeEvent and returns the outbox events.
 func (m *ThreadFSMManager) Snooze(ctx context.Context, fsm *ThreadFSM,
-	until time.Time) ([]ThreadOutboxEvent, error) {
-
+	until time.Time,
+) ([]ThreadOutboxEvent, error) {
 	return fsm.ProcessEvent(ctx, SnoozeEvent{
 		AgentID:      fsm.env.AgentID,
 		MessageID:    fsm.env.MessageID,
@@ -219,8 +219,8 @@ func (m *ThreadFSMManager) Snooze(ctx context.Context, fsm *ThreadFSM,
 
 // Wake creates a WakeEvent and returns the outbox events.
 func (m *ThreadFSMManager) Wake(ctx context.Context,
-	fsm *ThreadFSM) ([]ThreadOutboxEvent, error) {
-
+	fsm *ThreadFSM,
+) ([]ThreadOutboxEvent, error) {
 	return fsm.ProcessEvent(ctx, WakeEvent{
 		AgentID:   fsm.env.AgentID,
 		MessageID: fsm.env.MessageID,
@@ -229,8 +229,8 @@ func (m *ThreadFSMManager) Wake(ctx context.Context,
 
 // Archive creates an ArchiveEvent and returns the outbox events.
 func (m *ThreadFSMManager) Archive(ctx context.Context,
-	fsm *ThreadFSM) ([]ThreadOutboxEvent, error) {
-
+	fsm *ThreadFSM,
+) ([]ThreadOutboxEvent, error) {
 	return fsm.ProcessEvent(ctx, ArchiveEvent{
 		AgentID:   fsm.env.AgentID,
 		MessageID: fsm.env.MessageID,
@@ -239,8 +239,8 @@ func (m *ThreadFSMManager) Archive(ctx context.Context,
 
 // Unarchive creates an UnarchiveEvent and returns the outbox events.
 func (m *ThreadFSMManager) Unarchive(ctx context.Context,
-	fsm *ThreadFSM) ([]ThreadOutboxEvent, error) {
-
+	fsm *ThreadFSM,
+) ([]ThreadOutboxEvent, error) {
 	return fsm.ProcessEvent(ctx, UnarchiveEvent{
 		AgentID:   fsm.env.AgentID,
 		MessageID: fsm.env.MessageID,
@@ -249,8 +249,8 @@ func (m *ThreadFSMManager) Unarchive(ctx context.Context,
 
 // Trash creates a TrashEvent and returns the outbox events.
 func (m *ThreadFSMManager) Trash(ctx context.Context,
-	fsm *ThreadFSM) ([]ThreadOutboxEvent, error) {
-
+	fsm *ThreadFSM,
+) ([]ThreadOutboxEvent, error) {
 	return fsm.ProcessEvent(ctx, TrashEvent{
 		AgentID:   fsm.env.AgentID,
 		MessageID: fsm.env.MessageID,
@@ -259,8 +259,8 @@ func (m *ThreadFSMManager) Trash(ctx context.Context,
 
 // Restore creates a RestoreEvent and returns the outbox events.
 func (m *ThreadFSMManager) Restore(ctx context.Context,
-	fsm *ThreadFSM) ([]ThreadOutboxEvent, error) {
-
+	fsm *ThreadFSM,
+) ([]ThreadOutboxEvent, error) {
 	return fsm.ProcessEvent(ctx, RestoreEvent{
 		AgentID:   fsm.env.AgentID,
 		MessageID: fsm.env.MessageID,
@@ -269,8 +269,8 @@ func (m *ThreadFSMManager) Restore(ctx context.Context,
 
 // Ack creates an AckEvent and returns the outbox events.
 func (m *ThreadFSMManager) Ack(ctx context.Context,
-	fsm *ThreadFSM) ([]ThreadOutboxEvent, error) {
-
+	fsm *ThreadFSM,
+) ([]ThreadOutboxEvent, error) {
 	return fsm.ProcessEvent(ctx, AckEvent{
 		AgentID:   fsm.env.AgentID,
 		MessageID: fsm.env.MessageID,

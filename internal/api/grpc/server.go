@@ -8,7 +8,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/lightninglabs/darepo-client/baselib/actor"
+	"github.com/roasbeef/subtrate/internal/baselib/actor"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/keepalive"

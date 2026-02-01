@@ -97,8 +97,8 @@ type TransactionExecutor[Query any] struct {
 // Querier understands.
 func NewTransactionExecutor[Querier any](db BatchedQuerier,
 	createQuery QueryCreator[Querier], log *slog.Logger,
-	opts ...TxExecutorOption) *TransactionExecutor[Querier] {
-
+	opts ...TxExecutorOption,
+) *TransactionExecutor[Querier] {
 	txOpts := defaultTxExecutorOptions()
 	for _, optFunc := range opts {
 		optFunc(txOpts)
@@ -119,8 +119,8 @@ func NewTransactionExecutor[Querier any](db BatchedQuerier,
 // type of query and options run, in order to have access to batched operations
 // related to a storage object.
 func (t *TransactionExecutor[Q]) ExecTx(ctx context.Context,
-	txOptions TxOptions, txBody func(Q) error) error {
-
+	txOptions TxOptions, txBody func(Q) error,
+) error {
 	waitBeforeRetry := func(attemptNumber int) {
 		retryDelay := t.opts.randRetryDelay(attemptNumber)
 

@@ -85,15 +85,15 @@ func NewHeartbeatManager(registry *Registry, cfg *HeartbeatConfig) *HeartbeatMan
 // RecordHeartbeat records a heartbeat from an agent, updating its last active
 // timestamp.
 func (h *HeartbeatManager) RecordHeartbeat(ctx context.Context,
-	agentID int64) error {
-
+	agentID int64,
+) error {
 	return h.registry.UpdateLastActive(ctx, agentID)
 }
 
 // RecordHeartbeatByName records a heartbeat from an agent by name.
 func (h *HeartbeatManager) RecordHeartbeatByName(ctx context.Context,
-	agentName string) error {
-
+	agentName string,
+) error {
 	agent, err := h.registry.GetAgentByName(ctx, agentName)
 	if err != nil {
 		return err
@@ -169,8 +169,8 @@ type AgentWithStatus struct {
 
 // GetAgentWithStatus retrieves an agent with its computed status.
 func (h *HeartbeatManager) GetAgentWithStatus(ctx context.Context,
-	agentID int64) (*AgentWithStatus, error) {
-
+	agentID int64,
+) (*AgentWithStatus, error) {
 	agent, err := h.registry.GetAgent(ctx, agentID)
 	if err != nil {
 		return nil, err
@@ -186,8 +186,8 @@ func (h *HeartbeatManager) GetAgentWithStatus(ctx context.Context,
 
 // GetAgentWithStatusByName retrieves an agent by name with its computed status.
 func (h *HeartbeatManager) GetAgentWithStatusByName(ctx context.Context,
-	agentName string) (*AgentWithStatus, error) {
-
+	agentName string,
+) (*AgentWithStatus, error) {
 	agent, err := h.registry.GetAgentByName(ctx, agentName)
 	if err != nil {
 		return nil, err
@@ -203,8 +203,8 @@ func (h *HeartbeatManager) GetAgentWithStatusByName(ctx context.Context,
 
 // ListAgentsWithStatus returns all agents with their computed status.
 func (h *HeartbeatManager) ListAgentsWithStatus(
-	ctx context.Context) ([]AgentWithStatus, error) {
-
+	ctx context.Context,
+) ([]AgentWithStatus, error) {
 	agents, err := h.registry.ListAgents(ctx)
 	if err != nil {
 		return nil, err
@@ -235,8 +235,8 @@ type StatusCounts struct {
 
 // GetStatusCounts returns counts of agents by status.
 func (h *HeartbeatManager) GetStatusCounts(
-	ctx context.Context) (*StatusCounts, error) {
-
+	ctx context.Context,
+) (*StatusCounts, error) {
 	agents, err := h.registry.ListAgents(ctx)
 	if err != nil {
 		return nil, err

@@ -8,11 +8,9 @@ import (
 	"github.com/mattn/go-sqlite3"
 )
 
-var (
-	// ErrRetriesExceeded is returned when a transaction is retried more
-	// than the max allowed value without a success.
-	ErrRetriesExceeded = errors.New("db tx retries exceeded")
-)
+// ErrRetriesExceeded is returned when a transaction is retried more
+// than the max allowed value without a success.
+var ErrRetriesExceeded = errors.New("db tx retries exceeded")
 
 // MapSQLError attempts to interpret a given error as a database agnostic SQL
 // error.

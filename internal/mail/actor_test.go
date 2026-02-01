@@ -6,7 +6,7 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/lightninglabs/darepo-client/baselib/actor"
+	"github.com/roasbeef/subtrate/internal/baselib/actor"
 	"github.com/roasbeef/subtrate/internal/store"
 	"github.com/stretchr/testify/require"
 	"pgregory.net/rapid"

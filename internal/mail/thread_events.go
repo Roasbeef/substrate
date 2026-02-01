@@ -11,16 +11,16 @@ type ThreadEvent interface {
 }
 
 // Ensure all event types implement ThreadEvent.
-func (ReadEvent) isThreadEvent()       {}
-func (StarEvent) isThreadEvent()       {}
-func (UnstarEvent) isThreadEvent()     {}
-func (SnoozeEvent) isThreadEvent()     {}
-func (WakeEvent) isThreadEvent()       {}
-func (ArchiveEvent) isThreadEvent()    {}
-func (UnarchiveEvent) isThreadEvent()  {}
-func (TrashEvent) isThreadEvent()      {}
-func (RestoreEvent) isThreadEvent()    {}
-func (AckEvent) isThreadEvent()        {}
+func (ReadEvent) isThreadEvent()         {}
+func (StarEvent) isThreadEvent()         {}
+func (UnstarEvent) isThreadEvent()       {}
+func (SnoozeEvent) isThreadEvent()       {}
+func (WakeEvent) isThreadEvent()         {}
+func (ArchiveEvent) isThreadEvent()      {}
+func (UnarchiveEvent) isThreadEvent()    {}
+func (TrashEvent) isThreadEvent()        {}
+func (RestoreEvent) isThreadEvent()      {}
+func (AckEvent) isThreadEvent()          {}
 func (ResumeThreadEvent) isThreadEvent() {}
 
 // ReadEvent marks a message as read by the recipient.

@@ -37,7 +37,6 @@ func (a *ActorRefs) HasActivityActor() bool {
 func (s *Server) sendMail(
 	ctx context.Context, req mail.SendMailRequest,
 ) (mail.SendMailResponse, error) {
-
 	if !s.actorRefs.HasActors() {
 		return mail.SendMailResponse{}, nil
 	}
@@ -51,7 +50,6 @@ func (s *Server) sendMail(
 func (s *Server) fetchInbox(
 	ctx context.Context, req mail.FetchInboxRequest,
 ) (mail.FetchInboxResponse, error) {
-
 	if !s.actorRefs.HasActors() {
 		return mail.FetchInboxResponse{}, nil
 	}
@@ -65,7 +63,6 @@ func (s *Server) fetchInbox(
 func (s *Server) readMessage(
 	ctx context.Context, agentID, messageID int64,
 ) (mail.ReadMessageResponse, error) {
-
 	if !s.actorRefs.HasActors() {
 		return mail.ReadMessageResponse{}, nil
 	}
@@ -83,7 +80,6 @@ func (s *Server) updateMessageState(
 	ctx context.Context, agentID, messageID int64, newState string,
 	snoozedUntil *time.Time,
 ) (mail.UpdateStateResponse, error) {
-
 	if !s.actorRefs.HasActors() {
 		return mail.UpdateStateResponse{}, nil
 	}
@@ -102,7 +98,6 @@ func (s *Server) updateMessageState(
 func (s *Server) ackMessage(
 	ctx context.Context, agentID, messageID int64,
 ) (mail.AckMessageResponse, error) {
-
 	if !s.actorRefs.HasActors() {
 		return mail.AckMessageResponse{}, nil
 	}
@@ -119,7 +114,6 @@ func (s *Server) ackMessage(
 func (s *Server) getAgentStatus(
 	ctx context.Context, agentID int64,
 ) (mail.GetStatusResponse, error) {
-
 	if !s.actorRefs.HasActors() {
 		return mail.GetStatusResponse{}, nil
 	}
@@ -135,7 +129,6 @@ func (s *Server) getAgentStatus(
 func (s *Server) pollChanges(
 	ctx context.Context, agentID int64, sinceOffsets map[int64]int64,
 ) (mail.PollChangesResponse, error) {
-
 	if !s.actorRefs.HasActors() {
 		return mail.PollChangesResponse{}, nil
 	}
@@ -152,7 +145,6 @@ func (s *Server) pollChanges(
 func (s *Server) publishMessage(
 	ctx context.Context, req mail.PublishRequest,
 ) (mail.PublishResponse, error) {
-
 	if !s.actorRefs.HasActors() {
 		return mail.PublishResponse{}, nil
 	}
@@ -174,7 +166,6 @@ func (s *Server) recordActivity(ctx context.Context, req activity.RecordActivity
 func (s *Server) listRecentActivities(
 	ctx context.Context, limit int,
 ) ([]activity.Activity, error) {
-
 	if !s.actorRefs.HasActors() || s.actorRefs.ActivityRef == nil {
 		return nil, nil
 	}

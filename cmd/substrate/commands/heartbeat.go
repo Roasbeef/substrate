@@ -9,9 +9,7 @@ import (
 	"github.com/spf13/cobra"
 )
 
-var (
-	heartbeatSessionStart bool
-)
+var heartbeatSessionStart bool
 
 var heartbeatCmd = &cobra.Command{
 	Use:   "heartbeat",

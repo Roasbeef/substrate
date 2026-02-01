@@ -17,7 +17,6 @@ func (s *Server) hasMailActor() bool {
 func (s *Server) sendMailActor(
 	ctx context.Context, req mail.SendMailRequest,
 ) (mail.SendMailResponse, error) {
-
 	if s.mailRef == nil {
 		return mail.SendMailResponse{}, nil
 	}
@@ -31,7 +30,6 @@ func (s *Server) sendMailActor(
 func (s *Server) fetchInboxActor(
 	ctx context.Context, req mail.FetchInboxRequest,
 ) (mail.FetchInboxResponse, error) {
-
 	if s.mailRef == nil {
 		return mail.FetchInboxResponse{}, nil
 	}
@@ -45,7 +43,6 @@ func (s *Server) fetchInboxActor(
 func (s *Server) readMessageActor(
 	ctx context.Context, agentID, messageID int64,
 ) (mail.ReadMessageResponse, error) {
-
 	if s.mailRef == nil {
 		return mail.ReadMessageResponse{}, nil
 	}
@@ -63,7 +60,6 @@ func (s *Server) updateMessageStateActor(
 	ctx context.Context, agentID, messageID int64, newState string,
 	snoozedUntil *time.Time,
 ) (mail.UpdateStateResponse, error) {
-
 	if s.mailRef == nil {
 		return mail.UpdateStateResponse{}, nil
 	}
@@ -82,7 +78,6 @@ func (s *Server) updateMessageStateActor(
 func (s *Server) ackMessageActor(
 	ctx context.Context, agentID, messageID int64,
 ) (mail.AckMessageResponse, error) {
-
 	if s.mailRef == nil {
 		return mail.AckMessageResponse{}, nil
 	}
@@ -99,7 +94,6 @@ func (s *Server) ackMessageActor(
 func (s *Server) getAgentStatusActor(
 	ctx context.Context, agentID int64,
 ) (mail.GetStatusResponse, error) {
-
 	if s.mailRef == nil {
 		return mail.GetStatusResponse{}, nil
 	}
@@ -115,7 +109,6 @@ func (s *Server) getAgentStatusActor(
 func (s *Server) pollChangesActor(
 	ctx context.Context, agentID int64, sinceOffsets map[int64]int64,
 ) (mail.PollChangesResponse, error) {
-
 	if s.mailRef == nil {
 		return mail.PollChangesResponse{}, nil
 	}
@@ -132,7 +125,6 @@ func (s *Server) pollChangesActor(
 func (s *Server) publishMessageActor(
 	ctx context.Context, req mail.PublishRequest,
 ) (mail.PublishResponse, error) {
-
 	if s.mailRef == nil {
 		return mail.PublishResponse{}, nil
 	}

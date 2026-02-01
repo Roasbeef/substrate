@@ -55,8 +55,8 @@ func (s *Store) Queries() *sqlc.Queries {
 // automatic retry on serialization errors. This is the preferred method for
 // transactional operations.
 func (s *Store) ExecTx(ctx context.Context, txOptions TxOptions,
-	txBody func(*sqlc.Queries) error) error {
-
+	txBody func(*sqlc.Queries) error,
+) error {
 	return s.txExecutor.ExecTx(ctx, txOptions, txBody)
 }
 
@@ -100,8 +100,8 @@ type TxFuncResult[T any] func(ctx context.Context, q *sqlc.Queries) (T, error)
 // returns the result. If the function returns an error, the transaction is
 // rolled back. Otherwise, it is committed and the result is returned.
 func WithTxResult[T any](s *Store, ctx context.Context,
-	fn TxFuncResult[T]) (T, error) {
-
+	fn TxFuncResult[T],
+) (T, error) {
 	var result T
 
 	err := s.ExecTx(ctx, WriteTxOption(), func(q *sqlc.Queries) error {
@@ -116,8 +116,8 @@ func WithTxResult[T any](s *Store, ctx context.Context,
 // WithReadTxResult executes the given function within a read-only database
 // transaction and returns the result.
 func WithReadTxResult[T any](s *Store, ctx context.Context,
-	fn TxFuncResult[T]) (T, error) {
-
+	fn TxFuncResult[T],
+) (T, error) {
 	var result T
 
 	err := s.ExecTx(ctx, ReadTxOption(), func(q *sqlc.Queries) error {
@@ -132,8 +132,8 @@ func WithReadTxResult[T any](s *Store, ctx context.Context,
 // NextLogOffset returns the next available log offset for the given topic.
 // This must be called within a transaction to ensure atomicity.
 func NextLogOffset(ctx context.Context, q *sqlc.Queries, topicID int64) (int64,
-	error) {
-
+	error,
+) {
 	result, err := q.GetMaxLogOffset(ctx, topicID)
 	if err != nil {
 		return 0, fmt.Errorf("failed to get max log offset: %w", err)

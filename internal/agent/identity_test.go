@@ -30,7 +30,7 @@ func testIdentityManager(t *testing.T) (*IdentityManager, *db.Store, func()) {
 		filepath.Join(tmpDir, "by-project"),
 	}
 	for _, dir := range dirs {
-		err := os.MkdirAll(dir, 0700)
+		err := os.MkdirAll(dir, 0o700)
 		require.NoError(t, err)
 	}
 
@@ -187,7 +187,7 @@ func TestIdentityManager_RestoreIdentity_FromFile(t *testing.T) {
 	)
 	data, err := json.MarshalIndent(identityFile, "", "  ")
 	require.NoError(t, err)
-	err = os.WriteFile(filePath, data, 0600)
+	err = os.WriteFile(filePath, data, 0o600)
 	require.NoError(t, err)
 
 	// Restore should find the file.
@@ -259,7 +259,7 @@ func TestIdentityManager_RestoreIdentity_AgentNoLongerExists(t *testing.T) {
 	)
 	data, err := json.MarshalIndent(identityFile, "", "  ")
 	require.NoError(t, err)
-	err = os.WriteFile(filePath, data, 0600)
+	err = os.WriteFile(filePath, data, 0o600)
 	require.NoError(t, err)
 
 	// Delete the agent from database.

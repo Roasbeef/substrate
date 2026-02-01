@@ -1,6 +1,6 @@
 package mail
 
-import "github.com/lightninglabs/darepo-client/baselib/actor"
+import "github.com/roasbeef/subtrate/internal/baselib/actor"
 
 // NotificationRequest is the union type for all notification hub requests.
 type NotificationRequest interface {

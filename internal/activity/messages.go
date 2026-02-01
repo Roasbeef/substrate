@@ -5,7 +5,7 @@ package activity
 import (
 	"time"
 
-	"github.com/lightninglabs/darepo-client/baselib/actor"
+	"github.com/roasbeef/subtrate/internal/baselib/actor"
 )
 
 // ActivityServiceKey is the service key for the activity service actor.

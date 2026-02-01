@@ -35,7 +35,7 @@ type Server struct {
 	store        *db.Store
 	registry     *agent.Registry
 	heartbeatMgr *agent.HeartbeatManager
-	actorRefs    *ActorRefs // Optional actor references for Ask/Tell pattern.
+	actorRefs    *ActorRefs                    // Optional actor references for Ask/Tell pattern.
 	templates    map[string]*template.Template // Page-specific template sets.
 	partials     *template.Template            // Shared partials.
 	mux          *http.ServeMux

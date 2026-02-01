@@ -169,7 +169,6 @@ func (c *Client) Mode() ClientMode {
 func (c *Client) EnsureIdentity(
 	ctx context.Context, sessionID, projectDir, gitBranch string,
 ) (*agent.IdentityFile, error) {
-
 	if c.mode == ModeGRPC {
 		resp, err := c.agentClient.EnsureIdentity(ctx, &subtraterpc.EnsureIdentityRequest{
 			SessionId:  sessionID,
@@ -445,7 +444,6 @@ func (c *Client) GetStatus(ctx context.Context, agentID int64) (*mail.AgentStatu
 func (c *Client) HasUnackedStatusTo(
 	ctx context.Context, senderID, recipientID int64,
 ) (bool, error) {
-
 	if c.mode == ModeGRPC {
 		resp, err := c.mailClient.HasUnackedStatusTo(
 			ctx, &subtraterpc.HasUnackedStatusToRequest{
@@ -579,7 +577,6 @@ func (c *Client) Publish(ctx context.Context, senderID int64, topicName, subject
 func (c *Client) RegisterAgent(
 	ctx context.Context, name, projectKey, gitBranch string,
 ) (int64, string, error) {
-
 	if c.mode == ModeGRPC {
 		// Note: gRPC RegisterAgentRequest doesn't include git_branch yet.
 		// The branch will be set on first heartbeat/identity call.

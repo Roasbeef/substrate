@@ -3,7 +3,7 @@ package mail
 import (
 	"time"
 
-	"github.com/lightninglabs/darepo-client/baselib/actor"
+	"github.com/roasbeef/subtrate/internal/baselib/actor"
 )
 
 // Priority represents the priority level of a message.

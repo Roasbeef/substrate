@@ -38,8 +38,8 @@ type SendMailResult struct {
 }
 
 func (s *Server) handleSendMail(ctx context.Context,
-	req *mcp.CallToolRequest, args SendMailArgs) (*mcp.CallToolResult, SendMailResult, error) {
-
+	req *mcp.CallToolRequest, args SendMailArgs,
+) (*mcp.CallToolResult, SendMailResult, error) {
 	priority := mail.Priority(args.Priority)
 	if priority == "" {
 		priority = mail.PriorityNormal
@@ -106,8 +106,8 @@ type InboxMessageResult struct {
 }
 
 func (s *Server) handleFetchInbox(ctx context.Context,
-	req *mcp.CallToolRequest, args FetchInboxArgs) (*mcp.CallToolResult, FetchInboxResult, error) {
-
+	req *mcp.CallToolRequest, args FetchInboxArgs,
+) (*mcp.CallToolResult, FetchInboxResult, error) {
 	limit := args.Limit
 	if limit <= 0 {
 		limit = 50
@@ -175,8 +175,8 @@ type ReadMessageResult struct {
 }
 
 func (s *Server) handleReadMessage(ctx context.Context,
-	req *mcp.CallToolRequest, args ReadMessageArgs) (*mcp.CallToolResult, ReadMessageResult, error) {
-
+	req *mcp.CallToolRequest, args ReadMessageArgs,
+) (*mcp.CallToolResult, ReadMessageResult, error) {
 	// Use actor system if available, otherwise fall back to direct service call.
 	var resp mail.ReadMessageResponse
 	if s.hasMailActor() {
@@ -231,8 +231,8 @@ type AckMessageResult struct {
 }
 
 func (s *Server) handleAckMessage(ctx context.Context,
-	req *mcp.CallToolRequest, args AckMessageArgs) (*mcp.CallToolResult, AckMessageResult, error) {
-
+	req *mcp.CallToolRequest, args AckMessageArgs,
+) (*mcp.CallToolResult, AckMessageResult, error) {
 	// Use actor system if available, otherwise fall back to direct service call.
 	var resp mail.AckMessageResponse
 	if s.hasMailActor() {
@@ -273,14 +273,14 @@ type StateChangeResult struct {
 }
 
 func (s *Server) handleMarkRead(ctx context.Context,
-	req *mcp.CallToolRequest, args StateChangeArgs) (*mcp.CallToolResult, StateChangeResult, error) {
-
+	req *mcp.CallToolRequest, args StateChangeArgs,
+) (*mcp.CallToolResult, StateChangeResult, error) {
 	return s.updateState(ctx, args.AgentID, args.MessageID, "read", nil)
 }
 
 func (s *Server) handleStarMessage(ctx context.Context,
-	req *mcp.CallToolRequest, args StateChangeArgs) (*mcp.CallToolResult, StateChangeResult, error) {
-
+	req *mcp.CallToolRequest, args StateChangeArgs,
+) (*mcp.CallToolResult, StateChangeResult, error) {
 	return s.updateState(ctx, args.AgentID, args.MessageID, "starred", nil)
 }
 
@@ -292,8 +292,8 @@ type SnoozeArgs struct {
 }
 
 func (s *Server) handleSnoozeMessage(ctx context.Context,
-	req *mcp.CallToolRequest, args SnoozeArgs) (*mcp.CallToolResult, StateChangeResult, error) {
-
+	req *mcp.CallToolRequest, args SnoozeArgs,
+) (*mcp.CallToolResult, StateChangeResult, error) {
 	t, err := time.Parse(time.RFC3339, args.SnoozedUntil)
 	if err != nil {
 		return nil, StateChangeResult{}, fmt.Errorf("invalid snoozed_until format: %w", err)
@@ -303,20 +303,20 @@ func (s *Server) handleSnoozeMessage(ctx context.Context,
 }
 
 func (s *Server) handleArchiveMessage(ctx context.Context,
-	req *mcp.CallToolRequest, args StateChangeArgs) (*mcp.CallToolResult, StateChangeResult, error) {
-
+	req *mcp.CallToolRequest, args StateChangeArgs,
+) (*mcp.CallToolResult, StateChangeResult, error) {
 	return s.updateState(ctx, args.AgentID, args.MessageID, "archived", nil)
 }
 
 func (s *Server) handleTrashMessage(ctx context.Context,
-	req *mcp.CallToolRequest, args StateChangeArgs) (*mcp.CallToolResult, StateChangeResult, error) {
-
+	req *mcp.CallToolRequest, args StateChangeArgs,
+) (*mcp.CallToolResult, StateChangeResult, error) {
 	return s.updateState(ctx, args.AgentID, args.MessageID, "trash", nil)
 }
 
 func (s *Server) updateState(ctx context.Context, agentID, messageID int64,
-	newState string, snoozedUntil *time.Time) (*mcp.CallToolResult, StateChangeResult, error) {
-
+	newState string, snoozedUntil *time.Time,
+) (*mcp.CallToolResult, StateChangeResult, error) {
 	// Use actor system if available, otherwise fall back to direct service call.
 	var resp mail.UpdateStateResponse
 	if s.hasMailActor() {
@@ -360,8 +360,8 @@ type SubscribeResult struct {
 }
 
 func (s *Server) handleSubscribe(ctx context.Context,
-	req *mcp.CallToolRequest, args SubscribeArgs) (*mcp.CallToolResult, SubscribeResult, error) {
-
+	req *mcp.CallToolRequest, args SubscribeArgs,
+) (*mcp.CallToolResult, SubscribeResult, error) {
 	// Get the topic.
 	topic, err := s.storage.GetTopicByName(ctx, args.TopicName)
 	if err != nil {
@@ -387,8 +387,8 @@ type UnsubscribeArgs struct {
 }
 
 func (s *Server) handleUnsubscribe(ctx context.Context,
-	req *mcp.CallToolRequest, args UnsubscribeArgs) (*mcp.CallToolResult, SubscribeResult, error) {
-
+	req *mcp.CallToolRequest, args UnsubscribeArgs,
+) (*mcp.CallToolResult, SubscribeResult, error) {
 	// Get the topic.
 	topic, err := s.storage.GetTopicByName(ctx, args.TopicName)
 	if err != nil {
@@ -426,8 +426,8 @@ type ListTopicsResult struct {
 }
 
 func (s *Server) handleListTopics(ctx context.Context,
-	req *mcp.CallToolRequest, args ListTopicsArgs) (*mcp.CallToolResult, ListTopicsResult, error) {
-
+	req *mcp.CallToolRequest, args ListTopicsArgs,
+) (*mcp.CallToolResult, ListTopicsResult, error) {
 	var topicsResult []TopicInfo
 
 	if args.SubscribedOnly && args.AgentID > 0 {
@@ -477,8 +477,8 @@ type PublishResult struct {
 }
 
 func (s *Server) handlePublish(ctx context.Context,
-	req *mcp.CallToolRequest, args PublishArgs) (*mcp.CallToolResult, PublishResult, error) {
-
+	req *mcp.CallToolRequest, args PublishArgs,
+) (*mcp.CallToolResult, PublishResult, error) {
 	priority := mail.Priority(args.Priority)
 	if priority == "" {
 		priority = mail.PriorityNormal
@@ -532,8 +532,8 @@ type SearchResult struct {
 }
 
 func (s *Server) handleSearch(ctx context.Context,
-	req *mcp.CallToolRequest, args SearchArgs) (*mcp.CallToolResult, SearchResult, error) {
-
+	req *mcp.CallToolRequest, args SearchArgs,
+) (*mcp.CallToolResult, SearchResult, error) {
 	limit := args.Limit
 	if limit <= 0 {
 		limit = 20
@@ -576,8 +576,8 @@ type GetStatusResult struct {
 }
 
 func (s *Server) handleGetStatus(ctx context.Context,
-	req *mcp.CallToolRequest, args GetStatusArgs) (*mcp.CallToolResult, GetStatusResult, error) {
-
+	req *mcp.CallToolRequest, args GetStatusArgs,
+) (*mcp.CallToolResult, GetStatusResult, error) {
 	// Use actor system if available, otherwise fall back to direct service call.
 	var resp mail.GetStatusResponse
 	if s.hasMailActor() {
@@ -612,8 +612,8 @@ func (s *Server) handleGetStatus(ctx context.Context,
 
 // PollChangesArgs are the arguments for the poll_changes tool.
 type PollChangesArgs struct {
-	AgentID      int64             `json:"agent_id" jsonschema:"ID of the agent"`
-	SinceOffsets map[string]int64  `json:"since_offsets,omitempty" jsonschema:"Last seen offset per topic ID (keys are topic IDs as strings)"`
+	AgentID      int64            `json:"agent_id" jsonschema:"ID of the agent"`
+	SinceOffsets map[string]int64 `json:"since_offsets,omitempty" jsonschema:"Last seen offset per topic ID (keys are topic IDs as strings)"`
 }
 
 // PollChangesResult is the result of the poll_changes tool.
@@ -623,8 +623,8 @@ type PollChangesResult struct {
 }
 
 func (s *Server) handlePollChanges(ctx context.Context,
-	req *mcp.CallToolRequest, args PollChangesArgs) (*mcp.CallToolResult, PollChangesResult, error) {
-
+	req *mcp.CallToolRequest, args PollChangesArgs,
+) (*mcp.CallToolResult, PollChangesResult, error) {
 	// Convert string-keyed map to int64-keyed map for the mail service.
 	sinceOffsets := make(map[int64]int64)
 	for k, v := range args.SinceOffsets {
@@ -700,8 +700,8 @@ type RegisterAgentResult struct {
 }
 
 func (s *Server) handleRegisterAgent(ctx context.Context,
-	req *mcp.CallToolRequest, args RegisterAgentArgs) (*mcp.CallToolResult, RegisterAgentResult, error) {
-
+	req *mcp.CallToolRequest, args RegisterAgentArgs,
+) (*mcp.CallToolResult, RegisterAgentResult, error) {
 	agent, err := s.registry.RegisterAgent(
 		ctx, args.Name, args.ProjectKey, args.GitBranch,
 	)
@@ -728,8 +728,8 @@ type WhoAmIResult struct {
 }
 
 func (s *Server) handleWhoAmI(ctx context.Context,
-	req *mcp.CallToolRequest, args WhoAmIArgs) (*mcp.CallToolResult, WhoAmIResult, error) {
-
+	req *mcp.CallToolRequest, args WhoAmIArgs,
+) (*mcp.CallToolResult, WhoAmIResult, error) {
 	agent, err := s.storage.GetAgent(ctx, args.AgentID)
 	if err != nil {
 		return nil, WhoAmIResult{}, fmt.Errorf("agent not found: %w", err)

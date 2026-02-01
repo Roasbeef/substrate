@@ -9,9 +9,9 @@ import (
 	"testing"
 	"time"
 
+	claudeagent "github.com/roasbeef/claude-agent-sdk-go"
 	"github.com/roasbeef/subtrate/internal/agent"
 	"github.com/roasbeef/subtrate/internal/db"
-	claudeagent "github.com/roasbeef/claude-agent-sdk-go"
 )
 
 // testEnv holds the test environment configuration.
@@ -47,7 +47,7 @@ func setup(t *testing.T) *testEnv {
 	// Create isolated Claude config directory to avoid interacting with
 	// user's global hooks, sessions, and settings.
 	configDir := filepath.Join(tmpDir, "claude-config")
-	if err := os.MkdirAll(configDir, 0755); err != nil {
+	if err := os.MkdirAll(configDir, 0o755); err != nil {
 		os.RemoveAll(tmpDir)
 		t.Fatalf("failed to create config dir: %v", err)
 	}

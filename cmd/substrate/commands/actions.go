@@ -87,8 +87,8 @@ func runTrash(cmd *cobra.Command, args []string) error {
 }
 
 func runMessageAction(msgIDStr string, action string,
-	snoozedUntil *time.Time) error {
-
+	snoozedUntil *time.Time,
+) error {
 	ctx := context.Background()
 
 	msgID, err := strconv.ParseInt(msgIDStr, 10, 64)

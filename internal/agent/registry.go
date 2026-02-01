@@ -23,8 +23,8 @@ func NewRegistry(store *db.Store) *Registry {
 
 // RegisterAgent creates a new agent with the given name.
 func (r *Registry) RegisterAgent(ctx context.Context, name string,
-	projectKey string, gitBranch string) (*sqlc.Agent, error) {
-
+	projectKey string, gitBranch string,
+) (*sqlc.Agent, error) {
 	now := time.Now().Unix()
 
 	agent, err := r.store.Queries().CreateAgent(
@@ -65,8 +65,8 @@ func (r *Registry) RegisterAgent(ctx context.Context, name string,
 
 // GetAgent retrieves an agent by ID.
 func (r *Registry) GetAgent(ctx context.Context,
-	id int64) (*sqlc.Agent, error) {
-
+	id int64,
+) (*sqlc.Agent, error) {
 	agent, err := r.store.Queries().GetAgent(ctx, id)
 	if err != nil {
 		return nil, fmt.Errorf("agent not found: %w", err)
@@ -77,8 +77,8 @@ func (r *Registry) GetAgent(ctx context.Context,
 
 // GetAgentByName retrieves an agent by name.
 func (r *Registry) GetAgentByName(ctx context.Context,
-	name string) (*sqlc.Agent, error) {
-
+	name string,
+) (*sqlc.Agent, error) {
 	agent, err := r.store.Queries().GetAgentByName(ctx, name)
 	if err != nil {
 		return nil, fmt.Errorf("agent not found: %w", err)
@@ -94,8 +94,8 @@ func (r *Registry) ListAgents(ctx context.Context) ([]sqlc.Agent, error) {
 
 // ListAgentsByProject returns agents for a specific project.
 func (r *Registry) ListAgentsByProject(ctx context.Context,
-	projectKey string) ([]sqlc.Agent, error) {
-
+	projectKey string,
+) ([]sqlc.Agent, error) {
 	return r.store.Queries().ListAgentsByProject(ctx, sql.NullString{
 		String: projectKey,
 		Valid:  true,

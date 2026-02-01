@@ -46,8 +46,8 @@ func init() {
 
 // hookDecision represents the JSON output for Claude Code Stop hooks.
 type hookDecision struct {
-	Decision *string `json:"decision"`          // "block" or null
-	Reason   string  `json:"reason,omitempty"`  // Explanation shown to Claude
+	Decision *string `json:"decision"`         // "block" or null
+	Reason   string  `json:"reason,omitempty"` // Explanation shown to Claude
 }
 
 func runPoll(cmd *cobra.Command, args []string) error {

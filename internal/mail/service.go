@@ -6,8 +6,8 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/lightninglabs/darepo-client/baselib/actor"
 	"github.com/lightningnetwork/lnd/fn/v2"
+	"github.com/roasbeef/subtrate/internal/baselib/actor"
 	"github.com/roasbeef/subtrate/internal/store"
 )
 
@@ -60,8 +60,8 @@ func NewService(s store.Storage) *Service {
 // Receive implements actor.ActorBehavior by dispatching to type-specific
 // handlers.
 func (s *Service) Receive(ctx context.Context,
-	msg MailRequest) fn.Result[MailResponse] {
-
+	msg MailRequest,
+) fn.Result[MailResponse] {
 	switch m := msg.(type) {
 	case SendMailRequest:
 		resp := s.handleSendMail(ctx, m)
@@ -104,13 +104,13 @@ func (s *Service) Receive(ctx context.Context,
 
 // handleSendMail processes a SendMailRequest.
 func (s *Service) handleSendMail(ctx context.Context,
-	req SendMailRequest) SendMailResponse {
-
+	req SendMailRequest,
+) SendMailResponse {
 	var response SendMailResponse
 
 	err := s.store.WithTx(ctx, func(ctx context.Context,
-		txStore store.Storage) error {
-
+		txStore store.Storage,
+	) error {
 		// Generate thread ID if not provided.
 		threadID := req.ThreadID
 		if threadID == "" {
@@ -200,7 +200,6 @@ func (s *Service) handleSendMail(ctx context.Context,
 
 		return nil
 	})
-
 	if err != nil {
 		response.Error = err
 	}
@@ -210,8 +209,8 @@ func (s *Service) handleSendMail(ctx context.Context,
 
 // handleFetchInbox processes a FetchInboxRequest.
 func (s *Service) handleFetchInbox(ctx context.Context,
-	req FetchInboxRequest) FetchInboxResponse {
-
+	req FetchInboxRequest,
+) FetchInboxResponse {
 	var response FetchInboxResponse
 
 	limit := req.Limit
@@ -252,8 +251,8 @@ func (s *Service) handleFetchInbox(ctx context.Context,
 
 // handleReadMessage processes a ReadMessageRequest.
 func (s *Service) handleReadMessage(ctx context.Context,
-	req ReadMessageRequest) ReadMessageResponse {
-
+	req ReadMessageRequest,
+) ReadMessageResponse {
 	var response ReadMessageResponse
 
 	// Get the message.
@@ -308,8 +307,8 @@ func (s *Service) handleReadMessage(ctx context.Context,
 
 // handleUpdateState processes an UpdateStateRequest.
 func (s *Service) handleUpdateState(ctx context.Context,
-	req UpdateStateRequest) UpdateStateResponse {
-
+	req UpdateStateRequest,
+) UpdateStateResponse {
 	var response UpdateStateResponse
 
 	if req.NewState == "snoozed" {
@@ -344,8 +343,8 @@ func (s *Service) handleUpdateState(ctx context.Context,
 
 // handleAckMessage processes an AckMessageRequest.
 func (s *Service) handleAckMessage(ctx context.Context,
-	req AckMessageRequest) AckMessageResponse {
-
+	req AckMessageRequest,
+) AckMessageResponse {
 	var response AckMessageResponse
 
 	err := s.store.AckMessage(ctx, req.MessageID, req.AgentID)
@@ -360,8 +359,8 @@ func (s *Service) handleAckMessage(ctx context.Context,
 
 // handleGetStatus processes a GetStatusRequest.
 func (s *Service) handleGetStatus(ctx context.Context,
-	req GetStatusRequest) GetStatusResponse {
-
+	req GetStatusRequest,
+) GetStatusResponse {
 	var response GetStatusResponse
 
 	agent, err := s.store.GetAgent(ctx, req.AgentID)
@@ -396,8 +395,8 @@ func (s *Service) handleGetStatus(ctx context.Context,
 // inbox messages (unread) and subscribed topic messages since the given
 // offsets. Messages are deduplicated by ID.
 func (s *Service) handlePollChanges(ctx context.Context,
-	req PollChangesRequest) PollChangesResponse {
-
+	req PollChangesRequest,
+) PollChangesResponse {
 	var response PollChangesResponse
 	response.NewOffsets = make(map[int64]int64)
 
@@ -500,13 +499,13 @@ func storeMessageToMail(m store.Message) InboxMessage {
 
 // handlePublish processes a PublishRequest.
 func (s *Service) handlePublish(ctx context.Context,
-	req PublishRequest) PublishResponse {
-
+	req PublishRequest,
+) PublishResponse {
 	var response PublishResponse
 
 	err := s.store.WithTx(ctx, func(ctx context.Context,
-		txStore store.Storage) error {
-
+		txStore store.Storage,
+	) error {
 		// Get the topic.
 		topic, err := txStore.GetTopicByName(ctx, req.TopicName)
 		if err != nil {
@@ -560,7 +559,6 @@ func (s *Service) handlePublish(ctx context.Context,
 
 		return nil
 	})
-
 	if err != nil {
 		response.Error = err
 	}
@@ -647,8 +645,8 @@ func (s *Service) Subscribe(ctx context.Context, agentID int64, topicName string
 	var topicID int64
 
 	err := s.store.WithTx(ctx, func(ctx context.Context,
-		txStore store.Storage) error {
-
+		txStore store.Storage,
+	) error {
 		// Get or create the topic.
 		topic, err := txStore.GetOrCreateTopic(ctx, topicName, "broadcast")
 		if err != nil {
@@ -671,8 +669,8 @@ func (s *Service) Subscribe(ctx context.Context, agentID int64, topicName string
 // Unsubscribe removes an agent's subscription to a topic.
 func (s *Service) Unsubscribe(ctx context.Context, agentID int64, topicName string) error {
 	return s.store.WithTx(ctx, func(ctx context.Context,
-		txStore store.Storage) error {
-
+		txStore store.Storage,
+	) error {
 		topic, err := txStore.GetTopicByName(ctx, topicName)
 		if err != nil {
 			return fmt.Errorf("topic not found: %w", err)

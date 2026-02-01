@@ -556,7 +556,6 @@ func (s *Server) Search(ctx context.Context, req *SearchRequest) (*SearchRespons
 func (s *Server) HasUnackedStatusTo(
 	ctx context.Context, req *HasUnackedStatusToRequest,
 ) (*HasUnackedStatusToResponse, error) {
-
 	if req.SenderId == 0 {
 		return nil, status.Error(codes.InvalidArgument, "sender_id is required")
 	}
@@ -671,8 +670,10 @@ func timeToUnix(t *time.Time) int64 {
 }
 
 // Ensure we implement the interfaces.
-var _ MailServer = (*Server)(nil)
-var _ AgentServer = (*Server)(nil)
+var (
+	_ MailServer  = (*Server)(nil)
+	_ AgentServer = (*Server)(nil)
+)
 
 // =============================================================================
 // Agent RPCs

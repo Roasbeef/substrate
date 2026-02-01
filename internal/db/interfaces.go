@@ -8,11 +8,9 @@ import (
 	"github.com/roasbeef/subtrate/internal/db/sqlc"
 )
 
-var (
-	// DefaultStoreTimeout is the default timeout used for any interaction
-	// with the storage/database.
-	DefaultStoreTimeout = time.Second * 10
-)
+// DefaultStoreTimeout is the default timeout used for any interaction
+// with the storage/database.
+var DefaultStoreTimeout = time.Second * 10
 
 const (
 	// DefaultNumTxRetries is the default number of times we'll retry a

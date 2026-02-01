@@ -10,10 +10,10 @@ import (
 	"os/signal"
 	"syscall"
 
-	"github.com/lightninglabs/darepo-client/baselib/actor"
 	sdkmcp "github.com/modelcontextprotocol/go-sdk/mcp"
 	"github.com/roasbeef/subtrate/internal/agent"
 	subtraterpc "github.com/roasbeef/subtrate/internal/api/grpc"
+	"github.com/roasbeef/subtrate/internal/baselib/actor"
 	"github.com/roasbeef/subtrate/internal/db"
 	"github.com/roasbeef/subtrate/internal/mail"
 	"github.com/roasbeef/subtrate/internal/mcp"

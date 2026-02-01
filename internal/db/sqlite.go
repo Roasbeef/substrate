@@ -53,7 +53,7 @@ type SqliteStore struct {
 func NewSqliteStore(cfg *SqliteConfig, log *slog.Logger) (*SqliteStore, error) {
 	// Ensure the directory exists.
 	dir := filepath.Dir(cfg.DatabaseFileName)
-	if err := os.MkdirAll(dir, 0700); err != nil {
+	if err := os.MkdirAll(dir, 0o700); err != nil {
 		return nil, fmt.Errorf("failed to create database directory: %w", err)
 	}
 
@@ -100,8 +100,8 @@ func NewSqliteStore(cfg *SqliteConfig, log *slog.Logger) (*SqliteStore, error) {
 // initiating the migration, and then migrates the database to the latest
 // version.
 func (s *SqliteStore) backupAndMigrate(mig *migrate.Migrate,
-	currentDBVersion int, maxMigrationVersion uint) error {
-
+	currentDBVersion int, maxMigrationVersion uint,
+) error {
 	// Determine if a database migration is necessary given the current
 	// database version and the maximum migration version.
 	versionUpgradePending := currentDBVersion < int(maxMigrationVersion)
@@ -147,8 +147,8 @@ func (s *SqliteStore) backupAndMigrate(mig *migrate.Migrate,
 // ExecuteMigrations runs migrations for the sqlite database, depending on the
 // target given, either all migrations or up to a given version.
 func (s *SqliteStore) ExecuteMigrations(target MigrationTarget,
-	optFuncs ...MigrateOpt) error {
-
+	optFuncs ...MigrateOpt,
+) error {
 	opts := defaultMigrateOptions()
 	for _, optFunc := range optFuncs {
 		optFunc(opts)
@@ -183,7 +183,7 @@ func DefaultDBPath() (string, error) {
 func OpenSQLite(dbPath string) (*sql.DB, error) {
 	// Ensure the directory exists.
 	dir := filepath.Dir(dbPath)
-	if err := os.MkdirAll(dir, 0700); err != nil {
+	if err := os.MkdirAll(dir, 0o700); err != nil {
 		return nil, fmt.Errorf("failed to create database directory: %w", err)
 	}
 
