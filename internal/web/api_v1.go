@@ -477,56 +477,27 @@ func (s *Server) handleAPIV1Messages(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 
-		// Use actor system to send message.
-		if s.mailRef != nil {
-			resp, err := s.sendMail(ctx, mail.SendMailRequest{
-				SenderID:       s.getUserAgentID(ctx),
-				RecipientNames: recipientNames,
-				Subject:        req.Subject,
-				Body:           req.Body,
-				Priority:       mail.Priority(priority),
-			})
-			if err != nil {
-				writeError(w, http.StatusInternalServerError, "mail_error", "Failed to send message")
-				return
-			}
-
-			writeJSON(w, http.StatusCreated, APIV1Message{
-				ID:        resp.MessageID,
-				SenderID:  s.getUserAgentID(ctx),
-				Subject:   req.Subject,
-				Body:      req.Body,
-				Priority:  priority,
-				CreatedAt: time.Now().UTC().Format(time.RFC3339),
-				ThreadID:  resp.ThreadID,
-			})
-			return
-		}
-
-		// Fallback to direct store access.
-		msg, err := s.store.CreateMessage(ctx, store.CreateMessageParams{
-			SenderID: s.getUserAgentID(ctx),
-			Subject:  req.Subject,
-			Body:     req.Body,
-			Priority: priority,
+		// Send message via actor system.
+		resp, err := s.sendMail(ctx, mail.SendMailRequest{
+			SenderID:       s.getUserAgentID(ctx),
+			RecipientNames: recipientNames,
+			Subject:        req.Subject,
+			Body:           req.Body,
+			Priority:       mail.Priority(priority),
 		})
 		if err != nil {
-			writeError(w, http.StatusInternalServerError, "db_error", "Failed to create message")
+			writeError(w, http.StatusInternalServerError, "mail_error", "Failed to send message")
 			return
-		}
-
-		// Add recipients.
-		for _, recipientID := range req.To {
-			_ = s.store.CreateMessageRecipient(ctx, msg.ID, recipientID)
 		}
 
 		writeJSON(w, http.StatusCreated, APIV1Message{
-			ID:        msg.ID,
-			SenderID:  msg.SenderID,
-			Subject:   msg.Subject,
-			Body:      msg.Body,
-			Priority:  msg.Priority,
-			CreatedAt: msg.CreatedAt.UTC().Format(time.RFC3339),
+			ID:        resp.MessageID,
+			SenderID:  s.getUserAgentID(ctx),
+			Subject:   req.Subject,
+			Body:      req.Body,
+			Priority:  priority,
+			CreatedAt: time.Now().UTC().Format(time.RFC3339),
+			ThreadID:  resp.ThreadID,
 		})
 		return
 	}
@@ -634,61 +605,24 @@ func (s *Server) handleAPIV1MessageByID(w http.ResponseWriter, r *http.Request) 
 	}
 
 	if r.Method == http.MethodGet {
-		// Use actor system to read message (marks as read).
-		if s.mailRef != nil {
-			agentID := s.getUserAgentID(ctx)
-			resp, err := s.readMessage(ctx, agentID, msgID)
-			if err != nil || resp.Error != nil {
-				writeError(w, http.StatusNotFound, "not_found", "Message not found")
-				return
-			}
-
-			writeJSON(w, http.StatusOK, APIV1Message{
-				ID:         resp.Message.ID,
-				SenderID:   resp.Message.SenderID,
-				SenderName: resp.Message.SenderName,
-				Subject:    resp.Message.Subject,
-				Body:       resp.Message.Body,
-				Priority:   string(resp.Message.Priority),
-				CreatedAt:  resp.Message.CreatedAt.UTC().Format(time.RFC3339),
-				ThreadID:   resp.Message.ThreadID,
-			})
-			return
-		}
-
-		// Fallback to direct store access.
-		msg, err := s.store.GetMessage(ctx, msgID)
-		if err != nil {
+		// Read message via actor system (marks as read).
+		agentID := s.getUserAgentID(ctx)
+		resp, err := s.readMessage(ctx, agentID, msgID)
+		if err != nil || resp.Error != nil {
 			writeError(w, http.StatusNotFound, "not_found", "Message not found")
 			return
 		}
 
-		sender, _ := s.store.GetAgent(ctx, msg.SenderID)
-
-		apiMsg := APIV1Message{
-			ID:         msg.ID,
-			SenderID:   msg.SenderID,
-			SenderName: sender.Name,
-			Subject:    msg.Subject,
-			Body:       msg.Body,
-			Priority:   msg.Priority,
-			CreatedAt:  msg.CreatedAt.UTC().Format(time.RFC3339),
-			ThreadID:   msg.ThreadID,
-		}
-
-		// Fetch recipients.
-		recipients, _ := s.store.GetMessageRecipients(ctx, msg.ID)
-		for _, rec := range recipients {
-			apiRec := APIV1Recipient{
-				MessageID: rec.MessageID,
-				AgentID:   rec.AgentID,
-				AgentName: rec.AgentName,
-				State:     rec.State,
-			}
-			apiMsg.Recipients = append(apiMsg.Recipients, apiRec)
-		}
-
-		writeJSON(w, http.StatusOK, apiMsg)
+		writeJSON(w, http.StatusOK, APIV1Message{
+			ID:         resp.Message.ID,
+			SenderID:   resp.Message.SenderID,
+			SenderName: resp.Message.SenderName,
+			Subject:    resp.Message.Subject,
+			Body:       resp.Message.Body,
+			Priority:   string(resp.Message.Priority),
+			CreatedAt:  resp.Message.CreatedAt.UTC().Format(time.RFC3339),
+			ThreadID:   resp.Message.ThreadID,
+		})
 		return
 	}
 
@@ -708,34 +642,18 @@ func (s *Server) handleMessageAction(w http.ResponseWriter, r *http.Request, msg
 
 	switch action {
 	case "star":
-		if s.mailRef != nil {
-			_, err := s.updateMessageState(ctx, agentID, msgID, "starred", nil)
-			if err != nil {
-				writeError(w, http.StatusInternalServerError, "action_failed", "Failed to star message")
-				return
-			}
-		} else {
-			err := s.store.UpdateRecipientState(ctx, msgID, agentID, "starred")
-			if err != nil {
-				writeError(w, http.StatusInternalServerError, "action_failed", "Failed to star message")
-				return
-			}
+		_, err := s.updateMessageState(ctx, agentID, msgID, "starred", nil)
+		if err != nil {
+			writeError(w, http.StatusInternalServerError, "action_failed", "Failed to star message")
+			return
 		}
 		writeJSON(w, http.StatusOK, map[string]string{"status": "starred"})
 
 	case "archive":
-		if s.mailRef != nil {
-			_, err := s.updateMessageState(ctx, agentID, msgID, "archived", nil)
-			if err != nil {
-				writeError(w, http.StatusInternalServerError, "action_failed", "Failed to archive message")
-				return
-			}
-		} else {
-			err := s.store.UpdateRecipientState(ctx, msgID, agentID, "archived")
-			if err != nil {
-				writeError(w, http.StatusInternalServerError, "action_failed", "Failed to archive message")
-				return
-			}
+		_, err := s.updateMessageState(ctx, agentID, msgID, "archived", nil)
+		if err != nil {
+			writeError(w, http.StatusInternalServerError, "action_failed", "Failed to archive message")
+			return
 		}
 		writeJSON(w, http.StatusOK, map[string]string{"status": "archived"})
 
@@ -753,14 +671,10 @@ func (s *Server) handleMessageAction(w http.ResponseWriter, r *http.Request, msg
 			snoozedUntil = &t
 		}
 
-		if s.mailRef != nil {
-			_, err := s.updateMessageState(ctx, agentID, msgID, "snoozed", snoozedUntil)
-			if err != nil {
-				writeError(w, http.StatusInternalServerError, "action_failed", "Failed to snooze message")
-				return
-			}
-		} else {
-			_ = s.store.SnoozeMessage(ctx, msgID, agentID, *snoozedUntil)
+		_, err := s.updateMessageState(ctx, agentID, msgID, "snoozed", snoozedUntil)
+		if err != nil {
+			writeError(w, http.StatusInternalServerError, "action_failed", "Failed to snooze message")
+			return
 		}
 		writeJSON(w, http.StatusOK, map[string]any{
 			"status":        "snoozed",
@@ -768,39 +682,26 @@ func (s *Server) handleMessageAction(w http.ResponseWriter, r *http.Request, msg
 		})
 
 	case "ack":
-		if s.mailRef != nil {
-			_, err := s.ackMessage(ctx, agentID, msgID)
-			if err != nil {
-				writeError(w, http.StatusInternalServerError, "action_failed", "Failed to ack message")
-				return
-			}
-		} else {
-			_ = s.store.AckMessage(ctx, msgID, agentID)
+		_, err := s.ackMessage(ctx, agentID, msgID)
+		if err != nil {
+			writeError(w, http.StatusInternalServerError, "action_failed", "Failed to ack message")
+			return
 		}
 		writeJSON(w, http.StatusOK, map[string]string{"status": "acknowledged"})
 
 	case "read":
-		if s.mailRef != nil {
-			_, err := s.readMessage(ctx, agentID, msgID)
-			if err != nil {
-				writeError(w, http.StatusInternalServerError, "action_failed", "Failed to mark message as read")
-				return
-			}
-		} else {
-			_ = s.store.MarkMessageRead(ctx, msgID, agentID)
+		_, err := s.readMessage(ctx, agentID, msgID)
+		if err != nil {
+			writeError(w, http.StatusInternalServerError, "action_failed", "Failed to mark message as read")
+			return
 		}
 		writeJSON(w, http.StatusOK, map[string]string{"status": "read"})
 
 	case "unread":
-		// Mark as unread (reset state).
-		if s.mailRef != nil {
-			_, err := s.updateMessageState(ctx, agentID, msgID, "unread", nil)
-			if err != nil {
-				writeError(w, http.StatusInternalServerError, "action_failed", "Failed to mark message as unread")
-				return
-			}
-		} else {
-			_ = s.store.UpdateRecipientState(ctx, msgID, agentID, "unread")
+		_, err := s.updateMessageState(ctx, agentID, msgID, "unread", nil)
+		if err != nil {
+			writeError(w, http.StatusInternalServerError, "action_failed", "Failed to mark message as unread")
+			return
 		}
 		writeJSON(w, http.StatusOK, map[string]string{"status": "unread"})
 
@@ -1159,51 +1060,19 @@ func (s *Server) handleAPIV1Activities(w http.ResponseWriter, r *http.Request) {
 		pageSize = 20
 	}
 
-	// Use actor system for activities if available.
-	if s.activityRef != nil {
-		activityItems, err := s.listRecentActivities(ctx, pageSize)
-		if err == nil {
-			result := make([]APIV1Activity, 0, len(activityItems))
-			for _, a := range activityItems {
-				result = append(result, APIV1Activity{
-					ID:          a.ID,
-					AgentID:     a.AgentID,
-					AgentName:   a.AgentName,
-					Type:        a.ActivityType,
-					Description: a.Description,
-					CreatedAt:   a.CreatedAt.UTC().Format(time.RFC3339),
-				})
-			}
-			writeJSON(w, http.StatusOK, APIResponse{
-				Data: result,
-				Meta: &APIMeta{
-					Total:    len(result),
-					Page:     page,
-					PageSize: pageSize,
-				},
-			})
-			return
-		}
-		// Fall through to direct store access on error.
-	}
-
-	// Fallback to direct store access.
-	activities, err := s.store.ListRecentActivities(ctx, pageSize)
+	// List activities via actor system.
+	activityItems, err := s.listRecentActivities(ctx, pageSize)
 	if err != nil {
-		writeError(w, http.StatusInternalServerError, "db_error", "Failed to fetch activities")
+		writeError(w, http.StatusInternalServerError, "activity_error", "Failed to fetch activities")
 		return
 	}
 
-	result := make([]APIV1Activity, 0, len(activities))
-	for _, a := range activities {
-		agentName := ""
-		if ag, err := s.store.GetAgent(ctx, a.AgentID); err == nil {
-			agentName = ag.Name
-		}
+	result := make([]APIV1Activity, 0, len(activityItems))
+	for _, a := range activityItems {
 		result = append(result, APIV1Activity{
 			ID:          a.ID,
 			AgentID:     a.AgentID,
-			AgentName:   agentName,
+			AgentName:   a.AgentName,
 			Type:        a.ActivityType,
 			Description: a.Description,
 			CreatedAt:   a.CreatedAt.UTC().Format(time.RFC3339),

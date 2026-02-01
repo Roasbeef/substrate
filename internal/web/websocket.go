@@ -215,48 +215,19 @@ func (h *Hub) broadcastActivity() {
 
 	ctx := context.Background()
 
-	// Try actor-based fetching first if available.
-	if h.server.activityRef != nil {
-		activities, err := h.server.listRecentActivities(ctx, 10)
-		if err == nil {
-			activityList := make([]map[string]any, 0, len(activities))
-			for _, a := range activities {
-				activityList = append(activityList, map[string]any{
-					"id":          a.ID,
-					"agent_id":    a.AgentID,
-					"agent_name":  a.AgentName,
-					"type":        a.ActivityType,
-					"description": a.Description,
-					"created_at":  a.CreatedAt.UTC().Format(time.RFC3339),
-				})
-			}
-
-			h.BroadcastToAll(&WSMessage{
-				Type:    WSMsgTypeActivity,
-				Payload: activityList,
-			})
-			return
-		}
-	}
-
-	// Fallback to direct store access.
-	activities, err := h.server.store.ListRecentActivities(ctx, 10)
+	// Fetch activities via actor system.
+	activities, err := h.server.listRecentActivities(ctx, 10)
 	if err != nil {
+		log.Printf("WebSocket: Failed to fetch activities: %v", err)
 		return
 	}
 
 	activityList := make([]map[string]any, 0, len(activities))
 	for _, a := range activities {
-		// Get agent name.
-		agentName := ""
-		if ag, err := h.server.store.GetAgent(ctx, a.AgentID); err == nil {
-			agentName = ag.Name
-		}
-
 		activityList = append(activityList, map[string]any{
 			"id":          a.ID,
 			"agent_id":    a.AgentID,
-			"agent_name":  agentName,
+			"agent_name":  a.AgentName,
 			"type":        a.ActivityType,
 			"description": a.Description,
 			"created_at":  a.CreatedAt.UTC().Format(time.RFC3339),
@@ -284,35 +255,18 @@ func (h *Hub) broadcastUnreadCounts() {
 
 	ctx := context.Background()
 	for _, agentID := range agentIDs {
-		var count int64
-
-		// Try actor-based status fetch first if available.
-		if h.server.mailRef != nil {
-			resp, err := h.server.getAgentStatus(ctx, agentID)
-			if err == nil {
-				count = resp.Status.UnreadCount
-				h.BroadcastToAgent(agentID, &WSMessage{
-					Type: WSMsgTypeUnreadCount,
-					Payload: map[string]any{
-						"count":        count,
-						"urgent_count": resp.Status.UrgentCount,
-					},
-				})
-				continue
-			}
-		}
-
-		// Fallback to direct store access.
-		var err error
-		count, err = h.server.store.CountUnreadByAgent(ctx, agentID)
+		// Fetch agent status via actor system.
+		resp, err := h.server.getAgentStatus(ctx, agentID)
 		if err != nil {
+			log.Printf("WebSocket: Failed to get status for agent %d: %v", agentID, err)
 			continue
 		}
 
 		h.BroadcastToAgent(agentID, &WSMessage{
 			Type: WSMsgTypeUnreadCount,
 			Payload: map[string]any{
-				"count": count,
+				"count":        resp.Status.UnreadCount,
+				"urgent_count": resp.Status.UrgentCount,
 			},
 		})
 	}

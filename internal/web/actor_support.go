@@ -22,10 +22,6 @@ func (s *Server) sendMail(
 func (s *Server) fetchInbox(
 	ctx context.Context, req mail.FetchInboxRequest,
 ) (mail.FetchInboxResponse, error) {
-	if s.mailRef == nil {
-		return mail.FetchInboxResponse{}, nil
-	}
-
 	return actorutil.AskAwaitTyped[
 		mail.MailRequest, mail.MailResponse, mail.FetchInboxResponse,
 	](ctx, s.mailRef, req)
@@ -85,10 +81,6 @@ func (s *Server) getAgentStatus(
 func (s *Server) pollChanges(
 	ctx context.Context, agentID int64, sinceOffsets map[int64]int64,
 ) (mail.PollChangesResponse, error) {
-	if s.mailRef == nil {
-		return mail.PollChangesResponse{}, nil
-	}
-
 	return actorutil.AskAwaitTyped[
 		mail.MailRequest, mail.MailResponse, mail.PollChangesResponse,
 	](ctx, s.mailRef, mail.PollChangesRequest{
@@ -101,31 +93,20 @@ func (s *Server) pollChanges(
 func (s *Server) publishMessage(
 	ctx context.Context, req mail.PublishRequest,
 ) (mail.PublishResponse, error) {
-	if s.mailRef == nil {
-		return mail.PublishResponse{}, nil
-	}
-
 	return actorutil.AskAwaitTyped[
 		mail.MailRequest, mail.MailResponse, mail.PublishResponse,
 	](ctx, s.mailRef, req)
 }
 
-// recordActivity records an activity event via the actor system.
+// recordActivity records an activity event via the actor system (fire and forget).
 func (s *Server) recordActivity(ctx context.Context, req activity.RecordActivityRequest) {
-	if s.activityRef != nil {
-		// Fire and forget.
-		s.activityRef.Tell(ctx, req)
-	}
+	s.activityRef.Tell(ctx, req)
 }
 
 // listRecentActivities lists recent activities via the actor system.
 func (s *Server) listRecentActivities(
 	ctx context.Context, limit int,
 ) ([]activity.Activity, error) {
-	if s.activityRef == nil {
-		return nil, nil
-	}
-
 	resp, err := actorutil.AskAwaitTyped[
 		activity.ActivityRequest, activity.ActivityResponse,
 		activity.ListRecentResponse,
