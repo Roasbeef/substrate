@@ -2,7 +2,6 @@
 package web
 
 import (
-	"database/sql"
 	"encoding/json"
 	"log"
 	"net/http"
@@ -11,8 +10,8 @@ import (
 	"time"
 
 	"github.com/roasbeef/subtrate/internal/agent"
-	"github.com/roasbeef/subtrate/internal/db/sqlc"
 	"github.com/roasbeef/subtrate/internal/mail"
+	"github.com/roasbeef/subtrate/internal/store"
 )
 
 // APIResponse wraps API responses with data and optional metadata.
@@ -212,7 +211,7 @@ func (s *Server) handleAPIV1Agents(w http.ResponseWriter, r *http.Request) {
 	switch r.Method {
 	case http.MethodGet:
 		// List all agents.
-		agents, err := s.store.Queries().ListAgents(ctx)
+		agents, err := s.store.ListAgents(ctx)
 		if err != nil {
 			writeError(w, http.StatusInternalServerError, "db_error", "Failed to fetch agents")
 			return
@@ -223,7 +222,7 @@ func (s *Server) handleAPIV1Agents(w http.ResponseWriter, r *http.Request) {
 			result = append(result, APIV1Agent{
 				ID:        a.ID,
 				Name:      a.Name,
-				CreatedAt: time.Unix(a.CreatedAt, 0).UTC().Format(time.RFC3339),
+				CreatedAt: a.CreatedAt.UTC().Format(time.RFC3339),
 			})
 		}
 
@@ -252,9 +251,8 @@ func (s *Server) handleAPIV1Agents(w http.ResponseWriter, r *http.Request) {
 		}
 
 		// Create the agent.
-		agent, err := s.store.Queries().CreateAgent(ctx, sqlc.CreateAgentParams{
-			Name:      req.Name,
-			CreatedAt: time.Now().Unix(),
+		ag, err := s.store.CreateAgent(ctx, store.CreateAgentParams{
+			Name: req.Name,
 		})
 		if err != nil {
 			writeError(w, http.StatusInternalServerError, "db_error", "Failed to create agent")
@@ -262,9 +260,9 @@ func (s *Server) handleAPIV1Agents(w http.ResponseWriter, r *http.Request) {
 		}
 
 		writeJSON(w, http.StatusCreated, APIV1Agent{
-			ID:        agent.ID,
-			Name:      agent.Name,
-			CreatedAt: time.Unix(agent.CreatedAt, 0).UTC().Format(time.RFC3339),
+			ID:        ag.ID,
+			Name:      ag.Name,
+			CreatedAt: ag.CreatedAt.UTC().Format(time.RFC3339),
 		})
 
 	default:
@@ -298,16 +296,16 @@ func (s *Server) handleAPIV1AgentByID(w http.ResponseWriter, r *http.Request) {
 	switch r.Method {
 	case http.MethodGet:
 		// Get agent details.
-		agent, err := s.store.Queries().GetAgent(ctx, agentID)
+		ag, err := s.store.GetAgent(ctx, agentID)
 		if err != nil {
 			writeError(w, http.StatusNotFound, "not_found", "Agent not found")
 			return
 		}
 
 		writeJSON(w, http.StatusOK, APIV1Agent{
-			ID:        agent.ID,
-			Name:      agent.Name,
-			CreatedAt: time.Unix(agent.CreatedAt, 0).UTC().Format(time.RFC3339),
+			ID:        ag.ID,
+			Name:      ag.Name,
+			CreatedAt: ag.CreatedAt.UTC().Format(time.RFC3339),
 		})
 
 	case http.MethodPatch:
@@ -321,7 +319,7 @@ func (s *Server) handleAPIV1AgentByID(w http.ResponseWriter, r *http.Request) {
 		}
 
 		// Verify agent exists.
-		_, err := s.store.Queries().GetAgent(ctx, agentID)
+		_, err := s.store.GetAgent(ctx, agentID)
 		if err != nil {
 			writeError(w, http.StatusNotFound, "not_found", "Agent not found")
 			return
@@ -329,10 +327,7 @@ func (s *Server) handleAPIV1AgentByID(w http.ResponseWriter, r *http.Request) {
 
 		// Update the agent name.
 		if req.Name != "" {
-			err = s.store.Queries().UpdateAgentName(ctx, sqlc.UpdateAgentNameParams{
-				ID:   agentID,
-				Name: req.Name,
-			})
+			err = s.store.UpdateAgentName(ctx, agentID, req.Name)
 			if err != nil {
 				writeError(w, http.StatusInternalServerError, "db_error", "Failed to update agent")
 				return
@@ -340,12 +335,12 @@ func (s *Server) handleAPIV1AgentByID(w http.ResponseWriter, r *http.Request) {
 		}
 
 		// Fetch updated agent.
-		agent, _ := s.store.Queries().GetAgent(ctx, agentID)
+		ag, _ := s.store.GetAgent(ctx, agentID)
 
 		writeJSON(w, http.StatusOK, APIV1Agent{
-			ID:        agent.ID,
-			Name:      agent.Name,
-			CreatedAt: time.Unix(agent.CreatedAt, 0).UTC().Format(time.RFC3339),
+			ID:        ag.ID,
+			Name:      ag.Name,
+			CreatedAt: ag.CreatedAt.UTC().Format(time.RFC3339),
 		})
 
 	default:
@@ -377,32 +372,18 @@ func (s *Server) handleAPIV1AgentHeartbeat(w http.ResponseWriter, r *http.Reques
 	ctx := r.Context()
 
 	// Find or create agent by name.
-	agents, err := s.store.Queries().ListAgents(ctx)
+	ag, err := s.store.GetAgentByName(ctx, req.AgentName)
 	if err != nil {
-		writeError(w, http.StatusInternalServerError, "db_error", "Failed to fetch agents")
-		return
-	}
-
-	var agentID int64
-	for _, a := range agents {
-		if a.Name == req.AgentName {
-			agentID = a.ID
-			break
-		}
-	}
-
-	// Create agent if not found.
-	if agentID == 0 {
-		agent, err := s.store.Queries().CreateAgent(ctx, sqlc.CreateAgentParams{
-			Name:      req.AgentName,
-			CreatedAt: time.Now().Unix(),
+		// Agent doesn't exist, create it.
+		ag, err = s.store.CreateAgent(ctx, store.CreateAgentParams{
+			Name: req.AgentName,
 		})
 		if err != nil {
 			writeError(w, http.StatusInternalServerError, "db_error", "Failed to create agent")
 			return
 		}
-		agentID = agent.ID
 	}
+	agentID := ag.ID
 
 	// Record heartbeat.
 	_ = s.heartbeatMgr.RecordHeartbeat(ctx, agentID)
@@ -490,9 +471,9 @@ func (s *Server) handleAPIV1Messages(w http.ResponseWriter, r *http.Request) {
 		// Convert recipient IDs to names for actor system.
 		recipientNames := make([]string, 0, len(req.To))
 		for _, recipientID := range req.To {
-			agent, err := s.store.Queries().GetAgent(ctx, recipientID)
+			ag, err := s.store.GetAgent(ctx, recipientID)
 			if err == nil {
-				recipientNames = append(recipientNames, agent.Name)
+				recipientNames = append(recipientNames, ag.Name)
 			}
 		}
 
@@ -523,12 +504,11 @@ func (s *Server) handleAPIV1Messages(w http.ResponseWriter, r *http.Request) {
 		}
 
 		// Fallback to direct store access.
-		msg, err := s.store.Queries().CreateMessage(ctx, sqlc.CreateMessageParams{
-			SenderID:  s.getUserAgentID(ctx),
-			Subject:   req.Subject,
-			BodyMd:    req.Body,
-			Priority:  priority,
-			CreatedAt: time.Now().Unix(),
+		msg, err := s.store.CreateMessage(ctx, store.CreateMessageParams{
+			SenderID: s.getUserAgentID(ctx),
+			Subject:  req.Subject,
+			Body:     req.Body,
+			Priority: priority,
 		})
 		if err != nil {
 			writeError(w, http.StatusInternalServerError, "db_error", "Failed to create message")
@@ -537,19 +517,16 @@ func (s *Server) handleAPIV1Messages(w http.ResponseWriter, r *http.Request) {
 
 		// Add recipients.
 		for _, recipientID := range req.To {
-			_ = s.store.Queries().CreateMessageRecipient(ctx, sqlc.CreateMessageRecipientParams{
-				MessageID: msg.ID,
-				AgentID:   recipientID,
-			})
+			_ = s.store.CreateMessageRecipient(ctx, msg.ID, recipientID)
 		}
 
 		writeJSON(w, http.StatusCreated, APIV1Message{
 			ID:        msg.ID,
 			SenderID:  msg.SenderID,
 			Subject:   msg.Subject,
-			Body:      msg.BodyMd,
+			Body:      msg.Body,
 			Priority:  msg.Priority,
-			CreatedAt: time.Unix(msg.CreatedAt, 0).UTC().Format(time.RFC3339),
+			CreatedAt: msg.CreatedAt.UTC().Format(time.RFC3339),
 		})
 		return
 	}
@@ -565,10 +542,7 @@ func (s *Server) handleAPIV1Messages(w http.ResponseWriter, r *http.Request) {
 	}
 
 	offset := (page - 1) * pageSize
-	messages, err := s.store.Queries().GetAllInboxMessagesPaginated(ctx, sqlc.GetAllInboxMessagesPaginatedParams{
-		Limit:  int64(pageSize),
-		Offset: int64(offset),
-	})
+	messages, err := s.store.GetAllInboxMessages(ctx, pageSize, offset)
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, "db_error", "Failed to fetch messages")
 		return
@@ -581,51 +555,37 @@ func (s *Server) handleAPIV1Messages(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Bulk fetch all recipients for all messages (single query instead of N+1).
-	allRecipients, _ := s.store.Queries().GetMessageRecipientsWithAgentsBulk(ctx, messageIDs)
-
-	// Index recipients by message ID for fast lookup.
-	recipientsByMsg := make(map[int64][]sqlc.GetMessageRecipientsWithAgentsBulkRow)
-	for _, rec := range allRecipients {
-		recipientsByMsg[rec.MessageID] = append(recipientsByMsg[rec.MessageID], rec)
-	}
+	recipientsByMsg, _ := s.store.GetMessageRecipientsBulk(ctx, messageIDs)
 
 	result := make([]APIV1Message, 0, len(messages))
 	for _, m := range messages {
-		senderName := ""
-		if m.SenderName.Valid {
-			senderName = m.SenderName.String
-		}
 		apiMsg := APIV1Message{
 			ID:         m.ID,
 			SenderID:   m.SenderID,
-			SenderName: senderName,
+			SenderName: m.SenderName,
 			Subject:    m.Subject,
-			Body:       m.BodyMd,
+			Body:       m.Body,
 			Priority:   m.Priority,
-			CreatedAt:  time.Unix(m.CreatedAt, 0).UTC().Format(time.RFC3339),
+			CreatedAt:  m.CreatedAt.UTC().Format(time.RFC3339),
 			ThreadID:   m.ThreadID,
 		}
 
 		// Use pre-fetched recipients from bulk query.
 		for _, rec := range recipientsByMsg[m.ID] {
-			agentName := ""
-			if rec.AgentName.Valid {
-				agentName = rec.AgentName.String
-			}
 			apiRec := APIV1Recipient{
 				MessageID: rec.MessageID,
 				AgentID:   rec.AgentID,
-				AgentName: agentName,
+				AgentName: rec.AgentName,
 				State:     rec.State,
 			}
-			if rec.SnoozedUntil.Valid {
-				apiRec.SnoozedUntil = time.Unix(rec.SnoozedUntil.Int64, 0).UTC().Format(time.RFC3339)
+			if rec.SnoozedUntil != nil {
+				apiRec.SnoozedUntil = rec.SnoozedUntil.UTC().Format(time.RFC3339)
 			}
-			if rec.ReadAt.Valid {
-				apiRec.ReadAt = time.Unix(rec.ReadAt.Int64, 0).UTC().Format(time.RFC3339)
+			if rec.ReadAt != nil {
+				apiRec.ReadAt = rec.ReadAt.UTC().Format(time.RFC3339)
 			}
-			if rec.AckedAt.Valid {
-				apiRec.AckedAt = time.Unix(rec.AckedAt.Int64, 0).UTC().Format(time.RFC3339)
+			if rec.AckedAt != nil {
+				apiRec.AckedAt = rec.AckedAt.UTC().Format(time.RFC3339)
 			}
 			apiMsg.Recipients = append(apiMsg.Recipients, apiRec)
 		}
@@ -697,33 +657,32 @@ func (s *Server) handleAPIV1MessageByID(w http.ResponseWriter, r *http.Request) 
 		}
 
 		// Fallback to direct store access.
-		msg, err := s.store.Queries().GetMessage(ctx, msgID)
+		msg, err := s.store.GetMessage(ctx, msgID)
 		if err != nil {
 			writeError(w, http.StatusNotFound, "not_found", "Message not found")
 			return
 		}
 
-		sender, _ := s.store.Queries().GetAgent(ctx, msg.SenderID)
+		sender, _ := s.store.GetAgent(ctx, msg.SenderID)
 
 		apiMsg := APIV1Message{
 			ID:         msg.ID,
 			SenderID:   msg.SenderID,
 			SenderName: sender.Name,
 			Subject:    msg.Subject,
-			Body:       msg.BodyMd,
+			Body:       msg.Body,
 			Priority:   msg.Priority,
-			CreatedAt:  time.Unix(msg.CreatedAt, 0).UTC().Format(time.RFC3339),
+			CreatedAt:  msg.CreatedAt.UTC().Format(time.RFC3339),
 			ThreadID:   msg.ThreadID,
 		}
 
 		// Fetch recipients.
-		recipients, _ := s.store.Queries().GetMessageRecipients(ctx, msg.ID)
+		recipients, _ := s.store.GetMessageRecipients(ctx, msg.ID)
 		for _, rec := range recipients {
-			recAgent, _ := s.store.Queries().GetAgent(ctx, rec.AgentID)
 			apiRec := APIV1Recipient{
 				MessageID: rec.MessageID,
 				AgentID:   rec.AgentID,
-				AgentName: recAgent.Name,
+				AgentName: rec.AgentName,
 				State:     rec.State,
 			}
 			apiMsg.Recipients = append(apiMsg.Recipients, apiRec)
@@ -756,14 +715,7 @@ func (s *Server) handleMessageAction(w http.ResponseWriter, r *http.Request, msg
 				return
 			}
 		} else {
-			now := time.Now().Unix()
-			_, err := s.store.Queries().UpdateRecipientState(ctx, sqlc.UpdateRecipientStateParams{
-				State:     "starred",
-				Column2:   "starred",
-				ReadAt:    sql.NullInt64{Int64: now, Valid: true},
-				MessageID: msgID,
-				AgentID:   agentID,
-			})
+			err := s.store.UpdateRecipientState(ctx, msgID, agentID, "starred")
 			if err != nil {
 				writeError(w, http.StatusInternalServerError, "action_failed", "Failed to star message")
 				return
@@ -779,14 +731,7 @@ func (s *Server) handleMessageAction(w http.ResponseWriter, r *http.Request, msg
 				return
 			}
 		} else {
-			now := time.Now().Unix()
-			_, err := s.store.Queries().UpdateRecipientState(ctx, sqlc.UpdateRecipientStateParams{
-				State:     "archived",
-				Column2:   "archived",
-				ReadAt:    sql.NullInt64{Int64: now, Valid: true},
-				MessageID: msgID,
-				AgentID:   agentID,
-			})
+			err := s.store.UpdateRecipientState(ctx, msgID, agentID, "archived")
 			if err != nil {
 				writeError(w, http.StatusInternalServerError, "action_failed", "Failed to archive message")
 				return
@@ -815,11 +760,7 @@ func (s *Server) handleMessageAction(w http.ResponseWriter, r *http.Request, msg
 				return
 			}
 		} else {
-			_ = s.store.Queries().UpdateRecipientSnoozed(ctx, sqlc.UpdateRecipientSnoozedParams{
-				SnoozedUntil: sql.NullInt64{Int64: snoozedUntil.Unix(), Valid: true},
-				MessageID:    msgID,
-				AgentID:      agentID,
-			})
+			_ = s.store.SnoozeMessage(ctx, msgID, agentID, *snoozedUntil)
 		}
 		writeJSON(w, http.StatusOK, map[string]any{
 			"status":        "snoozed",
@@ -834,11 +775,7 @@ func (s *Server) handleMessageAction(w http.ResponseWriter, r *http.Request, msg
 				return
 			}
 		} else {
-			_ = s.store.Queries().UpdateRecipientAcked(ctx, sqlc.UpdateRecipientAckedParams{
-				AckedAt:   sql.NullInt64{Int64: time.Now().Unix(), Valid: true},
-				MessageID: msgID,
-				AgentID:   agentID,
-			})
+			_ = s.store.AckMessage(ctx, msgID, agentID)
 		}
 		writeJSON(w, http.StatusOK, map[string]string{"status": "acknowledged"})
 
@@ -850,14 +787,7 @@ func (s *Server) handleMessageAction(w http.ResponseWriter, r *http.Request, msg
 				return
 			}
 		} else {
-			now := time.Now().Unix()
-			_, _ = s.store.Queries().UpdateRecipientState(ctx, sqlc.UpdateRecipientStateParams{
-				State:     "read",
-				Column2:   "read",
-				ReadAt:    sql.NullInt64{Int64: now, Valid: true},
-				MessageID: msgID,
-				AgentID:   agentID,
-			})
+			_ = s.store.MarkMessageRead(ctx, msgID, agentID)
 		}
 		writeJSON(w, http.StatusOK, map[string]string{"status": "read"})
 
@@ -870,13 +800,7 @@ func (s *Server) handleMessageAction(w http.ResponseWriter, r *http.Request, msg
 				return
 			}
 		} else {
-			_, _ = s.store.Queries().UpdateRecipientState(ctx, sqlc.UpdateRecipientStateParams{
-				State:     "unread",
-				Column2:   "unread",
-				ReadAt:    sql.NullInt64{Valid: false},
-				MessageID: msgID,
-				AgentID:   agentID,
-			})
+			_ = s.store.UpdateRecipientState(ctx, msgID, agentID, "unread")
 		}
 		writeJSON(w, http.StatusOK, map[string]string{"status": "unread"})
 
@@ -922,7 +846,7 @@ func (s *Server) handleAPIV1AutocompleteRecipients(w http.ResponseWriter, r *htt
 	query := r.URL.Query().Get("q")
 	ctx := r.Context()
 
-	agents, err := s.store.Queries().ListAgents(ctx)
+	agents, err := s.store.ListAgents(ctx)
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, "db_error", "Failed to fetch agents")
 		return
@@ -959,7 +883,7 @@ func (s *Server) handleAPIV1Topics(w http.ResponseWriter, r *http.Request) {
 	}
 
 	ctx := r.Context()
-	topics, err := s.store.Queries().ListTopics(ctx)
+	topics, err := s.store.ListTopics(ctx)
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, "db_error", "Failed to fetch topics")
 		return
@@ -971,7 +895,7 @@ func (s *Server) handleAPIV1Topics(w http.ResponseWriter, r *http.Request) {
 			ID:           t.ID,
 			Name:         t.Name,
 			MessageCount: 0,
-			CreatedAt:    time.Unix(t.CreatedAt, 0).UTC().Format(time.RFC3339),
+			CreatedAt:    t.CreatedAt.UTC().Format(time.RFC3339),
 		})
 	}
 
@@ -1009,7 +933,7 @@ func (s *Server) handleAPIV1TopicByID(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 
 	// Get topic.
-	topic, err := s.store.Queries().GetTopic(ctx, topicID)
+	topic, err := s.store.GetTopic(ctx, topicID)
 	if err != nil {
 		writeError(w, http.StatusNotFound, "not_found", "Topic not found")
 		return
@@ -1018,18 +942,18 @@ func (s *Server) handleAPIV1TopicByID(w http.ResponseWriter, r *http.Request) {
 	// Check for /messages subpath.
 	if len(parts) > 1 && parts[1] == "messages" {
 		// Return messages in topic using existing query.
-		messages, _ := s.store.Queries().GetMessagesByTopic(ctx, topicID)
+		messages, _ := s.store.GetMessagesByTopic(ctx, topicID)
 		result := make([]APIV1Message, 0, len(messages))
 		for _, m := range messages {
-			sender, _ := s.store.Queries().GetAgent(ctx, m.SenderID)
+			sender, _ := s.store.GetAgent(ctx, m.SenderID)
 			result = append(result, APIV1Message{
 				ID:         m.ID,
 				SenderID:   m.SenderID,
 				SenderName: sender.Name,
 				Subject:    m.Subject,
-				Body:       m.BodyMd,
+				Body:       m.Body,
 				Priority:   m.Priority,
-				CreatedAt:  time.Unix(m.CreatedAt, 0).UTC().Format(time.RFC3339),
+				CreatedAt:  m.CreatedAt.UTC().Format(time.RFC3339),
 			})
 		}
 		writeJSON(w, http.StatusOK, APIResponse{Data: result})
@@ -1040,7 +964,7 @@ func (s *Server) handleAPIV1TopicByID(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, APIV1Topic{
 		ID:        topic.ID,
 		Name:      topic.Name,
-		CreatedAt: time.Unix(topic.CreatedAt, 0).UTC().Format(time.RFC3339),
+		CreatedAt: topic.CreatedAt.UTC().Format(time.RFC3339),
 	})
 }
 
@@ -1264,7 +1188,7 @@ func (s *Server) handleAPIV1Activities(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Fallback to direct store access.
-	activities, err := s.store.Queries().ListRecentActivities(ctx, int64(pageSize))
+	activities, err := s.store.ListRecentActivities(ctx, pageSize)
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, "db_error", "Failed to fetch activities")
 		return
@@ -1272,14 +1196,17 @@ func (s *Server) handleAPIV1Activities(w http.ResponseWriter, r *http.Request) {
 
 	result := make([]APIV1Activity, 0, len(activities))
 	for _, a := range activities {
-		agent, _ := s.store.Queries().GetAgent(ctx, a.AgentID)
+		agentName := ""
+		if ag, err := s.store.GetAgent(ctx, a.AgentID); err == nil {
+			agentName = ag.Name
+		}
 		result = append(result, APIV1Activity{
 			ID:          a.ID,
 			AgentID:     a.AgentID,
-			AgentName:   agent.Name,
+			AgentName:   agentName,
 			Type:        a.ActivityType,
 			Description: a.Description,
-			CreatedAt:   time.Unix(a.CreatedAt, 0).UTC().Format(time.RFC3339),
+			CreatedAt:   a.CreatedAt.UTC().Format(time.RFC3339),
 		})
 	}
 
@@ -1308,15 +1235,8 @@ func (s *Server) handleAPIV1Search(w http.ResponseWriter, r *http.Request) {
 
 	ctx := r.Context()
 
-	// Search messages (simple contains search).
-	// Escape SQL LIKE wildcards to prevent injection.
-	escapedQuery := strings.ReplaceAll(query, "%", "\\%")
-	escapedQuery = strings.ReplaceAll(escapedQuery, "_", "\\_")
-	searchPattern := "%" + escapedQuery + "%"
-	messages, err := s.store.Queries().SearchMessages(ctx, sqlc.SearchMessagesParams{
-		Subject: searchPattern,
-		BodyMd:  searchPattern,
-	})
+	// Search messages using the store interface.
+	messages, err := s.store.SearchMessages(ctx, query, 100)
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, "db_error", "Failed to search")
 		return
@@ -1324,18 +1244,14 @@ func (s *Server) handleAPIV1Search(w http.ResponseWriter, r *http.Request) {
 
 	result := make([]APIV1Message, 0, len(messages))
 	for _, m := range messages {
-		senderName := ""
-		if m.SenderName.Valid {
-			senderName = m.SenderName.String
-		}
 		result = append(result, APIV1Message{
 			ID:         m.ID,
 			SenderID:   m.SenderID,
-			SenderName: senderName,
+			SenderName: m.SenderName,
 			Subject:    m.Subject,
-			Body:       m.BodyMd,
+			Body:       m.Body,
 			Priority:   m.Priority,
-			CreatedAt:  time.Unix(m.CreatedAt, 0).UTC().Format(time.RFC3339),
+			CreatedAt:  m.CreatedAt.UTC().Format(time.RFC3339),
 		})
 	}
 

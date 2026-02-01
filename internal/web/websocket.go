@@ -214,7 +214,7 @@ func (h *Hub) broadcastActivity() {
 	}
 
 	ctx := context.Background()
-	activities, err := h.server.store.Queries().ListRecentActivities(ctx, 10)
+	activities, err := h.server.store.ListRecentActivities(ctx, 10)
 	if err != nil {
 		return
 	}
@@ -223,8 +223,8 @@ func (h *Hub) broadcastActivity() {
 	for _, a := range activities {
 		// Get agent name.
 		agentName := ""
-		if agent, err := h.server.store.Queries().GetAgent(ctx, a.AgentID); err == nil {
-			agentName = agent.Name
+		if ag, err := h.server.store.GetAgent(ctx, a.AgentID); err == nil {
+			agentName = ag.Name
 		}
 
 		activityList = append(activityList, map[string]any{
@@ -233,7 +233,7 @@ func (h *Hub) broadcastActivity() {
 			"agent_name":  agentName,
 			"type":        a.ActivityType,
 			"description": a.Description,
-			"created_at":  time.Unix(a.CreatedAt, 0).UTC().Format(time.RFC3339),
+			"created_at":  a.CreatedAt.UTC().Format(time.RFC3339),
 		})
 	}
 
@@ -258,7 +258,7 @@ func (h *Hub) broadcastUnreadCounts() {
 
 	ctx := context.Background()
 	for _, agentID := range agentIDs {
-		count, err := h.server.store.Queries().CountUnreadByAgent(ctx, agentID)
+		count, err := h.server.store.CountUnreadByAgent(ctx, agentID)
 		if err != nil {
 			continue
 		}
