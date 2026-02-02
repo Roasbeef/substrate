@@ -98,17 +98,30 @@ export function useNotifications(): NotificationState {
   // Show a notification.
   const showNotification = useCallback(
     (title: string, options?: NotificationOptions) => {
-      if (!isSupported || permission !== 'granted' || !preferences.enabled) {
+      if (!isSupported) {
+        console.warn('Notifications not supported in this browser');
+        return;
+      }
+      if (permission !== 'granted') {
+        console.warn('Notification permission not granted:', permission);
+        return;
+      }
+      if (!preferences.enabled) {
+        console.warn('Notifications disabled in preferences');
         return;
       }
 
       try {
-        new Notification(title, {
-          icon: '/static/icons/notification-icon.png',
+        // Create notification without icon if it might be missing.
+        const notification = new Notification(title, {
           ...options,
         });
-      } catch {
-        // Ignore notification errors.
+        console.log('Notification created:', title);
+
+        // Auto-close after 5 seconds.
+        setTimeout(() => notification.close(), 5000);
+      } catch (error) {
+        console.error('Failed to create notification:', error);
       }
     },
     [isSupported, permission, preferences.enabled],
