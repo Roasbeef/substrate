@@ -16,11 +16,11 @@ import type { ThreadWithMessages } from '@/types/api.js';
 export const threadKeys = {
   all: ['threads'] as const,
   details: () => [...threadKeys.all, 'detail'] as const,
-  detail: (id: number) => [...threadKeys.details(), id] as const,
+  detail: (id: string) => [...threadKeys.details(), id] as const,
 };
 
 // Hook for fetching a single thread with all its messages.
-export function useThread(id: number, enabled = true) {
+export function useThread(id: string, enabled = true) {
   return useQuery({
     queryKey: threadKeys.detail(id),
     queryFn: async ({ signal }) => {
@@ -35,7 +35,7 @@ export function useReplyToThread() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: ({ id, body }: { id: number; body: string }) =>
+    mutationFn: ({ id, body }: { id: string; body: string }) =>
       replyToThread(id, body),
     onSuccess: (_data, { id }) => {
       // Invalidate the thread to refetch with the new message.
@@ -51,7 +51,7 @@ export function useArchiveThread() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: (id: number) => archiveThread(id),
+    mutationFn: (id: string) => archiveThread(id),
     onMutate: async (id) => {
       // Cancel outgoing refetches.
       await queryClient.cancelQueries({ queryKey: threadKeys.detail(id) });
@@ -84,7 +84,7 @@ export function useMarkThreadUnread() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: (id: number) => markThreadUnread(id),
+    mutationFn: (id: string) => markThreadUnread(id),
     onSuccess: () => {
       // Invalidate message lists to refresh unread counts.
       void queryClient.invalidateQueries({ queryKey: messageKeys.lists() });
@@ -97,7 +97,7 @@ export function useUnarchiveThread() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: (id: number) => unarchiveThread(id),
+    mutationFn: (id: string) => unarchiveThread(id),
     onSettled: () => {
       // Invalidate lists to ensure they reflect the change.
       void queryClient.invalidateQueries({ queryKey: messageKeys.lists() });
@@ -110,7 +110,7 @@ export function useDeleteThread() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: (id: number) => deleteThread(id),
+    mutationFn: (id: string) => deleteThread(id),
     onSuccess: (_data, id) => {
       // Remove the thread from the cache.
       queryClient.removeQueries({ queryKey: threadKeys.detail(id) });

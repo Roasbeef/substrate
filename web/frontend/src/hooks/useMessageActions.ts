@@ -406,7 +406,7 @@ export function useThreadActions() {
 
   // Handle reply with toast.
   const handleReply = useCallback(
-    async (threadId: number, body: string) => {
+    async (threadId: string, body: string) => {
       try {
         await replyMutation.mutateAsync({ id: threadId, body });
         addToast({
@@ -427,7 +427,7 @@ export function useThreadActions() {
 
   // Handle archive with undo toast.
   const handleArchive = useCallback(
-    async (threadId: number, onComplete?: () => void) => {
+    async (threadId: string, onComplete?: () => void) => {
       try {
         await archiveMutation.mutateAsync(threadId);
         addToast({
@@ -455,7 +455,7 @@ export function useThreadActions() {
 
   // Handle mark as unread with toast.
   const handleMarkUnread = useCallback(
-    async (threadId: number, onComplete?: () => void) => {
+    async (threadId: string, onComplete?: () => void) => {
       try {
         await markUnreadMutation.mutateAsync(threadId);
         addToast({
@@ -477,7 +477,7 @@ export function useThreadActions() {
 
   // Handle delete with toast.
   const handleDelete = useCallback(
-    async (threadId: number, onComplete?: () => void) => {
+    async (threadId: string, onComplete?: () => void) => {
       try {
         await deleteMutation.mutateAsync(threadId);
         addToast({

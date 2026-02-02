@@ -11,6 +11,7 @@ import {
   snoozeMessage,
   markMessageRead,
   acknowledgeMessage,
+  deleteMessage,
   type MessageListOptions,
 } from '@/api/messages.js';
 import type {
@@ -294,6 +295,53 @@ export function useAcknowledgeMessage() {
   });
 }
 
+// Hook for deleting a message.
+export function useDeleteMessage() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (id: number) => deleteMessage(id),
+    onMutate: async (id) => {
+      // Cancel outgoing refetches to prevent overwriting optimistic update.
+      await queryClient.cancelQueries({ queryKey: messageKeys.lists() });
+
+      // Snapshot the previous lists for rollback.
+      const previousLists = queryClient.getQueriesData<{
+        data: MessageWithRecipients[];
+      }>({ queryKey: messageKeys.lists() });
+
+      // Optimistically remove the message from all lists.
+      queryClient.setQueriesData<{ data: MessageWithRecipients[] }>(
+        { queryKey: messageKeys.lists() },
+        (old) => {
+          if (!old?.data) return old;
+          return {
+            ...old,
+            data: old.data.filter((m) => m.id !== id),
+          };
+        },
+      );
+
+      // Also remove the detail cache.
+      queryClient.removeQueries({ queryKey: messageKeys.detail(id) });
+
+      return { previousLists };
+    },
+    onError: (_err, _id, context) => {
+      // Rollback all lists on error.
+      if (context?.previousLists) {
+        for (const [queryKey, data] of context.previousLists) {
+          queryClient.setQueryData(queryKey, data);
+        }
+      }
+    },
+    onSettled: () => {
+      // Always refetch to ensure consistency.
+      void queryClient.invalidateQueries({ queryKey: messageKeys.lists() });
+    },
+  });
+}
+
 // Convenience hook that returns all message-related mutations.
 export function useMessageMutations() {
   const sendMessageMutation = useSendMessage();
@@ -303,6 +351,7 @@ export function useMessageMutations() {
   const snoozeMutation = useSnoozeMessage();
   const markReadMutation = useMarkMessageRead();
   const acknowledgeMutation = useAcknowledgeMessage();
+  const deleteMutation = useDeleteMessage();
 
   return {
     sendMessage: sendMessageMutation,
@@ -312,5 +361,6 @@ export function useMessageMutations() {
     snooze: snoozeMutation,
     markRead: markReadMutation,
     acknowledge: acknowledgeMutation,
+    delete: deleteMutation,
   };
 }
