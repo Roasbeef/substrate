@@ -1,6 +1,7 @@
 // InboxPage component - main inbox view with messages, filters, and actions.
 
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useLocation } from 'react-router-dom';
 import {
   InboxStats,
   CategoryTabs,
@@ -20,6 +21,7 @@ import {
   useMarkMessageRead,
   useDeleteMessage,
 } from '@/hooks/useMessages.js';
+import { useAuthStore } from '@/stores/auth.js';
 import {
   useThread,
   useReplyToThread,
@@ -37,7 +39,26 @@ interface InboxState {
   senderFilter: string | null;
 }
 
+// Route filter type for sidebar navigation.
+type RouteFilter = 'inbox' | 'starred' | 'snoozed' | 'sent' | 'archive';
+
+// Get route filter from pathname.
+function getRouteFilter(pathname: string): RouteFilter {
+  if (pathname.startsWith('/starred')) return 'starred';
+  if (pathname.startsWith('/snoozed')) return 'snoozed';
+  if (pathname.startsWith('/sent')) return 'sent';
+  if (pathname.startsWith('/archive')) return 'archive';
+  return 'inbox';
+}
+
 export default function InboxPage() {
+  // Get current location for route-based filtering.
+  const location = useLocation();
+  const routeFilter = getRouteFilter(location.pathname);
+
+  // Get current agent from auth store for filtering.
+  const currentAgent = useAuthStore((state) => state.currentAgent);
+
   // Page state.
   const [state, setState] = useState<InboxState>({
     category: 'primary',
@@ -45,18 +66,30 @@ export default function InboxPage() {
     senderFilter: null,
   });
 
+  // Reset filter when route changes.
+  useEffect(() => {
+    setState((prev) => ({ ...prev, filter: 'all' }));
+  }, [routeFilter]);
+
   // Thread view state.
-  const [selectedThreadId, setSelectedThreadId] = useState<number | null>(null);
+  const [selectedThreadId, setSelectedThreadId] = useState<string | null>(null);
 
-  // Build query options from state.
+  // Build query options from route and state.
   const queryOptions = useMemo(() => {
-    const options: Record<string, string | boolean | undefined> = {};
+    const options: Record<string, string | boolean | number | undefined> = {};
 
-    // Apply filter.
-    if (state.filter === 'unread') {
-      options.state = 'unread';
-    } else if (state.filter === 'starred') {
-      options.starred = true;
+    // Apply route-based category filter.
+    if (routeFilter !== 'inbox') {
+      options.category = routeFilter;
+    }
+
+    // Apply additional state filter (only if on inbox page).
+    if (routeFilter === 'inbox') {
+      if (state.filter === 'unread') {
+        options.filter = 'unread';
+      } else if (state.filter === 'starred') {
+        options.filter = 'starred';
+      }
     }
 
     // Apply category (would need backend support).
@@ -64,8 +97,13 @@ export default function InboxPage() {
       options.category = state.category;
     }
 
+    // Apply agent filter if an agent is selected.
+    if (currentAgent?.id !== undefined) {
+      options.agentId = currentAgent.id;
+    }
+
     return options;
-  }, [state.category, state.filter]);
+  }, [state.category, state.filter, routeFilter, currentAgent?.id]);
 
   // Fetch messages.
   const {
@@ -110,7 +148,7 @@ export default function InboxPage() {
     data: threadData,
     isLoading: threadLoading,
     error: threadError,
-  } = useThread(selectedThreadId ?? 0, selectedThreadId !== null);
+  } = useThread(selectedThreadId ?? '', selectedThreadId !== null);
   const replyToThread = useReplyToThread();
   const archiveThread = useArchiveThread();
   const deleteThread = useDeleteThread();
@@ -209,8 +247,8 @@ export default function InboxPage() {
     if (message.recipients[0]?.state === 'unread') {
       markRead.mutate(message.id);
     }
-    // Open thread view with the message's thread_id (or message id for single messages).
-    const threadId = message.thread_id ?? message.id;
+    // Open thread view with the message's thread_id (or message id as string fallback).
+    const threadId = message.thread_id ?? String(message.id);
     setSelectedThreadId(threadId);
   }, [markRead]);
 
