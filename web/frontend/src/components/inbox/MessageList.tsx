@@ -11,6 +11,57 @@ function cn(...inputs: (string | undefined | null | false)[]) {
   return twMerge(clsx(inputs));
 }
 
+// Get the date label for grouping (TODAY, YESTERDAY, or formatted date).
+function getDateLabel(dateString: string): string {
+  const date = new Date(dateString);
+  const today = new Date();
+  const yesterday = new Date(today);
+  yesterday.setDate(yesterday.getDate() - 1);
+
+  // Reset time parts for comparison.
+  const dateOnly = new Date(date.getFullYear(), date.getMonth(), date.getDate());
+  const todayOnly = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+  const yesterdayOnly = new Date(yesterday.getFullYear(), yesterday.getMonth(), yesterday.getDate());
+
+  if (dateOnly.getTime() === todayOnly.getTime()) {
+    return 'TODAY';
+  }
+  if (dateOnly.getTime() === yesterdayOnly.getTime()) {
+    return 'YESTERDAY';
+  }
+
+  // Format as "January 15" or "January 15, 2025" if different year.
+  const options: Intl.DateTimeFormatOptions = { month: 'long', day: 'numeric' };
+  if (date.getFullYear() !== today.getFullYear()) {
+    options.year = 'numeric';
+  }
+  return date.toLocaleDateString('en-US', options).toUpperCase();
+}
+
+// Group messages by date.
+function groupMessagesByDate(messages: MessageWithRecipients[]): Map<string, MessageWithRecipients[]> {
+  const groups = new Map<string, MessageWithRecipients[]>();
+
+  for (const message of messages) {
+    const label = getDateLabel(message.created_at);
+    const group = groups.get(label) ?? [];
+    group.push(message);
+    groups.set(label, group);
+  }
+
+  return groups;
+}
+
+// Date divider component.
+function DateDivider({ label }: { label: string }) {
+  return (
+    <div className="flex items-center gap-3 bg-gray-50 px-4 py-2 border-b border-gray-100">
+      <span className="text-xs font-semibold text-gray-500 tracking-wide">{label}</span>
+      <div className="flex-1 h-px bg-gray-200" />
+    </div>
+  );
+}
+
 // Empty state component.
 function EmptyState({
   title,
@@ -114,6 +165,8 @@ export interface MessageListProps {
   showCheckboxes?: boolean;
   /** Whether to use compact variant. */
   compact?: boolean;
+  /** Whether to show date group dividers (TODAY, YESTERDAY, etc.). */
+  showDateGroups?: boolean;
   /** Additional class name. */
   className?: string;
 }
@@ -134,6 +187,7 @@ export function MessageList({
   emptyDescription = 'Your inbox is empty.',
   showCheckboxes = true,
   compact = false,
+  showDateGroups = true,
   className,
 }: MessageListProps) {
   // Handle individual message selection.
@@ -183,25 +237,44 @@ export function MessageList({
     );
   }
 
-  // Render full message list.
+  // Helper to render a message row.
+  const renderMessageRow = (message: MessageWithRecipients) => (
+    <MessageRow
+      key={message.id}
+      message={message}
+      isSelected={selectedIds.has(message.id)}
+      {...(onSelectionChange && {
+        onSelect: (selected: boolean) => handleMessageSelect(message.id, selected),
+      })}
+      {...(onMessageClick && { onClick: () => onMessageClick(message) })}
+      {...(onStar && { onStar: (starred: boolean) => onStar(message.id, starred) })}
+      {...(onArchive && { onArchive: () => onArchive(message.id) })}
+      {...(onSnooze && { onSnooze: () => onSnooze(message.id) })}
+      {...(onDelete && { onDelete: () => onDelete(message.id) })}
+      showCheckbox={showCheckboxes}
+    />
+  );
+
+  // Render with date grouping.
+  if (showDateGroups) {
+    const groupedMessages = groupMessagesByDate(messages);
+
+    return (
+      <div className={cn('divide-y divide-gray-100', className)}>
+        {Array.from(groupedMessages.entries()).map(([dateLabel, groupMessages]) => (
+          <div key={dateLabel}>
+            <DateDivider label={dateLabel} />
+            {groupMessages.map(renderMessageRow)}
+          </div>
+        ))}
+      </div>
+    );
+  }
+
+  // Render without date grouping.
   return (
     <div className={cn('divide-y divide-gray-100', className)}>
-      {messages.map((message) => (
-        <MessageRow
-          key={message.id}
-          message={message}
-          isSelected={selectedIds.has(message.id)}
-          {...(onSelectionChange && {
-            onSelect: (selected: boolean) => handleMessageSelect(message.id, selected),
-          })}
-          {...(onMessageClick && { onClick: () => onMessageClick(message) })}
-          {...(onStar && { onStar: (starred: boolean) => onStar(message.id, starred) })}
-          {...(onArchive && { onArchive: () => onArchive(message.id) })}
-          {...(onSnooze && { onSnooze: () => onSnooze(message.id) })}
-          {...(onDelete && { onDelete: () => onDelete(message.id) })}
-          showCheckbox={showCheckboxes}
-        />
-      ))}
+      {messages.map(renderMessageRow)}
     </div>
   );
 }
