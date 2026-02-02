@@ -58,7 +58,7 @@ func main() {
 	storage := store.FromDB(dbStore.DB())
 
 	// Create core services.
-	mailSvc := mail.NewService(storage)
+	mailSvc := mail.NewServiceWithStore(storage)
 	agentReg := agent.NewRegistry(dbStore)
 	identityMgr, err := agent.NewIdentityManager(dbStore, agentReg)
 	if err != nil {

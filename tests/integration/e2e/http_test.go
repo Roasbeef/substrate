@@ -74,7 +74,7 @@ func newHTTPTestEnv(t *testing.T) *httpTestEnv {
 
 	// Create storage and services.
 	storage := store.FromDB(dbStore.DB())
-	mailSvc := mail.NewService(storage)
+	mailSvc := mail.NewServiceWithStore(storage)
 
 	// Create actor system and actors.
 	actorSystem := actor.NewActorSystem()

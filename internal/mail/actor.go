@@ -21,11 +21,18 @@ type ActorConfig struct {
 
 	// MailboxSize is the buffer capacity for the actor's mailbox.
 	MailboxSize int
+
+	// NotificationHub is the optional notification hub actor reference. When
+	// set, the service notifies recipients via the hub after sending messages.
+	NotificationHub NotificationActorRef
 }
 
 // NewMailActor creates a new mail actor with the given configuration.
 func NewMailActor(cfg ActorConfig) *actor.Actor[MailRequest, MailResponse] {
-	svc := NewService(cfg.Store)
+	svc := NewService(ServiceConfig{
+		Store:           cfg.Store,
+		NotificationHub: cfg.NotificationHub,
+	})
 
 	mailboxSize := cfg.MailboxSize
 	if mailboxSize <= 0 {

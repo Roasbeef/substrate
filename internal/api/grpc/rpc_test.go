@@ -62,7 +62,7 @@ func newTestHarness(t *testing.T) *testHarness {
 	storage := store.FromDB(sqliteStore.DB())
 
 	// Create services.
-	mailSvc := mail.NewService(storage)
+	mailSvc := mail.NewServiceWithStore(storage)
 	agentReg := agent.NewRegistry(sqliteStore.Store)
 	identityMgr, err := agent.NewIdentityManager(sqliteStore.Store, agentReg)
 	require.NoError(t, err)

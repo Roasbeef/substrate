@@ -53,7 +53,7 @@ func newTestEnv(t *testing.T) *testEnv {
 	require.NoError(t, err)
 
 	// Create services.
-	mailSvc := mail.NewService(store.FromDB(dbStore.DB()))
+	mailSvc := mail.NewServiceWithStore(store.FromDB(dbStore.DB()))
 
 	env := &testEnv{
 		t:       t,

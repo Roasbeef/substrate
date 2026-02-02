@@ -142,7 +142,7 @@ func getDirectClient() (*Client, error) {
 
 	return &Client{
 		store:       dbStore,
-		mailService: mail.NewService(store.FromDB(dbStore.DB())),
+		mailService: mail.NewServiceWithStore(store.FromDB(dbStore.DB())),
 		registry:    registry,
 		identityMgr: identityMgr,
 		mode:        ModeDirect,
