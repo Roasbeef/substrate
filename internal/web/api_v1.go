@@ -562,8 +562,28 @@ func (s *Server) handleAPIV1Messages(w http.ResponseWriter, r *http.Request) {
 
 	offset := (page - 1) * pageSize
 
-	// Fetch all messages (we'll filter them based on category/filter/agent).
-	messages, err := s.store.GetAllInboxMessages(ctx, 1000, 0) // Fetch more to allow filtering.
+	// Determine which agent's inbox to fetch.
+	var agentID int64
+	if agentIDStr != "" {
+		var parseErr error
+		agentID, parseErr = strconv.ParseInt(agentIDStr, 10, 64)
+		if parseErr != nil {
+			agentID = 0
+		}
+	}
+
+	// Fetch messages based on agent filter. When an agent_id is specified, we
+	// fetch that agent's inbox (messages received by them). When no agent_id,
+	// we fetch the global inbox view.
+	var messages []store.InboxMessage
+	var err error
+	if agentID > 0 {
+		// Fetch inbox for specific agent (messages where they are a recipient).
+		messages, err = s.store.GetInboxMessages(ctx, agentID, 1000)
+	} else {
+		// Fetch global inbox (all messages).
+		messages, err = s.store.GetAllInboxMessages(ctx, 1000, 0)
+	}
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, "db_error", "Failed to fetch messages")
 		return
@@ -626,23 +646,6 @@ func (s *Server) handleAPIV1Messages(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 		messages = filtered
-	}
-
-	// Apply agent filter if specified.
-	if agentIDStr != "" {
-		agentID, err := strconv.ParseInt(agentIDStr, 10, 64)
-		if err == nil {
-			filtered := make([]store.InboxMessage, 0)
-			for _, m := range messages {
-				// Include message if the agent is either sender or recipient.
-				// For inbox, we check if agent is a recipient (via message_recipients).
-				// For simplicity, check if sender matches or message is addressed to agent.
-				if m.SenderID == agentID {
-					filtered = append(filtered, m)
-				}
-			}
-			messages = filtered
-		}
 	}
 
 	// Apply pagination after filtering.
