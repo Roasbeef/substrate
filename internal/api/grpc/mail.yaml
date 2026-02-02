@@ -1,0 +1,91 @@
+type: google.api.Service
+config_version: 3
+
+# gRPC to REST mapping for Subtrate Mail service.
+# This file is used by grpc-gateway to generate REST proxy handlers.
+# Pattern based on lnd's lnrpc/lightning.yaml.
+
+http:
+  rules:
+    # Mail Service - Message Operations
+    - selector: subtraterpc.Mail.SendMail
+      post: "/api/v1/messages"
+      body: "*"
+
+    - selector: subtraterpc.Mail.FetchInbox
+      get: "/api/v1/messages"
+
+    - selector: subtraterpc.Mail.ReadMessage
+      get: "/api/v1/messages/{message_id}"
+
+    - selector: subtraterpc.Mail.UpdateState
+      patch: "/api/v1/messages/{message_id}"
+      body: "*"
+
+    - selector: subtraterpc.Mail.AckMessage
+      post: "/api/v1/messages/{message_id}/ack"
+      body: "*"
+
+    # Mail Service - Thread Operations
+    - selector: subtraterpc.Mail.ReadThread
+      get: "/api/v1/threads/{thread_id}"
+
+    # Mail Service - Status Operations
+    - selector: subtraterpc.Mail.GetStatus
+      get: "/api/v1/status/{agent_id}"
+
+    - selector: subtraterpc.Mail.PollChanges
+      post: "/api/v1/poll"
+      body: "*"
+
+    # Mail Service - Streaming (no REST mapping, WebSocket only)
+    # SubscribeInbox is intentionally not mapped - use WebSocket
+
+    # Mail Service - Pub/Sub Operations
+    - selector: subtraterpc.Mail.Publish
+      post: "/api/v1/publish"
+      body: "*"
+
+    - selector: subtraterpc.Mail.Subscribe
+      post: "/api/v1/subscribe"
+      body: "*"
+
+    - selector: subtraterpc.Mail.Unsubscribe
+      post: "/api/v1/unsubscribe"
+      body: "*"
+
+    - selector: subtraterpc.Mail.ListTopics
+      get: "/api/v1/topics"
+
+    # Mail Service - Search
+    - selector: subtraterpc.Mail.Search
+      get: "/api/v1/search"
+
+    # Mail Service - Status Dedup Check
+    - selector: subtraterpc.Mail.HasUnackedStatusTo
+      get: "/api/v1/status/pending/{sender_id}/{recipient_id}"
+
+    # Agent Service - Agent Management
+    - selector: subtraterpc.Agent.RegisterAgent
+      post: "/api/v1/agents"
+      body: "*"
+
+    - selector: subtraterpc.Agent.GetAgent
+      get: "/api/v1/agents/{agent_id}"
+      additional_bindings:
+        - get: "/api/v1/agents/by-name/{name}"
+
+    - selector: subtraterpc.Agent.ListAgents
+      get: "/api/v1/agents"
+
+    - selector: subtraterpc.Agent.DeleteAgent
+      delete: "/api/v1/agents/{id}"
+
+    # Agent Service - Identity Management
+    - selector: subtraterpc.Agent.EnsureIdentity
+      post: "/api/v1/identity"
+      body: "*"
+
+    - selector: subtraterpc.Agent.SaveIdentity
+      put: "/api/v1/identity"
+      body: "*"

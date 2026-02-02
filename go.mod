@@ -5,8 +5,10 @@ go 1.25
 require (
 	github.com/btcsuite/btclog/v2 v2.0.1-0.20250728225537-6090e87c6c5b
 	github.com/golang-migrate/migrate/v4 v4.19.1
+	github.com/golang/protobuf v1.5.4
 	github.com/google/uuid v1.6.0
 	github.com/gorilla/websocket v1.5.3
+	github.com/grpc-ecosystem/grpc-gateway v1.16.0
 	github.com/lightningnetwork/lnd/fn/v2 v2.0.9
 	github.com/mattn/go-sqlite3 v1.14.24
 	github.com/modelcontextprotocol/go-sdk v1.2.0
@@ -37,6 +39,8 @@ require (
 	golang.org/x/sys v0.38.0 // indirect
 	golang.org/x/text v0.31.0 // indirect
 	golang.org/x/tools v0.38.0 // indirect
+	google.golang.org/genproto v0.0.0-20250603155806-513f23925822 // indirect
+	google.golang.org/genproto/googleapis/api v0.0.0-20251029180050-ab9386a59fda // indirect
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20251029180050-ab9386a59fda // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 	lukechampine.com/uint128 v1.2.0 // indirect
