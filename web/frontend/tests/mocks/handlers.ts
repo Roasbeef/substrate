@@ -208,7 +208,7 @@ export const handlers = [
     return new HttpResponse(null, { status: 204 });
   }),
 
-  http.patch(`${API_BASE}/messages/:id`, () => {
+  http.post(`${API_BASE}/messages/:id/read`, () => {
     return new HttpResponse(null, { status: 204 });
   }),
 

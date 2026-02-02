@@ -384,9 +384,7 @@ describe('messages API', () => {
   describe('markMessageRead', () => {
     it('should mark a message as read', async () => {
       server.use(
-        http.patch('/api/v1/messages/1', async ({ request }) => {
-          const body = (await request.json()) as { state?: string };
-          expect(body.state).toBe('read');
+        http.post('/api/v1/messages/1/read', () => {
           return new HttpResponse(null, { status: 204 });
         }),
       );
@@ -396,7 +394,7 @@ describe('messages API', () => {
 
     it('should handle error', async () => {
       server.use(
-        http.patch('/api/v1/messages/999', () => {
+        http.post('/api/v1/messages/999/read', () => {
           return HttpResponse.json(
             { error: { code: 'not_found', message: 'Message not found' } },
             { status: 404 },
