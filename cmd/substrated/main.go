@@ -154,6 +154,11 @@ func main() {
 		webCfg.ActivityRef = activityRef
 		webCfg.NotificationHubRef = web.NewActorNotificationHubRef(notificationHub)
 
+		// Enable grpc-gateway REST proxy if gRPC server is running.
+		if *grpcAddr != "" {
+			webCfg.GRPCEndpoint = *grpcAddr
+		}
+
 		webServer, err := web.NewServer(webCfg, storage, agentReg)
 		if err != nil {
 			log.Fatalf("Failed to create web server: %v", err)

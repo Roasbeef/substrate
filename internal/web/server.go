@@ -6,13 +6,18 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"strings"
 	"time"
 
+	"github.com/grpc-ecosystem/grpc-gateway/runtime"
 	"github.com/roasbeef/subtrate/internal/activity"
 	"github.com/roasbeef/subtrate/internal/agent"
+	subtraterpc "github.com/roasbeef/subtrate/internal/api/grpc"
 	"github.com/roasbeef/subtrate/internal/mail"
 	"github.com/roasbeef/subtrate/internal/mailclient"
 	"github.com/roasbeef/subtrate/internal/store"
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials/insecure"
 )
 
 // UserAgentName is the name of the agent used for human-sent messages.
@@ -29,9 +34,11 @@ type Server struct {
 	hub          *Hub                       // WebSocket hub for real-time updates.
 	notifBridge  *HubNotificationBridge     // Bridge for actor notifications to WebSocket.
 	mux          *http.ServeMux
+	gatewayMux   *runtime.ServeMux // grpc-gateway REST proxy mux (optional).
 	srv          *http.Server
 	addr         string
-	userAgentID  int64 // Cached ID for the User agent.
+	grpcEndpoint string // gRPC endpoint for gateway proxy.
+	userAgentID  int64  // Cached ID for the User agent.
 }
 
 // Config holds configuration for the web server.
@@ -47,6 +54,11 @@ type Config struct {
 	// NotificationHubRef is the notification hub reference (optional).
 	// When provided, enables real-time actor-based notifications to WebSocket clients.
 	NotificationHubRef NotificationHubRef
+
+	// GRPCEndpoint is the gRPC server endpoint for the gateway proxy (optional).
+	// When provided, enables REST-to-gRPC proxy via grpc-gateway.
+	// Example: "localhost:10009"
+	GRPCEndpoint string
 }
 
 // DefaultConfig returns the default server configuration.
@@ -80,10 +92,18 @@ func NewServer(cfg *Config, st store.Storage,
 		notifHubRef:  cfg.NotificationHubRef,
 		mux:          http.NewServeMux(),
 		addr:         cfg.Addr,
+		grpcEndpoint: cfg.GRPCEndpoint,
 	}
 
 	// Register API v1 routes (JSON API for React frontend).
 	s.registerAPIV1Routes()
+
+	// Register grpc-gateway REST proxy if gRPC endpoint is configured.
+	if cfg.GRPCEndpoint != "" {
+		if err := s.registerGateway(context.Background()); err != nil {
+			return nil, fmt.Errorf("failed to register grpc-gateway: %w", err)
+		}
+	}
 
 	// Initialize and start WebSocket hub.
 	s.hub = NewHub(s)
@@ -171,4 +191,51 @@ func (s *Server) getUserAgentID(ctx context.Context) int64 {
 		}
 	}
 	return s.userAgentID
+}
+
+// registerGateway sets up the grpc-gateway REST proxy to forward requests to the
+// gRPC server. This allows REST clients to access gRPC services via HTTP/JSON.
+func (s *Server) registerGateway(ctx context.Context) error {
+	// Create gateway mux with custom JSON marshaling options.
+	s.gatewayMux = runtime.NewServeMux(
+		runtime.WithMarshalerOption(runtime.MIMEWildcard, &runtime.JSONPb{
+			EmitDefaults: true,
+			OrigName:     true,
+		}),
+	)
+
+	// gRPC dial options for connecting to the gRPC server.
+	opts := []grpc.DialOption{
+		grpc.WithTransportCredentials(insecure.NewCredentials()),
+	}
+
+	// Register Mail service handler.
+	err := subtraterpc.RegisterMailHandlerFromEndpoint(
+		ctx, s.gatewayMux, s.grpcEndpoint, opts,
+	)
+	if err != nil {
+		return fmt.Errorf("failed to register Mail handler: %w", err)
+	}
+
+	// Register Agent service handler.
+	err = subtraterpc.RegisterAgentHandlerFromEndpoint(
+		ctx, s.gatewayMux, s.grpcEndpoint, opts,
+	)
+	if err != nil {
+		return fmt.Errorf("failed to register Agent handler: %w", err)
+	}
+
+	// Mount the gateway at /api/v1/gw/ for testing alongside existing handlers.
+	// This allows comparison between manual handlers and gateway before switching.
+	s.mux.HandleFunc("/api/v1/gw/", func(w http.ResponseWriter, r *http.Request) {
+		// Strip the /api/v1/gw prefix to match gateway paths.
+		r.URL.Path = strings.TrimPrefix(r.URL.Path, "/api/v1/gw")
+		if r.URL.Path == "" {
+			r.URL.Path = "/"
+		}
+		s.gatewayMux.ServeHTTP(w, r)
+	})
+
+	log.Printf("grpc-gateway REST proxy registered at /api/v1/gw/ -> %s", s.grpcEndpoint)
+	return nil
 }
