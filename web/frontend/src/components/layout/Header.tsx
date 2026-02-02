@@ -5,6 +5,7 @@ import { Link } from 'react-router-dom';
 import { clsx } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 import { useUIStore } from '@/stores/ui.js';
+import { useAuthStore } from '@/stores/auth.js';
 import { useAgentsStatus } from '@/hooks/useAgents.js';
 import { useMessages } from '@/hooks/useMessages.js';
 import { ConnectedAgentSwitcher } from './AgentSwitcher.js';
@@ -106,6 +107,25 @@ function BellIcon({ className }: { className?: string }) {
   );
 }
 
+// Globe icon for global/all agents view.
+function GlobeIcon({ className }: { className?: string }) {
+  return (
+    <svg
+      className={cn('h-5 w-5', className)}
+      fill="none"
+      viewBox="0 0 24 24"
+      stroke="currentColor"
+    >
+      <path
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        strokeWidth={2}
+        d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9a9 9 0 01-9-9m9 9c1.657 0 3-4.03 3-9s-1.343-9-3-9m0 18c-1.657 0-3-4.03-3-9s1.343-9 3-9m-9 9a9 9 0 019-9"
+      />
+    </svg>
+  );
+}
+
 // Icon button component.
 interface IconButtonProps {
   onClick?: () => void;
@@ -190,6 +210,7 @@ function BlueHeaderSearchBar() {
 export function Header({ className, leftContent, rightContent }: HeaderProps) {
   const toggleSidebar = useUIStore((state) => state.toggleSidebar);
   const toggleSearch = useUIStore((state) => state.toggleSearch);
+  const { currentAgent, setCurrentAgent } = useAuthStore();
 
   // Fetch agents and messages for agent switcher.
   const { data: agentsData, isLoading: agentsLoading } = useAgentsStatus();
@@ -197,6 +218,9 @@ export function Header({ className, leftContent, rightContent }: HeaderProps) {
 
   // Calculate total unread count.
   const totalUnreadCount = messagesData?.data?.length ?? 0;
+
+  // Check if Global (all agents) is currently selected.
+  const isGlobalSelected = currentAgent === null;
 
   return (
     <header
@@ -247,6 +271,22 @@ export function Header({ className, leftContent, rightContent }: HeaderProps) {
             <SearchIcon className="text-white" />
           </button>
         </div>
+
+        {/* Global button - shows all messages from all agents. */}
+        <button
+          type="button"
+          onClick={() => setCurrentAgent(null)}
+          className={cn(
+            'rounded-md p-2 transition-colors focus:outline-none focus:ring-2 focus:ring-white/50',
+            isGlobalSelected
+              ? 'bg-white/20 text-white'
+              : 'text-white/70 hover:bg-blue-500/50 hover:text-white',
+          )}
+          aria-label="View all agents"
+          title="Global - View all agents"
+        >
+          <GlobeIcon />
+        </button>
 
         {/* Agent switcher with unread count. */}
         {agentsData?.agents ? (
