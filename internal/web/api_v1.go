@@ -40,6 +40,9 @@ type APIErrorDetail struct {
 }
 
 // registerAPIV1Routes registers all /api/v1/ routes.
+// Routes are registered in order of specificity - more specific routes first.
+// When grpc-gateway is enabled, it handles core CRUD operations while manual
+// handlers provide additional functionality not covered by the gateway.
 func (s *Server) registerAPIV1Routes() {
 	// CORS middleware for API routes.
 	corsMiddleware := func(next http.HandlerFunc) http.HandlerFunc {
@@ -79,41 +82,44 @@ func (s *Server) registerAPIV1Routes() {
 	// Health check.
 	s.mux.HandleFunc("/api/v1/health", api(s.handleAPIV1Health))
 
-	// Agents.
-	s.mux.HandleFunc("/api/v1/agents", api(s.handleAPIV1Agents))
+	// Agents - status and heartbeat require manual handlers (not in gateway).
 	s.mux.HandleFunc("/api/v1/agents/status", api(s.handleAPIV1AgentsStatusJSON))
 	s.mux.HandleFunc("/api/v1/agents/heartbeat", api(s.handleAPIV1AgentHeartbeat))
+	// Core agent CRUD - manual handlers (gateway available at /api/v1/gw/).
+	s.mux.HandleFunc("/api/v1/agents", api(s.handleAPIV1Agents))
 	s.mux.HandleFunc("/api/v1/agents/", api(s.handleAPIV1AgentByID))
 
-	// Stats.
+	// Stats - dashboard not in gateway.
 	s.mux.HandleFunc("/api/v1/stats/dashboard", api(s.handleAPIV1DashboardStats))
 
-	// Messages.
+	// Messages - manual handlers for full functionality including actions.
+	// Gateway available at /api/v1/gw/ for basic CRUD.
 	s.mux.HandleFunc("/api/v1/messages", api(s.handleAPIV1Messages))
 	s.mux.HandleFunc("/api/v1/messages/", api(s.handleAPIV1MessageByID))
 
-	// Heartbeat.
+	// Heartbeat - not in gateway.
 	s.mux.HandleFunc("/api/v1/heartbeat", api(s.handleAPIV1Heartbeat))
 
-	// Autocomplete.
+	// Autocomplete - not in gateway.
 	s.mux.HandleFunc("/api/v1/autocomplete/recipients", api(s.handleAPIV1AutocompleteRecipients))
 
-	// Topics.
+	// Topics - manual handlers (gateway available at /api/v1/gw/).
 	s.mux.HandleFunc("/api/v1/topics", api(s.handleAPIV1Topics))
 	s.mux.HandleFunc("/api/v1/topics/", api(s.handleAPIV1TopicByID))
 
-	// Sessions.
-	s.mux.HandleFunc("/api/v1/sessions", api(s.handleAPIV1Sessions))
+	// Sessions - not in gateway.
 	s.mux.HandleFunc("/api/v1/sessions/active", api(s.handleAPIV1ActiveSessions))
+	s.mux.HandleFunc("/api/v1/sessions", api(s.handleAPIV1Sessions))
 	s.mux.HandleFunc("/api/v1/sessions/", api(s.handleAPIV1SessionByID))
 
-	// Activities.
+	// Activities - not in gateway.
 	s.mux.HandleFunc("/api/v1/activities", api(s.handleAPIV1Activities))
 
-	// Search.
+	// Search - manual handler (gateway available at /api/v1/gw/).
 	s.mux.HandleFunc("/api/v1/search", api(s.handleAPIV1Search))
 
-	// Threads.
+	// Threads - manual handlers for full functionality including reply.
+	// Gateway available at /api/v1/gw/ for read-only access.
 	s.mux.HandleFunc("/api/v1/threads/", api(s.handleAPIV1ThreadByID))
 }
 

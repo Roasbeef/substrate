@@ -225,8 +225,7 @@ func (s *Server) registerGateway(ctx context.Context) error {
 		return fmt.Errorf("failed to register Agent handler: %w", err)
 	}
 
-	// Mount the gateway at /api/v1/gw/ for testing alongside existing handlers.
-	// This allows comparison between manual handlers and gateway before switching.
+	// Mount the gateway at /api/v1/gw/ for direct access (useful for testing).
 	s.mux.HandleFunc("/api/v1/gw/", func(w http.ResponseWriter, r *http.Request) {
 		// Strip the /api/v1/gw prefix to match gateway paths.
 		r.URL.Path = strings.TrimPrefix(r.URL.Path, "/api/v1/gw")

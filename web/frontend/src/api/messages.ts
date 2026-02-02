@@ -8,6 +8,73 @@ import type {
   SendMessageRequest,
 } from '@/types/api.js';
 
+// Gateway response types (proto-based format from grpc-gateway).
+interface GatewayInboxMessage {
+  id: string;
+  thread_id?: string;
+  topic_id?: string;
+  sender_id: string;
+  sender_name?: string;
+  subject?: string;
+  body?: string;
+  priority?: string;
+  state?: string;
+  created_at?: string;
+  deadline_at?: string;
+  snoozed_until?: string;
+  read_at?: string;
+  acked_at?: string;
+}
+
+interface GatewayFetchInboxResponse {
+  messages?: GatewayInboxMessage[];
+}
+
+// Check if response is in gateway format (has 'messages' field, not 'data').
+function isGatewayResponse(
+  response: unknown,
+): response is GatewayFetchInboxResponse {
+  return (
+    typeof response === 'object' &&
+    response !== null &&
+    'messages' in response &&
+    !('data' in response)
+  );
+}
+
+// Convert gateway message to frontend format.
+function convertGatewayMessage(msg: GatewayInboxMessage): MessageWithRecipients {
+  return {
+    id: Number(msg.id),
+    sender_id: Number(msg.sender_id),
+    sender_name: msg.sender_name ?? 'Unknown',
+    subject: msg.subject ?? '',
+    body: msg.body ?? '',
+    priority: (msg.priority?.toLowerCase().replace('priority_', '') ?? 'normal') as MessageWithRecipients['priority'],
+    created_at: msg.created_at ?? new Date().toISOString(),
+    thread_id: msg.thread_id,
+    recipients: [],
+  };
+}
+
+// Normalize response to APIResponse format.
+function normalizeMessagesResponse(
+  response: APIResponse<MessageWithRecipients[]> | GatewayFetchInboxResponse,
+): APIResponse<MessageWithRecipients[]> {
+  if (isGatewayResponse(response)) {
+    const messages = (response.messages ?? []).map(convertGatewayMessage);
+    return {
+      data: messages,
+      meta: {
+        total: messages.length,
+        page: 1,
+        page_size: messages.length,
+      },
+    };
+  }
+  return response;
+}
+
 // Message list filter options.
 export interface MessageListOptions {
   page?: number;
@@ -42,12 +109,16 @@ function buildQueryString(options: MessageListOptions): string {
 }
 
 // Fetch messages with optional filters.
-export function fetchMessages(
+export async function fetchMessages(
   options: MessageListOptions = {},
   signal?: AbortSignal,
 ): Promise<APIResponse<MessageWithRecipients[]>> {
   const query = buildQueryString(options);
-  return get<APIResponse<MessageWithRecipients[]>>(`/messages${query}`, signal);
+  const response = await get<APIResponse<MessageWithRecipients[]> | GatewayFetchInboxResponse>(
+    `/messages${query}`,
+    signal,
+  );
+  return normalizeMessagesResponse(response);
 }
 
 // Fetch a single message by ID.
