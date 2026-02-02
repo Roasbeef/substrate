@@ -4,11 +4,21 @@ import { clsx } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 import { Avatar } from '@/components/ui/Avatar.js';
 import { PriorityBadge } from '@/components/ui/Badge.js';
-import type { MessageWithRecipients } from '@/types/api.js';
+import type { MessageWithRecipients, Message } from '@/types/api.js';
+import { formatAgentDisplayName, getAgentContext } from '@/lib/utils.js';
 
 // Combine clsx and tailwind-merge for class name handling.
 function cn(...inputs: (string | undefined | null | false)[]) {
   return twMerge(clsx(inputs));
+}
+
+// Convert message sender to AgentLike format for display formatting.
+function getSenderAsAgent(message: Message) {
+  return {
+    name: message.sender_name,
+    project_key: message.sender_project_key,
+    git_branch: message.sender_git_branch,
+  };
 }
 
 // Star icon.
@@ -269,8 +279,11 @@ export function MessageRow({
         <StarIcon filled={isStarred} className="h-5 w-5" />
       </button>
 
-      {/* Sender name - fixed width for alignment. */}
-      <div className="w-44 flex-shrink-0 truncate">
+      {/* Sender name with project/branch context - fixed width for alignment. */}
+      <div
+        className="w-52 flex-shrink-0 truncate"
+        title={formatAgentDisplayName(getSenderAsAgent(message))}
+      >
         <span
           className={cn(
             'text-sm',
@@ -279,6 +292,11 @@ export function MessageRow({
         >
           {message.sender_name}
         </span>
+        {getAgentContext(getSenderAsAgent(message)) ? (
+          <span className="ml-1 text-xs text-gray-400">
+            @{getAgentContext(getSenderAsAgent(message))}
+          </span>
+        ) : null}
       </div>
 
       {/* Subject and preview - flexible width. */}

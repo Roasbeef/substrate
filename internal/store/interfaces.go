@@ -286,11 +286,13 @@ type MessageRecipientWithAgent struct {
 // InboxMessage represents a message in an agent's inbox with metadata.
 type InboxMessage struct {
 	Message
-	SenderName   string
-	State        string
-	SnoozedUntil *time.Time
-	ReadAt       *time.Time
-	AckedAt      *time.Time
+	SenderName       string
+	SenderProjectKey string
+	SenderGitBranch  string
+	State            string
+	SnoozedUntil     *time.Time
+	ReadAt           *time.Time
+	AckedAt          *time.Time
 }
 
 // Agent represents an agent in the system.

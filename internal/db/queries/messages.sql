@@ -72,7 +72,7 @@ SET state = 'snoozed', snoozed_until = ?
 WHERE message_id = ? AND agent_id = ?;
 
 -- name: GetInboxMessages :many
-SELECT m.*, mr.state, mr.snoozed_until, mr.read_at, mr.acked_at, a.name as sender_name
+SELECT m.*, mr.state, mr.snoozed_until, mr.read_at, mr.acked_at, a.name as sender_name, a.project_key as sender_project_key, a.git_branch as sender_git_branch
 FROM messages m
 JOIN message_recipients mr ON m.id = mr.message_id
 LEFT JOIN agents a ON m.sender_id = a.id
@@ -83,7 +83,7 @@ LIMIT ?;
 
 -- name: GetAllInboxMessages :many
 -- Global inbox view: all messages across all agents, not archived or trashed.
-SELECT m.*, mr.state, mr.snoozed_until, mr.read_at, mr.acked_at, mr.agent_id as recipient_agent_id, a.name as sender_name
+SELECT m.*, mr.state, mr.snoozed_until, mr.read_at, mr.acked_at, mr.agent_id as recipient_agent_id, a.name as sender_name, a.project_key as sender_project_key, a.git_branch as sender_git_branch
 FROM messages m
 JOIN message_recipients mr ON m.id = mr.message_id
 LEFT JOIN agents a ON m.sender_id = a.id
@@ -93,7 +93,7 @@ LIMIT ?;
 
 -- name: GetAllInboxMessagesPaginated :many
 -- Global inbox view with pagination support.
-SELECT m.*, mr.state, mr.snoozed_until, mr.read_at, mr.acked_at, mr.agent_id as recipient_agent_id, a.name as sender_name
+SELECT m.*, mr.state, mr.snoozed_until, mr.read_at, mr.acked_at, mr.agent_id as recipient_agent_id, a.name as sender_name, a.project_key as sender_project_key, a.git_branch as sender_git_branch
 FROM messages m
 JOIN message_recipients mr ON m.id = mr.message_id
 LEFT JOIN agents a ON m.sender_id = a.id
@@ -102,7 +102,7 @@ ORDER BY m.created_at DESC
 LIMIT ? OFFSET ?;
 
 -- name: GetUnreadMessages :many
-SELECT m.*, mr.state, mr.snoozed_until, mr.read_at, mr.acked_at, a.name as sender_name
+SELECT m.*, mr.state, mr.snoozed_until, mr.read_at, mr.acked_at, a.name as sender_name, a.project_key as sender_project_key, a.git_branch as sender_git_branch
 FROM messages m
 JOIN message_recipients mr ON m.id = mr.message_id
 LEFT JOIN agents a ON m.sender_id = a.id
@@ -177,7 +177,7 @@ LIMIT ?;
 
 -- name: GetAllSentMessages :many
 -- Global sent view: all sent messages across all agents.
-SELECT m.*, a.name as sender_name
+SELECT m.*, a.name as sender_name, a.project_key as sender_project_key, a.git_branch as sender_git_branch
 FROM messages m
 JOIN agents a ON m.sender_id = a.id
 WHERE m.deleted_by_sender = 0
@@ -231,7 +231,7 @@ WHERE message_id IN (SELECT id FROM messages WHERE thread_id = ?);
 -- name: SearchMessages :many
 -- Simple LIKE-based search on subject and body. FTS5 is available but this
 -- covers basic cases. The search term should be passed with wildcards.
-SELECT m.*, a.name as sender_name
+SELECT m.*, a.name as sender_name, a.project_key as sender_project_key, a.git_branch as sender_git_branch
 FROM messages m
 LEFT JOIN agents a ON m.sender_id = a.id
 WHERE m.subject LIKE ? OR m.body_md LIKE ?

@@ -26,6 +26,8 @@ export interface APIError {
 export interface Agent {
   id: number;
   name: string;
+  project_key?: string;
+  git_branch?: string;
   created_at: string;
   last_active_at: string;
 }
@@ -35,6 +37,8 @@ export type AgentStatusType = 'active' | 'busy' | 'idle' | 'offline';
 export interface AgentWithStatus {
   id: number;
   name: string;
+  project_key?: string;
+  git_branch?: string;
   status: AgentStatusType;
   last_active_at: string;
   session_id?: number;
@@ -58,11 +62,13 @@ export interface Message {
   id: number;
   sender_id: number;
   sender_name: string;
+  sender_project_key?: string;
+  sender_git_branch?: string;
   subject: string;
   body: string;
   priority: MessagePriority;
   created_at: string;
-  thread_id?: number;
+  thread_id?: string;
 }
 
 export type MessagePriority = 'low' | 'normal' | 'high' | 'urgent';
@@ -87,7 +93,7 @@ export interface MessageWithRecipients extends Message {
 
 // Thread types.
 export interface Thread {
-  id: number;
+  id: string;
   subject: string;
   created_at: string;
   last_message_at: string;

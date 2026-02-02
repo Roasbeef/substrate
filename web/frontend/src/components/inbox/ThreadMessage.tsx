@@ -1,10 +1,29 @@
 // ThreadMessage component - a single message within a thread view.
 
+import { useMemo } from 'react';
 import { clsx } from 'clsx';
 import { twMerge } from 'tailwind-merge';
+import { marked } from 'marked';
+import DOMPurify from 'dompurify';
 import { Avatar } from '@/components/ui/Avatar.js';
 import { PriorityBadge } from '@/components/ui/Badge.js';
 import type { Message } from '@/types/api.js';
+import { formatAgentDisplayName, getAgentContext } from '@/lib/utils.js';
+
+// Convert message sender to AgentLike format for display formatting.
+function getSenderAsAgent(message: Message) {
+  return {
+    name: message.sender_name,
+    project_key: message.sender_project_key,
+    git_branch: message.sender_git_branch,
+  };
+}
+
+// Configure marked options for safe rendering.
+marked.setOptions({
+  gfm: true,
+  breaks: true,
+});
 
 // Combine clsx and tailwind-merge for class name handling.
 function cn(...inputs: (string | undefined | null | false)[]) {
@@ -43,34 +62,17 @@ function formatMessageDate(dateString: string): string {
   });
 }
 
-// Simple markdown-like rendering (basic bold, italic, code).
-function renderMarkdown(text: string): React.ReactNode {
-  // Split by code blocks first.
-  const parts = text.split(/(`[^`]+`)/g);
-
-  return parts.map((part, index) => {
-    // Handle inline code.
-    if (part.startsWith('`') && part.endsWith('`')) {
-      return (
-        <code
-          key={index}
-          className="rounded bg-gray-100 px-1 py-0.5 font-mono text-sm"
-        >
-          {part.slice(1, -1)}
-        </code>
-      );
-    }
-
-    // Handle bold (**text**).
-    let content: React.ReactNode = part;
-    content = part.split(/(\*\*[^*]+\*\*)/g).map((segment, i) => {
-      if (segment.startsWith('**') && segment.endsWith('**')) {
-        return <strong key={i}>{segment.slice(2, -2)}</strong>;
-      }
-      return segment;
-    });
-
-    return <span key={index}>{content}</span>;
+// Render markdown text safely using marked and DOMPurify.
+function renderMarkdownToHtml(text: string): string {
+  // Parse markdown to HTML.
+  const rawHtml = marked.parse(text, { async: false }) as string;
+  // Sanitize HTML to prevent XSS.
+  return DOMPurify.sanitize(rawHtml, {
+    ALLOWED_TAGS: [
+      'p', 'br', 'strong', 'em', 'code', 'pre', 'ul', 'ol', 'li',
+      'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'a', 'blockquote', 'hr',
+    ],
+    ALLOWED_ATTR: ['href', 'target', 'rel'],
   });
 }
 
@@ -92,6 +94,12 @@ export function ThreadMessage({
   isFocused = false,
   className,
 }: ThreadMessageProps) {
+  // Memoize the rendered markdown to avoid re-parsing on every render.
+  const renderedBody = useMemo(
+    () => renderMarkdownToHtml(message.body),
+    [message.body],
+  );
+
   return (
     <div
       className={cn(
@@ -100,17 +108,25 @@ export function ThreadMessage({
         className,
       )}
       role="article"
-      aria-label={`Message from ${message.sender_name}`}
+      aria-label={`Message from ${formatAgentDisplayName(getSenderAsAgent(message))}`}
     >
       {/* Message header. */}
       <div className="flex items-start justify-between gap-4">
         <div className="flex items-center gap-3">
           <Avatar name={message.sender_name} size="md" />
           <div>
-            <div className="flex items-center gap-2">
+            <div
+              className="flex items-center gap-2"
+              title={formatAgentDisplayName(getSenderAsAgent(message))}
+            >
               <span className="font-medium text-gray-900">
                 {message.sender_name}
               </span>
+              {getAgentContext(getSenderAsAgent(message)) ? (
+                <span className="text-xs text-gray-400">
+                  @{getAgentContext(getSenderAsAgent(message))}
+                </span>
+              ) : null}
               {message.priority !== 'normal' ? (
                 <PriorityBadge priority={message.priority} size="sm" />
               ) : null}
@@ -134,10 +150,11 @@ export function ThreadMessage({
         </h2>
       ) : null}
 
-      {/* Message body. */}
-      <div className="mt-3 whitespace-pre-wrap text-gray-700">
-        {renderMarkdown(message.body)}
-      </div>
+      {/* Message body with rendered markdown. */}
+      <div
+        className="prose prose-sm mt-3 max-w-none text-gray-700"
+        dangerouslySetInnerHTML={{ __html: renderedBody }}
+      />
     </div>
   );
 }
@@ -169,10 +186,15 @@ export function CompactThreadMessage({
       )}
     >
       <Avatar name={message.sender_name} size="sm" />
-      <div className="min-w-0 flex-1">
+      <div className="min-w-0 flex-1" title={formatAgentDisplayName(getSenderAsAgent(message))}>
         <span className="truncate text-sm font-medium text-gray-900">
           {message.sender_name}
         </span>
+        {getAgentContext(getSenderAsAgent(message)) ? (
+          <span className="text-xs text-gray-400">
+            @{getAgentContext(getSenderAsAgent(message))}
+          </span>
+        ) : null}
         <span className="ml-2 truncate text-sm text-gray-500">
           {message.body.slice(0, 80)}
           {message.body.length > 80 ? '...' : ''}

@@ -313,6 +313,7 @@ func (s *SqlcStore) CreateMessage(ctx context.Context,
 		Priority:    params.Priority,
 		DeadlineAt:  ToSqlcNullInt64(params.DeadlineAt),
 		Attachments: ToSqlcNullString(params.Attachments),
+		CreatedAt:   time.Now().Unix(),
 	})
 	if err != nil {
 		return Message{}, err
@@ -597,11 +598,13 @@ func (s *SqlcStore) GetAllInboxMessages(ctx context.Context, limit,
 				Priority:  row.Priority,
 				CreatedAt: time.Unix(row.CreatedAt, 0),
 			},
-			SenderName:   row.SenderName.String,
-			State:        row.State,
-			SnoozedUntil: nullInt64ToTime(row.SnoozedUntil),
-			ReadAt:       nullInt64ToTime(row.ReadAt),
-			AckedAt:      nullInt64ToTime(row.AckedAt),
+			SenderName:       row.SenderName.String,
+			SenderProjectKey: row.SenderProjectKey.String,
+			SenderGitBranch:  row.SenderGitBranch.String,
+			State:            row.State,
+			SnoozedUntil:     nullInt64ToTime(row.SnoozedUntil),
+			ReadAt:           nullInt64ToTime(row.ReadAt),
+			AckedAt:          nullInt64ToTime(row.AckedAt),
 		})
 	}
 	return messages, nil
@@ -1133,6 +1136,7 @@ func (s *txSqlcStore) CreateMessage(ctx context.Context,
 		Priority:    params.Priority,
 		DeadlineAt:  ToSqlcNullInt64(params.DeadlineAt),
 		Attachments: ToSqlcNullString(params.Attachments),
+		CreatedAt:   time.Now().Unix(),
 	})
 	if err != nil {
 		return Message{}, err
@@ -1795,11 +1799,13 @@ func (s *txSqlcStore) GetAllInboxMessages(ctx context.Context, limit,
 				Priority:  row.Priority,
 				CreatedAt: time.Unix(row.CreatedAt, 0),
 			},
-			SenderName:   row.SenderName.String,
-			State:        row.State,
-			SnoozedUntil: nullInt64ToTime(row.SnoozedUntil),
-			ReadAt:       nullInt64ToTime(row.ReadAt),
-			AckedAt:      nullInt64ToTime(row.AckedAt),
+			SenderName:       row.SenderName.String,
+			SenderProjectKey: row.SenderProjectKey.String,
+			SenderGitBranch:  row.SenderGitBranch.String,
+			State:            row.State,
+			SnoozedUntil:     nullInt64ToTime(row.SnoozedUntil),
+			ReadAt:           nullInt64ToTime(row.ReadAt),
+			AckedAt:          nullInt64ToTime(row.AckedAt),
 		})
 	}
 	return messages, nil
@@ -1939,8 +1945,10 @@ func convertInboxRows(rows []sqlc.GetInboxMessagesRow) []InboxMessage {
 				Priority:  row.Priority,
 				CreatedAt: time.Unix(row.CreatedAt, 0),
 			},
-			SenderName: row.SenderName.String,
-			State:      row.State,
+			SenderName:       row.SenderName.String,
+			SenderProjectKey: row.SenderProjectKey.String,
+			SenderGitBranch:  row.SenderGitBranch.String,
+			State:            row.State,
 		}
 		if row.DeadlineAt.Valid {
 			t := time.Unix(row.DeadlineAt.Int64, 0)
@@ -1982,8 +1990,10 @@ func convertUnreadRows(rows []sqlc.GetUnreadMessagesRow) []InboxMessage {
 				Priority:  row.Priority,
 				CreatedAt: time.Unix(row.CreatedAt, 0),
 			},
-			SenderName: row.SenderName.String,
-			State:      row.State,
+			SenderName:       row.SenderName.String,
+			SenderProjectKey: row.SenderProjectKey.String,
+			SenderGitBranch:  row.SenderGitBranch.String,
+			State:            row.State,
 		}
 		if row.DeadlineAt.Valid {
 			t := time.Unix(row.DeadlineAt.Int64, 0)
