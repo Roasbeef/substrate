@@ -3,6 +3,7 @@
 import { clsx } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 import { Avatar } from '@/components/ui/Avatar.js';
+import { getAgentContext } from '@/lib/utils.js';
 import type { AgentWithStatus, AgentStatusType } from '@/types/api.js';
 
 // Combine clsx and tailwind-merge for class name handling.
@@ -103,8 +104,13 @@ export function AgentCard({
       <div className="flex items-start justify-between">
         <div className="flex items-center gap-3">
           <Avatar name={agent.name} size="md" />
-          <div>
+          <div className="min-w-0 flex-1">
             <h3 className="font-medium text-gray-900">{agent.name}</h3>
+            {getAgentContext(agent) ? (
+              <p className="text-xs text-gray-500 truncate" title={getAgentContext(agent) ?? ''}>
+                {getAgentContext(agent)}
+              </p>
+            ) : null}
             <p className="text-sm text-gray-500">
               {formatTimeSince(agent.seconds_since_heartbeat)}
             </p>
@@ -160,6 +166,9 @@ export function CompactAgentCard({
       </div>
       <div className="min-w-0 flex-1">
         <p className="truncate text-sm font-medium text-gray-900">{agent.name}</p>
+        {getAgentContext(agent) ? (
+          <p className="truncate text-xs text-gray-500">{getAgentContext(agent)}</p>
+        ) : null}
       </div>
     </div>
   );
