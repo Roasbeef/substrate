@@ -1,6 +1,6 @@
 // API functions for message-related operations.
 
-import { get, post, patch } from './client.js';
+import { get, post } from './client.js';
 import type {
   APIResponse,
   Message,
@@ -14,6 +14,7 @@ export interface MessageListOptions {
   pageSize?: number;
   filter?: 'all' | 'unread' | 'starred';
   category?: 'inbox' | 'starred' | 'snoozed' | 'sent' | 'archive';
+  agentId?: number;
 }
 
 // Build query string from options.
@@ -31,6 +32,9 @@ function buildQueryString(options: MessageListOptions): string {
   }
   if (options.category !== undefined) {
     params.set('category', options.category);
+  }
+  if (options.agentId !== undefined) {
+    params.set('agent_id', String(options.agentId));
   }
 
   const queryString = params.toString();
@@ -84,7 +88,7 @@ export function snoozeMessage(id: number, until: string): Promise<void> {
 
 // Mark a message as read.
 export function markMessageRead(id: number): Promise<void> {
-  return patch<void>(`/messages/${id}`, { state: 'read' });
+  return post<void>(`/messages/${id}/read`, {});
 }
 
 // Mark a message as acknowledged.
