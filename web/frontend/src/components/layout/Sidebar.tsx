@@ -1,7 +1,7 @@
 // Sidebar component - main navigation sidebar with nav links and actions.
 
 import { type ReactNode, useState } from 'react';
-import { Link, useLocation } from 'react-router-dom';
+import { Link, useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import { clsx } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 import { useUIStore, type SidebarSection } from '@/stores/ui.js';
@@ -300,21 +300,30 @@ interface TopicItemProps {
   name: string;
   messageCount?: number;
   onClick?: () => void;
+  isActive?: boolean;
 }
 
-function TopicItem({ name, messageCount, onClick }: TopicItemProps) {
+function TopicItem({ name, messageCount, onClick, isActive = false }: TopicItemProps) {
   return (
     <button
       type="button"
       onClick={onClick}
-      className="flex w-full items-center gap-2 rounded-lg px-3 py-1.5 text-sm text-gray-700 hover:bg-gray-100"
+      className={cn(
+        'flex w-full items-center gap-2 rounded-lg px-3 py-1.5 text-sm',
+        isActive
+          ? 'bg-blue-50 text-blue-700'
+          : 'text-gray-700 hover:bg-gray-100',
+      )}
     >
-      <span className="text-gray-400">
+      <span className={isActive ? 'text-blue-500' : 'text-gray-400'}>
         <HashtagIcon />
       </span>
       <span className="flex-1 truncate text-left">{name}</span>
       {messageCount !== undefined && messageCount > 0 ? (
-        <span className="text-xs text-gray-400">{messageCount}</span>
+        <span className={cn(
+          'text-xs',
+          isActive ? 'text-blue-600' : 'text-gray-400',
+        )}>{messageCount}</span>
       ) : null}
     </button>
   );
@@ -392,14 +401,24 @@ export function Sidebar({
   const openModal = useUIStore((state) => state.openModal);
   const sidebarCollapsed = useUIStore((state) => state.sidebarCollapsed);
   const activeSection = useActiveSection();
+  const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
 
   // State for collapsible sections.
   const [topicsExpanded, setTopicsExpanded] = useState(true);
   const [agentsExpanded, setAgentsExpanded] = useState(true);
 
+  // Get active topic from URL params.
+  const activeTopic = searchParams.get('topic');
+
   // Fetch topics and agents.
   const { data: topics } = useTopics();
   const { data: agentsData } = useAgentsStatus();
+
+  // Handle topic click - navigate to inbox with topic filter.
+  const handleTopicClick = (topicName: string) => {
+    navigate(`/inbox?topic=${encodeURIComponent(topicName)}`);
+  };
 
   const items = customNavItems ?? navItems;
 
@@ -460,6 +479,8 @@ export function Sidebar({
                     key={topic.id}
                     name={topic.name}
                     messageCount={topic.message_count}
+                    onClick={() => handleTopicClick(topic.name)}
+                    isActive={activeTopic === topic.name}
                   />
                 ))
               ) : (

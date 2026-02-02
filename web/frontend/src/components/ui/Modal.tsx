@@ -29,6 +29,8 @@ export interface ModalProps {
   closeOnOverlayClick?: boolean | undefined;
   className?: string | undefined;
   initialFocus?: React.RefObject<HTMLElement | null> | undefined;
+  /** When true, content is rendered directly without padding wrapper. */
+  rawContent?: boolean | undefined;
 }
 
 // Size styles mapping.
@@ -72,6 +74,7 @@ export function Modal({
   closeOnOverlayClick = true,
   className,
   initialFocus,
+  rawContent = false,
 }: ModalProps) {
   const handleClose = () => {
     if (closeOnOverlayClick) {
@@ -114,13 +117,14 @@ export function Modal({
             >
               <DialogPanel
                 className={cn(
-                  'w-full transform overflow-hidden rounded-lg bg-white shadow-xl transition-all',
+                  'w-full transform rounded-lg bg-white shadow-xl transition-all',
+                  !rawContent && 'overflow-hidden',
                   sizeStyles[size],
                   className,
                 )}
               >
-                {/* Header. */}
-                {(title || showCloseButton) ? (
+                {/* Header - only show if not using rawContent mode. */}
+                {!rawContent && (title || showCloseButton) ? (
                   <div className="flex items-start justify-between border-b border-gray-200 px-6 py-4">
                     <div>
                       {title ? (
@@ -148,8 +152,8 @@ export function Modal({
                   </div>
                 ) : null}
 
-                {/* Content. */}
-                <div className="px-6 py-4">{children}</div>
+                {/* Content - raw or wrapped. */}
+                {rawContent ? children : <div className="px-6 py-4">{children}</div>}
               </DialogPanel>
             </TransitionChild>
           </div>

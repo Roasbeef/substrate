@@ -6,6 +6,7 @@ import { twMerge } from 'tailwind-merge';
 import { Header } from './Header.js';
 import { Sidebar } from './Sidebar.js';
 import { NotificationPrompt } from './NotificationPrompt.js';
+import { ModalContainer } from './ModalContainer.js';
 import { useNewMessageNotifications } from '@/hooks/useNotifications.js';
 
 // Combine clsx and tailwind-merge for class name handling.
@@ -55,14 +56,20 @@ export function AppShell({
   useNewMessageNotifications();
 
   return (
-    <div className="flex h-screen w-full overflow-hidden">
-      {!hideSidebar ? <Sidebar footer={sidebarFooter} /> : null}
-      <div className="flex flex-1 flex-col overflow-hidden">
-        {!hideHeader ? <Header rightContent={headerContent} /> : null}
+    <div className="flex h-screen w-full flex-col overflow-hidden">
+      {/* Header spans full width at top. */}
+      {!hideHeader ? <Header rightContent={headerContent} /> : null}
+
+      {/* Content area with sidebar and main content. */}
+      <div className="flex flex-1 overflow-hidden">
+        {!hideSidebar ? <Sidebar footer={sidebarFooter} /> : null}
         <MainContent {...(mainClassName && { className: mainClassName })}>{children}</MainContent>
       </div>
+
       {/* Notification permission prompt. */}
       <NotificationPrompt />
+      {/* Global modal container. */}
+      <ModalContainer />
     </div>
   );
 }
