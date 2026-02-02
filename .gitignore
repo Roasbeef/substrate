@@ -28,3 +28,4 @@ Thumbs.db
 coverage.out
 coverage.html
 node_modules/
+.test-data/
