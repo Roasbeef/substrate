@@ -1,1 +1,0 @@
-import{j as s}from"./query-D1a_yXj4.js";function t(){return s.jsxs("div",{className:"p-6",children:[s.jsx("h1",{className:"text-2xl font-bold text-gray-900",children:"Sessions"}),s.jsx("p",{className:"mt-2 text-gray-600",children:"Sessions page placeholder"})]})}export{t as default};
