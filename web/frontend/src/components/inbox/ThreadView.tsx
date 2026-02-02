@@ -314,15 +314,23 @@ export function ThreadView({
       className="flex h-[80vh] flex-col"
     >
       {/* Toolbar. */}
-      <div className="flex items-center justify-between border-b border-gray-200 px-4 py-2">
-        <div className="flex items-center gap-2">
-          <ToolbarButton
+      <div className="flex items-center justify-between border-b border-gray-200 bg-gray-50 px-4 py-2">
+        <div className="flex items-center gap-1">
+          <button
+            type="button"
             onClick={onClose}
-            icon={<ArrowLeftIcon />}
-            label="Back to inbox"
-          />
+            className={cn(
+              'flex items-center gap-2 rounded-lg px-3 py-1.5',
+              'text-sm font-medium text-gray-700',
+              'hover:bg-gray-200 transition-colors',
+              'focus:outline-none focus:ring-2 focus:ring-blue-500',
+            )}
+          >
+            <ArrowLeftIcon className="h-4 w-4" />
+            <span>Back to inbox</span>
+          </button>
 
-          <div className="mx-2 h-6 w-px bg-gray-200" />
+          <div className="mx-3 h-5 w-px bg-gray-300" />
 
           {onArchive ? (
             <ToolbarButton

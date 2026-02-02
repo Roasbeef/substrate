@@ -1,12 +1,13 @@
 // Sidebar component - main navigation sidebar with nav links and actions.
 
-import { type ReactNode } from 'react';
+import { type ReactNode, useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { clsx } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 import { useUIStore, type SidebarSection } from '@/stores/ui.js';
-import { Button } from '@/components/ui/Button.js';
-import { routes } from '@/router.js';
+import { useAgentsStatus } from '@/hooks/useAgents.js';
+import { useTopics } from '@/hooks/useTopics.js';
+import { routes } from '@/lib/routes.js';
 
 // Combine clsx and tailwind-merge for class name handling.
 function cn(...inputs: (string | undefined | null | false)[]) {
@@ -141,6 +142,48 @@ function PlusIcon() {
   );
 }
 
+function ChevronDownIcon({ className }: { className?: string }) {
+  return (
+    <svg className={cn('h-4 w-4', className)} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+    </svg>
+  );
+}
+
+function HashtagIcon() {
+  return (
+    <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+      <path
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        strokeWidth={2}
+        d="M7 20l4-16m2 16l4-16M6 9h14M4 15h14"
+      />
+    </svg>
+  );
+}
+
+function UserCircleIcon() {
+  return (
+    <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+      <path
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        strokeWidth={2}
+        d="M5.121 17.804A13.937 13.937 0 0112 16c2.5 0 4.847.655 6.879 1.804M15 10a3 3 0 11-6 0 3 3 0 016 0zm6 2a9 9 0 11-18 0 9 9 0 0118 0z"
+      />
+    </svg>
+  );
+}
+
+function SmallPlusIcon() {
+  return (
+    <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v12m6-6H6" />
+    </svg>
+  );
+}
+
 // Default navigation items.
 const navItems: NavItem[] = [
   { id: 'inbox', label: 'Inbox', path: routes.inbox, icon: <InboxIcon /> },
@@ -152,22 +195,14 @@ const navItems: NavItem[] = [
   { id: 'sessions', label: 'Sessions', path: routes.sessions, icon: <TerminalIcon /> },
 ];
 
-// Logo component.
+// Logo component - hidden in sidebar since branding is in header now.
 export interface LogoProps {
   collapsed?: boolean;
 }
 
-export function Logo({ collapsed = false }: LogoProps) {
-  return (
-    <Link to={routes.inbox} className="flex items-center gap-2 px-4 py-3">
-      <div className="h-8 w-8 flex-shrink-0 rounded-lg bg-blue-600 flex items-center justify-center">
-        <span className="text-white font-bold text-lg">S</span>
-      </div>
-      {!collapsed ? (
-        <span className="text-xl font-semibold text-gray-900">Subtrate</span>
-      ) : null}
-    </Link>
-  );
+export function Logo(_props: LogoProps) {
+  // Logo is now shown in the header, so sidebar just has spacing.
+  return <div className="h-2" />;
 }
 
 // Sidebar navigation link.
@@ -204,6 +239,117 @@ function NavLink({ item, isActive, collapsed = false }: NavLinkProps) {
         </>
       ) : null}
     </Link>
+  );
+}
+
+// Collapsible section header.
+interface SidebarSectionHeaderProps {
+  label: string;
+  icon: ReactNode;
+  isExpanded: boolean;
+  onToggle: () => void;
+  count?: number;
+  onAddClick?: () => void;
+}
+
+function SidebarSectionHeader({
+  label,
+  icon,
+  isExpanded,
+  onToggle,
+  count,
+  onAddClick,
+}: SidebarSectionHeaderProps) {
+  return (
+    <div className="flex items-center justify-between px-3 py-2">
+      <button
+        type="button"
+        onClick={onToggle}
+        className="flex flex-1 items-center gap-2 text-sm font-semibold text-gray-500 hover:text-gray-700"
+      >
+        <ChevronDownIcon
+          className={cn(
+            'transition-transform',
+            !isExpanded && '-rotate-90',
+          )}
+        />
+        <span className="text-gray-400">{icon}</span>
+        <span>{label}</span>
+        {count !== undefined && count > 0 ? (
+          <span className="rounded-full bg-gray-100 px-2 py-0.5 text-xs text-gray-500">
+            {count}
+          </span>
+        ) : null}
+      </button>
+      {onAddClick ? (
+        <button
+          type="button"
+          onClick={onAddClick}
+          className="rounded p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-600"
+          title={`Add ${label.slice(0, -1)}`}
+        >
+          <SmallPlusIcon />
+        </button>
+      ) : null}
+    </div>
+  );
+}
+
+// Topic item in sidebar.
+interface TopicItemProps {
+  name: string;
+  messageCount?: number;
+  onClick?: () => void;
+}
+
+function TopicItem({ name, messageCount, onClick }: TopicItemProps) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="flex w-full items-center gap-2 rounded-lg px-3 py-1.5 text-sm text-gray-700 hover:bg-gray-100"
+    >
+      <span className="text-gray-400">
+        <HashtagIcon />
+      </span>
+      <span className="flex-1 truncate text-left">{name}</span>
+      {messageCount !== undefined && messageCount > 0 ? (
+        <span className="text-xs text-gray-400">{messageCount}</span>
+      ) : null}
+    </button>
+  );
+}
+
+// Agent item in sidebar.
+interface AgentItemProps {
+  name: string;
+  status: 'active' | 'busy' | 'idle' | 'offline';
+  onClick?: () => void;
+}
+
+function AgentItem({ name, status, onClick }: AgentItemProps) {
+  const statusColors = {
+    active: 'bg-green-400',
+    busy: 'bg-yellow-400',
+    idle: 'bg-gray-400',
+    offline: 'bg-gray-300',
+  };
+
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="flex w-full items-center gap-2 rounded-lg px-3 py-1.5 text-sm text-gray-700 hover:bg-gray-100"
+    >
+      <span className="text-gray-400">
+        <UserCircleIcon />
+      </span>
+      <span className="flex-1 truncate text-left">{name}</span>
+      <span
+        className={cn('h-2 w-2 rounded-full', statusColors[status])}
+        title={status}
+      />
+    </button>
   );
 }
 
@@ -247,6 +393,14 @@ export function Sidebar({
   const sidebarCollapsed = useUIStore((state) => state.sidebarCollapsed);
   const activeSection = useActiveSection();
 
+  // State for collapsible sections.
+  const [topicsExpanded, setTopicsExpanded] = useState(true);
+  const [agentsExpanded, setAgentsExpanded] = useState(true);
+
+  // Fetch topics and agents.
+  const { data: topics } = useTopics();
+  const { data: agentsData } = useAgentsStatus();
+
   const items = customNavItems ?? navItems;
 
   if (sidebarCollapsed) {
@@ -263,18 +417,24 @@ export function Sidebar({
       <Logo />
 
       {showComposeButton ? (
-        <div className="px-3 py-2">
-          <Button
-            className="w-full"
+        <div className="px-3 py-3">
+          <button
+            type="button"
             onClick={() => openModal('compose')}
-            leftIcon={<PlusIcon />}
+            className={cn(
+              'flex w-full items-center justify-center gap-2 rounded-2xl px-6 py-3',
+              'bg-blue-600 text-white font-medium shadow-md',
+              'hover:bg-blue-700 hover:shadow-lg transition-all',
+              'focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2',
+            )}
           >
-            Compose
-          </Button>
+            <PlusIcon />
+            <span>Compose</span>
+          </button>
         </div>
       ) : null}
 
-      <nav className="flex-1 space-y-1 px-3 py-2">
+      <nav className="flex-1 space-y-1 overflow-y-auto px-3 py-2">
         {items.map((item) => (
           <NavLink
             key={item.id}
@@ -282,6 +442,59 @@ export function Sidebar({
             isActive={activeSection === item.id}
           />
         ))}
+
+        {/* Topics Section */}
+        <div className="mt-4 border-t border-gray-100 pt-2">
+          <SidebarSectionHeader
+            label="Topics"
+            icon={<HashtagIcon />}
+            isExpanded={topicsExpanded}
+            onToggle={() => setTopicsExpanded(!topicsExpanded)}
+            {...(topics?.length !== undefined && { count: topics.length })}
+          />
+          {topicsExpanded ? (
+            <div className="ml-2 space-y-0.5">
+              {topics && topics.length > 0 ? (
+                topics.slice(0, 5).map((topic) => (
+                  <TopicItem
+                    key={topic.id}
+                    name={topic.name}
+                    messageCount={topic.message_count}
+                  />
+                ))
+              ) : (
+                <p className="px-3 py-2 text-xs text-gray-400">No topics yet</p>
+              )}
+            </div>
+          ) : null}
+        </div>
+
+        {/* Agents Section */}
+        <div className="mt-4 border-t border-gray-100 pt-2">
+          <SidebarSectionHeader
+            label="Agents"
+            icon={<UserCircleIcon />}
+            isExpanded={agentsExpanded}
+            onToggle={() => setAgentsExpanded(!agentsExpanded)}
+            {...(agentsData?.agents.length !== undefined && { count: agentsData.agents.length })}
+            onAddClick={() => openModal('newAgent')}
+          />
+          {agentsExpanded ? (
+            <div className="ml-2 space-y-0.5">
+              {agentsData && agentsData.agents.length > 0 ? (
+                agentsData.agents.slice(0, 5).map((agent) => (
+                  <AgentItem
+                    key={agent.id}
+                    name={agent.name}
+                    status={agent.status}
+                  />
+                ))
+              ) : (
+                <p className="px-3 py-2 text-xs text-gray-400">No agents yet</p>
+              )}
+            </div>
+          ) : null}
+        </div>
       </nav>
 
       {footer}

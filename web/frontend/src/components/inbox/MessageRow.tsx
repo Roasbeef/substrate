@@ -214,11 +214,12 @@ export function MessageRow({
 
   return (
     <div
+      data-testid="message-row"
       className={cn(
-        'group flex items-center gap-3 border-b border-gray-100 px-4 py-3 transition-colors',
-        isUnread ? 'bg-blue-50/50' : 'bg-white',
-        isSelected ? 'bg-blue-100' : '',
-        onClick ? 'cursor-pointer hover:bg-gray-50' : '',
+        'group flex items-center gap-3 border-b border-gray-100 px-4 py-2.5 transition-all duration-150',
+        isUnread ? 'bg-white font-medium' : 'bg-white',
+        isSelected ? 'bg-blue-50' : '',
+        onClick ? 'cursor-pointer hover:shadow-sm hover:z-10 hover:relative' : '',
         className,
       )}
       onClick={onClick}
@@ -244,8 +245,10 @@ export function MessageRow({
             onChange={handleCheckboxChange}
             onClick={(e) => e.stopPropagation()}
             className={cn(
-              'h-4 w-4 rounded border-gray-300 text-blue-600',
-              'focus:ring-2 focus:ring-blue-500 focus:ring-offset-2',
+              'h-[18px] w-[18px] rounded border-gray-300 text-blue-600',
+              'focus:ring-2 focus:ring-blue-500 focus:ring-offset-0',
+              'opacity-0 group-hover:opacity-100 transition-opacity',
+              isSelected && 'opacity-100',
             )}
             aria-label={`Select message: ${message.subject}`}
           />
@@ -257,60 +260,55 @@ export function MessageRow({
         type="button"
         onClick={handleStarClick}
         className={cn(
-          'flex-shrink-0 p-1 rounded',
+          'flex-shrink-0 rounded p-0.5',
           isStarred ? 'text-yellow-500' : 'text-gray-300 hover:text-yellow-400',
           'focus:outline-none focus:ring-2 focus:ring-blue-500',
         )}
         aria-label={isStarred ? 'Unstar message' : 'Star message'}
       >
-        <StarIcon filled={isStarred} className="h-4 w-4" />
+        <StarIcon filled={isStarred} className="h-5 w-5" />
       </button>
 
-      {/* Avatar. */}
-      <Avatar
-        name={message.sender_name}
-        size="sm"
-        className="flex-shrink-0"
-      />
+      {/* Sender name - fixed width for alignment. */}
+      <div className="w-44 flex-shrink-0 truncate">
+        <span
+          className={cn(
+            'text-sm',
+            isUnread ? 'font-semibold text-gray-900' : 'text-gray-700',
+          )}
+        >
+          {message.sender_name}
+        </span>
+      </div>
 
-      {/* Content. */}
-      <div className="min-w-0 flex-1">
-        <div className="flex items-center gap-2">
-          <span
-            className={cn(
-              'truncate text-sm',
-              isUnread ? 'font-semibold text-gray-900' : 'font-medium text-gray-700',
-            )}
-          >
-            {message.sender_name}
-          </span>
-          {message.priority !== 'normal' ? (
-            <PriorityBadge priority={message.priority} size="sm" />
-          ) : null}
-        </div>
-        <div className="flex items-baseline gap-2">
-          <span
-            className={cn(
-              'truncate text-sm',
-              isUnread ? 'font-medium text-gray-900' : 'text-gray-600',
-            )}
-          >
-            {message.subject}
-          </span>
-          <span className="text-sm text-gray-400">—</span>
-          <span className="truncate text-sm text-gray-500">
-            {truncate(message.body, 60)}
-          </span>
-        </div>
+      {/* Subject and preview - flexible width. */}
+      <div className="flex min-w-0 flex-1 items-baseline gap-1.5">
+        {message.priority !== 'normal' ? (
+          <PriorityBadge priority={message.priority} size="sm" />
+        ) : null}
+        <span
+          data-testid="message-subject"
+          className={cn(
+            'truncate text-sm',
+            isUnread ? 'font-semibold text-gray-900' : 'text-gray-800',
+          )}
+        >
+          {message.subject}
+        </span>
+        <span className="hidden text-sm text-gray-400 sm:inline">-</span>
+        <span className="hidden truncate text-sm text-gray-500 sm:inline">
+          {truncate(message.body, 80)}
+        </span>
       </div>
 
       {/* Actions (visible on hover). */}
-      <div className="flex flex-shrink-0 items-center gap-1">
+      <div className="flex flex-shrink-0 items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
         {onArchive ? (
           <ActionButton
             icon={<ArchiveIcon className="h-4 w-4" />}
             label="Archive"
             onClick={handleArchiveClick}
+            className="opacity-100"
           />
         ) : null}
         {onSnooze ? (
@@ -318,6 +316,7 @@ export function MessageRow({
             icon={<ClockIcon className="h-4 w-4" />}
             label="Snooze"
             onClick={handleSnoozeClick}
+            className="opacity-100"
           />
         ) : null}
         {onDelete ? (
@@ -325,12 +324,16 @@ export function MessageRow({
             icon={<TrashIcon className="h-4 w-4" />}
             label="Delete"
             onClick={handleDeleteClick}
+            className="opacity-100"
           />
         ) : null}
       </div>
 
-      {/* Timestamp. */}
-      <span className="flex-shrink-0 text-xs text-gray-500">
+      {/* Timestamp - right aligned. */}
+      <span className={cn(
+        'w-16 flex-shrink-0 text-right text-xs',
+        isUnread ? 'font-semibold text-gray-900' : 'text-gray-500',
+      )}>
         {formatRelativeTime(message.created_at)}
       </span>
     </div>

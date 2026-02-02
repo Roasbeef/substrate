@@ -5,7 +5,10 @@ import { Link } from 'react-router-dom';
 import { clsx } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 import { useUIStore } from '@/stores/ui.js';
-import { routes } from '@/router.js';
+import { useAgentsStatus } from '@/hooks/useAgents.js';
+import { useMessages } from '@/hooks/useMessages.js';
+import { ConnectedAgentSwitcher } from './AgentSwitcher.js';
+import { routes } from '@/lib/routes.js';
 
 // Combine clsx and tailwind-merge for class name handling.
 function cn(...inputs: (string | undefined | null | false)[]) {
@@ -138,8 +141,28 @@ function IconButton({
   );
 }
 
-// Search bar component for the header.
-function HeaderSearchBar() {
+
+// Envelope icon for branding.
+function EnvelopeIcon({ className }: { className?: string }) {
+  return (
+    <svg
+      className={cn('h-6 w-6', className)}
+      fill="none"
+      viewBox="0 0 24 24"
+      stroke="currentColor"
+      strokeWidth={1.5}
+    >
+      <path
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        d="M21.75 6.75v10.5a2.25 2.25 0 01-2.25 2.25h-15a2.25 2.25 0 01-2.25-2.25V6.75m19.5 0A2.25 2.25 0 0019.5 4.5h-15a2.25 2.25 0 00-2.25 2.25m19.5 0v.243a2.25 2.25 0 01-1.07 1.916l-7.5 4.615a2.25 2.25 0 01-2.36 0L3.32 8.91a2.25 2.25 0 01-1.07-1.916V6.75"
+      />
+    </svg>
+  );
+}
+
+// Blue header search bar.
+function BlueHeaderSearchBar() {
   const toggleSearch = useUIStore((state) => state.toggleSearch);
 
   return (
@@ -147,15 +170,16 @@ function HeaderSearchBar() {
       type="button"
       onClick={toggleSearch}
       className={cn(
-        'flex items-center gap-2 rounded-lg border border-gray-200 bg-gray-50 px-3 py-2',
-        'text-sm text-gray-500 hover:border-gray-300 hover:bg-gray-100',
-        'focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2',
-        'min-w-[200px] md:min-w-[300px]',
+        'flex items-center gap-2 rounded-lg bg-blue-500/80 px-4 py-2',
+        'text-sm text-white/90 placeholder-white/60',
+        'hover:bg-blue-400/80 transition-colors',
+        'focus:outline-none focus:ring-2 focus:ring-white/50',
+        'min-w-[240px] md:min-w-[360px]',
       )}
     >
-      <SearchIcon className="text-gray-400" />
-      <span className="flex-1 text-left">Search messages...</span>
-      <kbd className="hidden rounded bg-gray-200 px-1.5 py-0.5 text-xs font-medium text-gray-500 md:inline-block">
+      <SearchIcon className="text-white/70" />
+      <span className="flex-1 text-left text-white/80">Search mail...</span>
+      <kbd className="hidden rounded bg-blue-400/50 px-1.5 py-0.5 text-xs font-medium text-white/70 md:inline-block">
         ⌘K
       </kbd>
     </button>
@@ -167,51 +191,91 @@ export function Header({ className, leftContent, rightContent }: HeaderProps) {
   const toggleSidebar = useUIStore((state) => state.toggleSidebar);
   const toggleSearch = useUIStore((state) => state.toggleSearch);
 
+  // Fetch agents and messages for agent switcher.
+  const { data: agentsData, isLoading: agentsLoading } = useAgentsStatus();
+  const { data: messagesData } = useMessages({ filter: 'unread' });
+
+  // Calculate total unread count.
+  const totalUnreadCount = messagesData?.data?.length ?? 0;
+
   return (
     <header
       className={cn(
-        'flex h-14 items-center justify-between border-b border-gray-200 bg-white px-4',
+        'flex h-14 items-center justify-between bg-blue-600 px-4 shadow-sm',
         className,
       )}
     >
-      {/* Left section - sidebar toggle and custom content. */}
+      {/* Left section - branding and search. */}
       <div className="flex items-center gap-4">
-        <IconButton onClick={toggleSidebar} ariaLabel="Toggle sidebar">
-          <MenuIcon />
-        </IconButton>
+        <button
+          type="button"
+          onClick={toggleSidebar}
+          className="rounded-md p-2 text-white/80 hover:bg-blue-500/50 hover:text-white focus:outline-none focus:ring-2 focus:ring-white/50 md:hidden"
+          aria-label="Toggle sidebar"
+        >
+          <MenuIcon className="text-white" />
+        </button>
+
+        {/* Logo and brand name. */}
+        <Link to={routes.inbox} className="flex items-center gap-2.5">
+          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-white/10">
+            <EnvelopeIcon className="text-white" />
+          </div>
+          <span className="text-xl font-semibold tracking-tight text-white">
+            Substrate
+          </span>
+        </Link>
 
         {leftContent}
 
         {/* Search bar - visible on larger screens. */}
-        <div className="hidden md:block">
-          <HeaderSearchBar />
+        <div className="ml-4 hidden md:block">
+          <BlueHeaderSearchBar />
         </div>
       </div>
 
       {/* Right section - actions and custom content. */}
-      <div className="flex items-center gap-2">
+      <div className="flex items-center gap-1">
         {/* Mobile search button. */}
         <div className="md:hidden">
-          <IconButton onClick={toggleSearch} ariaLabel="Search">
-            <SearchIcon />
-          </IconButton>
+          <button
+            type="button"
+            onClick={toggleSearch}
+            className="rounded-md p-2 text-white/80 hover:bg-blue-500/50 hover:text-white focus:outline-none focus:ring-2 focus:ring-white/50"
+            aria-label="Search"
+          >
+            <SearchIcon className="text-white" />
+          </button>
         </div>
 
+        {/* Agent switcher with unread count. */}
+        {agentsData?.agents ? (
+          <ConnectedAgentSwitcher
+            agents={agentsData.agents}
+            isLoading={agentsLoading}
+            totalUnreadCount={totalUnreadCount}
+          />
+        ) : null}
+
         {/* Notifications button. */}
-        <IconButton ariaLabel="View notifications" showBadge>
-          <BellIcon />
-        </IconButton>
+        <button
+          type="button"
+          className="relative rounded-md p-2 text-white/80 hover:bg-blue-500/50 hover:text-white focus:outline-none focus:ring-2 focus:ring-white/50"
+          aria-label="View notifications"
+        >
+          <BellIcon className="text-white" />
+          {totalUnreadCount > 0 ? (
+            <span className="absolute right-1.5 top-1.5 block h-2 w-2 rounded-full bg-red-500 ring-2 ring-blue-600" />
+          ) : null}
+        </button>
 
         {/* Settings link. */}
         <Link
           to={routes.settings}
-          className={cn(
-            'rounded-md p-2 text-gray-400 hover:bg-gray-100 hover:text-gray-500',
-            'focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2',
-          )}
+          className="rounded-md p-2 text-white/80 hover:bg-blue-500/50 hover:text-white focus:outline-none focus:ring-2 focus:ring-white/50"
           aria-label="Settings"
         >
-          <SettingsIcon />
+          <SettingsIcon className="text-white" />
         </Link>
 
         {rightContent}
