@@ -11,6 +11,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
+	"google.golang.org/protobuf/types/known/timestamppb"
 
 	"github.com/roasbeef/subtrate/internal/activity"
 	"github.com/roasbeef/subtrate/internal/agent"
@@ -461,7 +462,7 @@ func TestMailService_SendMail_Urgent(t *testing.T) {
 	h.createTestAgent("UrgentRecipient")
 
 	// Send urgent message with deadline.
-	deadline := time.Now().Add(1 * time.Hour).Unix()
+	deadline := timestamppb.New(time.Now().Add(1 * time.Hour))
 	resp, err := h.mailClient.SendMail(ctx, &SendMailRequest{
 		SenderId:       senderID,
 		RecipientNames: []string{"UrgentRecipient"},

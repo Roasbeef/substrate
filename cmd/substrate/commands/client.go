@@ -6,14 +6,16 @@ import (
 	"os"
 	"time"
 
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials/insecure"
+	"google.golang.org/protobuf/types/known/timestamppb"
+
 	"github.com/roasbeef/subtrate/internal/agent"
 	subtraterpc "github.com/roasbeef/subtrate/internal/api/grpc"
 	"github.com/roasbeef/subtrate/internal/db"
 	"github.com/roasbeef/subtrate/internal/db/sqlc"
 	"github.com/roasbeef/subtrate/internal/mail"
 	"github.com/roasbeef/subtrate/internal/store"
-	"google.golang.org/grpc"
-	"google.golang.org/grpc/credentials/insecure"
 )
 
 const (
@@ -331,7 +333,7 @@ func (c *Client) SendMail(ctx context.Context, req mail.SendMailRequest) (int64,
 			Priority:       convertPriorityToProto(req.Priority),
 		}
 		if req.Deadline != nil {
-			grpcReq.DeadlineAt = req.Deadline.Unix()
+			grpcReq.DeadlineAt = timestamppb.New(*req.Deadline)
 		}
 
 		resp, err := c.mailClient.SendMail(ctx, grpcReq)
@@ -362,7 +364,7 @@ func (c *Client) UpdateState(ctx context.Context, agentID, messageID int64, stat
 			NewState:  convertStateToProto(state),
 		}
 		if snoozedUntil != nil {
-			grpcReq.SnoozedUntil = snoozedUntil.Unix()
+			grpcReq.SnoozedUntil = timestamppb.New(*snoozedUntil)
 		}
 
 		_, err := c.mailClient.UpdateState(ctx, grpcReq)
@@ -640,10 +642,14 @@ func (c *Client) GetAgent(ctx context.Context, agentID int64) (*sqlc.Agent, erro
 		if err != nil {
 			return nil, err
 		}
+		var lastActiveAt int64
+		if resp.LastActiveAt != nil {
+			lastActiveAt = resp.LastActiveAt.AsTime().Unix()
+		}
 		return &sqlc.Agent{
 			ID:           resp.Id,
 			Name:         resp.Name,
-			LastActiveAt: resp.LastActiveAt,
+			LastActiveAt: lastActiveAt,
 		}, nil
 	}
 
@@ -886,27 +892,36 @@ func convertProtoMessageToMail(m *subtraterpc.InboxMessage) mail.InboxMessage {
 		Body:       m.Body,
 		Priority:   convertProtoToPriority(m.Priority),
 		State:      convertProtoToState(m.State),
-		CreatedAt:  time.Unix(m.CreatedAt, 0),
+		CreatedAt:  timestampToTime(m.CreatedAt),
 	}
 
-	if m.DeadlineAt > 0 {
-		t := time.Unix(m.DeadlineAt, 0)
+	if m.DeadlineAt != nil && m.DeadlineAt.IsValid() {
+		t := m.DeadlineAt.AsTime()
 		msg.Deadline = &t
 	}
-	if m.SnoozedUntil > 0 {
-		t := time.Unix(m.SnoozedUntil, 0)
+	if m.SnoozedUntil != nil && m.SnoozedUntil.IsValid() {
+		t := m.SnoozedUntil.AsTime()
 		msg.SnoozedUntil = &t
 	}
-	if m.ReadAt > 0 {
-		t := time.Unix(m.ReadAt, 0)
+	if m.ReadAt != nil && m.ReadAt.IsValid() {
+		t := m.ReadAt.AsTime()
 		msg.ReadAt = &t
 	}
-	if m.AckedAt > 0 {
-		t := time.Unix(m.AckedAt, 0)
+	if m.AcknowledgedAt != nil && m.AcknowledgedAt.IsValid() {
+		t := m.AcknowledgedAt.AsTime()
 		msg.AckedAt = &t
 	}
 
 	return msg
+}
+
+// timestampToTime converts a proto timestamp to time.Time.
+// Returns zero time if ts is nil or invalid.
+func timestampToTime(ts *timestamppb.Timestamp) time.Time {
+	if ts == nil || !ts.IsValid() {
+		return time.Time{}
+	}
+	return ts.AsTime()
 }
 
 func convertPriorityToProto(p mail.Priority) subtraterpc.Priority {

@@ -85,6 +85,9 @@ type Server struct {
 
 	UnimplementedMailServer
 	UnimplementedAgentServer
+	UnimplementedSessionServer
+	UnimplementedActivityServer
+	UnimplementedStatsServer
 }
 
 // NewServer creates a new gRPC server instance.
@@ -134,6 +137,9 @@ func (s *Server) Start() error {
 	// Register services.
 	RegisterMailServer(s.grpcServer, s)
 	RegisterAgentServer(s.grpcServer, s)
+	RegisterSessionServer(s.grpcServer, s)
+	RegisterActivityServer(s.grpcServer, s)
+	RegisterStatsServer(s.grpcServer, s)
 
 	// Start serving in a goroutine.
 	s.wg.Add(1)

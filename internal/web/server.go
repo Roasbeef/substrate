@@ -225,6 +225,30 @@ func (s *Server) registerGateway(ctx context.Context) error {
 		return fmt.Errorf("failed to register Agent handler: %w", err)
 	}
 
+	// Register Session service handler.
+	err = subtraterpc.RegisterSessionHandlerFromEndpoint(
+		ctx, s.gatewayMux, s.grpcEndpoint, opts,
+	)
+	if err != nil {
+		return fmt.Errorf("failed to register Session handler: %w", err)
+	}
+
+	// Register Activity service handler.
+	err = subtraterpc.RegisterActivityHandlerFromEndpoint(
+		ctx, s.gatewayMux, s.grpcEndpoint, opts,
+	)
+	if err != nil {
+		return fmt.Errorf("failed to register Activity handler: %w", err)
+	}
+
+	// Register Stats service handler.
+	err = subtraterpc.RegisterStatsHandlerFromEndpoint(
+		ctx, s.gatewayMux, s.grpcEndpoint, opts,
+	)
+	if err != nil {
+		return fmt.Errorf("failed to register Stats handler: %w", err)
+	}
+
 	// Mount the gateway at /api/v1/gw/ for direct access (useful for testing).
 	s.mux.HandleFunc("/api/v1/gw/", func(w http.ResponseWriter, r *http.Request) {
 		// Strip the /api/v1/gw prefix to match gateway paths.

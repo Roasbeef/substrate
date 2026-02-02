@@ -65,6 +65,36 @@ http:
     - selector: subtraterpc.Mail.HasUnackedStatusTo
       get: "/api/v1/status/pending/{sender_id}/{recipient_id}"
 
+    # Mail Service - Thread Operations
+    - selector: subtraterpc.Mail.ReplyToThread
+      post: "/api/v1/threads/{thread_id}/reply"
+      body: "*"
+
+    - selector: subtraterpc.Mail.ArchiveThread
+      post: "/api/v1/threads/{thread_id}/archive"
+      body: "*"
+
+    - selector: subtraterpc.Mail.DeleteThread
+      post: "/api/v1/threads/{thread_id}/delete"
+      body: "*"
+
+    - selector: subtraterpc.Mail.MarkThreadUnread
+      post: "/api/v1/threads/{thread_id}/unread"
+      body: "*"
+
+    # Mail Service - Topic Operations
+    - selector: subtraterpc.Mail.GetTopic
+      get: "/api/v1/topics/{topic_id}"
+
+    # Mail Service - Autocomplete
+    - selector: subtraterpc.Mail.AutocompleteRecipients
+      get: "/api/v1/autocomplete/recipients"
+
+    # Mail Service - Delete Message
+    - selector: subtraterpc.Mail.DeleteMessage
+      post: "/api/v1/messages/{message_id}/delete"
+      body: "*"
+
     # Agent Service - Agent Management
     - selector: subtraterpc.Agent.RegisterAgent
       post: "/api/v1/agents"
@@ -81,6 +111,18 @@ http:
     - selector: subtraterpc.Agent.DeleteAgent
       delete: "/api/v1/agents/{id}"
 
+    # Agent Service - Extended Operations
+    - selector: subtraterpc.Agent.UpdateAgent
+      patch: "/api/v1/agents/{id}"
+      body: "*"
+
+    - selector: subtraterpc.Agent.GetAgentsStatus
+      get: "/api/v1/agents/status"
+
+    - selector: subtraterpc.Agent.Heartbeat
+      post: "/api/v1/heartbeat"
+      body: "*"
+
     # Agent Service - Identity Management
     - selector: subtraterpc.Agent.EnsureIdentity
       post: "/api/v1/identity"
@@ -89,3 +131,29 @@ http:
     - selector: subtraterpc.Agent.SaveIdentity
       put: "/api/v1/identity"
       body: "*"
+
+    # Session Service
+    - selector: subtraterpc.Session.ListSessions
+      get: "/api/v1/sessions"
+
+    - selector: subtraterpc.Session.GetSession
+      get: "/api/v1/sessions/{session_id}"
+
+    - selector: subtraterpc.Session.StartSession
+      post: "/api/v1/sessions"
+      body: "*"
+
+    - selector: subtraterpc.Session.CompleteSession
+      post: "/api/v1/sessions/{session_id}/complete"
+      body: "*"
+
+    # Activity Service
+    - selector: subtraterpc.Activity.ListActivities
+      get: "/api/v1/activities"
+
+    # Stats Service
+    - selector: subtraterpc.Stats.GetDashboardStats
+      get: "/api/v1/stats/dashboard"
+
+    - selector: subtraterpc.Stats.HealthCheck
+      get: "/api/v1/health"

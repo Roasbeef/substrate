@@ -19,21 +19,28 @@ import (
 const _ = grpc.SupportPackageIsVersion9
 
 const (
-	Mail_SendMail_FullMethodName           = "/subtraterpc.Mail/SendMail"
-	Mail_FetchInbox_FullMethodName         = "/subtraterpc.Mail/FetchInbox"
-	Mail_ReadMessage_FullMethodName        = "/subtraterpc.Mail/ReadMessage"
-	Mail_ReadThread_FullMethodName         = "/subtraterpc.Mail/ReadThread"
-	Mail_UpdateState_FullMethodName        = "/subtraterpc.Mail/UpdateState"
-	Mail_AckMessage_FullMethodName         = "/subtraterpc.Mail/AckMessage"
-	Mail_GetStatus_FullMethodName          = "/subtraterpc.Mail/GetStatus"
-	Mail_PollChanges_FullMethodName        = "/subtraterpc.Mail/PollChanges"
-	Mail_SubscribeInbox_FullMethodName     = "/subtraterpc.Mail/SubscribeInbox"
-	Mail_Publish_FullMethodName            = "/subtraterpc.Mail/Publish"
-	Mail_Subscribe_FullMethodName          = "/subtraterpc.Mail/Subscribe"
-	Mail_Unsubscribe_FullMethodName        = "/subtraterpc.Mail/Unsubscribe"
-	Mail_ListTopics_FullMethodName         = "/subtraterpc.Mail/ListTopics"
-	Mail_Search_FullMethodName             = "/subtraterpc.Mail/Search"
-	Mail_HasUnackedStatusTo_FullMethodName = "/subtraterpc.Mail/HasUnackedStatusTo"
+	Mail_SendMail_FullMethodName               = "/subtraterpc.Mail/SendMail"
+	Mail_FetchInbox_FullMethodName             = "/subtraterpc.Mail/FetchInbox"
+	Mail_ReadMessage_FullMethodName            = "/subtraterpc.Mail/ReadMessage"
+	Mail_ReadThread_FullMethodName             = "/subtraterpc.Mail/ReadThread"
+	Mail_UpdateState_FullMethodName            = "/subtraterpc.Mail/UpdateState"
+	Mail_AckMessage_FullMethodName             = "/subtraterpc.Mail/AckMessage"
+	Mail_GetStatus_FullMethodName              = "/subtraterpc.Mail/GetStatus"
+	Mail_PollChanges_FullMethodName            = "/subtraterpc.Mail/PollChanges"
+	Mail_SubscribeInbox_FullMethodName         = "/subtraterpc.Mail/SubscribeInbox"
+	Mail_Publish_FullMethodName                = "/subtraterpc.Mail/Publish"
+	Mail_Subscribe_FullMethodName              = "/subtraterpc.Mail/Subscribe"
+	Mail_Unsubscribe_FullMethodName            = "/subtraterpc.Mail/Unsubscribe"
+	Mail_ListTopics_FullMethodName             = "/subtraterpc.Mail/ListTopics"
+	Mail_Search_FullMethodName                 = "/subtraterpc.Mail/Search"
+	Mail_HasUnackedStatusTo_FullMethodName     = "/subtraterpc.Mail/HasUnackedStatusTo"
+	Mail_ReplyToThread_FullMethodName          = "/subtraterpc.Mail/ReplyToThread"
+	Mail_ArchiveThread_FullMethodName          = "/subtraterpc.Mail/ArchiveThread"
+	Mail_DeleteThread_FullMethodName           = "/subtraterpc.Mail/DeleteThread"
+	Mail_MarkThreadUnread_FullMethodName       = "/subtraterpc.Mail/MarkThreadUnread"
+	Mail_GetTopic_FullMethodName               = "/subtraterpc.Mail/GetTopic"
+	Mail_AutocompleteRecipients_FullMethodName = "/subtraterpc.Mail/AutocompleteRecipients"
+	Mail_DeleteMessage_FullMethodName          = "/subtraterpc.Mail/DeleteMessage"
 )
 
 // MailClient is the client API for Mail service.
@@ -74,6 +81,20 @@ type MailClient interface {
 	// HasUnackedStatusTo checks if there are unacked status messages from
 	// sender to recipient. Used for deduplication in status-update command.
 	HasUnackedStatusTo(ctx context.Context, in *HasUnackedStatusToRequest, opts ...grpc.CallOption) (*HasUnackedStatusToResponse, error)
+	// ReplyToThread sends a reply message to an existing thread.
+	ReplyToThread(ctx context.Context, in *ReplyToThreadRequest, opts ...grpc.CallOption) (*ReplyToThreadResponse, error)
+	// ArchiveThread archives all messages in a thread.
+	ArchiveThread(ctx context.Context, in *ArchiveThreadRequest, opts ...grpc.CallOption) (*ArchiveThreadResponse, error)
+	// DeleteThread deletes all messages in a thread.
+	DeleteThread(ctx context.Context, in *DeleteThreadRequest, opts ...grpc.CallOption) (*DeleteThreadResponse, error)
+	// MarkThreadUnread marks a thread as unread.
+	MarkThreadUnread(ctx context.Context, in *MarkThreadUnreadRequest, opts ...grpc.CallOption) (*MarkThreadUnreadResponse, error)
+	// GetTopic retrieves a single topic by ID.
+	GetTopic(ctx context.Context, in *GetTopicRequest, opts ...grpc.CallOption) (*GetTopicResponse, error)
+	// AutocompleteRecipients returns matching agents for autocomplete.
+	AutocompleteRecipients(ctx context.Context, in *AutocompleteRecipientsRequest, opts ...grpc.CallOption) (*AutocompleteRecipientsResponse, error)
+	// DeleteMessage marks a message as deleted/trash.
+	DeleteMessage(ctx context.Context, in *DeleteMessageRequest, opts ...grpc.CallOption) (*DeleteMessageResponse, error)
 }
 
 type mailClient struct {
@@ -243,6 +264,76 @@ func (c *mailClient) HasUnackedStatusTo(ctx context.Context, in *HasUnackedStatu
 	return out, nil
 }
 
+func (c *mailClient) ReplyToThread(ctx context.Context, in *ReplyToThreadRequest, opts ...grpc.CallOption) (*ReplyToThreadResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ReplyToThreadResponse)
+	err := c.cc.Invoke(ctx, Mail_ReplyToThread_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *mailClient) ArchiveThread(ctx context.Context, in *ArchiveThreadRequest, opts ...grpc.CallOption) (*ArchiveThreadResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ArchiveThreadResponse)
+	err := c.cc.Invoke(ctx, Mail_ArchiveThread_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *mailClient) DeleteThread(ctx context.Context, in *DeleteThreadRequest, opts ...grpc.CallOption) (*DeleteThreadResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(DeleteThreadResponse)
+	err := c.cc.Invoke(ctx, Mail_DeleteThread_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *mailClient) MarkThreadUnread(ctx context.Context, in *MarkThreadUnreadRequest, opts ...grpc.CallOption) (*MarkThreadUnreadResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(MarkThreadUnreadResponse)
+	err := c.cc.Invoke(ctx, Mail_MarkThreadUnread_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *mailClient) GetTopic(ctx context.Context, in *GetTopicRequest, opts ...grpc.CallOption) (*GetTopicResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(GetTopicResponse)
+	err := c.cc.Invoke(ctx, Mail_GetTopic_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *mailClient) AutocompleteRecipients(ctx context.Context, in *AutocompleteRecipientsRequest, opts ...grpc.CallOption) (*AutocompleteRecipientsResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(AutocompleteRecipientsResponse)
+	err := c.cc.Invoke(ctx, Mail_AutocompleteRecipients_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *mailClient) DeleteMessage(ctx context.Context, in *DeleteMessageRequest, opts ...grpc.CallOption) (*DeleteMessageResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(DeleteMessageResponse)
+	err := c.cc.Invoke(ctx, Mail_DeleteMessage_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // MailServer is the server API for Mail service.
 // All implementations must embed UnimplementedMailServer
 // for forward compatibility.
@@ -281,6 +372,20 @@ type MailServer interface {
 	// HasUnackedStatusTo checks if there are unacked status messages from
 	// sender to recipient. Used for deduplication in status-update command.
 	HasUnackedStatusTo(context.Context, *HasUnackedStatusToRequest) (*HasUnackedStatusToResponse, error)
+	// ReplyToThread sends a reply message to an existing thread.
+	ReplyToThread(context.Context, *ReplyToThreadRequest) (*ReplyToThreadResponse, error)
+	// ArchiveThread archives all messages in a thread.
+	ArchiveThread(context.Context, *ArchiveThreadRequest) (*ArchiveThreadResponse, error)
+	// DeleteThread deletes all messages in a thread.
+	DeleteThread(context.Context, *DeleteThreadRequest) (*DeleteThreadResponse, error)
+	// MarkThreadUnread marks a thread as unread.
+	MarkThreadUnread(context.Context, *MarkThreadUnreadRequest) (*MarkThreadUnreadResponse, error)
+	// GetTopic retrieves a single topic by ID.
+	GetTopic(context.Context, *GetTopicRequest) (*GetTopicResponse, error)
+	// AutocompleteRecipients returns matching agents for autocomplete.
+	AutocompleteRecipients(context.Context, *AutocompleteRecipientsRequest) (*AutocompleteRecipientsResponse, error)
+	// DeleteMessage marks a message as deleted/trash.
+	DeleteMessage(context.Context, *DeleteMessageRequest) (*DeleteMessageResponse, error)
 	mustEmbedUnimplementedMailServer()
 }
 
@@ -335,6 +440,27 @@ func (UnimplementedMailServer) Search(context.Context, *SearchRequest) (*SearchR
 }
 func (UnimplementedMailServer) HasUnackedStatusTo(context.Context, *HasUnackedStatusToRequest) (*HasUnackedStatusToResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method HasUnackedStatusTo not implemented")
+}
+func (UnimplementedMailServer) ReplyToThread(context.Context, *ReplyToThreadRequest) (*ReplyToThreadResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method ReplyToThread not implemented")
+}
+func (UnimplementedMailServer) ArchiveThread(context.Context, *ArchiveThreadRequest) (*ArchiveThreadResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method ArchiveThread not implemented")
+}
+func (UnimplementedMailServer) DeleteThread(context.Context, *DeleteThreadRequest) (*DeleteThreadResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method DeleteThread not implemented")
+}
+func (UnimplementedMailServer) MarkThreadUnread(context.Context, *MarkThreadUnreadRequest) (*MarkThreadUnreadResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method MarkThreadUnread not implemented")
+}
+func (UnimplementedMailServer) GetTopic(context.Context, *GetTopicRequest) (*GetTopicResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method GetTopic not implemented")
+}
+func (UnimplementedMailServer) AutocompleteRecipients(context.Context, *AutocompleteRecipientsRequest) (*AutocompleteRecipientsResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method AutocompleteRecipients not implemented")
+}
+func (UnimplementedMailServer) DeleteMessage(context.Context, *DeleteMessageRequest) (*DeleteMessageResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method DeleteMessage not implemented")
 }
 func (UnimplementedMailServer) mustEmbedUnimplementedMailServer() {}
 func (UnimplementedMailServer) testEmbeddedByValue()              {}
@@ -620,6 +746,132 @@ func _Mail_HasUnackedStatusTo_Handler(srv interface{}, ctx context.Context, dec 
 	return interceptor(ctx, in, info, handler)
 }
 
+func _Mail_ReplyToThread_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ReplyToThreadRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(MailServer).ReplyToThread(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Mail_ReplyToThread_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(MailServer).ReplyToThread(ctx, req.(*ReplyToThreadRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _Mail_ArchiveThread_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ArchiveThreadRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(MailServer).ArchiveThread(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Mail_ArchiveThread_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(MailServer).ArchiveThread(ctx, req.(*ArchiveThreadRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _Mail_DeleteThread_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(DeleteThreadRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(MailServer).DeleteThread(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Mail_DeleteThread_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(MailServer).DeleteThread(ctx, req.(*DeleteThreadRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _Mail_MarkThreadUnread_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(MarkThreadUnreadRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(MailServer).MarkThreadUnread(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Mail_MarkThreadUnread_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(MailServer).MarkThreadUnread(ctx, req.(*MarkThreadUnreadRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _Mail_GetTopic_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetTopicRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(MailServer).GetTopic(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Mail_GetTopic_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(MailServer).GetTopic(ctx, req.(*GetTopicRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _Mail_AutocompleteRecipients_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(AutocompleteRecipientsRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(MailServer).AutocompleteRecipients(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Mail_AutocompleteRecipients_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(MailServer).AutocompleteRecipients(ctx, req.(*AutocompleteRecipientsRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _Mail_DeleteMessage_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(DeleteMessageRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(MailServer).DeleteMessage(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Mail_DeleteMessage_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(MailServer).DeleteMessage(ctx, req.(*DeleteMessageRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // Mail_ServiceDesc is the grpc.ServiceDesc for Mail service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -683,6 +935,34 @@ var Mail_ServiceDesc = grpc.ServiceDesc{
 			MethodName: "HasUnackedStatusTo",
 			Handler:    _Mail_HasUnackedStatusTo_Handler,
 		},
+		{
+			MethodName: "ReplyToThread",
+			Handler:    _Mail_ReplyToThread_Handler,
+		},
+		{
+			MethodName: "ArchiveThread",
+			Handler:    _Mail_ArchiveThread_Handler,
+		},
+		{
+			MethodName: "DeleteThread",
+			Handler:    _Mail_DeleteThread_Handler,
+		},
+		{
+			MethodName: "MarkThreadUnread",
+			Handler:    _Mail_MarkThreadUnread_Handler,
+		},
+		{
+			MethodName: "GetTopic",
+			Handler:    _Mail_GetTopic_Handler,
+		},
+		{
+			MethodName: "AutocompleteRecipients",
+			Handler:    _Mail_AutocompleteRecipients_Handler,
+		},
+		{
+			MethodName: "DeleteMessage",
+			Handler:    _Mail_DeleteMessage_Handler,
+		},
 	},
 	Streams: []grpc.StreamDesc{
 		{
@@ -695,12 +975,15 @@ var Mail_ServiceDesc = grpc.ServiceDesc{
 }
 
 const (
-	Agent_RegisterAgent_FullMethodName  = "/subtraterpc.Agent/RegisterAgent"
-	Agent_GetAgent_FullMethodName       = "/subtraterpc.Agent/GetAgent"
-	Agent_ListAgents_FullMethodName     = "/subtraterpc.Agent/ListAgents"
-	Agent_DeleteAgent_FullMethodName    = "/subtraterpc.Agent/DeleteAgent"
-	Agent_EnsureIdentity_FullMethodName = "/subtraterpc.Agent/EnsureIdentity"
-	Agent_SaveIdentity_FullMethodName   = "/subtraterpc.Agent/SaveIdentity"
+	Agent_RegisterAgent_FullMethodName   = "/subtraterpc.Agent/RegisterAgent"
+	Agent_GetAgent_FullMethodName        = "/subtraterpc.Agent/GetAgent"
+	Agent_ListAgents_FullMethodName      = "/subtraterpc.Agent/ListAgents"
+	Agent_DeleteAgent_FullMethodName     = "/subtraterpc.Agent/DeleteAgent"
+	Agent_UpdateAgent_FullMethodName     = "/subtraterpc.Agent/UpdateAgent"
+	Agent_GetAgentsStatus_FullMethodName = "/subtraterpc.Agent/GetAgentsStatus"
+	Agent_Heartbeat_FullMethodName       = "/subtraterpc.Agent/Heartbeat"
+	Agent_EnsureIdentity_FullMethodName  = "/subtraterpc.Agent/EnsureIdentity"
+	Agent_SaveIdentity_FullMethodName    = "/subtraterpc.Agent/SaveIdentity"
 )
 
 // AgentClient is the client API for Agent service.
@@ -717,6 +1000,12 @@ type AgentClient interface {
 	ListAgents(ctx context.Context, in *ListAgentsRequest, opts ...grpc.CallOption) (*ListAgentsResponse, error)
 	// DeleteAgent removes an agent by ID.
 	DeleteAgent(ctx context.Context, in *DeleteAgentRequest, opts ...grpc.CallOption) (*DeleteAgentResponse, error)
+	// UpdateAgent updates an agent's properties.
+	UpdateAgent(ctx context.Context, in *UpdateAgentRequest, opts ...grpc.CallOption) (*UpdateAgentResponse, error)
+	// GetAgentsStatus returns all agents with their status and counts.
+	GetAgentsStatus(ctx context.Context, in *GetAgentsStatusRequest, opts ...grpc.CallOption) (*GetAgentsStatusResponse, error)
+	// Heartbeat records a heartbeat for an agent.
+	Heartbeat(ctx context.Context, in *HeartbeatRequest, opts ...grpc.CallOption) (*HeartbeatResponse, error)
 	// EnsureIdentity creates or retrieves an agent identity for a session.
 	EnsureIdentity(ctx context.Context, in *EnsureIdentityRequest, opts ...grpc.CallOption) (*EnsureIdentityResponse, error)
 	// SaveIdentity persists an agent's current state.
@@ -771,6 +1060,36 @@ func (c *agentClient) DeleteAgent(ctx context.Context, in *DeleteAgentRequest, o
 	return out, nil
 }
 
+func (c *agentClient) UpdateAgent(ctx context.Context, in *UpdateAgentRequest, opts ...grpc.CallOption) (*UpdateAgentResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(UpdateAgentResponse)
+	err := c.cc.Invoke(ctx, Agent_UpdateAgent_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *agentClient) GetAgentsStatus(ctx context.Context, in *GetAgentsStatusRequest, opts ...grpc.CallOption) (*GetAgentsStatusResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(GetAgentsStatusResponse)
+	err := c.cc.Invoke(ctx, Agent_GetAgentsStatus_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *agentClient) Heartbeat(ctx context.Context, in *HeartbeatRequest, opts ...grpc.CallOption) (*HeartbeatResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(HeartbeatResponse)
+	err := c.cc.Invoke(ctx, Agent_Heartbeat_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 func (c *agentClient) EnsureIdentity(ctx context.Context, in *EnsureIdentityRequest, opts ...grpc.CallOption) (*EnsureIdentityResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(EnsureIdentityResponse)
@@ -805,6 +1124,12 @@ type AgentServer interface {
 	ListAgents(context.Context, *ListAgentsRequest) (*ListAgentsResponse, error)
 	// DeleteAgent removes an agent by ID.
 	DeleteAgent(context.Context, *DeleteAgentRequest) (*DeleteAgentResponse, error)
+	// UpdateAgent updates an agent's properties.
+	UpdateAgent(context.Context, *UpdateAgentRequest) (*UpdateAgentResponse, error)
+	// GetAgentsStatus returns all agents with their status and counts.
+	GetAgentsStatus(context.Context, *GetAgentsStatusRequest) (*GetAgentsStatusResponse, error)
+	// Heartbeat records a heartbeat for an agent.
+	Heartbeat(context.Context, *HeartbeatRequest) (*HeartbeatResponse, error)
 	// EnsureIdentity creates or retrieves an agent identity for a session.
 	EnsureIdentity(context.Context, *EnsureIdentityRequest) (*EnsureIdentityResponse, error)
 	// SaveIdentity persists an agent's current state.
@@ -830,6 +1155,15 @@ func (UnimplementedAgentServer) ListAgents(context.Context, *ListAgentsRequest) 
 }
 func (UnimplementedAgentServer) DeleteAgent(context.Context, *DeleteAgentRequest) (*DeleteAgentResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method DeleteAgent not implemented")
+}
+func (UnimplementedAgentServer) UpdateAgent(context.Context, *UpdateAgentRequest) (*UpdateAgentResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method UpdateAgent not implemented")
+}
+func (UnimplementedAgentServer) GetAgentsStatus(context.Context, *GetAgentsStatusRequest) (*GetAgentsStatusResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method GetAgentsStatus not implemented")
+}
+func (UnimplementedAgentServer) Heartbeat(context.Context, *HeartbeatRequest) (*HeartbeatResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method Heartbeat not implemented")
 }
 func (UnimplementedAgentServer) EnsureIdentity(context.Context, *EnsureIdentityRequest) (*EnsureIdentityResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method EnsureIdentity not implemented")
@@ -930,6 +1264,60 @@ func _Agent_DeleteAgent_Handler(srv interface{}, ctx context.Context, dec func(i
 	return interceptor(ctx, in, info, handler)
 }
 
+func _Agent_UpdateAgent_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(UpdateAgentRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(AgentServer).UpdateAgent(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Agent_UpdateAgent_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(AgentServer).UpdateAgent(ctx, req.(*UpdateAgentRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _Agent_GetAgentsStatus_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetAgentsStatusRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(AgentServer).GetAgentsStatus(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Agent_GetAgentsStatus_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(AgentServer).GetAgentsStatus(ctx, req.(*GetAgentsStatusRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _Agent_Heartbeat_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(HeartbeatRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(AgentServer).Heartbeat(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Agent_Heartbeat_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(AgentServer).Heartbeat(ctx, req.(*HeartbeatRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 func _Agent_EnsureIdentity_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(EnsureIdentityRequest)
 	if err := dec(in); err != nil {
@@ -990,12 +1378,508 @@ var Agent_ServiceDesc = grpc.ServiceDesc{
 			Handler:    _Agent_DeleteAgent_Handler,
 		},
 		{
+			MethodName: "UpdateAgent",
+			Handler:    _Agent_UpdateAgent_Handler,
+		},
+		{
+			MethodName: "GetAgentsStatus",
+			Handler:    _Agent_GetAgentsStatus_Handler,
+		},
+		{
+			MethodName: "Heartbeat",
+			Handler:    _Agent_Heartbeat_Handler,
+		},
+		{
 			MethodName: "EnsureIdentity",
 			Handler:    _Agent_EnsureIdentity_Handler,
 		},
 		{
 			MethodName: "SaveIdentity",
 			Handler:    _Agent_SaveIdentity_Handler,
+		},
+	},
+	Streams:  []grpc.StreamDesc{},
+	Metadata: "mail.proto",
+}
+
+const (
+	Session_ListSessions_FullMethodName    = "/subtraterpc.Session/ListSessions"
+	Session_GetSession_FullMethodName      = "/subtraterpc.Session/GetSession"
+	Session_StartSession_FullMethodName    = "/subtraterpc.Session/StartSession"
+	Session_CompleteSession_FullMethodName = "/subtraterpc.Session/CompleteSession"
+)
+
+// SessionClient is the client API for Session service.
+//
+// For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
+//
+// Session is the RPC service for managing agent sessions.
+type SessionClient interface {
+	// ListSessions lists all sessions with optional filters.
+	ListSessions(ctx context.Context, in *ListSessionsRequest, opts ...grpc.CallOption) (*ListSessionsResponse, error)
+	// GetSession retrieves a single session by ID.
+	GetSession(ctx context.Context, in *GetSessionRequest, opts ...grpc.CallOption) (*GetSessionResponse, error)
+	// StartSession starts a new session for an agent.
+	StartSession(ctx context.Context, in *StartSessionRequest, opts ...grpc.CallOption) (*StartSessionResponse, error)
+	// CompleteSession marks a session as completed.
+	CompleteSession(ctx context.Context, in *CompleteSessionRequest, opts ...grpc.CallOption) (*CompleteSessionResponse, error)
+}
+
+type sessionClient struct {
+	cc grpc.ClientConnInterface
+}
+
+func NewSessionClient(cc grpc.ClientConnInterface) SessionClient {
+	return &sessionClient{cc}
+}
+
+func (c *sessionClient) ListSessions(ctx context.Context, in *ListSessionsRequest, opts ...grpc.CallOption) (*ListSessionsResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ListSessionsResponse)
+	err := c.cc.Invoke(ctx, Session_ListSessions_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *sessionClient) GetSession(ctx context.Context, in *GetSessionRequest, opts ...grpc.CallOption) (*GetSessionResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(GetSessionResponse)
+	err := c.cc.Invoke(ctx, Session_GetSession_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *sessionClient) StartSession(ctx context.Context, in *StartSessionRequest, opts ...grpc.CallOption) (*StartSessionResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(StartSessionResponse)
+	err := c.cc.Invoke(ctx, Session_StartSession_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *sessionClient) CompleteSession(ctx context.Context, in *CompleteSessionRequest, opts ...grpc.CallOption) (*CompleteSessionResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(CompleteSessionResponse)
+	err := c.cc.Invoke(ctx, Session_CompleteSession_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+// SessionServer is the server API for Session service.
+// All implementations must embed UnimplementedSessionServer
+// for forward compatibility.
+//
+// Session is the RPC service for managing agent sessions.
+type SessionServer interface {
+	// ListSessions lists all sessions with optional filters.
+	ListSessions(context.Context, *ListSessionsRequest) (*ListSessionsResponse, error)
+	// GetSession retrieves a single session by ID.
+	GetSession(context.Context, *GetSessionRequest) (*GetSessionResponse, error)
+	// StartSession starts a new session for an agent.
+	StartSession(context.Context, *StartSessionRequest) (*StartSessionResponse, error)
+	// CompleteSession marks a session as completed.
+	CompleteSession(context.Context, *CompleteSessionRequest) (*CompleteSessionResponse, error)
+	mustEmbedUnimplementedSessionServer()
+}
+
+// UnimplementedSessionServer must be embedded to have
+// forward compatible implementations.
+//
+// NOTE: this should be embedded by value instead of pointer to avoid a nil
+// pointer dereference when methods are called.
+type UnimplementedSessionServer struct{}
+
+func (UnimplementedSessionServer) ListSessions(context.Context, *ListSessionsRequest) (*ListSessionsResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method ListSessions not implemented")
+}
+func (UnimplementedSessionServer) GetSession(context.Context, *GetSessionRequest) (*GetSessionResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method GetSession not implemented")
+}
+func (UnimplementedSessionServer) StartSession(context.Context, *StartSessionRequest) (*StartSessionResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method StartSession not implemented")
+}
+func (UnimplementedSessionServer) CompleteSession(context.Context, *CompleteSessionRequest) (*CompleteSessionResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method CompleteSession not implemented")
+}
+func (UnimplementedSessionServer) mustEmbedUnimplementedSessionServer() {}
+func (UnimplementedSessionServer) testEmbeddedByValue()                 {}
+
+// UnsafeSessionServer may be embedded to opt out of forward compatibility for this service.
+// Use of this interface is not recommended, as added methods to SessionServer will
+// result in compilation errors.
+type UnsafeSessionServer interface {
+	mustEmbedUnimplementedSessionServer()
+}
+
+func RegisterSessionServer(s grpc.ServiceRegistrar, srv SessionServer) {
+	// If the following call pancis, it indicates UnimplementedSessionServer was
+	// embedded by pointer and is nil.  This will cause panics if an
+	// unimplemented method is ever invoked, so we test this at initialization
+	// time to prevent it from happening at runtime later due to I/O.
+	if t, ok := srv.(interface{ testEmbeddedByValue() }); ok {
+		t.testEmbeddedByValue()
+	}
+	s.RegisterService(&Session_ServiceDesc, srv)
+}
+
+func _Session_ListSessions_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ListSessionsRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(SessionServer).ListSessions(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Session_ListSessions_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(SessionServer).ListSessions(ctx, req.(*ListSessionsRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _Session_GetSession_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetSessionRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(SessionServer).GetSession(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Session_GetSession_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(SessionServer).GetSession(ctx, req.(*GetSessionRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _Session_StartSession_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(StartSessionRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(SessionServer).StartSession(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Session_StartSession_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(SessionServer).StartSession(ctx, req.(*StartSessionRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _Session_CompleteSession_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(CompleteSessionRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(SessionServer).CompleteSession(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Session_CompleteSession_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(SessionServer).CompleteSession(ctx, req.(*CompleteSessionRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+// Session_ServiceDesc is the grpc.ServiceDesc for Session service.
+// It's only intended for direct use with grpc.RegisterService,
+// and not to be introspected or modified (even as a copy)
+var Session_ServiceDesc = grpc.ServiceDesc{
+	ServiceName: "subtraterpc.Session",
+	HandlerType: (*SessionServer)(nil),
+	Methods: []grpc.MethodDesc{
+		{
+			MethodName: "ListSessions",
+			Handler:    _Session_ListSessions_Handler,
+		},
+		{
+			MethodName: "GetSession",
+			Handler:    _Session_GetSession_Handler,
+		},
+		{
+			MethodName: "StartSession",
+			Handler:    _Session_StartSession_Handler,
+		},
+		{
+			MethodName: "CompleteSession",
+			Handler:    _Session_CompleteSession_Handler,
+		},
+	},
+	Streams:  []grpc.StreamDesc{},
+	Metadata: "mail.proto",
+}
+
+const (
+	Activity_ListActivities_FullMethodName = "/subtraterpc.Activity/ListActivities"
+)
+
+// ActivityClient is the client API for Activity service.
+//
+// For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
+//
+// Activity is the RPC service for activity feeds.
+type ActivityClient interface {
+	// ListActivities lists activities with optional filters.
+	ListActivities(ctx context.Context, in *ListActivitiesRequest, opts ...grpc.CallOption) (*ListActivitiesResponse, error)
+}
+
+type activityClient struct {
+	cc grpc.ClientConnInterface
+}
+
+func NewActivityClient(cc grpc.ClientConnInterface) ActivityClient {
+	return &activityClient{cc}
+}
+
+func (c *activityClient) ListActivities(ctx context.Context, in *ListActivitiesRequest, opts ...grpc.CallOption) (*ListActivitiesResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ListActivitiesResponse)
+	err := c.cc.Invoke(ctx, Activity_ListActivities_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+// ActivityServer is the server API for Activity service.
+// All implementations must embed UnimplementedActivityServer
+// for forward compatibility.
+//
+// Activity is the RPC service for activity feeds.
+type ActivityServer interface {
+	// ListActivities lists activities with optional filters.
+	ListActivities(context.Context, *ListActivitiesRequest) (*ListActivitiesResponse, error)
+	mustEmbedUnimplementedActivityServer()
+}
+
+// UnimplementedActivityServer must be embedded to have
+// forward compatible implementations.
+//
+// NOTE: this should be embedded by value instead of pointer to avoid a nil
+// pointer dereference when methods are called.
+type UnimplementedActivityServer struct{}
+
+func (UnimplementedActivityServer) ListActivities(context.Context, *ListActivitiesRequest) (*ListActivitiesResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method ListActivities not implemented")
+}
+func (UnimplementedActivityServer) mustEmbedUnimplementedActivityServer() {}
+func (UnimplementedActivityServer) testEmbeddedByValue()                  {}
+
+// UnsafeActivityServer may be embedded to opt out of forward compatibility for this service.
+// Use of this interface is not recommended, as added methods to ActivityServer will
+// result in compilation errors.
+type UnsafeActivityServer interface {
+	mustEmbedUnimplementedActivityServer()
+}
+
+func RegisterActivityServer(s grpc.ServiceRegistrar, srv ActivityServer) {
+	// If the following call pancis, it indicates UnimplementedActivityServer was
+	// embedded by pointer and is nil.  This will cause panics if an
+	// unimplemented method is ever invoked, so we test this at initialization
+	// time to prevent it from happening at runtime later due to I/O.
+	if t, ok := srv.(interface{ testEmbeddedByValue() }); ok {
+		t.testEmbeddedByValue()
+	}
+	s.RegisterService(&Activity_ServiceDesc, srv)
+}
+
+func _Activity_ListActivities_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ListActivitiesRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ActivityServer).ListActivities(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Activity_ListActivities_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ActivityServer).ListActivities(ctx, req.(*ListActivitiesRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+// Activity_ServiceDesc is the grpc.ServiceDesc for Activity service.
+// It's only intended for direct use with grpc.RegisterService,
+// and not to be introspected or modified (even as a copy)
+var Activity_ServiceDesc = grpc.ServiceDesc{
+	ServiceName: "subtraterpc.Activity",
+	HandlerType: (*ActivityServer)(nil),
+	Methods: []grpc.MethodDesc{
+		{
+			MethodName: "ListActivities",
+			Handler:    _Activity_ListActivities_Handler,
+		},
+	},
+	Streams:  []grpc.StreamDesc{},
+	Metadata: "mail.proto",
+}
+
+const (
+	Stats_GetDashboardStats_FullMethodName = "/subtraterpc.Stats/GetDashboardStats"
+	Stats_HealthCheck_FullMethodName       = "/subtraterpc.Stats/HealthCheck"
+)
+
+// StatsClient is the client API for Stats service.
+//
+// For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
+//
+// Stats is the RPC service for dashboard statistics.
+type StatsClient interface {
+	// GetDashboardStats returns dashboard statistics.
+	GetDashboardStats(ctx context.Context, in *GetDashboardStatsRequest, opts ...grpc.CallOption) (*GetDashboardStatsResponse, error)
+	// HealthCheck returns server health status.
+	HealthCheck(ctx context.Context, in *HealthCheckRequest, opts ...grpc.CallOption) (*HealthCheckResponse, error)
+}
+
+type statsClient struct {
+	cc grpc.ClientConnInterface
+}
+
+func NewStatsClient(cc grpc.ClientConnInterface) StatsClient {
+	return &statsClient{cc}
+}
+
+func (c *statsClient) GetDashboardStats(ctx context.Context, in *GetDashboardStatsRequest, opts ...grpc.CallOption) (*GetDashboardStatsResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(GetDashboardStatsResponse)
+	err := c.cc.Invoke(ctx, Stats_GetDashboardStats_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *statsClient) HealthCheck(ctx context.Context, in *HealthCheckRequest, opts ...grpc.CallOption) (*HealthCheckResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(HealthCheckResponse)
+	err := c.cc.Invoke(ctx, Stats_HealthCheck_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+// StatsServer is the server API for Stats service.
+// All implementations must embed UnimplementedStatsServer
+// for forward compatibility.
+//
+// Stats is the RPC service for dashboard statistics.
+type StatsServer interface {
+	// GetDashboardStats returns dashboard statistics.
+	GetDashboardStats(context.Context, *GetDashboardStatsRequest) (*GetDashboardStatsResponse, error)
+	// HealthCheck returns server health status.
+	HealthCheck(context.Context, *HealthCheckRequest) (*HealthCheckResponse, error)
+	mustEmbedUnimplementedStatsServer()
+}
+
+// UnimplementedStatsServer must be embedded to have
+// forward compatible implementations.
+//
+// NOTE: this should be embedded by value instead of pointer to avoid a nil
+// pointer dereference when methods are called.
+type UnimplementedStatsServer struct{}
+
+func (UnimplementedStatsServer) GetDashboardStats(context.Context, *GetDashboardStatsRequest) (*GetDashboardStatsResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method GetDashboardStats not implemented")
+}
+func (UnimplementedStatsServer) HealthCheck(context.Context, *HealthCheckRequest) (*HealthCheckResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method HealthCheck not implemented")
+}
+func (UnimplementedStatsServer) mustEmbedUnimplementedStatsServer() {}
+func (UnimplementedStatsServer) testEmbeddedByValue()               {}
+
+// UnsafeStatsServer may be embedded to opt out of forward compatibility for this service.
+// Use of this interface is not recommended, as added methods to StatsServer will
+// result in compilation errors.
+type UnsafeStatsServer interface {
+	mustEmbedUnimplementedStatsServer()
+}
+
+func RegisterStatsServer(s grpc.ServiceRegistrar, srv StatsServer) {
+	// If the following call pancis, it indicates UnimplementedStatsServer was
+	// embedded by pointer and is nil.  This will cause panics if an
+	// unimplemented method is ever invoked, so we test this at initialization
+	// time to prevent it from happening at runtime later due to I/O.
+	if t, ok := srv.(interface{ testEmbeddedByValue() }); ok {
+		t.testEmbeddedByValue()
+	}
+	s.RegisterService(&Stats_ServiceDesc, srv)
+}
+
+func _Stats_GetDashboardStats_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetDashboardStatsRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(StatsServer).GetDashboardStats(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Stats_GetDashboardStats_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(StatsServer).GetDashboardStats(ctx, req.(*GetDashboardStatsRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _Stats_HealthCheck_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(HealthCheckRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(StatsServer).HealthCheck(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Stats_HealthCheck_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(StatsServer).HealthCheck(ctx, req.(*HealthCheckRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+// Stats_ServiceDesc is the grpc.ServiceDesc for Stats service.
+// It's only intended for direct use with grpc.RegisterService,
+// and not to be introspected or modified (even as a copy)
+var Stats_ServiceDesc = grpc.ServiceDesc{
+	ServiceName: "subtraterpc.Stats",
+	HandlerType: (*StatsServer)(nil),
+	Methods: []grpc.MethodDesc{
+		{
+			MethodName: "GetDashboardStats",
+			Handler:    _Stats_GetDashboardStats_Handler,
+		},
+		{
+			MethodName: "HealthCheck",
+			Handler:    _Stats_HealthCheck_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

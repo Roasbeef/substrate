@@ -9,6 +9,7 @@ package subtraterpc
 import (
 	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
 	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
+	timestamppb "google.golang.org/protobuf/types/known/timestamppb"
 	reflect "reflect"
 	sync "sync"
 	unsafe "unsafe"
@@ -136,25 +137,198 @@ func (MessageState) EnumDescriptor() ([]byte, []int) {
 	return file_mail_proto_rawDescGZIP(), []int{1}
 }
 
+// AgentStatus represents an agent's current status.
+type AgentStatus int32
+
+const (
+	AgentStatus_AGENT_STATUS_UNSPECIFIED AgentStatus = 0
+	AgentStatus_AGENT_STATUS_ACTIVE      AgentStatus = 1
+	AgentStatus_AGENT_STATUS_BUSY        AgentStatus = 2
+	AgentStatus_AGENT_STATUS_IDLE        AgentStatus = 3
+	AgentStatus_AGENT_STATUS_OFFLINE     AgentStatus = 4
+)
+
+// Enum value maps for AgentStatus.
+var (
+	AgentStatus_name = map[int32]string{
+		0: "AGENT_STATUS_UNSPECIFIED",
+		1: "AGENT_STATUS_ACTIVE",
+		2: "AGENT_STATUS_BUSY",
+		3: "AGENT_STATUS_IDLE",
+		4: "AGENT_STATUS_OFFLINE",
+	}
+	AgentStatus_value = map[string]int32{
+		"AGENT_STATUS_UNSPECIFIED": 0,
+		"AGENT_STATUS_ACTIVE":      1,
+		"AGENT_STATUS_BUSY":        2,
+		"AGENT_STATUS_IDLE":        3,
+		"AGENT_STATUS_OFFLINE":     4,
+	}
+)
+
+func (x AgentStatus) Enum() *AgentStatus {
+	p := new(AgentStatus)
+	*p = x
+	return p
+}
+
+func (x AgentStatus) String() string {
+	return protoimpl.X.EnumStringOf(x.Descriptor(), protoreflect.EnumNumber(x))
+}
+
+func (AgentStatus) Descriptor() protoreflect.EnumDescriptor {
+	return file_mail_proto_enumTypes[2].Descriptor()
+}
+
+func (AgentStatus) Type() protoreflect.EnumType {
+	return &file_mail_proto_enumTypes[2]
+}
+
+func (x AgentStatus) Number() protoreflect.EnumNumber {
+	return protoreflect.EnumNumber(x)
+}
+
+// Deprecated: Use AgentStatus.Descriptor instead.
+func (AgentStatus) EnumDescriptor() ([]byte, []int) {
+	return file_mail_proto_rawDescGZIP(), []int{2}
+}
+
+// SessionStatus represents the status of a session.
+type SessionStatus int32
+
+const (
+	SessionStatus_SESSION_STATUS_UNSPECIFIED SessionStatus = 0
+	SessionStatus_SESSION_STATUS_ACTIVE      SessionStatus = 1
+	SessionStatus_SESSION_STATUS_COMPLETED   SessionStatus = 2
+	SessionStatus_SESSION_STATUS_ABANDONED   SessionStatus = 3
+)
+
+// Enum value maps for SessionStatus.
+var (
+	SessionStatus_name = map[int32]string{
+		0: "SESSION_STATUS_UNSPECIFIED",
+		1: "SESSION_STATUS_ACTIVE",
+		2: "SESSION_STATUS_COMPLETED",
+		3: "SESSION_STATUS_ABANDONED",
+	}
+	SessionStatus_value = map[string]int32{
+		"SESSION_STATUS_UNSPECIFIED": 0,
+		"SESSION_STATUS_ACTIVE":      1,
+		"SESSION_STATUS_COMPLETED":   2,
+		"SESSION_STATUS_ABANDONED":   3,
+	}
+)
+
+func (x SessionStatus) Enum() *SessionStatus {
+	p := new(SessionStatus)
+	*p = x
+	return p
+}
+
+func (x SessionStatus) String() string {
+	return protoimpl.X.EnumStringOf(x.Descriptor(), protoreflect.EnumNumber(x))
+}
+
+func (SessionStatus) Descriptor() protoreflect.EnumDescriptor {
+	return file_mail_proto_enumTypes[3].Descriptor()
+}
+
+func (SessionStatus) Type() protoreflect.EnumType {
+	return &file_mail_proto_enumTypes[3]
+}
+
+func (x SessionStatus) Number() protoreflect.EnumNumber {
+	return protoreflect.EnumNumber(x)
+}
+
+// Deprecated: Use SessionStatus.Descriptor instead.
+func (SessionStatus) EnumDescriptor() ([]byte, []int) {
+	return file_mail_proto_rawDescGZIP(), []int{3}
+}
+
+// ActivityType represents the type of an activity.
+type ActivityType int32
+
+const (
+	ActivityType_ACTIVITY_TYPE_UNSPECIFIED       ActivityType = 0
+	ActivityType_ACTIVITY_TYPE_MESSAGE_SENT      ActivityType = 1
+	ActivityType_ACTIVITY_TYPE_MESSAGE_READ      ActivityType = 2
+	ActivityType_ACTIVITY_TYPE_SESSION_STARTED   ActivityType = 3
+	ActivityType_ACTIVITY_TYPE_SESSION_COMPLETED ActivityType = 4
+	ActivityType_ACTIVITY_TYPE_AGENT_REGISTERED  ActivityType = 5
+	ActivityType_ACTIVITY_TYPE_HEARTBEAT         ActivityType = 6
+)
+
+// Enum value maps for ActivityType.
+var (
+	ActivityType_name = map[int32]string{
+		0: "ACTIVITY_TYPE_UNSPECIFIED",
+		1: "ACTIVITY_TYPE_MESSAGE_SENT",
+		2: "ACTIVITY_TYPE_MESSAGE_READ",
+		3: "ACTIVITY_TYPE_SESSION_STARTED",
+		4: "ACTIVITY_TYPE_SESSION_COMPLETED",
+		5: "ACTIVITY_TYPE_AGENT_REGISTERED",
+		6: "ACTIVITY_TYPE_HEARTBEAT",
+	}
+	ActivityType_value = map[string]int32{
+		"ACTIVITY_TYPE_UNSPECIFIED":       0,
+		"ACTIVITY_TYPE_MESSAGE_SENT":      1,
+		"ACTIVITY_TYPE_MESSAGE_READ":      2,
+		"ACTIVITY_TYPE_SESSION_STARTED":   3,
+		"ACTIVITY_TYPE_SESSION_COMPLETED": 4,
+		"ACTIVITY_TYPE_AGENT_REGISTERED":  5,
+		"ACTIVITY_TYPE_HEARTBEAT":         6,
+	}
+)
+
+func (x ActivityType) Enum() *ActivityType {
+	p := new(ActivityType)
+	*p = x
+	return p
+}
+
+func (x ActivityType) String() string {
+	return protoimpl.X.EnumStringOf(x.Descriptor(), protoreflect.EnumNumber(x))
+}
+
+func (ActivityType) Descriptor() protoreflect.EnumDescriptor {
+	return file_mail_proto_enumTypes[4].Descriptor()
+}
+
+func (ActivityType) Type() protoreflect.EnumType {
+	return &file_mail_proto_enumTypes[4]
+}
+
+func (x ActivityType) Number() protoreflect.EnumNumber {
+	return protoreflect.EnumNumber(x)
+}
+
+// Deprecated: Use ActivityType.Descriptor instead.
+func (ActivityType) EnumDescriptor() ([]byte, []int) {
+	return file_mail_proto_rawDescGZIP(), []int{4}
+}
+
 // InboxMessage represents a message in an agent's inbox.
+// Note: int64 fields serialize as strings in JSON (protobuf standard).
+// Timestamps use RFC 3339 format. Priority/state serialize as enum strings.
 type InboxMessage struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Id            int64                  `protobuf:"varint,1,opt,name=id,proto3" json:"id,omitempty"`
-	ThreadId      string                 `protobuf:"bytes,2,opt,name=thread_id,json=threadId,proto3" json:"thread_id,omitempty"`
-	TopicId       int64                  `protobuf:"varint,3,opt,name=topic_id,json=topicId,proto3" json:"topic_id,omitempty"`
-	SenderId      int64                  `protobuf:"varint,4,opt,name=sender_id,json=senderId,proto3" json:"sender_id,omitempty"`
-	SenderName    string                 `protobuf:"bytes,5,opt,name=sender_name,json=senderName,proto3" json:"sender_name,omitempty"`
-	Subject       string                 `protobuf:"bytes,6,opt,name=subject,proto3" json:"subject,omitempty"`
-	Body          string                 `protobuf:"bytes,7,opt,name=body,proto3" json:"body,omitempty"`
-	Priority      Priority               `protobuf:"varint,8,opt,name=priority,proto3,enum=subtraterpc.Priority" json:"priority,omitempty"`
-	State         MessageState           `protobuf:"varint,9,opt,name=state,proto3,enum=subtraterpc.MessageState" json:"state,omitempty"`
-	CreatedAt     int64                  `protobuf:"varint,10,opt,name=created_at,json=createdAt,proto3" json:"created_at,omitempty"`          // Unix timestamp
-	DeadlineAt    int64                  `protobuf:"varint,11,opt,name=deadline_at,json=deadlineAt,proto3" json:"deadline_at,omitempty"`       // Unix timestamp, 0 if no deadline
-	SnoozedUntil  int64                  `protobuf:"varint,12,opt,name=snoozed_until,json=snoozedUntil,proto3" json:"snoozed_until,omitempty"` // Unix timestamp, 0 if not snoozed
-	ReadAt        int64                  `protobuf:"varint,13,opt,name=read_at,json=readAt,proto3" json:"read_at,omitempty"`                   // Unix timestamp, 0 if unread
-	AckedAt       int64                  `protobuf:"varint,14,opt,name=acked_at,json=ackedAt,proto3" json:"acked_at,omitempty"`                // Unix timestamp, 0 if not acked
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	state          protoimpl.MessageState `protogen:"open.v1"`
+	Id             int64                  `protobuf:"varint,1,opt,name=id,proto3" json:"id,omitempty"`
+	ThreadId       string                 `protobuf:"bytes,2,opt,name=thread_id,json=threadId,proto3" json:"thread_id,omitempty"`
+	TopicId        int64                  `protobuf:"varint,3,opt,name=topic_id,json=topicId,proto3" json:"topic_id,omitempty"`
+	SenderId       int64                  `protobuf:"varint,4,opt,name=sender_id,json=senderId,proto3" json:"sender_id,omitempty"`
+	SenderName     string                 `protobuf:"bytes,5,opt,name=sender_name,json=senderName,proto3" json:"sender_name,omitempty"`
+	Subject        string                 `protobuf:"bytes,6,opt,name=subject,proto3" json:"subject,omitempty"`
+	Body           string                 `protobuf:"bytes,7,opt,name=body,proto3" json:"body,omitempty"`
+	Priority       Priority               `protobuf:"varint,8,opt,name=priority,proto3,enum=subtraterpc.Priority" json:"priority,omitempty"`
+	State          MessageState           `protobuf:"varint,9,opt,name=state,proto3,enum=subtraterpc.MessageState" json:"state,omitempty"`
+	CreatedAt      *timestamppb.Timestamp `protobuf:"bytes,10,opt,name=created_at,json=createdAt,proto3" json:"created_at,omitempty"`
+	DeadlineAt     *timestamppb.Timestamp `protobuf:"bytes,11,opt,name=deadline_at,json=deadlineAt,proto3" json:"deadline_at,omitempty"`             // null if no deadline
+	SnoozedUntil   *timestamppb.Timestamp `protobuf:"bytes,12,opt,name=snoozed_until,json=snoozedUntil,proto3" json:"snoozed_until,omitempty"`       // null if not snoozed
+	ReadAt         *timestamppb.Timestamp `protobuf:"bytes,13,opt,name=read_at,json=readAt,proto3" json:"read_at,omitempty"`                         // null if unread
+	AcknowledgedAt *timestamppb.Timestamp `protobuf:"bytes,14,opt,name=acknowledged_at,json=acknowledgedAt,proto3" json:"acknowledged_at,omitempty"` // null if not acked
+	unknownFields  protoimpl.UnknownFields
+	sizeCache      protoimpl.SizeCache
 }
 
 func (x *InboxMessage) Reset() {
@@ -250,39 +424,39 @@ func (x *InboxMessage) GetState() MessageState {
 	return MessageState_STATE_UNSPECIFIED
 }
 
-func (x *InboxMessage) GetCreatedAt() int64 {
+func (x *InboxMessage) GetCreatedAt() *timestamppb.Timestamp {
 	if x != nil {
 		return x.CreatedAt
 	}
-	return 0
+	return nil
 }
 
-func (x *InboxMessage) GetDeadlineAt() int64 {
+func (x *InboxMessage) GetDeadlineAt() *timestamppb.Timestamp {
 	if x != nil {
 		return x.DeadlineAt
 	}
-	return 0
+	return nil
 }
 
-func (x *InboxMessage) GetSnoozedUntil() int64 {
+func (x *InboxMessage) GetSnoozedUntil() *timestamppb.Timestamp {
 	if x != nil {
 		return x.SnoozedUntil
 	}
-	return 0
+	return nil
 }
 
-func (x *InboxMessage) GetReadAt() int64 {
+func (x *InboxMessage) GetReadAt() *timestamppb.Timestamp {
 	if x != nil {
 		return x.ReadAt
 	}
-	return 0
+	return nil
 }
 
-func (x *InboxMessage) GetAckedAt() int64 {
+func (x *InboxMessage) GetAcknowledgedAt() *timestamppb.Timestamp {
 	if x != nil {
-		return x.AckedAt
+		return x.AcknowledgedAt
 	}
-	return 0
+	return nil
 }
 
 // SendMailRequest is the request for SendMail.
@@ -295,7 +469,7 @@ type SendMailRequest struct {
 	Subject         string                 `protobuf:"bytes,5,opt,name=subject,proto3" json:"subject,omitempty"`
 	Body            string                 `protobuf:"bytes,6,opt,name=body,proto3" json:"body,omitempty"`
 	Priority        Priority               `protobuf:"varint,7,opt,name=priority,proto3,enum=subtraterpc.Priority" json:"priority,omitempty"`
-	DeadlineAt      int64                  `protobuf:"varint,8,opt,name=deadline_at,json=deadlineAt,proto3" json:"deadline_at,omitempty"`               // Unix timestamp, 0 for no deadline
+	DeadlineAt      *timestamppb.Timestamp `protobuf:"bytes,8,opt,name=deadline_at,json=deadlineAt,proto3" json:"deadline_at,omitempty"`                // Optional deadline
 	AttachmentsJson string                 `protobuf:"bytes,9,opt,name=attachments_json,json=attachmentsJson,proto3" json:"attachments_json,omitempty"` // JSON string of attachments
 	unknownFields   protoimpl.UnknownFields
 	sizeCache       protoimpl.SizeCache
@@ -380,11 +554,11 @@ func (x *SendMailRequest) GetPriority() Priority {
 	return Priority_PRIORITY_UNSPECIFIED
 }
 
-func (x *SendMailRequest) GetDeadlineAt() int64 {
+func (x *SendMailRequest) GetDeadlineAt() *timestamppb.Timestamp {
 	if x != nil {
 		return x.DeadlineAt
 	}
-	return 0
+	return nil
 }
 
 func (x *SendMailRequest) GetAttachmentsJson() string {
@@ -763,7 +937,7 @@ type UpdateStateRequest struct {
 	AgentId       int64                  `protobuf:"varint,1,opt,name=agent_id,json=agentId,proto3" json:"agent_id,omitempty"`
 	MessageId     int64                  `protobuf:"varint,2,opt,name=message_id,json=messageId,proto3" json:"message_id,omitempty"`
 	NewState      MessageState           `protobuf:"varint,3,opt,name=new_state,json=newState,proto3,enum=subtraterpc.MessageState" json:"new_state,omitempty"`
-	SnoozedUntil  int64                  `protobuf:"varint,4,opt,name=snoozed_until,json=snoozedUntil,proto3" json:"snoozed_until,omitempty"` // Required for STATE_SNOOZED
+	SnoozedUntil  *timestamppb.Timestamp `protobuf:"bytes,4,opt,name=snoozed_until,json=snoozedUntil,proto3" json:"snoozed_until,omitempty"` // Required for STATE_SNOOZED
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -819,11 +993,11 @@ func (x *UpdateStateRequest) GetNewState() MessageState {
 	return MessageState_STATE_UNSPECIFIED
 }
 
-func (x *UpdateStateRequest) GetSnoozedUntil() int64 {
+func (x *UpdateStateRequest) GetSnoozedUntil() *timestamppb.Timestamp {
 	if x != nil {
 		return x.SnoozedUntil
 	}
-	return 0
+	return nil
 }
 
 // UpdateStateResponse is the response for UpdateState.
@@ -1590,7 +1764,7 @@ type Topic struct {
 	Id            int64                  `protobuf:"varint,1,opt,name=id,proto3" json:"id,omitempty"`
 	Name          string                 `protobuf:"bytes,2,opt,name=name,proto3" json:"name,omitempty"`
 	TopicType     string                 `protobuf:"bytes,3,opt,name=topic_type,json=topicType,proto3" json:"topic_type,omitempty"` // "direct", "broadcast", "queue"
-	CreatedAt     int64                  `protobuf:"varint,4,opt,name=created_at,json=createdAt,proto3" json:"created_at,omitempty"`
+	CreatedAt     *timestamppb.Timestamp `protobuf:"bytes,4,opt,name=created_at,json=createdAt,proto3" json:"created_at,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -1646,11 +1820,11 @@ func (x *Topic) GetTopicType() string {
 	return ""
 }
 
-func (x *Topic) GetCreatedAt() int64 {
+func (x *Topic) GetCreatedAt() *timestamppb.Timestamp {
 	if x != nil {
 		return x.CreatedAt
 	}
-	return 0
+	return nil
 }
 
 // ListTopicsRequest is the request for ListTopics.
@@ -2123,16 +2297,17 @@ func (x *GetAgentRequest) GetName() string {
 }
 
 // GetAgentResponse is the response for GetAgent.
+// Note: int64 fields serialize as strings in JSON (protobuf standard).
 type GetAgentResponse struct {
-	state            protoimpl.MessageState `protogen:"open.v1"`
-	Id               int64                  `protobuf:"varint,1,opt,name=id,proto3" json:"id,omitempty"`
-	Name             string                 `protobuf:"bytes,2,opt,name=name,proto3" json:"name,omitempty"`
-	ProjectKey       string                 `protobuf:"bytes,3,opt,name=project_key,json=projectKey,proto3" json:"project_key,omitempty"`
-	CurrentSessionId string                 `protobuf:"bytes,4,opt,name=current_session_id,json=currentSessionId,proto3" json:"current_session_id,omitempty"`
-	CreatedAt        int64                  `protobuf:"varint,5,opt,name=created_at,json=createdAt,proto3" json:"created_at,omitempty"`
-	LastActiveAt     int64                  `protobuf:"varint,6,opt,name=last_active_at,json=lastActiveAt,proto3" json:"last_active_at,omitempty"`
-	unknownFields    protoimpl.UnknownFields
-	sizeCache        protoimpl.SizeCache
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Id            int64                  `protobuf:"varint,1,opt,name=id,proto3" json:"id,omitempty"`
+	Name          string                 `protobuf:"bytes,2,opt,name=name,proto3" json:"name,omitempty"`
+	ProjectKey    string                 `protobuf:"bytes,3,opt,name=project_key,json=projectKey,proto3" json:"project_key,omitempty"`
+	SessionId     string                 `protobuf:"bytes,4,opt,name=session_id,json=sessionId,proto3" json:"session_id,omitempty"` // Current session ID (renamed from current_session_id)
+	CreatedAt     *timestamppb.Timestamp `protobuf:"bytes,5,opt,name=created_at,json=createdAt,proto3" json:"created_at,omitempty"`
+	LastActiveAt  *timestamppb.Timestamp `protobuf:"bytes,6,opt,name=last_active_at,json=lastActiveAt,proto3" json:"last_active_at,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
 }
 
 func (x *GetAgentResponse) Reset() {
@@ -2186,25 +2361,25 @@ func (x *GetAgentResponse) GetProjectKey() string {
 	return ""
 }
 
-func (x *GetAgentResponse) GetCurrentSessionId() string {
+func (x *GetAgentResponse) GetSessionId() string {
 	if x != nil {
-		return x.CurrentSessionId
+		return x.SessionId
 	}
 	return ""
 }
 
-func (x *GetAgentResponse) GetCreatedAt() int64 {
+func (x *GetAgentResponse) GetCreatedAt() *timestamppb.Timestamp {
 	if x != nil {
 		return x.CreatedAt
 	}
-	return 0
+	return nil
 }
 
-func (x *GetAgentResponse) GetLastActiveAt() int64 {
+func (x *GetAgentResponse) GetLastActiveAt() *timestamppb.Timestamp {
 	if x != nil {
 		return x.LastActiveAt
 	}
-	return 0
+	return nil
 }
 
 // ListAgentsRequest is the request for ListAgents.
@@ -2615,12 +2790,2212 @@ func (x *DeleteAgentResponse) GetSuccess() bool {
 	return false
 }
 
+// ReplyToThreadRequest is the request for ReplyToThread.
+type ReplyToThreadRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	SenderId      int64                  `protobuf:"varint,1,opt,name=sender_id,json=senderId,proto3" json:"sender_id,omitempty"`
+	ThreadId      string                 `protobuf:"bytes,2,opt,name=thread_id,json=threadId,proto3" json:"thread_id,omitempty"`
+	Body          string                 `protobuf:"bytes,3,opt,name=body,proto3" json:"body,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ReplyToThreadRequest) Reset() {
+	*x = ReplyToThreadRequest{}
+	mi := &file_mail_proto_msgTypes[43]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ReplyToThreadRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ReplyToThreadRequest) ProtoMessage() {}
+
+func (x *ReplyToThreadRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_mail_proto_msgTypes[43]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ReplyToThreadRequest.ProtoReflect.Descriptor instead.
+func (*ReplyToThreadRequest) Descriptor() ([]byte, []int) {
+	return file_mail_proto_rawDescGZIP(), []int{43}
+}
+
+func (x *ReplyToThreadRequest) GetSenderId() int64 {
+	if x != nil {
+		return x.SenderId
+	}
+	return 0
+}
+
+func (x *ReplyToThreadRequest) GetThreadId() string {
+	if x != nil {
+		return x.ThreadId
+	}
+	return ""
+}
+
+func (x *ReplyToThreadRequest) GetBody() string {
+	if x != nil {
+		return x.Body
+	}
+	return ""
+}
+
+// ReplyToThreadResponse is the response for ReplyToThread.
+type ReplyToThreadResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	MessageId     int64                  `protobuf:"varint,1,opt,name=message_id,json=messageId,proto3" json:"message_id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ReplyToThreadResponse) Reset() {
+	*x = ReplyToThreadResponse{}
+	mi := &file_mail_proto_msgTypes[44]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ReplyToThreadResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ReplyToThreadResponse) ProtoMessage() {}
+
+func (x *ReplyToThreadResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_mail_proto_msgTypes[44]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ReplyToThreadResponse.ProtoReflect.Descriptor instead.
+func (*ReplyToThreadResponse) Descriptor() ([]byte, []int) {
+	return file_mail_proto_rawDescGZIP(), []int{44}
+}
+
+func (x *ReplyToThreadResponse) GetMessageId() int64 {
+	if x != nil {
+		return x.MessageId
+	}
+	return 0
+}
+
+// ArchiveThreadRequest is the request for ArchiveThread.
+type ArchiveThreadRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	AgentId       int64                  `protobuf:"varint,1,opt,name=agent_id,json=agentId,proto3" json:"agent_id,omitempty"`
+	ThreadId      string                 `protobuf:"bytes,2,opt,name=thread_id,json=threadId,proto3" json:"thread_id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ArchiveThreadRequest) Reset() {
+	*x = ArchiveThreadRequest{}
+	mi := &file_mail_proto_msgTypes[45]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ArchiveThreadRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ArchiveThreadRequest) ProtoMessage() {}
+
+func (x *ArchiveThreadRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_mail_proto_msgTypes[45]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ArchiveThreadRequest.ProtoReflect.Descriptor instead.
+func (*ArchiveThreadRequest) Descriptor() ([]byte, []int) {
+	return file_mail_proto_rawDescGZIP(), []int{45}
+}
+
+func (x *ArchiveThreadRequest) GetAgentId() int64 {
+	if x != nil {
+		return x.AgentId
+	}
+	return 0
+}
+
+func (x *ArchiveThreadRequest) GetThreadId() string {
+	if x != nil {
+		return x.ThreadId
+	}
+	return ""
+}
+
+// ArchiveThreadResponse is the response for ArchiveThread.
+type ArchiveThreadResponse struct {
+	state            protoimpl.MessageState `protogen:"open.v1"`
+	Success          bool                   `protobuf:"varint,1,opt,name=success,proto3" json:"success,omitempty"`
+	MessagesArchived int32                  `protobuf:"varint,2,opt,name=messages_archived,json=messagesArchived,proto3" json:"messages_archived,omitempty"`
+	unknownFields    protoimpl.UnknownFields
+	sizeCache        protoimpl.SizeCache
+}
+
+func (x *ArchiveThreadResponse) Reset() {
+	*x = ArchiveThreadResponse{}
+	mi := &file_mail_proto_msgTypes[46]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ArchiveThreadResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ArchiveThreadResponse) ProtoMessage() {}
+
+func (x *ArchiveThreadResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_mail_proto_msgTypes[46]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ArchiveThreadResponse.ProtoReflect.Descriptor instead.
+func (*ArchiveThreadResponse) Descriptor() ([]byte, []int) {
+	return file_mail_proto_rawDescGZIP(), []int{46}
+}
+
+func (x *ArchiveThreadResponse) GetSuccess() bool {
+	if x != nil {
+		return x.Success
+	}
+	return false
+}
+
+func (x *ArchiveThreadResponse) GetMessagesArchived() int32 {
+	if x != nil {
+		return x.MessagesArchived
+	}
+	return 0
+}
+
+// DeleteThreadRequest is the request for DeleteThread.
+type DeleteThreadRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	AgentId       int64                  `protobuf:"varint,1,opt,name=agent_id,json=agentId,proto3" json:"agent_id,omitempty"`
+	ThreadId      string                 `protobuf:"bytes,2,opt,name=thread_id,json=threadId,proto3" json:"thread_id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *DeleteThreadRequest) Reset() {
+	*x = DeleteThreadRequest{}
+	mi := &file_mail_proto_msgTypes[47]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *DeleteThreadRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*DeleteThreadRequest) ProtoMessage() {}
+
+func (x *DeleteThreadRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_mail_proto_msgTypes[47]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use DeleteThreadRequest.ProtoReflect.Descriptor instead.
+func (*DeleteThreadRequest) Descriptor() ([]byte, []int) {
+	return file_mail_proto_rawDescGZIP(), []int{47}
+}
+
+func (x *DeleteThreadRequest) GetAgentId() int64 {
+	if x != nil {
+		return x.AgentId
+	}
+	return 0
+}
+
+func (x *DeleteThreadRequest) GetThreadId() string {
+	if x != nil {
+		return x.ThreadId
+	}
+	return ""
+}
+
+// DeleteThreadResponse is the response for DeleteThread.
+type DeleteThreadResponse struct {
+	state           protoimpl.MessageState `protogen:"open.v1"`
+	Success         bool                   `protobuf:"varint,1,opt,name=success,proto3" json:"success,omitempty"`
+	MessagesDeleted int32                  `protobuf:"varint,2,opt,name=messages_deleted,json=messagesDeleted,proto3" json:"messages_deleted,omitempty"`
+	unknownFields   protoimpl.UnknownFields
+	sizeCache       protoimpl.SizeCache
+}
+
+func (x *DeleteThreadResponse) Reset() {
+	*x = DeleteThreadResponse{}
+	mi := &file_mail_proto_msgTypes[48]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *DeleteThreadResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*DeleteThreadResponse) ProtoMessage() {}
+
+func (x *DeleteThreadResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_mail_proto_msgTypes[48]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use DeleteThreadResponse.ProtoReflect.Descriptor instead.
+func (*DeleteThreadResponse) Descriptor() ([]byte, []int) {
+	return file_mail_proto_rawDescGZIP(), []int{48}
+}
+
+func (x *DeleteThreadResponse) GetSuccess() bool {
+	if x != nil {
+		return x.Success
+	}
+	return false
+}
+
+func (x *DeleteThreadResponse) GetMessagesDeleted() int32 {
+	if x != nil {
+		return x.MessagesDeleted
+	}
+	return 0
+}
+
+// MarkThreadUnreadRequest is the request for MarkThreadUnread.
+type MarkThreadUnreadRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	AgentId       int64                  `protobuf:"varint,1,opt,name=agent_id,json=agentId,proto3" json:"agent_id,omitempty"`
+	ThreadId      string                 `protobuf:"bytes,2,opt,name=thread_id,json=threadId,proto3" json:"thread_id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *MarkThreadUnreadRequest) Reset() {
+	*x = MarkThreadUnreadRequest{}
+	mi := &file_mail_proto_msgTypes[49]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *MarkThreadUnreadRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*MarkThreadUnreadRequest) ProtoMessage() {}
+
+func (x *MarkThreadUnreadRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_mail_proto_msgTypes[49]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use MarkThreadUnreadRequest.ProtoReflect.Descriptor instead.
+func (*MarkThreadUnreadRequest) Descriptor() ([]byte, []int) {
+	return file_mail_proto_rawDescGZIP(), []int{49}
+}
+
+func (x *MarkThreadUnreadRequest) GetAgentId() int64 {
+	if x != nil {
+		return x.AgentId
+	}
+	return 0
+}
+
+func (x *MarkThreadUnreadRequest) GetThreadId() string {
+	if x != nil {
+		return x.ThreadId
+	}
+	return ""
+}
+
+// MarkThreadUnreadResponse is the response for MarkThreadUnread.
+type MarkThreadUnreadResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Success       bool                   `protobuf:"varint,1,opt,name=success,proto3" json:"success,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *MarkThreadUnreadResponse) Reset() {
+	*x = MarkThreadUnreadResponse{}
+	mi := &file_mail_proto_msgTypes[50]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *MarkThreadUnreadResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*MarkThreadUnreadResponse) ProtoMessage() {}
+
+func (x *MarkThreadUnreadResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_mail_proto_msgTypes[50]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use MarkThreadUnreadResponse.ProtoReflect.Descriptor instead.
+func (*MarkThreadUnreadResponse) Descriptor() ([]byte, []int) {
+	return file_mail_proto_rawDescGZIP(), []int{50}
+}
+
+func (x *MarkThreadUnreadResponse) GetSuccess() bool {
+	if x != nil {
+		return x.Success
+	}
+	return false
+}
+
+// GetTopicRequest is the request for GetTopic.
+type GetTopicRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	TopicId       int64                  `protobuf:"varint,1,opt,name=topic_id,json=topicId,proto3" json:"topic_id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetTopicRequest) Reset() {
+	*x = GetTopicRequest{}
+	mi := &file_mail_proto_msgTypes[51]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetTopicRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetTopicRequest) ProtoMessage() {}
+
+func (x *GetTopicRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_mail_proto_msgTypes[51]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetTopicRequest.ProtoReflect.Descriptor instead.
+func (*GetTopicRequest) Descriptor() ([]byte, []int) {
+	return file_mail_proto_rawDescGZIP(), []int{51}
+}
+
+func (x *GetTopicRequest) GetTopicId() int64 {
+	if x != nil {
+		return x.TopicId
+	}
+	return 0
+}
+
+// GetTopicResponse is the response for GetTopic.
+type GetTopicResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Topic         *Topic                 `protobuf:"bytes,1,opt,name=topic,proto3" json:"topic,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetTopicResponse) Reset() {
+	*x = GetTopicResponse{}
+	mi := &file_mail_proto_msgTypes[52]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetTopicResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetTopicResponse) ProtoMessage() {}
+
+func (x *GetTopicResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_mail_proto_msgTypes[52]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetTopicResponse.ProtoReflect.Descriptor instead.
+func (*GetTopicResponse) Descriptor() ([]byte, []int) {
+	return file_mail_proto_rawDescGZIP(), []int{52}
+}
+
+func (x *GetTopicResponse) GetTopic() *Topic {
+	if x != nil {
+		return x.Topic
+	}
+	return nil
+}
+
+// AutocompleteRecipientsRequest is the request for AutocompleteRecipients.
+type AutocompleteRecipientsRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Query         string                 `protobuf:"bytes,1,opt,name=query,proto3" json:"query,omitempty"`
+	Limit         int32                  `protobuf:"varint,2,opt,name=limit,proto3" json:"limit,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *AutocompleteRecipientsRequest) Reset() {
+	*x = AutocompleteRecipientsRequest{}
+	mi := &file_mail_proto_msgTypes[53]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *AutocompleteRecipientsRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*AutocompleteRecipientsRequest) ProtoMessage() {}
+
+func (x *AutocompleteRecipientsRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_mail_proto_msgTypes[53]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use AutocompleteRecipientsRequest.ProtoReflect.Descriptor instead.
+func (*AutocompleteRecipientsRequest) Descriptor() ([]byte, []int) {
+	return file_mail_proto_rawDescGZIP(), []int{53}
+}
+
+func (x *AutocompleteRecipientsRequest) GetQuery() string {
+	if x != nil {
+		return x.Query
+	}
+	return ""
+}
+
+func (x *AutocompleteRecipientsRequest) GetLimit() int32 {
+	if x != nil {
+		return x.Limit
+	}
+	return 0
+}
+
+// AutocompleteRecipient represents a recipient suggestion.
+type AutocompleteRecipient struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Id            int64                  `protobuf:"varint,1,opt,name=id,proto3" json:"id,omitempty"`
+	Name          string                 `protobuf:"bytes,2,opt,name=name,proto3" json:"name,omitempty"`
+	ProjectKey    string                 `protobuf:"bytes,3,opt,name=project_key,json=projectKey,proto3" json:"project_key,omitempty"`
+	GitBranch     string                 `protobuf:"bytes,4,opt,name=git_branch,json=gitBranch,proto3" json:"git_branch,omitempty"`
+	Status        string                 `protobuf:"bytes,5,opt,name=status,proto3" json:"status,omitempty"` // "active", "busy", "idle", "offline"
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *AutocompleteRecipient) Reset() {
+	*x = AutocompleteRecipient{}
+	mi := &file_mail_proto_msgTypes[54]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *AutocompleteRecipient) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*AutocompleteRecipient) ProtoMessage() {}
+
+func (x *AutocompleteRecipient) ProtoReflect() protoreflect.Message {
+	mi := &file_mail_proto_msgTypes[54]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use AutocompleteRecipient.ProtoReflect.Descriptor instead.
+func (*AutocompleteRecipient) Descriptor() ([]byte, []int) {
+	return file_mail_proto_rawDescGZIP(), []int{54}
+}
+
+func (x *AutocompleteRecipient) GetId() int64 {
+	if x != nil {
+		return x.Id
+	}
+	return 0
+}
+
+func (x *AutocompleteRecipient) GetName() string {
+	if x != nil {
+		return x.Name
+	}
+	return ""
+}
+
+func (x *AutocompleteRecipient) GetProjectKey() string {
+	if x != nil {
+		return x.ProjectKey
+	}
+	return ""
+}
+
+func (x *AutocompleteRecipient) GetGitBranch() string {
+	if x != nil {
+		return x.GitBranch
+	}
+	return ""
+}
+
+func (x *AutocompleteRecipient) GetStatus() string {
+	if x != nil {
+		return x.Status
+	}
+	return ""
+}
+
+// AutocompleteRecipientsResponse is the response for AutocompleteRecipients.
+type AutocompleteRecipientsResponse struct {
+	state         protoimpl.MessageState   `protogen:"open.v1"`
+	Recipients    []*AutocompleteRecipient `protobuf:"bytes,1,rep,name=recipients,proto3" json:"recipients,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *AutocompleteRecipientsResponse) Reset() {
+	*x = AutocompleteRecipientsResponse{}
+	mi := &file_mail_proto_msgTypes[55]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *AutocompleteRecipientsResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*AutocompleteRecipientsResponse) ProtoMessage() {}
+
+func (x *AutocompleteRecipientsResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_mail_proto_msgTypes[55]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use AutocompleteRecipientsResponse.ProtoReflect.Descriptor instead.
+func (*AutocompleteRecipientsResponse) Descriptor() ([]byte, []int) {
+	return file_mail_proto_rawDescGZIP(), []int{55}
+}
+
+func (x *AutocompleteRecipientsResponse) GetRecipients() []*AutocompleteRecipient {
+	if x != nil {
+		return x.Recipients
+	}
+	return nil
+}
+
+// DeleteMessageRequest is the request for DeleteMessage.
+type DeleteMessageRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	AgentId       int64                  `protobuf:"varint,1,opt,name=agent_id,json=agentId,proto3" json:"agent_id,omitempty"`
+	MessageId     int64                  `protobuf:"varint,2,opt,name=message_id,json=messageId,proto3" json:"message_id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *DeleteMessageRequest) Reset() {
+	*x = DeleteMessageRequest{}
+	mi := &file_mail_proto_msgTypes[56]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *DeleteMessageRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*DeleteMessageRequest) ProtoMessage() {}
+
+func (x *DeleteMessageRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_mail_proto_msgTypes[56]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use DeleteMessageRequest.ProtoReflect.Descriptor instead.
+func (*DeleteMessageRequest) Descriptor() ([]byte, []int) {
+	return file_mail_proto_rawDescGZIP(), []int{56}
+}
+
+func (x *DeleteMessageRequest) GetAgentId() int64 {
+	if x != nil {
+		return x.AgentId
+	}
+	return 0
+}
+
+func (x *DeleteMessageRequest) GetMessageId() int64 {
+	if x != nil {
+		return x.MessageId
+	}
+	return 0
+}
+
+// DeleteMessageResponse is the response for DeleteMessage.
+type DeleteMessageResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Success       bool                   `protobuf:"varint,1,opt,name=success,proto3" json:"success,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *DeleteMessageResponse) Reset() {
+	*x = DeleteMessageResponse{}
+	mi := &file_mail_proto_msgTypes[57]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *DeleteMessageResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*DeleteMessageResponse) ProtoMessage() {}
+
+func (x *DeleteMessageResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_mail_proto_msgTypes[57]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use DeleteMessageResponse.ProtoReflect.Descriptor instead.
+func (*DeleteMessageResponse) Descriptor() ([]byte, []int) {
+	return file_mail_proto_rawDescGZIP(), []int{57}
+}
+
+func (x *DeleteMessageResponse) GetSuccess() bool {
+	if x != nil {
+		return x.Success
+	}
+	return false
+}
+
+// UpdateAgentRequest is the request for UpdateAgent.
+type UpdateAgentRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Id            int64                  `protobuf:"varint,1,opt,name=id,proto3" json:"id,omitempty"`
+	ProjectKey    string                 `protobuf:"bytes,2,opt,name=project_key,json=projectKey,proto3" json:"project_key,omitempty"`
+	GitBranch     string                 `protobuf:"bytes,3,opt,name=git_branch,json=gitBranch,proto3" json:"git_branch,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *UpdateAgentRequest) Reset() {
+	*x = UpdateAgentRequest{}
+	mi := &file_mail_proto_msgTypes[58]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *UpdateAgentRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*UpdateAgentRequest) ProtoMessage() {}
+
+func (x *UpdateAgentRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_mail_proto_msgTypes[58]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use UpdateAgentRequest.ProtoReflect.Descriptor instead.
+func (*UpdateAgentRequest) Descriptor() ([]byte, []int) {
+	return file_mail_proto_rawDescGZIP(), []int{58}
+}
+
+func (x *UpdateAgentRequest) GetId() int64 {
+	if x != nil {
+		return x.Id
+	}
+	return 0
+}
+
+func (x *UpdateAgentRequest) GetProjectKey() string {
+	if x != nil {
+		return x.ProjectKey
+	}
+	return ""
+}
+
+func (x *UpdateAgentRequest) GetGitBranch() string {
+	if x != nil {
+		return x.GitBranch
+	}
+	return ""
+}
+
+// UpdateAgentResponse is the response for UpdateAgent.
+type UpdateAgentResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Agent         *GetAgentResponse      `protobuf:"bytes,1,opt,name=agent,proto3" json:"agent,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *UpdateAgentResponse) Reset() {
+	*x = UpdateAgentResponse{}
+	mi := &file_mail_proto_msgTypes[59]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *UpdateAgentResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*UpdateAgentResponse) ProtoMessage() {}
+
+func (x *UpdateAgentResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_mail_proto_msgTypes[59]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use UpdateAgentResponse.ProtoReflect.Descriptor instead.
+func (*UpdateAgentResponse) Descriptor() ([]byte, []int) {
+	return file_mail_proto_rawDescGZIP(), []int{59}
+}
+
+func (x *UpdateAgentResponse) GetAgent() *GetAgentResponse {
+	if x != nil {
+		return x.Agent
+	}
+	return nil
+}
+
+// AgentWithStatus represents an agent with its current status.
+type AgentWithStatus struct {
+	state                 protoimpl.MessageState `protogen:"open.v1"`
+	Id                    int64                  `protobuf:"varint,1,opt,name=id,proto3" json:"id,omitempty"`
+	Name                  string                 `protobuf:"bytes,2,opt,name=name,proto3" json:"name,omitempty"`
+	ProjectKey            string                 `protobuf:"bytes,3,opt,name=project_key,json=projectKey,proto3" json:"project_key,omitempty"`
+	GitBranch             string                 `protobuf:"bytes,4,opt,name=git_branch,json=gitBranch,proto3" json:"git_branch,omitempty"`
+	Status                AgentStatus            `protobuf:"varint,5,opt,name=status,proto3,enum=subtraterpc.AgentStatus" json:"status,omitempty"`
+	LastActiveAt          *timestamppb.Timestamp `protobuf:"bytes,6,opt,name=last_active_at,json=lastActiveAt,proto3" json:"last_active_at,omitempty"`
+	SessionId             int64                  `protobuf:"varint,7,opt,name=session_id,json=sessionId,proto3" json:"session_id,omitempty"`
+	SecondsSinceHeartbeat int64                  `protobuf:"varint,8,opt,name=seconds_since_heartbeat,json=secondsSinceHeartbeat,proto3" json:"seconds_since_heartbeat,omitempty"`
+	unknownFields         protoimpl.UnknownFields
+	sizeCache             protoimpl.SizeCache
+}
+
+func (x *AgentWithStatus) Reset() {
+	*x = AgentWithStatus{}
+	mi := &file_mail_proto_msgTypes[60]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *AgentWithStatus) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*AgentWithStatus) ProtoMessage() {}
+
+func (x *AgentWithStatus) ProtoReflect() protoreflect.Message {
+	mi := &file_mail_proto_msgTypes[60]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use AgentWithStatus.ProtoReflect.Descriptor instead.
+func (*AgentWithStatus) Descriptor() ([]byte, []int) {
+	return file_mail_proto_rawDescGZIP(), []int{60}
+}
+
+func (x *AgentWithStatus) GetId() int64 {
+	if x != nil {
+		return x.Id
+	}
+	return 0
+}
+
+func (x *AgentWithStatus) GetName() string {
+	if x != nil {
+		return x.Name
+	}
+	return ""
+}
+
+func (x *AgentWithStatus) GetProjectKey() string {
+	if x != nil {
+		return x.ProjectKey
+	}
+	return ""
+}
+
+func (x *AgentWithStatus) GetGitBranch() string {
+	if x != nil {
+		return x.GitBranch
+	}
+	return ""
+}
+
+func (x *AgentWithStatus) GetStatus() AgentStatus {
+	if x != nil {
+		return x.Status
+	}
+	return AgentStatus_AGENT_STATUS_UNSPECIFIED
+}
+
+func (x *AgentWithStatus) GetLastActiveAt() *timestamppb.Timestamp {
+	if x != nil {
+		return x.LastActiveAt
+	}
+	return nil
+}
+
+func (x *AgentWithStatus) GetSessionId() int64 {
+	if x != nil {
+		return x.SessionId
+	}
+	return 0
+}
+
+func (x *AgentWithStatus) GetSecondsSinceHeartbeat() int64 {
+	if x != nil {
+		return x.SecondsSinceHeartbeat
+	}
+	return 0
+}
+
+// AgentStatusCounts represents counts of agents by status.
+type AgentStatusCounts struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Active        int32                  `protobuf:"varint,1,opt,name=active,proto3" json:"active,omitempty"`
+	Busy          int32                  `protobuf:"varint,2,opt,name=busy,proto3" json:"busy,omitempty"`
+	Idle          int32                  `protobuf:"varint,3,opt,name=idle,proto3" json:"idle,omitempty"`
+	Offline       int32                  `protobuf:"varint,4,opt,name=offline,proto3" json:"offline,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *AgentStatusCounts) Reset() {
+	*x = AgentStatusCounts{}
+	mi := &file_mail_proto_msgTypes[61]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *AgentStatusCounts) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*AgentStatusCounts) ProtoMessage() {}
+
+func (x *AgentStatusCounts) ProtoReflect() protoreflect.Message {
+	mi := &file_mail_proto_msgTypes[61]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use AgentStatusCounts.ProtoReflect.Descriptor instead.
+func (*AgentStatusCounts) Descriptor() ([]byte, []int) {
+	return file_mail_proto_rawDescGZIP(), []int{61}
+}
+
+func (x *AgentStatusCounts) GetActive() int32 {
+	if x != nil {
+		return x.Active
+	}
+	return 0
+}
+
+func (x *AgentStatusCounts) GetBusy() int32 {
+	if x != nil {
+		return x.Busy
+	}
+	return 0
+}
+
+func (x *AgentStatusCounts) GetIdle() int32 {
+	if x != nil {
+		return x.Idle
+	}
+	return 0
+}
+
+func (x *AgentStatusCounts) GetOffline() int32 {
+	if x != nil {
+		return x.Offline
+	}
+	return 0
+}
+
+// GetAgentsStatusRequest is the request for GetAgentsStatus.
+type GetAgentsStatusRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetAgentsStatusRequest) Reset() {
+	*x = GetAgentsStatusRequest{}
+	mi := &file_mail_proto_msgTypes[62]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetAgentsStatusRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetAgentsStatusRequest) ProtoMessage() {}
+
+func (x *GetAgentsStatusRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_mail_proto_msgTypes[62]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetAgentsStatusRequest.ProtoReflect.Descriptor instead.
+func (*GetAgentsStatusRequest) Descriptor() ([]byte, []int) {
+	return file_mail_proto_rawDescGZIP(), []int{62}
+}
+
+// GetAgentsStatusResponse is the response for GetAgentsStatus.
+type GetAgentsStatusResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Agents        []*AgentWithStatus     `protobuf:"bytes,1,rep,name=agents,proto3" json:"agents,omitempty"`
+	Counts        *AgentStatusCounts     `protobuf:"bytes,2,opt,name=counts,proto3" json:"counts,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetAgentsStatusResponse) Reset() {
+	*x = GetAgentsStatusResponse{}
+	mi := &file_mail_proto_msgTypes[63]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetAgentsStatusResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetAgentsStatusResponse) ProtoMessage() {}
+
+func (x *GetAgentsStatusResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_mail_proto_msgTypes[63]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetAgentsStatusResponse.ProtoReflect.Descriptor instead.
+func (*GetAgentsStatusResponse) Descriptor() ([]byte, []int) {
+	return file_mail_proto_rawDescGZIP(), []int{63}
+}
+
+func (x *GetAgentsStatusResponse) GetAgents() []*AgentWithStatus {
+	if x != nil {
+		return x.Agents
+	}
+	return nil
+}
+
+func (x *GetAgentsStatusResponse) GetCounts() *AgentStatusCounts {
+	if x != nil {
+		return x.Counts
+	}
+	return nil
+}
+
+// HeartbeatRequest is the request for Heartbeat.
+type HeartbeatRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	AgentId       int64                  `protobuf:"varint,1,opt,name=agent_id,json=agentId,proto3" json:"agent_id,omitempty"`
+	SessionId     string                 `protobuf:"bytes,2,opt,name=session_id,json=sessionId,proto3" json:"session_id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *HeartbeatRequest) Reset() {
+	*x = HeartbeatRequest{}
+	mi := &file_mail_proto_msgTypes[64]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *HeartbeatRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*HeartbeatRequest) ProtoMessage() {}
+
+func (x *HeartbeatRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_mail_proto_msgTypes[64]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use HeartbeatRequest.ProtoReflect.Descriptor instead.
+func (*HeartbeatRequest) Descriptor() ([]byte, []int) {
+	return file_mail_proto_rawDescGZIP(), []int{64}
+}
+
+func (x *HeartbeatRequest) GetAgentId() int64 {
+	if x != nil {
+		return x.AgentId
+	}
+	return 0
+}
+
+func (x *HeartbeatRequest) GetSessionId() string {
+	if x != nil {
+		return x.SessionId
+	}
+	return ""
+}
+
+// HeartbeatResponse is the response for Heartbeat.
+type HeartbeatResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Success       bool                   `protobuf:"varint,1,opt,name=success,proto3" json:"success,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *HeartbeatResponse) Reset() {
+	*x = HeartbeatResponse{}
+	mi := &file_mail_proto_msgTypes[65]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *HeartbeatResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*HeartbeatResponse) ProtoMessage() {}
+
+func (x *HeartbeatResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_mail_proto_msgTypes[65]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use HeartbeatResponse.ProtoReflect.Descriptor instead.
+func (*HeartbeatResponse) Descriptor() ([]byte, []int) {
+	return file_mail_proto_rawDescGZIP(), []int{65}
+}
+
+func (x *HeartbeatResponse) GetSuccess() bool {
+	if x != nil {
+		return x.Success
+	}
+	return false
+}
+
+// SessionInfo represents a session.
+type SessionInfo struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Id            int64                  `protobuf:"varint,1,opt,name=id,proto3" json:"id,omitempty"`
+	AgentId       int64                  `protobuf:"varint,2,opt,name=agent_id,json=agentId,proto3" json:"agent_id,omitempty"`
+	AgentName     string                 `protobuf:"bytes,3,opt,name=agent_name,json=agentName,proto3" json:"agent_name,omitempty"`
+	Project       string                 `protobuf:"bytes,4,opt,name=project,proto3" json:"project,omitempty"`
+	Branch        string                 `protobuf:"bytes,5,opt,name=branch,proto3" json:"branch,omitempty"`
+	StartedAt     *timestamppb.Timestamp `protobuf:"bytes,6,opt,name=started_at,json=startedAt,proto3" json:"started_at,omitempty"`
+	EndedAt       *timestamppb.Timestamp `protobuf:"bytes,7,opt,name=ended_at,json=endedAt,proto3" json:"ended_at,omitempty"`
+	Status        SessionStatus          `protobuf:"varint,8,opt,name=status,proto3,enum=subtraterpc.SessionStatus" json:"status,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *SessionInfo) Reset() {
+	*x = SessionInfo{}
+	mi := &file_mail_proto_msgTypes[66]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *SessionInfo) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*SessionInfo) ProtoMessage() {}
+
+func (x *SessionInfo) ProtoReflect() protoreflect.Message {
+	mi := &file_mail_proto_msgTypes[66]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use SessionInfo.ProtoReflect.Descriptor instead.
+func (*SessionInfo) Descriptor() ([]byte, []int) {
+	return file_mail_proto_rawDescGZIP(), []int{66}
+}
+
+func (x *SessionInfo) GetId() int64 {
+	if x != nil {
+		return x.Id
+	}
+	return 0
+}
+
+func (x *SessionInfo) GetAgentId() int64 {
+	if x != nil {
+		return x.AgentId
+	}
+	return 0
+}
+
+func (x *SessionInfo) GetAgentName() string {
+	if x != nil {
+		return x.AgentName
+	}
+	return ""
+}
+
+func (x *SessionInfo) GetProject() string {
+	if x != nil {
+		return x.Project
+	}
+	return ""
+}
+
+func (x *SessionInfo) GetBranch() string {
+	if x != nil {
+		return x.Branch
+	}
+	return ""
+}
+
+func (x *SessionInfo) GetStartedAt() *timestamppb.Timestamp {
+	if x != nil {
+		return x.StartedAt
+	}
+	return nil
+}
+
+func (x *SessionInfo) GetEndedAt() *timestamppb.Timestamp {
+	if x != nil {
+		return x.EndedAt
+	}
+	return nil
+}
+
+func (x *SessionInfo) GetStatus() SessionStatus {
+	if x != nil {
+		return x.Status
+	}
+	return SessionStatus_SESSION_STATUS_UNSPECIFIED
+}
+
+// ListSessionsRequest is the request for ListSessions.
+type ListSessionsRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	ActiveOnly    bool                   `protobuf:"varint,1,opt,name=active_only,json=activeOnly,proto3" json:"active_only,omitempty"`
+	Limit         int32                  `protobuf:"varint,2,opt,name=limit,proto3" json:"limit,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ListSessionsRequest) Reset() {
+	*x = ListSessionsRequest{}
+	mi := &file_mail_proto_msgTypes[67]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ListSessionsRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ListSessionsRequest) ProtoMessage() {}
+
+func (x *ListSessionsRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_mail_proto_msgTypes[67]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ListSessionsRequest.ProtoReflect.Descriptor instead.
+func (*ListSessionsRequest) Descriptor() ([]byte, []int) {
+	return file_mail_proto_rawDescGZIP(), []int{67}
+}
+
+func (x *ListSessionsRequest) GetActiveOnly() bool {
+	if x != nil {
+		return x.ActiveOnly
+	}
+	return false
+}
+
+func (x *ListSessionsRequest) GetLimit() int32 {
+	if x != nil {
+		return x.Limit
+	}
+	return 0
+}
+
+// ListSessionsResponse is the response for ListSessions.
+type ListSessionsResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Sessions      []*SessionInfo         `protobuf:"bytes,1,rep,name=sessions,proto3" json:"sessions,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ListSessionsResponse) Reset() {
+	*x = ListSessionsResponse{}
+	mi := &file_mail_proto_msgTypes[68]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ListSessionsResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ListSessionsResponse) ProtoMessage() {}
+
+func (x *ListSessionsResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_mail_proto_msgTypes[68]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ListSessionsResponse.ProtoReflect.Descriptor instead.
+func (*ListSessionsResponse) Descriptor() ([]byte, []int) {
+	return file_mail_proto_rawDescGZIP(), []int{68}
+}
+
+func (x *ListSessionsResponse) GetSessions() []*SessionInfo {
+	if x != nil {
+		return x.Sessions
+	}
+	return nil
+}
+
+// GetSessionRequest is the request for GetSession.
+type GetSessionRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	SessionId     int64                  `protobuf:"varint,1,opt,name=session_id,json=sessionId,proto3" json:"session_id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetSessionRequest) Reset() {
+	*x = GetSessionRequest{}
+	mi := &file_mail_proto_msgTypes[69]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetSessionRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetSessionRequest) ProtoMessage() {}
+
+func (x *GetSessionRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_mail_proto_msgTypes[69]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetSessionRequest.ProtoReflect.Descriptor instead.
+func (*GetSessionRequest) Descriptor() ([]byte, []int) {
+	return file_mail_proto_rawDescGZIP(), []int{69}
+}
+
+func (x *GetSessionRequest) GetSessionId() int64 {
+	if x != nil {
+		return x.SessionId
+	}
+	return 0
+}
+
+// GetSessionResponse is the response for GetSession.
+type GetSessionResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Session       *SessionInfo           `protobuf:"bytes,1,opt,name=session,proto3" json:"session,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetSessionResponse) Reset() {
+	*x = GetSessionResponse{}
+	mi := &file_mail_proto_msgTypes[70]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetSessionResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetSessionResponse) ProtoMessage() {}
+
+func (x *GetSessionResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_mail_proto_msgTypes[70]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetSessionResponse.ProtoReflect.Descriptor instead.
+func (*GetSessionResponse) Descriptor() ([]byte, []int) {
+	return file_mail_proto_rawDescGZIP(), []int{70}
+}
+
+func (x *GetSessionResponse) GetSession() *SessionInfo {
+	if x != nil {
+		return x.Session
+	}
+	return nil
+}
+
+// StartSessionRequest is the request for StartSession.
+type StartSessionRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	AgentId       int64                  `protobuf:"varint,1,opt,name=agent_id,json=agentId,proto3" json:"agent_id,omitempty"`
+	Project       string                 `protobuf:"bytes,2,opt,name=project,proto3" json:"project,omitempty"`
+	Branch        string                 `protobuf:"bytes,3,opt,name=branch,proto3" json:"branch,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *StartSessionRequest) Reset() {
+	*x = StartSessionRequest{}
+	mi := &file_mail_proto_msgTypes[71]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *StartSessionRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*StartSessionRequest) ProtoMessage() {}
+
+func (x *StartSessionRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_mail_proto_msgTypes[71]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use StartSessionRequest.ProtoReflect.Descriptor instead.
+func (*StartSessionRequest) Descriptor() ([]byte, []int) {
+	return file_mail_proto_rawDescGZIP(), []int{71}
+}
+
+func (x *StartSessionRequest) GetAgentId() int64 {
+	if x != nil {
+		return x.AgentId
+	}
+	return 0
+}
+
+func (x *StartSessionRequest) GetProject() string {
+	if x != nil {
+		return x.Project
+	}
+	return ""
+}
+
+func (x *StartSessionRequest) GetBranch() string {
+	if x != nil {
+		return x.Branch
+	}
+	return ""
+}
+
+// StartSessionResponse is the response for StartSession.
+type StartSessionResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Session       *SessionInfo           `protobuf:"bytes,1,opt,name=session,proto3" json:"session,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *StartSessionResponse) Reset() {
+	*x = StartSessionResponse{}
+	mi := &file_mail_proto_msgTypes[72]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *StartSessionResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*StartSessionResponse) ProtoMessage() {}
+
+func (x *StartSessionResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_mail_proto_msgTypes[72]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use StartSessionResponse.ProtoReflect.Descriptor instead.
+func (*StartSessionResponse) Descriptor() ([]byte, []int) {
+	return file_mail_proto_rawDescGZIP(), []int{72}
+}
+
+func (x *StartSessionResponse) GetSession() *SessionInfo {
+	if x != nil {
+		return x.Session
+	}
+	return nil
+}
+
+// CompleteSessionRequest is the request for CompleteSession.
+type CompleteSessionRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	SessionId     int64                  `protobuf:"varint,1,opt,name=session_id,json=sessionId,proto3" json:"session_id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *CompleteSessionRequest) Reset() {
+	*x = CompleteSessionRequest{}
+	mi := &file_mail_proto_msgTypes[73]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *CompleteSessionRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*CompleteSessionRequest) ProtoMessage() {}
+
+func (x *CompleteSessionRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_mail_proto_msgTypes[73]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use CompleteSessionRequest.ProtoReflect.Descriptor instead.
+func (*CompleteSessionRequest) Descriptor() ([]byte, []int) {
+	return file_mail_proto_rawDescGZIP(), []int{73}
+}
+
+func (x *CompleteSessionRequest) GetSessionId() int64 {
+	if x != nil {
+		return x.SessionId
+	}
+	return 0
+}
+
+// CompleteSessionResponse is the response for CompleteSession.
+type CompleteSessionResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Success       bool                   `protobuf:"varint,1,opt,name=success,proto3" json:"success,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *CompleteSessionResponse) Reset() {
+	*x = CompleteSessionResponse{}
+	mi := &file_mail_proto_msgTypes[74]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *CompleteSessionResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*CompleteSessionResponse) ProtoMessage() {}
+
+func (x *CompleteSessionResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_mail_proto_msgTypes[74]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use CompleteSessionResponse.ProtoReflect.Descriptor instead.
+func (*CompleteSessionResponse) Descriptor() ([]byte, []int) {
+	return file_mail_proto_rawDescGZIP(), []int{74}
+}
+
+func (x *CompleteSessionResponse) GetSuccess() bool {
+	if x != nil {
+		return x.Success
+	}
+	return false
+}
+
+// ActivityInfo represents an activity entry.
+type ActivityInfo struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Id            int64                  `protobuf:"varint,1,opt,name=id,proto3" json:"id,omitempty"`
+	AgentId       int64                  `protobuf:"varint,2,opt,name=agent_id,json=agentId,proto3" json:"agent_id,omitempty"`
+	AgentName     string                 `protobuf:"bytes,3,opt,name=agent_name,json=agentName,proto3" json:"agent_name,omitempty"`
+	Type          ActivityType           `protobuf:"varint,4,opt,name=type,proto3,enum=subtraterpc.ActivityType" json:"type,omitempty"`
+	Description   string                 `protobuf:"bytes,5,opt,name=description,proto3" json:"description,omitempty"`
+	CreatedAt     *timestamppb.Timestamp `protobuf:"bytes,6,opt,name=created_at,json=createdAt,proto3" json:"created_at,omitempty"`
+	MetadataJson  string                 `protobuf:"bytes,7,opt,name=metadata_json,json=metadataJson,proto3" json:"metadata_json,omitempty"` // JSON-encoded metadata
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ActivityInfo) Reset() {
+	*x = ActivityInfo{}
+	mi := &file_mail_proto_msgTypes[75]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ActivityInfo) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ActivityInfo) ProtoMessage() {}
+
+func (x *ActivityInfo) ProtoReflect() protoreflect.Message {
+	mi := &file_mail_proto_msgTypes[75]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ActivityInfo.ProtoReflect.Descriptor instead.
+func (*ActivityInfo) Descriptor() ([]byte, []int) {
+	return file_mail_proto_rawDescGZIP(), []int{75}
+}
+
+func (x *ActivityInfo) GetId() int64 {
+	if x != nil {
+		return x.Id
+	}
+	return 0
+}
+
+func (x *ActivityInfo) GetAgentId() int64 {
+	if x != nil {
+		return x.AgentId
+	}
+	return 0
+}
+
+func (x *ActivityInfo) GetAgentName() string {
+	if x != nil {
+		return x.AgentName
+	}
+	return ""
+}
+
+func (x *ActivityInfo) GetType() ActivityType {
+	if x != nil {
+		return x.Type
+	}
+	return ActivityType_ACTIVITY_TYPE_UNSPECIFIED
+}
+
+func (x *ActivityInfo) GetDescription() string {
+	if x != nil {
+		return x.Description
+	}
+	return ""
+}
+
+func (x *ActivityInfo) GetCreatedAt() *timestamppb.Timestamp {
+	if x != nil {
+		return x.CreatedAt
+	}
+	return nil
+}
+
+func (x *ActivityInfo) GetMetadataJson() string {
+	if x != nil {
+		return x.MetadataJson
+	}
+	return ""
+}
+
+// ListActivitiesRequest is the request for ListActivities.
+type ListActivitiesRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	AgentId       int64                  `protobuf:"varint,1,opt,name=agent_id,json=agentId,proto3" json:"agent_id,omitempty"`          // Filter by agent (0 = all)
+	Type          ActivityType           `protobuf:"varint,2,opt,name=type,proto3,enum=subtraterpc.ActivityType" json:"type,omitempty"` // Filter by type (UNSPECIFIED = all)
+	Page          int32                  `protobuf:"varint,3,opt,name=page,proto3" json:"page,omitempty"`
+	PageSize      int32                  `protobuf:"varint,4,opt,name=page_size,json=pageSize,proto3" json:"page_size,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ListActivitiesRequest) Reset() {
+	*x = ListActivitiesRequest{}
+	mi := &file_mail_proto_msgTypes[76]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ListActivitiesRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ListActivitiesRequest) ProtoMessage() {}
+
+func (x *ListActivitiesRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_mail_proto_msgTypes[76]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ListActivitiesRequest.ProtoReflect.Descriptor instead.
+func (*ListActivitiesRequest) Descriptor() ([]byte, []int) {
+	return file_mail_proto_rawDescGZIP(), []int{76}
+}
+
+func (x *ListActivitiesRequest) GetAgentId() int64 {
+	if x != nil {
+		return x.AgentId
+	}
+	return 0
+}
+
+func (x *ListActivitiesRequest) GetType() ActivityType {
+	if x != nil {
+		return x.Type
+	}
+	return ActivityType_ACTIVITY_TYPE_UNSPECIFIED
+}
+
+func (x *ListActivitiesRequest) GetPage() int32 {
+	if x != nil {
+		return x.Page
+	}
+	return 0
+}
+
+func (x *ListActivitiesRequest) GetPageSize() int32 {
+	if x != nil {
+		return x.PageSize
+	}
+	return 0
+}
+
+// ListActivitiesResponse is the response for ListActivities.
+type ListActivitiesResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Activities    []*ActivityInfo        `protobuf:"bytes,1,rep,name=activities,proto3" json:"activities,omitempty"`
+	Total         int64                  `protobuf:"varint,2,opt,name=total,proto3" json:"total,omitempty"`
+	Page          int32                  `protobuf:"varint,3,opt,name=page,proto3" json:"page,omitempty"`
+	PageSize      int32                  `protobuf:"varint,4,opt,name=page_size,json=pageSize,proto3" json:"page_size,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ListActivitiesResponse) Reset() {
+	*x = ListActivitiesResponse{}
+	mi := &file_mail_proto_msgTypes[77]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ListActivitiesResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ListActivitiesResponse) ProtoMessage() {}
+
+func (x *ListActivitiesResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_mail_proto_msgTypes[77]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ListActivitiesResponse.ProtoReflect.Descriptor instead.
+func (*ListActivitiesResponse) Descriptor() ([]byte, []int) {
+	return file_mail_proto_rawDescGZIP(), []int{77}
+}
+
+func (x *ListActivitiesResponse) GetActivities() []*ActivityInfo {
+	if x != nil {
+		return x.Activities
+	}
+	return nil
+}
+
+func (x *ListActivitiesResponse) GetTotal() int64 {
+	if x != nil {
+		return x.Total
+	}
+	return 0
+}
+
+func (x *ListActivitiesResponse) GetPage() int32 {
+	if x != nil {
+		return x.Page
+	}
+	return 0
+}
+
+func (x *ListActivitiesResponse) GetPageSize() int32 {
+	if x != nil {
+		return x.PageSize
+	}
+	return 0
+}
+
+// DashboardStats represents dashboard statistics.
+type DashboardStats struct {
+	state           protoimpl.MessageState `protogen:"open.v1"`
+	ActiveAgents    int32                  `protobuf:"varint,1,opt,name=active_agents,json=activeAgents,proto3" json:"active_agents,omitempty"`
+	RunningSessions int32                  `protobuf:"varint,2,opt,name=running_sessions,json=runningSessions,proto3" json:"running_sessions,omitempty"`
+	PendingMessages int32                  `protobuf:"varint,3,opt,name=pending_messages,json=pendingMessages,proto3" json:"pending_messages,omitempty"`
+	CompletedToday  int32                  `protobuf:"varint,4,opt,name=completed_today,json=completedToday,proto3" json:"completed_today,omitempty"`
+	unknownFields   protoimpl.UnknownFields
+	sizeCache       protoimpl.SizeCache
+}
+
+func (x *DashboardStats) Reset() {
+	*x = DashboardStats{}
+	mi := &file_mail_proto_msgTypes[78]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *DashboardStats) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*DashboardStats) ProtoMessage() {}
+
+func (x *DashboardStats) ProtoReflect() protoreflect.Message {
+	mi := &file_mail_proto_msgTypes[78]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use DashboardStats.ProtoReflect.Descriptor instead.
+func (*DashboardStats) Descriptor() ([]byte, []int) {
+	return file_mail_proto_rawDescGZIP(), []int{78}
+}
+
+func (x *DashboardStats) GetActiveAgents() int32 {
+	if x != nil {
+		return x.ActiveAgents
+	}
+	return 0
+}
+
+func (x *DashboardStats) GetRunningSessions() int32 {
+	if x != nil {
+		return x.RunningSessions
+	}
+	return 0
+}
+
+func (x *DashboardStats) GetPendingMessages() int32 {
+	if x != nil {
+		return x.PendingMessages
+	}
+	return 0
+}
+
+func (x *DashboardStats) GetCompletedToday() int32 {
+	if x != nil {
+		return x.CompletedToday
+	}
+	return 0
+}
+
+// GetDashboardStatsRequest is the request for GetDashboardStats.
+type GetDashboardStatsRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetDashboardStatsRequest) Reset() {
+	*x = GetDashboardStatsRequest{}
+	mi := &file_mail_proto_msgTypes[79]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetDashboardStatsRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetDashboardStatsRequest) ProtoMessage() {}
+
+func (x *GetDashboardStatsRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_mail_proto_msgTypes[79]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetDashboardStatsRequest.ProtoReflect.Descriptor instead.
+func (*GetDashboardStatsRequest) Descriptor() ([]byte, []int) {
+	return file_mail_proto_rawDescGZIP(), []int{79}
+}
+
+// GetDashboardStatsResponse is the response for GetDashboardStats.
+type GetDashboardStatsResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Stats         *DashboardStats        `protobuf:"bytes,1,opt,name=stats,proto3" json:"stats,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetDashboardStatsResponse) Reset() {
+	*x = GetDashboardStatsResponse{}
+	mi := &file_mail_proto_msgTypes[80]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetDashboardStatsResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetDashboardStatsResponse) ProtoMessage() {}
+
+func (x *GetDashboardStatsResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_mail_proto_msgTypes[80]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetDashboardStatsResponse.ProtoReflect.Descriptor instead.
+func (*GetDashboardStatsResponse) Descriptor() ([]byte, []int) {
+	return file_mail_proto_rawDescGZIP(), []int{80}
+}
+
+func (x *GetDashboardStatsResponse) GetStats() *DashboardStats {
+	if x != nil {
+		return x.Stats
+	}
+	return nil
+}
+
+// HealthCheckRequest is the request for HealthCheck.
+type HealthCheckRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *HealthCheckRequest) Reset() {
+	*x = HealthCheckRequest{}
+	mi := &file_mail_proto_msgTypes[81]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *HealthCheckRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*HealthCheckRequest) ProtoMessage() {}
+
+func (x *HealthCheckRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_mail_proto_msgTypes[81]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use HealthCheckRequest.ProtoReflect.Descriptor instead.
+func (*HealthCheckRequest) Descriptor() ([]byte, []int) {
+	return file_mail_proto_rawDescGZIP(), []int{81}
+}
+
+// HealthCheckResponse is the response for HealthCheck.
+type HealthCheckResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Status        string                 `protobuf:"bytes,1,opt,name=status,proto3" json:"status,omitempty"` // "ok" or "error"
+	Time          *timestamppb.Timestamp `protobuf:"bytes,2,opt,name=time,proto3" json:"time,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *HealthCheckResponse) Reset() {
+	*x = HealthCheckResponse{}
+	mi := &file_mail_proto_msgTypes[82]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *HealthCheckResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*HealthCheckResponse) ProtoMessage() {}
+
+func (x *HealthCheckResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_mail_proto_msgTypes[82]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use HealthCheckResponse.ProtoReflect.Descriptor instead.
+func (*HealthCheckResponse) Descriptor() ([]byte, []int) {
+	return file_mail_proto_rawDescGZIP(), []int{82}
+}
+
+func (x *HealthCheckResponse) GetStatus() string {
+	if x != nil {
+		return x.Status
+	}
+	return ""
+}
+
+func (x *HealthCheckResponse) GetTime() *timestamppb.Timestamp {
+	if x != nil {
+		return x.Time
+	}
+	return nil
+}
+
 var File_mail_proto protoreflect.FileDescriptor
 
 const file_mail_proto_rawDesc = "" +
 	"\n" +
 	"\n" +
-	"mail.proto\x12\vsubtraterpc\"\xbf\x03\n" +
+	"mail.proto\x12\vsubtraterpc\x1a\x1fgoogle/protobuf/timestamp.proto\"\xd9\x04\n" +
 	"\fInboxMessage\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\x03R\x02id\x12\x1b\n" +
 	"\tthread_id\x18\x02 \x01(\tR\bthreadId\x12\x19\n" +
@@ -2631,15 +5006,15 @@ const file_mail_proto_rawDesc = "" +
 	"\asubject\x18\x06 \x01(\tR\asubject\x12\x12\n" +
 	"\x04body\x18\a \x01(\tR\x04body\x121\n" +
 	"\bpriority\x18\b \x01(\x0e2\x15.subtraterpc.PriorityR\bpriority\x12/\n" +
-	"\x05state\x18\t \x01(\x0e2\x19.subtraterpc.MessageStateR\x05state\x12\x1d\n" +
+	"\x05state\x18\t \x01(\x0e2\x19.subtraterpc.MessageStateR\x05state\x129\n" +
 	"\n" +
 	"created_at\x18\n" +
-	" \x01(\x03R\tcreatedAt\x12\x1f\n" +
-	"\vdeadline_at\x18\v \x01(\x03R\n" +
-	"deadlineAt\x12#\n" +
-	"\rsnoozed_until\x18\f \x01(\x03R\fsnoozedUntil\x12\x17\n" +
-	"\aread_at\x18\r \x01(\x03R\x06readAt\x12\x19\n" +
-	"\backed_at\x18\x0e \x01(\x03R\aackedAt\"\xc0\x02\n" +
+	" \x01(\v2\x1a.google.protobuf.TimestampR\tcreatedAt\x12;\n" +
+	"\vdeadline_at\x18\v \x01(\v2\x1a.google.protobuf.TimestampR\n" +
+	"deadlineAt\x12?\n" +
+	"\rsnoozed_until\x18\f \x01(\v2\x1a.google.protobuf.TimestampR\fsnoozedUntil\x123\n" +
+	"\aread_at\x18\r \x01(\v2\x1a.google.protobuf.TimestampR\x06readAt\x12C\n" +
+	"\x0facknowledged_at\x18\x0e \x01(\v2\x1a.google.protobuf.TimestampR\x0eacknowledgedAt\"\xdc\x02\n" +
 	"\x0fSendMailRequest\x12\x1b\n" +
 	"\tsender_id\x18\x01 \x01(\x03R\bsenderId\x12'\n" +
 	"\x0frecipient_names\x18\x02 \x03(\tR\x0erecipientNames\x12\x1d\n" +
@@ -2648,8 +5023,8 @@ const file_mail_proto_rawDesc = "" +
 	"\tthread_id\x18\x04 \x01(\tR\bthreadId\x12\x18\n" +
 	"\asubject\x18\x05 \x01(\tR\asubject\x12\x12\n" +
 	"\x04body\x18\x06 \x01(\tR\x04body\x121\n" +
-	"\bpriority\x18\a \x01(\x0e2\x15.subtraterpc.PriorityR\bpriority\x12\x1f\n" +
-	"\vdeadline_at\x18\b \x01(\x03R\n" +
+	"\bpriority\x18\a \x01(\x0e2\x15.subtraterpc.PriorityR\bpriority\x12;\n" +
+	"\vdeadline_at\x18\b \x01(\v2\x1a.google.protobuf.TimestampR\n" +
 	"deadlineAt\x12)\n" +
 	"\x10attachments_json\x18\t \x01(\tR\x0fattachmentsJson\"N\n" +
 	"\x10SendMailResponse\x12\x1d\n" +
@@ -2674,13 +5049,13 @@ const file_mail_proto_rawDesc = "" +
 	"\bagent_id\x18\x01 \x01(\x03R\aagentId\x12\x1b\n" +
 	"\tthread_id\x18\x02 \x01(\tR\bthreadId\"K\n" +
 	"\x12ReadThreadResponse\x125\n" +
-	"\bmessages\x18\x01 \x03(\v2\x19.subtraterpc.InboxMessageR\bmessages\"\xab\x01\n" +
+	"\bmessages\x18\x01 \x03(\v2\x19.subtraterpc.InboxMessageR\bmessages\"\xc7\x01\n" +
 	"\x12UpdateStateRequest\x12\x19\n" +
 	"\bagent_id\x18\x01 \x01(\x03R\aagentId\x12\x1d\n" +
 	"\n" +
 	"message_id\x18\x02 \x01(\x03R\tmessageId\x126\n" +
-	"\tnew_state\x18\x03 \x01(\x0e2\x19.subtraterpc.MessageStateR\bnewState\x12#\n" +
-	"\rsnoozed_until\x18\x04 \x01(\x03R\fsnoozedUntil\"/\n" +
+	"\tnew_state\x18\x03 \x01(\x0e2\x19.subtraterpc.MessageStateR\bnewState\x12?\n" +
+	"\rsnoozed_until\x18\x04 \x01(\v2\x1a.google.protobuf.TimestampR\fsnoozedUntil\"/\n" +
 	"\x13UpdateStateResponse\x12\x18\n" +
 	"\asuccess\x18\x01 \x01(\bR\asuccess\"M\n" +
 	"\x11AckMessageRequest\x12\x19\n" +
@@ -2737,14 +5112,14 @@ const file_mail_proto_rawDesc = "" +
 	"\n" +
 	"topic_name\x18\x02 \x01(\tR\ttopicName\"/\n" +
 	"\x13UnsubscribeResponse\x12\x18\n" +
-	"\asuccess\x18\x01 \x01(\bR\asuccess\"i\n" +
+	"\asuccess\x18\x01 \x01(\bR\asuccess\"\x85\x01\n" +
 	"\x05Topic\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\x03R\x02id\x12\x12\n" +
 	"\x04name\x18\x02 \x01(\tR\x04name\x12\x1d\n" +
 	"\n" +
-	"topic_type\x18\x03 \x01(\tR\ttopicType\x12\x1d\n" +
+	"topic_type\x18\x03 \x01(\tR\ttopicType\x129\n" +
 	"\n" +
-	"created_at\x18\x04 \x01(\x03R\tcreatedAt\"W\n" +
+	"created_at\x18\x04 \x01(\v2\x1a.google.protobuf.TimestampR\tcreatedAt\"W\n" +
 	"\x11ListTopicsRequest\x12\x19\n" +
 	"\bagent_id\x18\x01 \x01(\x03R\aagentId\x12'\n" +
 	"\x0fsubscribed_only\x18\x02 \x01(\bR\x0esubscribedOnly\"@\n" +
@@ -2772,16 +5147,17 @@ const file_mail_proto_rawDesc = "" +
 	"\x04name\x18\x02 \x01(\tR\x04name\"@\n" +
 	"\x0fGetAgentRequest\x12\x19\n" +
 	"\bagent_id\x18\x01 \x01(\x03R\aagentId\x12\x12\n" +
-	"\x04name\x18\x02 \x01(\tR\x04name\"\xca\x01\n" +
+	"\x04name\x18\x02 \x01(\tR\x04name\"\xf3\x01\n" +
 	"\x10GetAgentResponse\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\x03R\x02id\x12\x12\n" +
 	"\x04name\x18\x02 \x01(\tR\x04name\x12\x1f\n" +
 	"\vproject_key\x18\x03 \x01(\tR\n" +
-	"projectKey\x12,\n" +
-	"\x12current_session_id\x18\x04 \x01(\tR\x10currentSessionId\x12\x1d\n" +
+	"projectKey\x12\x1d\n" +
 	"\n" +
-	"created_at\x18\x05 \x01(\x03R\tcreatedAt\x12$\n" +
-	"\x0elast_active_at\x18\x06 \x01(\x03R\flastActiveAt\")\n" +
+	"session_id\x18\x04 \x01(\tR\tsessionId\x129\n" +
+	"\n" +
+	"created_at\x18\x05 \x01(\v2\x1a.google.protobuf.TimestampR\tcreatedAt\x12@\n" +
+	"\x0elast_active_at\x18\x06 \x01(\v2\x1a.google.protobuf.TimestampR\flastActiveAt\")\n" +
 	"\x11ListAgentsRequest\x12\x14\n" +
 	"\x05limit\x18\x01 \x01(\x05R\x05limit\"K\n" +
 	"\x12ListAgentsResponse\x125\n" +
@@ -2811,7 +5187,158 @@ const file_mail_proto_rawDesc = "" +
 	"\x12DeleteAgentRequest\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\x03R\x02id\"/\n" +
 	"\x13DeleteAgentResponse\x12\x18\n" +
-	"\asuccess\x18\x01 \x01(\bR\asuccess*`\n" +
+	"\asuccess\x18\x01 \x01(\bR\asuccess\"d\n" +
+	"\x14ReplyToThreadRequest\x12\x1b\n" +
+	"\tsender_id\x18\x01 \x01(\x03R\bsenderId\x12\x1b\n" +
+	"\tthread_id\x18\x02 \x01(\tR\bthreadId\x12\x12\n" +
+	"\x04body\x18\x03 \x01(\tR\x04body\"6\n" +
+	"\x15ReplyToThreadResponse\x12\x1d\n" +
+	"\n" +
+	"message_id\x18\x01 \x01(\x03R\tmessageId\"N\n" +
+	"\x14ArchiveThreadRequest\x12\x19\n" +
+	"\bagent_id\x18\x01 \x01(\x03R\aagentId\x12\x1b\n" +
+	"\tthread_id\x18\x02 \x01(\tR\bthreadId\"^\n" +
+	"\x15ArchiveThreadResponse\x12\x18\n" +
+	"\asuccess\x18\x01 \x01(\bR\asuccess\x12+\n" +
+	"\x11messages_archived\x18\x02 \x01(\x05R\x10messagesArchived\"M\n" +
+	"\x13DeleteThreadRequest\x12\x19\n" +
+	"\bagent_id\x18\x01 \x01(\x03R\aagentId\x12\x1b\n" +
+	"\tthread_id\x18\x02 \x01(\tR\bthreadId\"[\n" +
+	"\x14DeleteThreadResponse\x12\x18\n" +
+	"\asuccess\x18\x01 \x01(\bR\asuccess\x12)\n" +
+	"\x10messages_deleted\x18\x02 \x01(\x05R\x0fmessagesDeleted\"Q\n" +
+	"\x17MarkThreadUnreadRequest\x12\x19\n" +
+	"\bagent_id\x18\x01 \x01(\x03R\aagentId\x12\x1b\n" +
+	"\tthread_id\x18\x02 \x01(\tR\bthreadId\"4\n" +
+	"\x18MarkThreadUnreadResponse\x12\x18\n" +
+	"\asuccess\x18\x01 \x01(\bR\asuccess\",\n" +
+	"\x0fGetTopicRequest\x12\x19\n" +
+	"\btopic_id\x18\x01 \x01(\x03R\atopicId\"<\n" +
+	"\x10GetTopicResponse\x12(\n" +
+	"\x05topic\x18\x01 \x01(\v2\x12.subtraterpc.TopicR\x05topic\"K\n" +
+	"\x1dAutocompleteRecipientsRequest\x12\x14\n" +
+	"\x05query\x18\x01 \x01(\tR\x05query\x12\x14\n" +
+	"\x05limit\x18\x02 \x01(\x05R\x05limit\"\x93\x01\n" +
+	"\x15AutocompleteRecipient\x12\x0e\n" +
+	"\x02id\x18\x01 \x01(\x03R\x02id\x12\x12\n" +
+	"\x04name\x18\x02 \x01(\tR\x04name\x12\x1f\n" +
+	"\vproject_key\x18\x03 \x01(\tR\n" +
+	"projectKey\x12\x1d\n" +
+	"\n" +
+	"git_branch\x18\x04 \x01(\tR\tgitBranch\x12\x16\n" +
+	"\x06status\x18\x05 \x01(\tR\x06status\"d\n" +
+	"\x1eAutocompleteRecipientsResponse\x12B\n" +
+	"\n" +
+	"recipients\x18\x01 \x03(\v2\".subtraterpc.AutocompleteRecipientR\n" +
+	"recipients\"P\n" +
+	"\x14DeleteMessageRequest\x12\x19\n" +
+	"\bagent_id\x18\x01 \x01(\x03R\aagentId\x12\x1d\n" +
+	"\n" +
+	"message_id\x18\x02 \x01(\x03R\tmessageId\"1\n" +
+	"\x15DeleteMessageResponse\x12\x18\n" +
+	"\asuccess\x18\x01 \x01(\bR\asuccess\"d\n" +
+	"\x12UpdateAgentRequest\x12\x0e\n" +
+	"\x02id\x18\x01 \x01(\x03R\x02id\x12\x1f\n" +
+	"\vproject_key\x18\x02 \x01(\tR\n" +
+	"projectKey\x12\x1d\n" +
+	"\n" +
+	"git_branch\x18\x03 \x01(\tR\tgitBranch\"J\n" +
+	"\x13UpdateAgentResponse\x123\n" +
+	"\x05agent\x18\x01 \x01(\v2\x1d.subtraterpc.GetAgentResponseR\x05agent\"\xc0\x02\n" +
+	"\x0fAgentWithStatus\x12\x0e\n" +
+	"\x02id\x18\x01 \x01(\x03R\x02id\x12\x12\n" +
+	"\x04name\x18\x02 \x01(\tR\x04name\x12\x1f\n" +
+	"\vproject_key\x18\x03 \x01(\tR\n" +
+	"projectKey\x12\x1d\n" +
+	"\n" +
+	"git_branch\x18\x04 \x01(\tR\tgitBranch\x120\n" +
+	"\x06status\x18\x05 \x01(\x0e2\x18.subtraterpc.AgentStatusR\x06status\x12@\n" +
+	"\x0elast_active_at\x18\x06 \x01(\v2\x1a.google.protobuf.TimestampR\flastActiveAt\x12\x1d\n" +
+	"\n" +
+	"session_id\x18\a \x01(\x03R\tsessionId\x126\n" +
+	"\x17seconds_since_heartbeat\x18\b \x01(\x03R\x15secondsSinceHeartbeat\"m\n" +
+	"\x11AgentStatusCounts\x12\x16\n" +
+	"\x06active\x18\x01 \x01(\x05R\x06active\x12\x12\n" +
+	"\x04busy\x18\x02 \x01(\x05R\x04busy\x12\x12\n" +
+	"\x04idle\x18\x03 \x01(\x05R\x04idle\x12\x18\n" +
+	"\aoffline\x18\x04 \x01(\x05R\aoffline\"\x18\n" +
+	"\x16GetAgentsStatusRequest\"\x87\x01\n" +
+	"\x17GetAgentsStatusResponse\x124\n" +
+	"\x06agents\x18\x01 \x03(\v2\x1c.subtraterpc.AgentWithStatusR\x06agents\x126\n" +
+	"\x06counts\x18\x02 \x01(\v2\x1e.subtraterpc.AgentStatusCountsR\x06counts\"L\n" +
+	"\x10HeartbeatRequest\x12\x19\n" +
+	"\bagent_id\x18\x01 \x01(\x03R\aagentId\x12\x1d\n" +
+	"\n" +
+	"session_id\x18\x02 \x01(\tR\tsessionId\"-\n" +
+	"\x11HeartbeatResponse\x12\x18\n" +
+	"\asuccess\x18\x01 \x01(\bR\asuccess\"\xaf\x02\n" +
+	"\vSessionInfo\x12\x0e\n" +
+	"\x02id\x18\x01 \x01(\x03R\x02id\x12\x19\n" +
+	"\bagent_id\x18\x02 \x01(\x03R\aagentId\x12\x1d\n" +
+	"\n" +
+	"agent_name\x18\x03 \x01(\tR\tagentName\x12\x18\n" +
+	"\aproject\x18\x04 \x01(\tR\aproject\x12\x16\n" +
+	"\x06branch\x18\x05 \x01(\tR\x06branch\x129\n" +
+	"\n" +
+	"started_at\x18\x06 \x01(\v2\x1a.google.protobuf.TimestampR\tstartedAt\x125\n" +
+	"\bended_at\x18\a \x01(\v2\x1a.google.protobuf.TimestampR\aendedAt\x122\n" +
+	"\x06status\x18\b \x01(\x0e2\x1a.subtraterpc.SessionStatusR\x06status\"L\n" +
+	"\x13ListSessionsRequest\x12\x1f\n" +
+	"\vactive_only\x18\x01 \x01(\bR\n" +
+	"activeOnly\x12\x14\n" +
+	"\x05limit\x18\x02 \x01(\x05R\x05limit\"L\n" +
+	"\x14ListSessionsResponse\x124\n" +
+	"\bsessions\x18\x01 \x03(\v2\x18.subtraterpc.SessionInfoR\bsessions\"2\n" +
+	"\x11GetSessionRequest\x12\x1d\n" +
+	"\n" +
+	"session_id\x18\x01 \x01(\x03R\tsessionId\"H\n" +
+	"\x12GetSessionResponse\x122\n" +
+	"\asession\x18\x01 \x01(\v2\x18.subtraterpc.SessionInfoR\asession\"b\n" +
+	"\x13StartSessionRequest\x12\x19\n" +
+	"\bagent_id\x18\x01 \x01(\x03R\aagentId\x12\x18\n" +
+	"\aproject\x18\x02 \x01(\tR\aproject\x12\x16\n" +
+	"\x06branch\x18\x03 \x01(\tR\x06branch\"J\n" +
+	"\x14StartSessionResponse\x122\n" +
+	"\asession\x18\x01 \x01(\v2\x18.subtraterpc.SessionInfoR\asession\"7\n" +
+	"\x16CompleteSessionRequest\x12\x1d\n" +
+	"\n" +
+	"session_id\x18\x01 \x01(\x03R\tsessionId\"3\n" +
+	"\x17CompleteSessionResponse\x12\x18\n" +
+	"\asuccess\x18\x01 \x01(\bR\asuccess\"\x89\x02\n" +
+	"\fActivityInfo\x12\x0e\n" +
+	"\x02id\x18\x01 \x01(\x03R\x02id\x12\x19\n" +
+	"\bagent_id\x18\x02 \x01(\x03R\aagentId\x12\x1d\n" +
+	"\n" +
+	"agent_name\x18\x03 \x01(\tR\tagentName\x12-\n" +
+	"\x04type\x18\x04 \x01(\x0e2\x19.subtraterpc.ActivityTypeR\x04type\x12 \n" +
+	"\vdescription\x18\x05 \x01(\tR\vdescription\x129\n" +
+	"\n" +
+	"created_at\x18\x06 \x01(\v2\x1a.google.protobuf.TimestampR\tcreatedAt\x12#\n" +
+	"\rmetadata_json\x18\a \x01(\tR\fmetadataJson\"\x92\x01\n" +
+	"\x15ListActivitiesRequest\x12\x19\n" +
+	"\bagent_id\x18\x01 \x01(\x03R\aagentId\x12-\n" +
+	"\x04type\x18\x02 \x01(\x0e2\x19.subtraterpc.ActivityTypeR\x04type\x12\x12\n" +
+	"\x04page\x18\x03 \x01(\x05R\x04page\x12\x1b\n" +
+	"\tpage_size\x18\x04 \x01(\x05R\bpageSize\"\x9a\x01\n" +
+	"\x16ListActivitiesResponse\x129\n" +
+	"\n" +
+	"activities\x18\x01 \x03(\v2\x19.subtraterpc.ActivityInfoR\n" +
+	"activities\x12\x14\n" +
+	"\x05total\x18\x02 \x01(\x03R\x05total\x12\x12\n" +
+	"\x04page\x18\x03 \x01(\x05R\x04page\x12\x1b\n" +
+	"\tpage_size\x18\x04 \x01(\x05R\bpageSize\"\xb4\x01\n" +
+	"\x0eDashboardStats\x12#\n" +
+	"\ractive_agents\x18\x01 \x01(\x05R\factiveAgents\x12)\n" +
+	"\x10running_sessions\x18\x02 \x01(\x05R\x0frunningSessions\x12)\n" +
+	"\x10pending_messages\x18\x03 \x01(\x05R\x0fpendingMessages\x12'\n" +
+	"\x0fcompleted_today\x18\x04 \x01(\x05R\x0ecompletedToday\"\x1a\n" +
+	"\x18GetDashboardStatsRequest\"N\n" +
+	"\x19GetDashboardStatsResponse\x121\n" +
+	"\x05stats\x18\x01 \x01(\v2\x1b.subtraterpc.DashboardStatsR\x05stats\"\x14\n" +
+	"\x12HealthCheckRequest\"]\n" +
+	"\x13HealthCheckResponse\x12\x16\n" +
+	"\x06status\x18\x01 \x01(\tR\x06status\x12.\n" +
+	"\x04time\x18\x02 \x01(\v2\x1a.google.protobuf.TimestampR\x04time*`\n" +
 	"\bPriority\x12\x18\n" +
 	"\x14PRIORITY_UNSPECIFIED\x10\x00\x12\x10\n" +
 	"\fPRIORITY_LOW\x10\x01\x12\x13\n" +
@@ -2825,7 +5352,26 @@ const file_mail_proto_rawDesc = "" +
 	"\rSTATE_STARRED\x10\x03\x12\x11\n" +
 	"\rSTATE_SNOOZED\x10\x04\x12\x12\n" +
 	"\x0eSTATE_ARCHIVED\x10\x05\x12\x0f\n" +
-	"\vSTATE_TRASH\x10\x062\xae\t\n" +
+	"\vSTATE_TRASH\x10\x06*\x8c\x01\n" +
+	"\vAgentStatus\x12\x1c\n" +
+	"\x18AGENT_STATUS_UNSPECIFIED\x10\x00\x12\x17\n" +
+	"\x13AGENT_STATUS_ACTIVE\x10\x01\x12\x15\n" +
+	"\x11AGENT_STATUS_BUSY\x10\x02\x12\x15\n" +
+	"\x11AGENT_STATUS_IDLE\x10\x03\x12\x18\n" +
+	"\x14AGENT_STATUS_OFFLINE\x10\x04*\x86\x01\n" +
+	"\rSessionStatus\x12\x1e\n" +
+	"\x1aSESSION_STATUS_UNSPECIFIED\x10\x00\x12\x19\n" +
+	"\x15SESSION_STATUS_ACTIVE\x10\x01\x12\x1c\n" +
+	"\x18SESSION_STATUS_COMPLETED\x10\x02\x12\x1c\n" +
+	"\x18SESSION_STATUS_ABANDONED\x10\x03*\xf6\x01\n" +
+	"\fActivityType\x12\x1d\n" +
+	"\x19ACTIVITY_TYPE_UNSPECIFIED\x10\x00\x12\x1e\n" +
+	"\x1aACTIVITY_TYPE_MESSAGE_SENT\x10\x01\x12\x1e\n" +
+	"\x1aACTIVITY_TYPE_MESSAGE_READ\x10\x02\x12!\n" +
+	"\x1dACTIVITY_TYPE_SESSION_STARTED\x10\x03\x12#\n" +
+	"\x1fACTIVITY_TYPE_SESSION_COMPLETED\x10\x04\x12\"\n" +
+	"\x1eACTIVITY_TYPE_AGENT_REGISTERED\x10\x05\x12\x1b\n" +
+	"\x17ACTIVITY_TYPE_HEARTBEAT\x10\x062\xa8\x0e\n" +
 	"\x04Mail\x12G\n" +
 	"\bSendMail\x12\x1c.subtraterpc.SendMailRequest\x1a\x1d.subtraterpc.SendMailResponse\x12M\n" +
 	"\n" +
@@ -2845,15 +5391,36 @@ const file_mail_proto_rawDesc = "" +
 	"\n" +
 	"ListTopics\x12\x1e.subtraterpc.ListTopicsRequest\x1a\x1f.subtraterpc.ListTopicsResponse\x12A\n" +
 	"\x06Search\x12\x1a.subtraterpc.SearchRequest\x1a\x1b.subtraterpc.SearchResponse\x12e\n" +
-	"\x12HasUnackedStatusTo\x12&.subtraterpc.HasUnackedStatusToRequest\x1a'.subtraterpc.HasUnackedStatusToResponse2\xf9\x03\n" +
+	"\x12HasUnackedStatusTo\x12&.subtraterpc.HasUnackedStatusToRequest\x1a'.subtraterpc.HasUnackedStatusToResponse\x12V\n" +
+	"\rReplyToThread\x12!.subtraterpc.ReplyToThreadRequest\x1a\".subtraterpc.ReplyToThreadResponse\x12V\n" +
+	"\rArchiveThread\x12!.subtraterpc.ArchiveThreadRequest\x1a\".subtraterpc.ArchiveThreadResponse\x12S\n" +
+	"\fDeleteThread\x12 .subtraterpc.DeleteThreadRequest\x1a!.subtraterpc.DeleteThreadResponse\x12_\n" +
+	"\x10MarkThreadUnread\x12$.subtraterpc.MarkThreadUnreadRequest\x1a%.subtraterpc.MarkThreadUnreadResponse\x12G\n" +
+	"\bGetTopic\x12\x1c.subtraterpc.GetTopicRequest\x1a\x1d.subtraterpc.GetTopicResponse\x12q\n" +
+	"\x16AutocompleteRecipients\x12*.subtraterpc.AutocompleteRecipientsRequest\x1a+.subtraterpc.AutocompleteRecipientsResponse\x12V\n" +
+	"\rDeleteMessage\x12!.subtraterpc.DeleteMessageRequest\x1a\".subtraterpc.DeleteMessageResponse2\xf5\x05\n" +
 	"\x05Agent\x12V\n" +
 	"\rRegisterAgent\x12!.subtraterpc.RegisterAgentRequest\x1a\".subtraterpc.RegisterAgentResponse\x12G\n" +
 	"\bGetAgent\x12\x1c.subtraterpc.GetAgentRequest\x1a\x1d.subtraterpc.GetAgentResponse\x12M\n" +
 	"\n" +
 	"ListAgents\x12\x1e.subtraterpc.ListAgentsRequest\x1a\x1f.subtraterpc.ListAgentsResponse\x12P\n" +
-	"\vDeleteAgent\x12\x1f.subtraterpc.DeleteAgentRequest\x1a .subtraterpc.DeleteAgentResponse\x12Y\n" +
+	"\vDeleteAgent\x12\x1f.subtraterpc.DeleteAgentRequest\x1a .subtraterpc.DeleteAgentResponse\x12P\n" +
+	"\vUpdateAgent\x12\x1f.subtraterpc.UpdateAgentRequest\x1a .subtraterpc.UpdateAgentResponse\x12\\\n" +
+	"\x0fGetAgentsStatus\x12#.subtraterpc.GetAgentsStatusRequest\x1a$.subtraterpc.GetAgentsStatusResponse\x12J\n" +
+	"\tHeartbeat\x12\x1d.subtraterpc.HeartbeatRequest\x1a\x1e.subtraterpc.HeartbeatResponse\x12Y\n" +
 	"\x0eEnsureIdentity\x12\".subtraterpc.EnsureIdentityRequest\x1a#.subtraterpc.EnsureIdentityResponse\x12S\n" +
-	"\fSaveIdentity\x12 .subtraterpc.SaveIdentityRequest\x1a!.subtraterpc.SaveIdentityResponseB<Z:github.com/roasbeef/subtrate/internal/api/grpc/subtraterpcb\x06proto3"
+	"\fSaveIdentity\x12 .subtraterpc.SaveIdentityRequest\x1a!.subtraterpc.SaveIdentityResponse2\xe0\x02\n" +
+	"\aSession\x12S\n" +
+	"\fListSessions\x12 .subtraterpc.ListSessionsRequest\x1a!.subtraterpc.ListSessionsResponse\x12M\n" +
+	"\n" +
+	"GetSession\x12\x1e.subtraterpc.GetSessionRequest\x1a\x1f.subtraterpc.GetSessionResponse\x12S\n" +
+	"\fStartSession\x12 .subtraterpc.StartSessionRequest\x1a!.subtraterpc.StartSessionResponse\x12\\\n" +
+	"\x0fCompleteSession\x12#.subtraterpc.CompleteSessionRequest\x1a$.subtraterpc.CompleteSessionResponse2e\n" +
+	"\bActivity\x12Y\n" +
+	"\x0eListActivities\x12\".subtraterpc.ListActivitiesRequest\x1a#.subtraterpc.ListActivitiesResponse2\xbd\x01\n" +
+	"\x05Stats\x12b\n" +
+	"\x11GetDashboardStats\x12%.subtraterpc.GetDashboardStatsRequest\x1a&.subtraterpc.GetDashboardStatsResponse\x12P\n" +
+	"\vHealthCheck\x12\x1f.subtraterpc.HealthCheckRequest\x1a .subtraterpc.HealthCheckResponseB<Z:github.com/roasbeef/subtrate/internal/api/grpc/subtraterpcb\x06proto3"
 
 var (
 	file_mail_proto_rawDescOnce sync.Once
@@ -2867,122 +5434,229 @@ func file_mail_proto_rawDescGZIP() []byte {
 	return file_mail_proto_rawDescData
 }
 
-var file_mail_proto_enumTypes = make([]protoimpl.EnumInfo, 2)
-var file_mail_proto_msgTypes = make([]protoimpl.MessageInfo, 46)
+var file_mail_proto_enumTypes = make([]protoimpl.EnumInfo, 5)
+var file_mail_proto_msgTypes = make([]protoimpl.MessageInfo, 86)
 var file_mail_proto_goTypes = []any{
-	(Priority)(0),                      // 0: subtraterpc.Priority
-	(MessageState)(0),                  // 1: subtraterpc.MessageState
-	(*InboxMessage)(nil),               // 2: subtraterpc.InboxMessage
-	(*SendMailRequest)(nil),            // 3: subtraterpc.SendMailRequest
-	(*SendMailResponse)(nil),           // 4: subtraterpc.SendMailResponse
-	(*FetchInboxRequest)(nil),          // 5: subtraterpc.FetchInboxRequest
-	(*FetchInboxResponse)(nil),         // 6: subtraterpc.FetchInboxResponse
-	(*ReadMessageRequest)(nil),         // 7: subtraterpc.ReadMessageRequest
-	(*ReadMessageResponse)(nil),        // 8: subtraterpc.ReadMessageResponse
-	(*ReadThreadRequest)(nil),          // 9: subtraterpc.ReadThreadRequest
-	(*ReadThreadResponse)(nil),         // 10: subtraterpc.ReadThreadResponse
-	(*UpdateStateRequest)(nil),         // 11: subtraterpc.UpdateStateRequest
-	(*UpdateStateResponse)(nil),        // 12: subtraterpc.UpdateStateResponse
-	(*AckMessageRequest)(nil),          // 13: subtraterpc.AckMessageRequest
-	(*AckMessageResponse)(nil),         // 14: subtraterpc.AckMessageResponse
-	(*GetStatusRequest)(nil),           // 15: subtraterpc.GetStatusRequest
-	(*GetStatusResponse)(nil),          // 16: subtraterpc.GetStatusResponse
-	(*PollChangesRequest)(nil),         // 17: subtraterpc.PollChangesRequest
-	(*PollChangesResponse)(nil),        // 18: subtraterpc.PollChangesResponse
-	(*SubscribeInboxRequest)(nil),      // 19: subtraterpc.SubscribeInboxRequest
-	(*PublishRequest)(nil),             // 20: subtraterpc.PublishRequest
-	(*PublishResponse)(nil),            // 21: subtraterpc.PublishResponse
-	(*SubscribeRequest)(nil),           // 22: subtraterpc.SubscribeRequest
-	(*SubscribeResponse)(nil),          // 23: subtraterpc.SubscribeResponse
-	(*UnsubscribeRequest)(nil),         // 24: subtraterpc.UnsubscribeRequest
-	(*UnsubscribeResponse)(nil),        // 25: subtraterpc.UnsubscribeResponse
-	(*Topic)(nil),                      // 26: subtraterpc.Topic
-	(*ListTopicsRequest)(nil),          // 27: subtraterpc.ListTopicsRequest
-	(*ListTopicsResponse)(nil),         // 28: subtraterpc.ListTopicsResponse
-	(*SearchRequest)(nil),              // 29: subtraterpc.SearchRequest
-	(*SearchResponse)(nil),             // 30: subtraterpc.SearchResponse
-	(*HasUnackedStatusToRequest)(nil),  // 31: subtraterpc.HasUnackedStatusToRequest
-	(*HasUnackedStatusToResponse)(nil), // 32: subtraterpc.HasUnackedStatusToResponse
-	(*RegisterAgentRequest)(nil),       // 33: subtraterpc.RegisterAgentRequest
-	(*RegisterAgentResponse)(nil),      // 34: subtraterpc.RegisterAgentResponse
-	(*GetAgentRequest)(nil),            // 35: subtraterpc.GetAgentRequest
-	(*GetAgentResponse)(nil),           // 36: subtraterpc.GetAgentResponse
-	(*ListAgentsRequest)(nil),          // 37: subtraterpc.ListAgentsRequest
-	(*ListAgentsResponse)(nil),         // 38: subtraterpc.ListAgentsResponse
-	(*EnsureIdentityRequest)(nil),      // 39: subtraterpc.EnsureIdentityRequest
-	(*EnsureIdentityResponse)(nil),     // 40: subtraterpc.EnsureIdentityResponse
-	(*SaveIdentityRequest)(nil),        // 41: subtraterpc.SaveIdentityRequest
-	(*SaveIdentityResponse)(nil),       // 42: subtraterpc.SaveIdentityResponse
-	(*DeleteAgentRequest)(nil),         // 43: subtraterpc.DeleteAgentRequest
-	(*DeleteAgentResponse)(nil),        // 44: subtraterpc.DeleteAgentResponse
-	nil,                                // 45: subtraterpc.PollChangesRequest.SinceOffsetsEntry
-	nil,                                // 46: subtraterpc.PollChangesResponse.NewOffsetsEntry
-	nil,                                // 47: subtraterpc.SaveIdentityRequest.ConsumerOffsetsEntry
+	(Priority)(0),                          // 0: subtraterpc.Priority
+	(MessageState)(0),                      // 1: subtraterpc.MessageState
+	(AgentStatus)(0),                       // 2: subtraterpc.AgentStatus
+	(SessionStatus)(0),                     // 3: subtraterpc.SessionStatus
+	(ActivityType)(0),                      // 4: subtraterpc.ActivityType
+	(*InboxMessage)(nil),                   // 5: subtraterpc.InboxMessage
+	(*SendMailRequest)(nil),                // 6: subtraterpc.SendMailRequest
+	(*SendMailResponse)(nil),               // 7: subtraterpc.SendMailResponse
+	(*FetchInboxRequest)(nil),              // 8: subtraterpc.FetchInboxRequest
+	(*FetchInboxResponse)(nil),             // 9: subtraterpc.FetchInboxResponse
+	(*ReadMessageRequest)(nil),             // 10: subtraterpc.ReadMessageRequest
+	(*ReadMessageResponse)(nil),            // 11: subtraterpc.ReadMessageResponse
+	(*ReadThreadRequest)(nil),              // 12: subtraterpc.ReadThreadRequest
+	(*ReadThreadResponse)(nil),             // 13: subtraterpc.ReadThreadResponse
+	(*UpdateStateRequest)(nil),             // 14: subtraterpc.UpdateStateRequest
+	(*UpdateStateResponse)(nil),            // 15: subtraterpc.UpdateStateResponse
+	(*AckMessageRequest)(nil),              // 16: subtraterpc.AckMessageRequest
+	(*AckMessageResponse)(nil),             // 17: subtraterpc.AckMessageResponse
+	(*GetStatusRequest)(nil),               // 18: subtraterpc.GetStatusRequest
+	(*GetStatusResponse)(nil),              // 19: subtraterpc.GetStatusResponse
+	(*PollChangesRequest)(nil),             // 20: subtraterpc.PollChangesRequest
+	(*PollChangesResponse)(nil),            // 21: subtraterpc.PollChangesResponse
+	(*SubscribeInboxRequest)(nil),          // 22: subtraterpc.SubscribeInboxRequest
+	(*PublishRequest)(nil),                 // 23: subtraterpc.PublishRequest
+	(*PublishResponse)(nil),                // 24: subtraterpc.PublishResponse
+	(*SubscribeRequest)(nil),               // 25: subtraterpc.SubscribeRequest
+	(*SubscribeResponse)(nil),              // 26: subtraterpc.SubscribeResponse
+	(*UnsubscribeRequest)(nil),             // 27: subtraterpc.UnsubscribeRequest
+	(*UnsubscribeResponse)(nil),            // 28: subtraterpc.UnsubscribeResponse
+	(*Topic)(nil),                          // 29: subtraterpc.Topic
+	(*ListTopicsRequest)(nil),              // 30: subtraterpc.ListTopicsRequest
+	(*ListTopicsResponse)(nil),             // 31: subtraterpc.ListTopicsResponse
+	(*SearchRequest)(nil),                  // 32: subtraterpc.SearchRequest
+	(*SearchResponse)(nil),                 // 33: subtraterpc.SearchResponse
+	(*HasUnackedStatusToRequest)(nil),      // 34: subtraterpc.HasUnackedStatusToRequest
+	(*HasUnackedStatusToResponse)(nil),     // 35: subtraterpc.HasUnackedStatusToResponse
+	(*RegisterAgentRequest)(nil),           // 36: subtraterpc.RegisterAgentRequest
+	(*RegisterAgentResponse)(nil),          // 37: subtraterpc.RegisterAgentResponse
+	(*GetAgentRequest)(nil),                // 38: subtraterpc.GetAgentRequest
+	(*GetAgentResponse)(nil),               // 39: subtraterpc.GetAgentResponse
+	(*ListAgentsRequest)(nil),              // 40: subtraterpc.ListAgentsRequest
+	(*ListAgentsResponse)(nil),             // 41: subtraterpc.ListAgentsResponse
+	(*EnsureIdentityRequest)(nil),          // 42: subtraterpc.EnsureIdentityRequest
+	(*EnsureIdentityResponse)(nil),         // 43: subtraterpc.EnsureIdentityResponse
+	(*SaveIdentityRequest)(nil),            // 44: subtraterpc.SaveIdentityRequest
+	(*SaveIdentityResponse)(nil),           // 45: subtraterpc.SaveIdentityResponse
+	(*DeleteAgentRequest)(nil),             // 46: subtraterpc.DeleteAgentRequest
+	(*DeleteAgentResponse)(nil),            // 47: subtraterpc.DeleteAgentResponse
+	(*ReplyToThreadRequest)(nil),           // 48: subtraterpc.ReplyToThreadRequest
+	(*ReplyToThreadResponse)(nil),          // 49: subtraterpc.ReplyToThreadResponse
+	(*ArchiveThreadRequest)(nil),           // 50: subtraterpc.ArchiveThreadRequest
+	(*ArchiveThreadResponse)(nil),          // 51: subtraterpc.ArchiveThreadResponse
+	(*DeleteThreadRequest)(nil),            // 52: subtraterpc.DeleteThreadRequest
+	(*DeleteThreadResponse)(nil),           // 53: subtraterpc.DeleteThreadResponse
+	(*MarkThreadUnreadRequest)(nil),        // 54: subtraterpc.MarkThreadUnreadRequest
+	(*MarkThreadUnreadResponse)(nil),       // 55: subtraterpc.MarkThreadUnreadResponse
+	(*GetTopicRequest)(nil),                // 56: subtraterpc.GetTopicRequest
+	(*GetTopicResponse)(nil),               // 57: subtraterpc.GetTopicResponse
+	(*AutocompleteRecipientsRequest)(nil),  // 58: subtraterpc.AutocompleteRecipientsRequest
+	(*AutocompleteRecipient)(nil),          // 59: subtraterpc.AutocompleteRecipient
+	(*AutocompleteRecipientsResponse)(nil), // 60: subtraterpc.AutocompleteRecipientsResponse
+	(*DeleteMessageRequest)(nil),           // 61: subtraterpc.DeleteMessageRequest
+	(*DeleteMessageResponse)(nil),          // 62: subtraterpc.DeleteMessageResponse
+	(*UpdateAgentRequest)(nil),             // 63: subtraterpc.UpdateAgentRequest
+	(*UpdateAgentResponse)(nil),            // 64: subtraterpc.UpdateAgentResponse
+	(*AgentWithStatus)(nil),                // 65: subtraterpc.AgentWithStatus
+	(*AgentStatusCounts)(nil),              // 66: subtraterpc.AgentStatusCounts
+	(*GetAgentsStatusRequest)(nil),         // 67: subtraterpc.GetAgentsStatusRequest
+	(*GetAgentsStatusResponse)(nil),        // 68: subtraterpc.GetAgentsStatusResponse
+	(*HeartbeatRequest)(nil),               // 69: subtraterpc.HeartbeatRequest
+	(*HeartbeatResponse)(nil),              // 70: subtraterpc.HeartbeatResponse
+	(*SessionInfo)(nil),                    // 71: subtraterpc.SessionInfo
+	(*ListSessionsRequest)(nil),            // 72: subtraterpc.ListSessionsRequest
+	(*ListSessionsResponse)(nil),           // 73: subtraterpc.ListSessionsResponse
+	(*GetSessionRequest)(nil),              // 74: subtraterpc.GetSessionRequest
+	(*GetSessionResponse)(nil),             // 75: subtraterpc.GetSessionResponse
+	(*StartSessionRequest)(nil),            // 76: subtraterpc.StartSessionRequest
+	(*StartSessionResponse)(nil),           // 77: subtraterpc.StartSessionResponse
+	(*CompleteSessionRequest)(nil),         // 78: subtraterpc.CompleteSessionRequest
+	(*CompleteSessionResponse)(nil),        // 79: subtraterpc.CompleteSessionResponse
+	(*ActivityInfo)(nil),                   // 80: subtraterpc.ActivityInfo
+	(*ListActivitiesRequest)(nil),          // 81: subtraterpc.ListActivitiesRequest
+	(*ListActivitiesResponse)(nil),         // 82: subtraterpc.ListActivitiesResponse
+	(*DashboardStats)(nil),                 // 83: subtraterpc.DashboardStats
+	(*GetDashboardStatsRequest)(nil),       // 84: subtraterpc.GetDashboardStatsRequest
+	(*GetDashboardStatsResponse)(nil),      // 85: subtraterpc.GetDashboardStatsResponse
+	(*HealthCheckRequest)(nil),             // 86: subtraterpc.HealthCheckRequest
+	(*HealthCheckResponse)(nil),            // 87: subtraterpc.HealthCheckResponse
+	nil,                                    // 88: subtraterpc.PollChangesRequest.SinceOffsetsEntry
+	nil,                                    // 89: subtraterpc.PollChangesResponse.NewOffsetsEntry
+	nil,                                    // 90: subtraterpc.SaveIdentityRequest.ConsumerOffsetsEntry
+	(*timestamppb.Timestamp)(nil),          // 91: google.protobuf.Timestamp
 }
 var file_mail_proto_depIdxs = []int32{
 	0,  // 0: subtraterpc.InboxMessage.priority:type_name -> subtraterpc.Priority
 	1,  // 1: subtraterpc.InboxMessage.state:type_name -> subtraterpc.MessageState
-	0,  // 2: subtraterpc.SendMailRequest.priority:type_name -> subtraterpc.Priority
-	1,  // 3: subtraterpc.FetchInboxRequest.state_filter:type_name -> subtraterpc.MessageState
-	2,  // 4: subtraterpc.FetchInboxResponse.messages:type_name -> subtraterpc.InboxMessage
-	2,  // 5: subtraterpc.ReadMessageResponse.message:type_name -> subtraterpc.InboxMessage
-	2,  // 6: subtraterpc.ReadThreadResponse.messages:type_name -> subtraterpc.InboxMessage
-	1,  // 7: subtraterpc.UpdateStateRequest.new_state:type_name -> subtraterpc.MessageState
-	45, // 8: subtraterpc.PollChangesRequest.since_offsets:type_name -> subtraterpc.PollChangesRequest.SinceOffsetsEntry
-	2,  // 9: subtraterpc.PollChangesResponse.new_messages:type_name -> subtraterpc.InboxMessage
-	46, // 10: subtraterpc.PollChangesResponse.new_offsets:type_name -> subtraterpc.PollChangesResponse.NewOffsetsEntry
-	0,  // 11: subtraterpc.PublishRequest.priority:type_name -> subtraterpc.Priority
-	26, // 12: subtraterpc.ListTopicsResponse.topics:type_name -> subtraterpc.Topic
-	2,  // 13: subtraterpc.SearchResponse.results:type_name -> subtraterpc.InboxMessage
-	36, // 14: subtraterpc.ListAgentsResponse.agents:type_name -> subtraterpc.GetAgentResponse
-	47, // 15: subtraterpc.SaveIdentityRequest.consumer_offsets:type_name -> subtraterpc.SaveIdentityRequest.ConsumerOffsetsEntry
-	3,  // 16: subtraterpc.Mail.SendMail:input_type -> subtraterpc.SendMailRequest
-	5,  // 17: subtraterpc.Mail.FetchInbox:input_type -> subtraterpc.FetchInboxRequest
-	7,  // 18: subtraterpc.Mail.ReadMessage:input_type -> subtraterpc.ReadMessageRequest
-	9,  // 19: subtraterpc.Mail.ReadThread:input_type -> subtraterpc.ReadThreadRequest
-	11, // 20: subtraterpc.Mail.UpdateState:input_type -> subtraterpc.UpdateStateRequest
-	13, // 21: subtraterpc.Mail.AckMessage:input_type -> subtraterpc.AckMessageRequest
-	15, // 22: subtraterpc.Mail.GetStatus:input_type -> subtraterpc.GetStatusRequest
-	17, // 23: subtraterpc.Mail.PollChanges:input_type -> subtraterpc.PollChangesRequest
-	19, // 24: subtraterpc.Mail.SubscribeInbox:input_type -> subtraterpc.SubscribeInboxRequest
-	20, // 25: subtraterpc.Mail.Publish:input_type -> subtraterpc.PublishRequest
-	22, // 26: subtraterpc.Mail.Subscribe:input_type -> subtraterpc.SubscribeRequest
-	24, // 27: subtraterpc.Mail.Unsubscribe:input_type -> subtraterpc.UnsubscribeRequest
-	27, // 28: subtraterpc.Mail.ListTopics:input_type -> subtraterpc.ListTopicsRequest
-	29, // 29: subtraterpc.Mail.Search:input_type -> subtraterpc.SearchRequest
-	31, // 30: subtraterpc.Mail.HasUnackedStatusTo:input_type -> subtraterpc.HasUnackedStatusToRequest
-	33, // 31: subtraterpc.Agent.RegisterAgent:input_type -> subtraterpc.RegisterAgentRequest
-	35, // 32: subtraterpc.Agent.GetAgent:input_type -> subtraterpc.GetAgentRequest
-	37, // 33: subtraterpc.Agent.ListAgents:input_type -> subtraterpc.ListAgentsRequest
-	43, // 34: subtraterpc.Agent.DeleteAgent:input_type -> subtraterpc.DeleteAgentRequest
-	39, // 35: subtraterpc.Agent.EnsureIdentity:input_type -> subtraterpc.EnsureIdentityRequest
-	41, // 36: subtraterpc.Agent.SaveIdentity:input_type -> subtraterpc.SaveIdentityRequest
-	4,  // 37: subtraterpc.Mail.SendMail:output_type -> subtraterpc.SendMailResponse
-	6,  // 38: subtraterpc.Mail.FetchInbox:output_type -> subtraterpc.FetchInboxResponse
-	8,  // 39: subtraterpc.Mail.ReadMessage:output_type -> subtraterpc.ReadMessageResponse
-	10, // 40: subtraterpc.Mail.ReadThread:output_type -> subtraterpc.ReadThreadResponse
-	12, // 41: subtraterpc.Mail.UpdateState:output_type -> subtraterpc.UpdateStateResponse
-	14, // 42: subtraterpc.Mail.AckMessage:output_type -> subtraterpc.AckMessageResponse
-	16, // 43: subtraterpc.Mail.GetStatus:output_type -> subtraterpc.GetStatusResponse
-	18, // 44: subtraterpc.Mail.PollChanges:output_type -> subtraterpc.PollChangesResponse
-	2,  // 45: subtraterpc.Mail.SubscribeInbox:output_type -> subtraterpc.InboxMessage
-	21, // 46: subtraterpc.Mail.Publish:output_type -> subtraterpc.PublishResponse
-	23, // 47: subtraterpc.Mail.Subscribe:output_type -> subtraterpc.SubscribeResponse
-	25, // 48: subtraterpc.Mail.Unsubscribe:output_type -> subtraterpc.UnsubscribeResponse
-	28, // 49: subtraterpc.Mail.ListTopics:output_type -> subtraterpc.ListTopicsResponse
-	30, // 50: subtraterpc.Mail.Search:output_type -> subtraterpc.SearchResponse
-	32, // 51: subtraterpc.Mail.HasUnackedStatusTo:output_type -> subtraterpc.HasUnackedStatusToResponse
-	34, // 52: subtraterpc.Agent.RegisterAgent:output_type -> subtraterpc.RegisterAgentResponse
-	36, // 53: subtraterpc.Agent.GetAgent:output_type -> subtraterpc.GetAgentResponse
-	38, // 54: subtraterpc.Agent.ListAgents:output_type -> subtraterpc.ListAgentsResponse
-	44, // 55: subtraterpc.Agent.DeleteAgent:output_type -> subtraterpc.DeleteAgentResponse
-	40, // 56: subtraterpc.Agent.EnsureIdentity:output_type -> subtraterpc.EnsureIdentityResponse
-	42, // 57: subtraterpc.Agent.SaveIdentity:output_type -> subtraterpc.SaveIdentityResponse
-	37, // [37:58] is the sub-list for method output_type
-	16, // [16:37] is the sub-list for method input_type
-	16, // [16:16] is the sub-list for extension type_name
-	16, // [16:16] is the sub-list for extension extendee
-	0,  // [0:16] is the sub-list for field type_name
+	91, // 2: subtraterpc.InboxMessage.created_at:type_name -> google.protobuf.Timestamp
+	91, // 3: subtraterpc.InboxMessage.deadline_at:type_name -> google.protobuf.Timestamp
+	91, // 4: subtraterpc.InboxMessage.snoozed_until:type_name -> google.protobuf.Timestamp
+	91, // 5: subtraterpc.InboxMessage.read_at:type_name -> google.protobuf.Timestamp
+	91, // 6: subtraterpc.InboxMessage.acknowledged_at:type_name -> google.protobuf.Timestamp
+	0,  // 7: subtraterpc.SendMailRequest.priority:type_name -> subtraterpc.Priority
+	91, // 8: subtraterpc.SendMailRequest.deadline_at:type_name -> google.protobuf.Timestamp
+	1,  // 9: subtraterpc.FetchInboxRequest.state_filter:type_name -> subtraterpc.MessageState
+	5,  // 10: subtraterpc.FetchInboxResponse.messages:type_name -> subtraterpc.InboxMessage
+	5,  // 11: subtraterpc.ReadMessageResponse.message:type_name -> subtraterpc.InboxMessage
+	5,  // 12: subtraterpc.ReadThreadResponse.messages:type_name -> subtraterpc.InboxMessage
+	1,  // 13: subtraterpc.UpdateStateRequest.new_state:type_name -> subtraterpc.MessageState
+	91, // 14: subtraterpc.UpdateStateRequest.snoozed_until:type_name -> google.protobuf.Timestamp
+	88, // 15: subtraterpc.PollChangesRequest.since_offsets:type_name -> subtraterpc.PollChangesRequest.SinceOffsetsEntry
+	5,  // 16: subtraterpc.PollChangesResponse.new_messages:type_name -> subtraterpc.InboxMessage
+	89, // 17: subtraterpc.PollChangesResponse.new_offsets:type_name -> subtraterpc.PollChangesResponse.NewOffsetsEntry
+	0,  // 18: subtraterpc.PublishRequest.priority:type_name -> subtraterpc.Priority
+	91, // 19: subtraterpc.Topic.created_at:type_name -> google.protobuf.Timestamp
+	29, // 20: subtraterpc.ListTopicsResponse.topics:type_name -> subtraterpc.Topic
+	5,  // 21: subtraterpc.SearchResponse.results:type_name -> subtraterpc.InboxMessage
+	91, // 22: subtraterpc.GetAgentResponse.created_at:type_name -> google.protobuf.Timestamp
+	91, // 23: subtraterpc.GetAgentResponse.last_active_at:type_name -> google.protobuf.Timestamp
+	39, // 24: subtraterpc.ListAgentsResponse.agents:type_name -> subtraterpc.GetAgentResponse
+	90, // 25: subtraterpc.SaveIdentityRequest.consumer_offsets:type_name -> subtraterpc.SaveIdentityRequest.ConsumerOffsetsEntry
+	29, // 26: subtraterpc.GetTopicResponse.topic:type_name -> subtraterpc.Topic
+	59, // 27: subtraterpc.AutocompleteRecipientsResponse.recipients:type_name -> subtraterpc.AutocompleteRecipient
+	39, // 28: subtraterpc.UpdateAgentResponse.agent:type_name -> subtraterpc.GetAgentResponse
+	2,  // 29: subtraterpc.AgentWithStatus.status:type_name -> subtraterpc.AgentStatus
+	91, // 30: subtraterpc.AgentWithStatus.last_active_at:type_name -> google.protobuf.Timestamp
+	65, // 31: subtraterpc.GetAgentsStatusResponse.agents:type_name -> subtraterpc.AgentWithStatus
+	66, // 32: subtraterpc.GetAgentsStatusResponse.counts:type_name -> subtraterpc.AgentStatusCounts
+	91, // 33: subtraterpc.SessionInfo.started_at:type_name -> google.protobuf.Timestamp
+	91, // 34: subtraterpc.SessionInfo.ended_at:type_name -> google.protobuf.Timestamp
+	3,  // 35: subtraterpc.SessionInfo.status:type_name -> subtraterpc.SessionStatus
+	71, // 36: subtraterpc.ListSessionsResponse.sessions:type_name -> subtraterpc.SessionInfo
+	71, // 37: subtraterpc.GetSessionResponse.session:type_name -> subtraterpc.SessionInfo
+	71, // 38: subtraterpc.StartSessionResponse.session:type_name -> subtraterpc.SessionInfo
+	4,  // 39: subtraterpc.ActivityInfo.type:type_name -> subtraterpc.ActivityType
+	91, // 40: subtraterpc.ActivityInfo.created_at:type_name -> google.protobuf.Timestamp
+	4,  // 41: subtraterpc.ListActivitiesRequest.type:type_name -> subtraterpc.ActivityType
+	80, // 42: subtraterpc.ListActivitiesResponse.activities:type_name -> subtraterpc.ActivityInfo
+	83, // 43: subtraterpc.GetDashboardStatsResponse.stats:type_name -> subtraterpc.DashboardStats
+	91, // 44: subtraterpc.HealthCheckResponse.time:type_name -> google.protobuf.Timestamp
+	6,  // 45: subtraterpc.Mail.SendMail:input_type -> subtraterpc.SendMailRequest
+	8,  // 46: subtraterpc.Mail.FetchInbox:input_type -> subtraterpc.FetchInboxRequest
+	10, // 47: subtraterpc.Mail.ReadMessage:input_type -> subtraterpc.ReadMessageRequest
+	12, // 48: subtraterpc.Mail.ReadThread:input_type -> subtraterpc.ReadThreadRequest
+	14, // 49: subtraterpc.Mail.UpdateState:input_type -> subtraterpc.UpdateStateRequest
+	16, // 50: subtraterpc.Mail.AckMessage:input_type -> subtraterpc.AckMessageRequest
+	18, // 51: subtraterpc.Mail.GetStatus:input_type -> subtraterpc.GetStatusRequest
+	20, // 52: subtraterpc.Mail.PollChanges:input_type -> subtraterpc.PollChangesRequest
+	22, // 53: subtraterpc.Mail.SubscribeInbox:input_type -> subtraterpc.SubscribeInboxRequest
+	23, // 54: subtraterpc.Mail.Publish:input_type -> subtraterpc.PublishRequest
+	25, // 55: subtraterpc.Mail.Subscribe:input_type -> subtraterpc.SubscribeRequest
+	27, // 56: subtraterpc.Mail.Unsubscribe:input_type -> subtraterpc.UnsubscribeRequest
+	30, // 57: subtraterpc.Mail.ListTopics:input_type -> subtraterpc.ListTopicsRequest
+	32, // 58: subtraterpc.Mail.Search:input_type -> subtraterpc.SearchRequest
+	34, // 59: subtraterpc.Mail.HasUnackedStatusTo:input_type -> subtraterpc.HasUnackedStatusToRequest
+	48, // 60: subtraterpc.Mail.ReplyToThread:input_type -> subtraterpc.ReplyToThreadRequest
+	50, // 61: subtraterpc.Mail.ArchiveThread:input_type -> subtraterpc.ArchiveThreadRequest
+	52, // 62: subtraterpc.Mail.DeleteThread:input_type -> subtraterpc.DeleteThreadRequest
+	54, // 63: subtraterpc.Mail.MarkThreadUnread:input_type -> subtraterpc.MarkThreadUnreadRequest
+	56, // 64: subtraterpc.Mail.GetTopic:input_type -> subtraterpc.GetTopicRequest
+	58, // 65: subtraterpc.Mail.AutocompleteRecipients:input_type -> subtraterpc.AutocompleteRecipientsRequest
+	61, // 66: subtraterpc.Mail.DeleteMessage:input_type -> subtraterpc.DeleteMessageRequest
+	36, // 67: subtraterpc.Agent.RegisterAgent:input_type -> subtraterpc.RegisterAgentRequest
+	38, // 68: subtraterpc.Agent.GetAgent:input_type -> subtraterpc.GetAgentRequest
+	40, // 69: subtraterpc.Agent.ListAgents:input_type -> subtraterpc.ListAgentsRequest
+	46, // 70: subtraterpc.Agent.DeleteAgent:input_type -> subtraterpc.DeleteAgentRequest
+	63, // 71: subtraterpc.Agent.UpdateAgent:input_type -> subtraterpc.UpdateAgentRequest
+	67, // 72: subtraterpc.Agent.GetAgentsStatus:input_type -> subtraterpc.GetAgentsStatusRequest
+	69, // 73: subtraterpc.Agent.Heartbeat:input_type -> subtraterpc.HeartbeatRequest
+	42, // 74: subtraterpc.Agent.EnsureIdentity:input_type -> subtraterpc.EnsureIdentityRequest
+	44, // 75: subtraterpc.Agent.SaveIdentity:input_type -> subtraterpc.SaveIdentityRequest
+	72, // 76: subtraterpc.Session.ListSessions:input_type -> subtraterpc.ListSessionsRequest
+	74, // 77: subtraterpc.Session.GetSession:input_type -> subtraterpc.GetSessionRequest
+	76, // 78: subtraterpc.Session.StartSession:input_type -> subtraterpc.StartSessionRequest
+	78, // 79: subtraterpc.Session.CompleteSession:input_type -> subtraterpc.CompleteSessionRequest
+	81, // 80: subtraterpc.Activity.ListActivities:input_type -> subtraterpc.ListActivitiesRequest
+	84, // 81: subtraterpc.Stats.GetDashboardStats:input_type -> subtraterpc.GetDashboardStatsRequest
+	86, // 82: subtraterpc.Stats.HealthCheck:input_type -> subtraterpc.HealthCheckRequest
+	7,  // 83: subtraterpc.Mail.SendMail:output_type -> subtraterpc.SendMailResponse
+	9,  // 84: subtraterpc.Mail.FetchInbox:output_type -> subtraterpc.FetchInboxResponse
+	11, // 85: subtraterpc.Mail.ReadMessage:output_type -> subtraterpc.ReadMessageResponse
+	13, // 86: subtraterpc.Mail.ReadThread:output_type -> subtraterpc.ReadThreadResponse
+	15, // 87: subtraterpc.Mail.UpdateState:output_type -> subtraterpc.UpdateStateResponse
+	17, // 88: subtraterpc.Mail.AckMessage:output_type -> subtraterpc.AckMessageResponse
+	19, // 89: subtraterpc.Mail.GetStatus:output_type -> subtraterpc.GetStatusResponse
+	21, // 90: subtraterpc.Mail.PollChanges:output_type -> subtraterpc.PollChangesResponse
+	5,  // 91: subtraterpc.Mail.SubscribeInbox:output_type -> subtraterpc.InboxMessage
+	24, // 92: subtraterpc.Mail.Publish:output_type -> subtraterpc.PublishResponse
+	26, // 93: subtraterpc.Mail.Subscribe:output_type -> subtraterpc.SubscribeResponse
+	28, // 94: subtraterpc.Mail.Unsubscribe:output_type -> subtraterpc.UnsubscribeResponse
+	31, // 95: subtraterpc.Mail.ListTopics:output_type -> subtraterpc.ListTopicsResponse
+	33, // 96: subtraterpc.Mail.Search:output_type -> subtraterpc.SearchResponse
+	35, // 97: subtraterpc.Mail.HasUnackedStatusTo:output_type -> subtraterpc.HasUnackedStatusToResponse
+	49, // 98: subtraterpc.Mail.ReplyToThread:output_type -> subtraterpc.ReplyToThreadResponse
+	51, // 99: subtraterpc.Mail.ArchiveThread:output_type -> subtraterpc.ArchiveThreadResponse
+	53, // 100: subtraterpc.Mail.DeleteThread:output_type -> subtraterpc.DeleteThreadResponse
+	55, // 101: subtraterpc.Mail.MarkThreadUnread:output_type -> subtraterpc.MarkThreadUnreadResponse
+	57, // 102: subtraterpc.Mail.GetTopic:output_type -> subtraterpc.GetTopicResponse
+	60, // 103: subtraterpc.Mail.AutocompleteRecipients:output_type -> subtraterpc.AutocompleteRecipientsResponse
+	62, // 104: subtraterpc.Mail.DeleteMessage:output_type -> subtraterpc.DeleteMessageResponse
+	37, // 105: subtraterpc.Agent.RegisterAgent:output_type -> subtraterpc.RegisterAgentResponse
+	39, // 106: subtraterpc.Agent.GetAgent:output_type -> subtraterpc.GetAgentResponse
+	41, // 107: subtraterpc.Agent.ListAgents:output_type -> subtraterpc.ListAgentsResponse
+	47, // 108: subtraterpc.Agent.DeleteAgent:output_type -> subtraterpc.DeleteAgentResponse
+	64, // 109: subtraterpc.Agent.UpdateAgent:output_type -> subtraterpc.UpdateAgentResponse
+	68, // 110: subtraterpc.Agent.GetAgentsStatus:output_type -> subtraterpc.GetAgentsStatusResponse
+	70, // 111: subtraterpc.Agent.Heartbeat:output_type -> subtraterpc.HeartbeatResponse
+	43, // 112: subtraterpc.Agent.EnsureIdentity:output_type -> subtraterpc.EnsureIdentityResponse
+	45, // 113: subtraterpc.Agent.SaveIdentity:output_type -> subtraterpc.SaveIdentityResponse
+	73, // 114: subtraterpc.Session.ListSessions:output_type -> subtraterpc.ListSessionsResponse
+	75, // 115: subtraterpc.Session.GetSession:output_type -> subtraterpc.GetSessionResponse
+	77, // 116: subtraterpc.Session.StartSession:output_type -> subtraterpc.StartSessionResponse
+	79, // 117: subtraterpc.Session.CompleteSession:output_type -> subtraterpc.CompleteSessionResponse
+	82, // 118: subtraterpc.Activity.ListActivities:output_type -> subtraterpc.ListActivitiesResponse
+	85, // 119: subtraterpc.Stats.GetDashboardStats:output_type -> subtraterpc.GetDashboardStatsResponse
+	87, // 120: subtraterpc.Stats.HealthCheck:output_type -> subtraterpc.HealthCheckResponse
+	83, // [83:121] is the sub-list for method output_type
+	45, // [45:83] is the sub-list for method input_type
+	45, // [45:45] is the sub-list for extension type_name
+	45, // [45:45] is the sub-list for extension extendee
+	0,  // [0:45] is the sub-list for field type_name
 }
 
 func init() { file_mail_proto_init() }
@@ -2995,10 +5669,10 @@ func file_mail_proto_init() {
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_mail_proto_rawDesc), len(file_mail_proto_rawDesc)),
-			NumEnums:      2,
-			NumMessages:   46,
+			NumEnums:      5,
+			NumMessages:   86,
 			NumExtensions: 0,
-			NumServices:   2,
+			NumServices:   5,
 		},
 		GoTypes:           file_mail_proto_goTypes,
 		DependencyIndexes: file_mail_proto_depIdxs,

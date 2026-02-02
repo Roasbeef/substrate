@@ -8,6 +8,7 @@ import (
 
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
+	"google.golang.org/protobuf/types/known/timestamppb"
 
 	"github.com/roasbeef/subtrate/internal/agent"
 	"github.com/roasbeef/subtrate/internal/db/sqlc"
@@ -37,8 +38,8 @@ func (s *Server) SendMail(ctx context.Context, req *SendMailRequest) (*SendMailR
 
 	// Build send request.
 	var deadline *time.Time
-	if req.DeadlineAt > 0 {
-		t := time.Unix(req.DeadlineAt, 0)
+	if req.DeadlineAt != nil && req.DeadlineAt.IsValid() {
+		t := req.DeadlineAt.AsTime()
 		deadline = &t
 	}
 
@@ -188,10 +189,10 @@ func (s *Server) UpdateState(ctx context.Context, req *UpdateStateRequest) (*Upd
 	newState := stateToString(req.NewState)
 	var snoozedUntil *time.Time
 	if req.NewState == MessageState_STATE_SNOOZED {
-		if req.SnoozedUntil == 0 {
+		if req.SnoozedUntil == nil || !req.SnoozedUntil.IsValid() {
 			return nil, status.Error(codes.InvalidArgument, "snoozed_until is required for STATE_SNOOZED")
 		}
-		t := time.Unix(req.SnoozedUntil, 0)
+		t := req.SnoozedUntil.AsTime()
 		snoozedUntil = &t
 	}
 
@@ -433,7 +434,7 @@ func (s *Server) ListTopics(ctx context.Context, req *ListTopicsRequest) (*ListT
 			Id:        t.ID,
 			Name:      t.Name,
 			TopicType: t.TopicType,
-			CreatedAt: t.CreatedAt.Unix(),
+			CreatedAt: timestamppb.New(t.CreatedAt),
 		}
 	}
 
@@ -555,20 +556,20 @@ func convertMessage(m *mail.InboxMessage) *InboxMessage {
 	}
 
 	return &InboxMessage{
-		Id:           m.ID,
-		ThreadId:     m.ThreadID,
-		TopicId:      m.TopicID,
-		SenderId:     m.SenderID,
-		SenderName:   m.SenderName,
-		Subject:      m.Subject,
-		Body:         m.Body,
-		Priority:     priority,
-		State:        state,
-		CreatedAt:    m.CreatedAt.Unix(),
-		DeadlineAt:   timeToUnix(m.Deadline),
-		SnoozedUntil: timeToUnix(m.SnoozedUntil),
-		ReadAt:       timeToUnix(m.ReadAt),
-		AckedAt:      timeToUnix(m.AckedAt),
+		Id:             m.ID,
+		ThreadId:       m.ThreadID,
+		TopicId:        m.TopicID,
+		SenderId:       m.SenderID,
+		SenderName:     m.SenderName,
+		Subject:        m.Subject,
+		Body:           m.Body,
+		Priority:       priority,
+		State:          state,
+		CreatedAt:      timestamppb.New(m.CreatedAt),
+		DeadlineAt:     timeToTimestamp(m.Deadline),
+		SnoozedUntil:   timeToTimestamp(m.SnoozedUntil),
+		ReadAt:         timeToTimestamp(m.ReadAt),
+		AcknowledgedAt: timeToTimestamp(m.AckedAt),
 	}
 }
 
@@ -580,11 +581,22 @@ func convertMessages(msgs []mail.InboxMessage) []*InboxMessage {
 	return result
 }
 
-func timeToUnix(t *time.Time) int64 {
+// timeToTimestamp converts a *time.Time to a protobuf Timestamp.
+// Returns nil if t is nil or zero (serializes as null in JSON).
+func timeToTimestamp(t *time.Time) *timestamppb.Timestamp {
 	if t == nil || t.IsZero() {
-		return 0
+		return nil
 	}
-	return t.Unix()
+	return timestamppb.New(*t)
+}
+
+// int64ToTimestamp converts a Unix timestamp int64 to a protobuf Timestamp.
+// Returns nil if ts is 0 (serializes as null in JSON).
+func int64ToTimestamp(ts int64) *timestamppb.Timestamp {
+	if ts == 0 {
+		return nil
+	}
+	return timestamppb.New(time.Unix(ts, 0))
 }
 
 // Ensure we implement the interfaces.
@@ -611,7 +623,7 @@ func (s *Server) ListAgents(ctx context.Context, req *ListAgentsRequest) (*ListA
 		resp.Agents[i] = &GetAgentResponse{
 			Id:        a.ID,
 			Name:      a.Name,
-			CreatedAt: a.CreatedAt,
+			CreatedAt: int64ToTimestamp(a.CreatedAt),
 		}
 	}
 
@@ -660,7 +672,7 @@ func (s *Server) GetAgent(ctx context.Context, req *GetAgentRequest) (*GetAgentR
 		return &GetAgentResponse{
 			Id:        a.ID,
 			Name:      a.Name,
-			CreatedAt: a.CreatedAt,
+			CreatedAt: int64ToTimestamp(a.CreatedAt),
 		}, nil
 	}
 
@@ -672,7 +684,7 @@ func (s *Server) GetAgent(ctx context.Context, req *GetAgentRequest) (*GetAgentR
 		return &GetAgentResponse{
 			Id:        a.ID,
 			Name:      a.Name,
-			CreatedAt: a.CreatedAt,
+			CreatedAt: int64ToTimestamp(a.CreatedAt),
 		}, nil
 	}
 
