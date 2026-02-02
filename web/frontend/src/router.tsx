@@ -197,19 +197,5 @@ export const router = createBrowserRouter([
   },
 ]);
 
-// Route path constants for navigation.
-export const routes = {
-  inbox: '/inbox',
-  inboxCategory: (category: string) => `/inbox/${category}`,
-  starred: '/starred',
-  snoozed: '/snoozed',
-  sent: '/sent',
-  archive: '/archive',
-  thread: (threadId: number | string) => `/thread/${threadId}`,
-  agents: '/agents',
-  agent: (agentId: number | string) => `/agents/${agentId}`,
-  sessions: '/sessions',
-  session: (sessionId: number | string) => `/sessions/${sessionId}`,
-  settings: '/settings',
-  search: '/search',
-} as const;
+// Re-export routes for backward compatibility.
+export { routes } from '@/lib/routes.js';
