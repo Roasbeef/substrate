@@ -8,6 +8,7 @@ import { Sidebar } from './Sidebar.js';
 import { NotificationPrompt } from './NotificationPrompt.js';
 import { ModalContainer } from './ModalContainer.js';
 import { useNewMessageNotifications } from '@/hooks/useNotifications.js';
+import { useMessageToasts } from '@/hooks/useMessageToasts.js';
 
 // Combine clsx and tailwind-merge for class name handling.
 function cn(...inputs: (string | undefined | null | false)[]) {
@@ -53,7 +54,10 @@ export function AppShell({
   mainClassName,
 }: AppShellProps) {
   // Enable automatic notifications for new messages.
+  // Browser notifications (desktop).
   useNewMessageNotifications();
+  // In-app toast notifications.
+  useMessageToasts();
 
   return (
     <div className="flex h-screen w-full flex-col overflow-hidden">
