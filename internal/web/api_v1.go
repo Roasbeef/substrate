@@ -170,14 +170,22 @@ func (s *Server) handleAPIV1AgentsStatusJSON(w http.ResponseWriter, r *http.Requ
 
 	response := make([]map[string]any, 0, len(agents))
 	for _, aws := range agents {
-		response = append(response, map[string]any{
+		item := map[string]any{
 			"id":                      aws.Agent.ID,
 			"name":                    aws.Agent.Name,
 			"status":                  string(aws.Status),
 			"last_active_at":          aws.LastActive.UTC().Format(time.RFC3339),
 			"session_id":              aws.ActiveSessionID,
 			"seconds_since_heartbeat": int(time.Since(aws.LastActive).Seconds()),
-		})
+		}
+		// Extract string values from sql.NullString fields.
+		if aws.Agent.ProjectKey.Valid {
+			item["project_key"] = aws.Agent.ProjectKey.String
+		}
+		if aws.Agent.GitBranch.Valid {
+			item["git_branch"] = aws.Agent.GitBranch.String
+		}
+		response = append(response, item)
 	}
 
 	writeJSON(w, http.StatusOK, map[string]any{
@@ -203,6 +211,8 @@ func countsToMap(counts *agent.StatusCounts) map[string]int {
 type APIV1Agent struct {
 	ID           int64  `json:"id"`
 	Name         string `json:"name"`
+	ProjectKey   string `json:"project_key,omitempty"`
+	GitBranch    string `json:"git_branch,omitempty"`
 	CreatedAt    string `json:"created_at"`
 	LastActiveAt string `json:"last_active_at,omitempty"`
 }
@@ -223,9 +233,11 @@ func (s *Server) handleAPIV1Agents(w http.ResponseWriter, r *http.Request) {
 		result := make([]APIV1Agent, 0, len(agents))
 		for _, a := range agents {
 			result = append(result, APIV1Agent{
-				ID:        a.ID,
-				Name:      a.Name,
-				CreatedAt: a.CreatedAt.UTC().Format(time.RFC3339),
+				ID:         a.ID,
+				Name:       a.Name,
+				ProjectKey: a.ProjectKey,
+				GitBranch:  a.GitBranch,
+				CreatedAt:  a.CreatedAt.UTC().Format(time.RFC3339),
 			})
 		}
 
@@ -263,9 +275,11 @@ func (s *Server) handleAPIV1Agents(w http.ResponseWriter, r *http.Request) {
 		}
 
 		writeJSON(w, http.StatusCreated, APIV1Agent{
-			ID:        ag.ID,
-			Name:      ag.Name,
-			CreatedAt: ag.CreatedAt.UTC().Format(time.RFC3339),
+			ID:         ag.ID,
+			Name:       ag.Name,
+			ProjectKey: ag.ProjectKey,
+			GitBranch:  ag.GitBranch,
+			CreatedAt:  ag.CreatedAt.UTC().Format(time.RFC3339),
 		})
 
 	default:
@@ -422,15 +436,17 @@ func (s *Server) handleAPIV1DashboardStats(w http.ResponseWriter, r *http.Reques
 
 // APIV1Message represents a message in the JSON API.
 type APIV1Message struct {
-	ID         int64            `json:"id"`
-	SenderID   int64            `json:"sender_id"`
-	SenderName string           `json:"sender_name"`
-	Subject    string           `json:"subject"`
-	Body       string           `json:"body"`
-	Priority   string           `json:"priority"`
-	CreatedAt  string           `json:"created_at"`
-	ThreadID   string           `json:"thread_id,omitempty"`
-	Recipients []APIV1Recipient `json:"recipients,omitempty"`
+	ID               int64            `json:"id"`
+	SenderID         int64            `json:"sender_id"`
+	SenderName       string           `json:"sender_name"`
+	SenderProjectKey string           `json:"sender_project_key,omitempty"`
+	SenderGitBranch  string           `json:"sender_git_branch,omitempty"`
+	Subject          string           `json:"subject"`
+	Body             string           `json:"body"`
+	Priority         string           `json:"priority"`
+	CreatedAt        string           `json:"created_at"`
+	ThreadID         string           `json:"thread_id,omitempty"`
+	Recipients       []APIV1Recipient `json:"recipients,omitempty"`
 }
 
 // APIV1Recipient represents a message recipient in the JSON API.
@@ -481,8 +497,9 @@ func (s *Server) handleAPIV1Messages(w http.ResponseWriter, r *http.Request) {
 		}
 
 		// Send message via actor system.
+		senderID := s.getUserAgentID(ctx)
 		resp, err := s.sendMail(ctx, mail.SendMailRequest{
-			SenderID:       s.getUserAgentID(ctx),
+			SenderID:       senderID,
 			RecipientNames: recipientNames,
 			Subject:        req.Subject,
 			Body:           req.Body,
@@ -493,13 +510,36 @@ func (s *Server) handleAPIV1Messages(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
+		// Get sender name for broadcast.
+		senderName := "Unknown"
+		if sender, err := s.store.GetAgent(ctx, senderID); err == nil {
+			senderName = sender.Name
+		}
+
+		createdAt := time.Now().UTC().Format(time.RFC3339)
+
+		// Broadcast new message to all recipients via WebSocket.
+		msgPayload := map[string]any{
+			"id":          resp.MessageID,
+			"sender_id":   senderID,
+			"sender_name": senderName,
+			"subject":     req.Subject,
+			"body":        req.Body,
+			"priority":    priority,
+			"created_at":  createdAt,
+			"thread_id":   resp.ThreadID,
+		}
+		for _, recipientID := range req.To {
+			s.hub.BroadcastNewMessage(recipientID, msgPayload)
+		}
+
 		writeJSON(w, http.StatusCreated, APIV1Message{
 			ID:        resp.MessageID,
-			SenderID:  s.getUserAgentID(ctx),
+			SenderID:  senderID,
 			Subject:   req.Subject,
 			Body:      req.Body,
 			Priority:  priority,
-			CreatedAt: time.Now().UTC().Format(time.RFC3339),
+			CreatedAt: createdAt,
 			ThreadID:  resp.ThreadID,
 		})
 		return
@@ -515,11 +555,106 @@ func (s *Server) handleAPIV1Messages(w http.ResponseWriter, r *http.Request) {
 		pageSize = 20
 	}
 
+	// Parse filter parameters.
+	category := r.URL.Query().Get("category")
+	filter := r.URL.Query().Get("filter")
+	agentIDStr := r.URL.Query().Get("agent_id")
+
 	offset := (page - 1) * pageSize
-	messages, err := s.store.GetAllInboxMessages(ctx, pageSize, offset)
+
+	// Fetch all messages (we'll filter them based on category/filter/agent).
+	messages, err := s.store.GetAllInboxMessages(ctx, 1000, 0) // Fetch more to allow filtering.
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, "db_error", "Failed to fetch messages")
 		return
+	}
+
+	// Apply category filter.
+	currentUserID := s.getUserAgentID(ctx)
+	if category == "sent" {
+		// Filter to messages sent by current user.
+		filtered := make([]store.InboxMessage, 0)
+		for _, m := range messages {
+			if m.SenderID == currentUserID {
+				filtered = append(filtered, m)
+			}
+		}
+		messages = filtered
+	} else if category == "starred" {
+		// Filter to starred messages.
+		filtered := make([]store.InboxMessage, 0)
+		for _, m := range messages {
+			if m.State == "starred" {
+				filtered = append(filtered, m)
+			}
+		}
+		messages = filtered
+	} else if category == "archive" {
+		// Filter to archived messages.
+		filtered := make([]store.InboxMessage, 0)
+		for _, m := range messages {
+			if m.State == "archived" {
+				filtered = append(filtered, m)
+			}
+		}
+		messages = filtered
+	} else if category == "snoozed" {
+		// Filter to snoozed messages.
+		filtered := make([]store.InboxMessage, 0)
+		for _, m := range messages {
+			if m.State == "snoozed" && m.SnoozedUntil != nil {
+				filtered = append(filtered, m)
+			}
+		}
+		messages = filtered
+	}
+
+	// Apply additional filter (for inbox view).
+	if filter == "unread" {
+		filtered := make([]store.InboxMessage, 0)
+		for _, m := range messages {
+			if m.State == "unread" {
+				filtered = append(filtered, m)
+			}
+		}
+		messages = filtered
+	} else if filter == "starred" {
+		filtered := make([]store.InboxMessage, 0)
+		for _, m := range messages {
+			if m.State == "starred" {
+				filtered = append(filtered, m)
+			}
+		}
+		messages = filtered
+	}
+
+	// Apply agent filter if specified.
+	if agentIDStr != "" {
+		agentID, err := strconv.ParseInt(agentIDStr, 10, 64)
+		if err == nil {
+			filtered := make([]store.InboxMessage, 0)
+			for _, m := range messages {
+				// Include message if the agent is either sender or recipient.
+				// For inbox, we check if agent is a recipient (via message_recipients).
+				// For simplicity, check if sender matches or message is addressed to agent.
+				if m.SenderID == agentID {
+					filtered = append(filtered, m)
+				}
+			}
+			messages = filtered
+		}
+	}
+
+	// Apply pagination after filtering.
+	total := len(messages)
+	if offset >= len(messages) {
+		messages = []store.InboxMessage{}
+	} else {
+		end := offset + pageSize
+		if end > len(messages) {
+			end = len(messages)
+		}
+		messages = messages[offset:end]
 	}
 
 	// Collect message IDs for bulk recipient fetch.
@@ -534,14 +669,16 @@ func (s *Server) handleAPIV1Messages(w http.ResponseWriter, r *http.Request) {
 	result := make([]APIV1Message, 0, len(messages))
 	for _, m := range messages {
 		apiMsg := APIV1Message{
-			ID:         m.ID,
-			SenderID:   m.SenderID,
-			SenderName: m.SenderName,
-			Subject:    m.Subject,
-			Body:       m.Body,
-			Priority:   m.Priority,
-			CreatedAt:  m.CreatedAt.UTC().Format(time.RFC3339),
-			ThreadID:   m.ThreadID,
+			ID:               m.ID,
+			SenderID:         m.SenderID,
+			SenderName:       m.SenderName,
+			SenderProjectKey: m.SenderProjectKey,
+			SenderGitBranch:  m.SenderGitBranch,
+			Subject:          m.Subject,
+			Body:             m.Body,
+			Priority:         m.Priority,
+			CreatedAt:        m.CreatedAt.UTC().Format(time.RFC3339),
+			ThreadID:         m.ThreadID,
 		}
 
 		// Use pre-fetched recipients from bulk query.
@@ -570,7 +707,7 @@ func (s *Server) handleAPIV1Messages(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, APIResponse{
 		Data: result,
 		Meta: &APIMeta{
-			Total:    len(result),
+			Total:    total,
 			Page:     page,
 			PageSize: pageSize,
 		},
@@ -768,11 +905,24 @@ func (s *Server) handleAPIV1AutocompleteRecipients(w http.ResponseWriter, r *htt
 	result := make([]map[string]any, 0)
 	queryLower := strings.ToLower(query)
 	for _, a := range agents {
-		if query == "" || strings.Contains(strings.ToLower(a.Name), queryLower) {
-			result = append(result, map[string]any{
+		// Match on name, project_key, or git_branch.
+		matches := query == "" ||
+			strings.Contains(strings.ToLower(a.Name), queryLower) ||
+			strings.Contains(strings.ToLower(a.ProjectKey), queryLower) ||
+			strings.Contains(strings.ToLower(a.GitBranch), queryLower)
+
+		if matches {
+			item := map[string]any{
 				"id":   a.ID,
 				"name": a.Name,
-			})
+			}
+			if a.ProjectKey != "" {
+				item["project_key"] = a.ProjectKey
+			}
+			if a.GitBranch != "" {
+				item["git_branch"] = a.GitBranch
+			}
+			result = append(result, item)
 		}
 	}
 
@@ -1296,42 +1446,155 @@ func (s *Server) handleThreadAction(w http.ResponseWriter, r *http.Request, thre
 			return
 		}
 
-		// For now, just acknowledge the reply (would need to create a new message in a real implementation).
-		writeJSON(w, http.StatusOK, map[string]string{"status": "replied"})
+		var originalMsg *store.Message
+		var threadID string
 
-	case "archive":
-		// Try to parse as numeric ID.
+		// Try to parse as numeric ID (message ID) first.
 		msgID, err := strconv.ParseInt(threadIDStr, 10, 64)
 		if err == nil {
+			// Numeric ID - fetch message directly.
+			msg, err := s.store.GetMessage(ctx, msgID)
+			if err != nil {
+				writeError(w, http.StatusNotFound, "not_found", "Original message not found")
+				return
+			}
+			originalMsg = &msg
+			threadID = originalMsg.ThreadID
+			if threadID == "" {
+				threadID = strconv.FormatInt(originalMsg.ID, 10)
+			}
+		} else {
+			// UUID thread ID - fetch messages in thread and get the first one.
+			messages, err := s.store.GetMessagesByThread(ctx, threadIDStr)
+			if err != nil || len(messages) == 0 {
+				writeError(w, http.StatusNotFound, "not_found", "Thread not found")
+				return
+			}
+			originalMsg = &messages[0]
+			threadID = threadIDStr
+		}
+
+		// Get the sender name to reply to.
+		originalSender, err := s.store.GetAgent(ctx, originalMsg.SenderID)
+		if err != nil {
+			writeError(w, http.StatusInternalServerError, "db_error", "Failed to find original sender")
+			return
+		}
+
+		// Build subject (Re: prefix if not already present).
+		subject := originalMsg.Subject
+		if !strings.HasPrefix(subject, "Re: ") {
+			subject = "Re: " + subject
+		}
+
+		// Send the reply via actor system.
+		resp, err := s.sendMail(ctx, mail.SendMailRequest{
+			SenderID:       agentID,
+			RecipientNames: []string{originalSender.Name},
+			Subject:        subject,
+			Body:           req.Body,
+			Priority:       mail.Priority(originalMsg.Priority),
+			ThreadID:       threadID,
+		})
+		if err != nil {
+			writeError(w, http.StatusInternalServerError, "mail_error", "Failed to send reply")
+			return
+		}
+
+		// Get sender name for broadcast.
+		senderName := "Unknown"
+		if sender, err := s.store.GetAgent(ctx, agentID); err == nil {
+			senderName = sender.Name
+		}
+
+		createdAt := time.Now().UTC().Format(time.RFC3339)
+
+		// Broadcast new reply to recipient via WebSocket.
+		msgPayload := map[string]any{
+			"id":          resp.MessageID,
+			"sender_id":   agentID,
+			"sender_name": senderName,
+			"subject":     subject,
+			"body":        req.Body,
+			"priority":    originalMsg.Priority,
+			"created_at":  createdAt,
+			"thread_id":   resp.ThreadID,
+		}
+		s.hub.BroadcastNewMessage(originalSender.ID, msgPayload)
+
+		writeJSON(w, http.StatusOK, map[string]any{
+			"status":     "replied",
+			"message_id": resp.MessageID,
+			"thread_id":  resp.ThreadID,
+		})
+
+	case "archive":
+		// Try to parse as numeric ID (message ID) first.
+		msgID, err := strconv.ParseInt(threadIDStr, 10, 64)
+		if err == nil {
+			// Numeric ID - archive this message.
 			_, err := s.updateMessageState(ctx, agentID, msgID, mail.StateArchivedStr.String(), nil)
 			if err != nil {
 				writeError(w, http.StatusInternalServerError, "action_failed", "Failed to archive thread")
 				return
 			}
+		} else {
+			// UUID thread ID - archive all messages in thread.
+			messages, err := s.store.GetMessagesByThread(ctx, threadIDStr)
+			if err == nil {
+				for _, msg := range messages {
+					_, err := s.updateMessageState(ctx, agentID, msg.ID, mail.StateArchivedStr.String(), nil)
+					if err != nil {
+						log.Printf("Failed to archive message %d in thread %s: %v", msg.ID, threadIDStr, err)
+					}
+				}
+			}
 		}
 		writeJSON(w, http.StatusOK, map[string]string{"status": "archived"})
 
 	case "delete":
-		// Try to parse as numeric ID.
+		// Try to parse as numeric ID (message ID) first.
 		msgID, err := strconv.ParseInt(threadIDStr, 10, 64)
 		if err == nil {
-			// Delete by setting to deleted state.
-			_, err := s.updateMessageState(ctx, agentID, msgID, "deleted", nil)
+			// Numeric ID - delete this message.
+			_, err := s.updateMessageState(ctx, agentID, msgID, mail.StateTrashStr.String(), nil)
 			if err != nil {
-				// For now, just return success even if there's an error.
 				log.Printf("Failed to delete message %d: %v", msgID, err)
+			}
+		} else {
+			// UUID thread ID - delete all messages in thread.
+			messages, err := s.store.GetMessagesByThread(ctx, threadIDStr)
+			if err == nil {
+				for _, msg := range messages {
+					_, err := s.updateMessageState(ctx, agentID, msg.ID, mail.StateTrashStr.String(), nil)
+					if err != nil {
+						log.Printf("Failed to delete message %d in thread %s: %v", msg.ID, threadIDStr, err)
+					}
+				}
 			}
 		}
 		writeJSON(w, http.StatusOK, map[string]string{"status": "deleted"})
 
 	case "unread":
-		// Try to parse as numeric ID.
+		// Try to parse as numeric ID (message ID) first.
 		msgID, err := strconv.ParseInt(threadIDStr, 10, 64)
 		if err == nil {
+			// Numeric ID - mark this message as unread.
 			_, err := s.updateMessageState(ctx, agentID, msgID, mail.StateUnreadStr.String(), nil)
 			if err != nil {
 				writeError(w, http.StatusInternalServerError, "action_failed", "Failed to mark thread unread")
 				return
+			}
+		} else {
+			// UUID thread ID - mark all messages in thread as unread.
+			messages, err := s.store.GetMessagesByThread(ctx, threadIDStr)
+			if err == nil {
+				for _, msg := range messages {
+					_, err := s.updateMessageState(ctx, agentID, msg.ID, mail.StateUnreadStr.String(), nil)
+					if err != nil {
+						log.Printf("Failed to mark message %d as unread in thread %s: %v", msg.ID, threadIDStr, err)
+					}
+				}
 			}
 		}
 		writeJSON(w, http.StatusOK, map[string]string{"status": "unread"})

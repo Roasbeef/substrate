@@ -174,6 +174,8 @@ export interface SearchResult {
 export interface AutocompleteRecipient {
   id: number;
   name: string;
+  project_key?: string;
+  git_branch?: string;
   status?: AgentStatusType;
 }
 

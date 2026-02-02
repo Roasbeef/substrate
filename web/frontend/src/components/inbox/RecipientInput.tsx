@@ -5,6 +5,7 @@ import { clsx } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 import { Avatar } from '@/components/ui/Avatar.js';
 import type { AutocompleteRecipient, AgentStatusType } from '@/types/api.js';
+import { formatAgentDisplayName, getAgentContext } from '@/lib/utils.js';
 
 // Combine clsx and tailwind-merge for class name handling.
 function cn(...inputs: (string | undefined | null | false)[]) {
@@ -38,9 +39,22 @@ interface RecipientChipProps {
 }
 
 function RecipientChip({ recipient, onRemove, disabled }: RecipientChipProps) {
+  const agentLike = {
+    name: recipient.name,
+    project_key: recipient.project_key,
+    git_branch: recipient.git_branch,
+  };
+  const displayName = formatAgentDisplayName(agentLike);
+
   return (
-    <span className="inline-flex items-center gap-1 rounded-full bg-blue-100 py-0.5 pl-2 pr-1 text-sm text-blue-700">
+    <span
+      className="inline-flex items-center gap-1 rounded-full bg-blue-100 py-0.5 pl-2 pr-1 text-sm text-blue-700"
+      title={displayName}
+    >
       {recipient.name}
+      {getAgentContext(agentLike) ? (
+        <span className="text-xs text-blue-500">@{getAgentContext(agentLike)}</span>
+      ) : null}
       <button
         type="button"
         onClick={onRemove}
@@ -50,7 +64,7 @@ function RecipientChip({ recipient, onRemove, disabled }: RecipientChipProps) {
           'focus:outline-none focus:ring-2 focus:ring-blue-500',
           disabled ? 'cursor-not-allowed opacity-50' : '',
         )}
-        aria-label={`Remove ${recipient.name}`}
+        aria-label={`Remove ${displayName}`}
       >
         <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
           <path
@@ -77,6 +91,13 @@ function SuggestionItem({
   isHighlighted,
   onSelect,
 }: SuggestionItemProps) {
+  const agentLike = {
+    name: recipient.name,
+    project_key: recipient.project_key,
+    git_branch: recipient.git_branch,
+  };
+  const context = getAgentContext(agentLike);
+
   return (
     <button
       type="button"
@@ -87,9 +108,15 @@ function SuggestionItem({
       )}
       role="option"
       aria-selected={isHighlighted}
+      title={formatAgentDisplayName(agentLike)}
     >
       <Avatar name={recipient.name} size="sm" />
-      <span className="flex-1 truncate font-medium">{recipient.name}</span>
+      <div className="min-w-0 flex-1">
+        <span className="block truncate font-medium">{recipient.name}</span>
+        {context ? (
+          <span className="block truncate text-xs text-gray-500">@{context}</span>
+        ) : null}
+      </div>
       <StatusDot {...(recipient.status && { status: recipient.status })} />
     </button>
   );
