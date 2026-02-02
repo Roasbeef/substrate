@@ -5,6 +5,10 @@ import { defineConfig, devices } from '@playwright/test';
 // Read from environment variables with test defaults.
 const VITE_DEV_PORT = process.env.VITE_DEV_PORT ?? '5175';
 const API_PORT = process.env.API_PORT ?? '8082';
+const PROD_PORT = process.env.PROD_PORT ?? '8090';
+
+// Check if we're testing against production build.
+const USE_PRODUCTION = process.env.PLAYWRIGHT_USE_PRODUCTION === 'true';
 
 export default defineConfig({
   // Test directory.
@@ -30,8 +34,8 @@ export default defineConfig({
 
   // Shared settings for all tests.
   use: {
-    // Base URL for navigation.
-    baseURL: `http://localhost:${VITE_DEV_PORT}`,
+    // Base URL for navigation (use production server if PLAYWRIGHT_USE_PRODUCTION is set).
+    baseURL: USE_PRODUCTION ? `http://localhost:${PROD_PORT}` : `http://localhost:${VITE_DEV_PORT}`,
 
     // Collect trace when retrying failed tests.
     trace: 'on-first-retry',
@@ -83,23 +87,33 @@ export default defineConfig({
     },
   ],
 
-  // Local dev server configuration.
-  webServer: [
-    // Start the Go API server.
-    {
-      command: `cd ../.. && go run ./cmd/substrated -web-only -addr :${API_PORT} -data-dir .test-data`,
-      url: `http://localhost:${API_PORT}/api/v1/health`,
-      reuseExistingServer: !process.env.CI,
-      timeout: 120000,
-    },
-    // Start the Vite dev server.
-    {
-      command: `bun run dev --port ${VITE_DEV_PORT}`,
-      url: `http://localhost:${VITE_DEV_PORT}`,
-      reuseExistingServer: !process.env.CI,
-      timeout: 120000,
-    },
-  ],
+  // Server configuration - use production build or dev servers.
+  // Tests use a separate database (.test-data/test.db) to avoid modifying your normal data.
+  webServer: USE_PRODUCTION
+    ? [
+        // Production: Start the Go server with embedded frontend.
+        {
+          command: `cd ../.. && ./substrated -web-only -web :${PROD_PORT} -grpc "" -db .test-data/test.db`,
+          url: `http://localhost:${PROD_PORT}`,
+          reuseExistingServer: !process.env.CI,
+          timeout: 120000,
+        },
+      ]
+    : [
+        // Development: Start Go API server + Vite dev server.
+        {
+          command: `cd ../.. && CGO_CFLAGS="-DSQLITE_ENABLE_FTS5" go run ./cmd/substrated -web-only -web :${API_PORT} -grpc "" -db .test-data/test.db`,
+          url: `http://localhost:${API_PORT}/api/v1/health`,
+          reuseExistingServer: !process.env.CI,
+          timeout: 120000,
+        },
+        {
+          command: `bun run dev --port ${VITE_DEV_PORT}`,
+          url: `http://localhost:${VITE_DEV_PORT}`,
+          reuseExistingServer: !process.env.CI,
+          timeout: 120000,
+        },
+      ],
 
   // Output directory for test artifacts.
   outputDir: './test-results',

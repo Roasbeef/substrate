@@ -51,6 +51,26 @@ bun-test:
 bun-test-e2e:
 	cd $(FRONTEND_DIR) && bun run test:e2e
 
+# E2E test with full rebuild (frontend + daemon).
+# Cleans test data and runs E2E tests against production build.
+.PHONY: bun-test-e2e-full
+bun-test-e2e-full: bun-build build-daemon
+	@rm -rf .test-data
+	cd $(FRONTEND_DIR) && PLAYWRIGHT_USE_PRODUCTION=true bun run test:e2e
+
+# E2E test specific file with full rebuild.
+# Usage: make bun-test-e2e-file file=tests/e2e/inbox/message-delete.spec.ts
+.PHONY: bun-test-e2e-file
+bun-test-e2e-file: bun-build build-daemon
+	@rm -rf .test-data
+	cd $(FRONTEND_DIR) && PLAYWRIGHT_USE_PRODUCTION=true bun run test:e2e $(file) --project=chromium
+
+# E2E test without rebuild (for iterating on tests only).
+.PHONY: bun-test-e2e-quick
+bun-test-e2e-quick:
+	@rm -rf .test-data
+	cd $(FRONTEND_DIR) && PLAYWRIGHT_USE_PRODUCTION=true bun run test:e2e --project=chromium
+
 .PHONY: bun-lint
 bun-lint:
 	cd $(FRONTEND_DIR) && bun run lint
