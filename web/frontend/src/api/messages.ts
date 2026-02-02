@@ -44,7 +44,7 @@ function isGatewayResponse(
 
 // Convert gateway message to frontend format.
 function convertGatewayMessage(msg: GatewayInboxMessage): MessageWithRecipients {
-  return {
+  const result: MessageWithRecipients = {
     id: Number(msg.id),
     sender_id: Number(msg.sender_id),
     sender_name: msg.sender_name ?? 'Unknown',
@@ -52,9 +52,13 @@ function convertGatewayMessage(msg: GatewayInboxMessage): MessageWithRecipients 
     body: msg.body ?? '',
     priority: (msg.priority?.toLowerCase().replace('priority_', '') ?? 'normal') as MessageWithRecipients['priority'],
     created_at: msg.created_at ?? new Date().toISOString(),
-    thread_id: msg.thread_id,
     recipients: [],
   };
+  // Only set thread_id if it's defined (exactOptionalPropertyTypes compliance).
+  if (msg.thread_id !== undefined) {
+    result.thread_id = msg.thread_id;
+  }
+  return result;
 }
 
 // Normalize response to APIResponse format.
