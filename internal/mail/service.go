@@ -47,14 +47,41 @@ func (GetStatusResponse) isMailResponse()   {}
 func (PollChangesResponse) isMailResponse() {}
 func (PublishResponse) isMailResponse()     {}
 
-// Service is the mail service actor behavior.
-type Service struct {
-	store store.Storage
+// ServiceConfig holds configuration for the mail service.
+type ServiceConfig struct {
+	// Store is the storage backend for persisting messages.
+	Store store.Storage
+
+	// NotificationHub is the optional notification hub actor reference. When
+	// set, the service notifies recipients via the hub after sending messages
+	// using fire-and-forget Tell semantics for optimal performance.
+	NotificationHub NotificationActorRef
 }
 
-// NewService creates a new mail service with the given store.
-func NewService(s store.Storage) *Service {
+// Service is the mail service actor behavior.
+type Service struct {
+	store    store.Storage
+	notifHub NotificationActorRef
+}
+
+// NewService creates a new mail service with the given configuration.
+func NewService(cfg ServiceConfig) *Service {
+	return &Service{
+		store:    cfg.Store,
+		notifHub: cfg.NotificationHub,
+	}
+}
+
+// NewServiceWithStore creates a new mail service with just a store (no
+// notifications). This is a convenience constructor for simple use cases.
+func NewServiceWithStore(s store.Storage) *Service {
 	return &Service{store: s}
+}
+
+// SetNotificationHub sets the notification hub actor reference. This allows
+// deferred initialization when the hub is spawned after the mail service.
+func (s *Service) SetNotificationHub(hub NotificationActorRef) {
+	s.notifHub = hub
 }
 
 // Receive implements actor.ActorBehavior by dispatching to type-specific
@@ -108,6 +135,11 @@ func (s *Service) handleSendMail(ctx context.Context,
 ) SendMailResponse {
 	var response SendMailResponse
 
+	// Variables to capture data for notification after successful transaction.
+	var recipientIDs []int64
+	var senderName string
+	var msgCreatedAt time.Time
+
 	err := s.store.WithTx(ctx, func(ctx context.Context,
 		txStore store.Storage,
 	) error {
@@ -119,7 +151,6 @@ func (s *Service) handleSendMail(ctx context.Context,
 		response.ThreadID = threadID
 
 		// Resolve recipient agent IDs.
-		var recipientIDs []int64
 		for _, name := range req.RecipientNames {
 			agent, err := txStore.GetAgentByName(ctx, name)
 			if err != nil {
@@ -134,6 +165,7 @@ func (s *Service) handleSendMail(ctx context.Context,
 		if err != nil {
 			return fmt.Errorf("sender not found: %w", err)
 		}
+		senderName = sender.Name
 
 		// For direct messages, use the first recipient's inbox topic.
 		var topicID int64
@@ -186,6 +218,7 @@ func (s *Service) handleSendMail(ctx context.Context,
 			return fmt.Errorf("failed to create message: %w", err)
 		}
 		response.MessageID = msg.ID
+		msgCreatedAt = msg.CreatedAt
 
 		// Create recipient entries.
 		for _, recipientID := range recipientIDs {
@@ -202,6 +235,33 @@ func (s *Service) handleSendMail(ctx context.Context,
 	})
 	if err != nil {
 		response.Error = err
+		return response
+	}
+
+	// After successful transaction, notify recipients via notification hub actor.
+	// Use fire-and-forget Tell for optimal performance - we don't need to wait
+	// for the notification to be delivered.
+	if s.notifHub != nil && len(recipientIDs) > 0 {
+		notifMsg := InboxMessage{
+			ID:         response.MessageID,
+			ThreadID:   response.ThreadID,
+			SenderID:   req.SenderID,
+			SenderName: senderName,
+			Subject:    req.Subject,
+			Body:       req.Body,
+			Priority:   req.Priority,
+			State:      StateUnreadStr.String(),
+			CreatedAt:  msgCreatedAt,
+			Deadline:   req.Deadline,
+		}
+
+		// Notify each recipient via the hub actor using fire-and-forget.
+		for _, recipientID := range recipientIDs {
+			s.notifHub.Tell(ctx, NotifyAgentMsg{
+				AgentID: recipientID,
+				Message: notifMsg,
+			})
+		}
 	}
 
 	return response
