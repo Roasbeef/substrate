@@ -57,19 +57,20 @@ func main() {
 	dbStore := sqliteStore.Store
 	storage := store.FromDB(dbStore.DB())
 
-	// Create core services.
-	mailSvc := mail.NewServiceWithStore(storage)
+	// Create agent registry and identity manager.
 	agentReg := agent.NewRegistry(dbStore)
 	identityMgr, err := agent.NewIdentityManager(dbStore, agentReg)
 	if err != nil {
 		log.Fatalf("Failed to create identity manager: %v", err)
 	}
 
-	// Create the actor system and register core actors.
+	// Create the actor system.
 	actorSystem := actor.NewActorSystem()
 	defer actorSystem.Shutdown(context.Background())
 
-	// Create and register the notification hub for gRPC streaming.
+	// Create and register the notification hub for real-time notifications.
+	// This hub receives notifications from the mail service and delivers them
+	// to WebSocket clients and gRPC streams.
 	notificationHub := actor.RegisterWithSystem(
 		actorSystem,
 		"notification-hub",
@@ -78,14 +79,21 @@ func main() {
 	)
 	log.Println("NotificationHub actor started")
 
-	// Create and register the mail actor.
+	// Create the mail service with the notification hub reference.
+	// This enables real-time notifications when messages are sent.
+	mailSvc := mail.NewService(mail.ServiceConfig{
+		Store:           storage,
+		NotificationHub: notificationHub,
+	})
+
+	// Register the mail service as an actor.
 	mailRef := actor.RegisterWithSystem(
 		actorSystem,
 		"mail-service",
 		mail.MailServiceKey,
 		mailSvc,
 	)
-	log.Println("Mail actor started")
+	log.Println("Mail actor started with NotificationHub integration")
 
 	// Create and register the activity actor.
 	activitySvc := activity.NewService(activity.ServiceConfig{
@@ -144,6 +152,7 @@ func main() {
 		webCfg.Addr = *webAddr
 		webCfg.MailRef = mailRef
 		webCfg.ActivityRef = activityRef
+		webCfg.NotificationHubRef = web.NewActorNotificationHubRef(notificationHub)
 
 		webServer, err := web.NewServer(webCfg, storage, agentReg)
 		if err != nil {
