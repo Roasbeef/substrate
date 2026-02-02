@@ -44,6 +44,28 @@ func (s *Server) ackMessage(
 	return s.mailClient.AckMessage(ctx, agentID, messageID)
 }
 
+// updateMessageStateForAllRecipients updates the state for all recipients of a message.
+// This is used for global inbox actions like delete where all recipients should be affected.
+func (s *Server) updateMessageStateForAllRecipients(
+	ctx context.Context, messageID int64, newState string,
+) error {
+	// Get all recipients of the message.
+	recipients, err := s.store.GetMessageRecipients(ctx, messageID)
+	if err != nil {
+		return err
+	}
+
+	// Update state for each recipient.
+	for _, r := range recipients {
+		_, err := s.mailClient.UpdateMessageState(ctx, r.AgentID, messageID, newState, nil)
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
 // getAgentStatus gets an agent's mail status via the shared mail client.
 func (s *Server) getAgentStatus(
 	ctx context.Context, agentID int64,

@@ -81,6 +81,9 @@ const (
 
 	// ActionUnread marks a message as unread.
 	ActionUnread MessageAction = "unread"
+
+	// ActionDelete deletes a message (moves to trash).
+	ActionDelete MessageAction = "delete"
 )
 
 // String returns the string representation of the action.
@@ -92,7 +95,7 @@ func (a MessageAction) String() string {
 func (a MessageAction) IsValid() bool {
 	switch a {
 	case ActionStar, ActionArchive, ActionSnooze,
-		ActionAck, ActionRead, ActionUnread:
+		ActionAck, ActionRead, ActionUnread, ActionDelete:
 		return true
 	default:
 		return false

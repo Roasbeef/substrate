@@ -296,11 +296,18 @@ func (h *Hub) BroadcastToAll(msg *WSMessage) {
 }
 
 // BroadcastNewMessage notifies clients of a new message.
+// This broadcasts to both the specific recipient and to "global" viewers (agent_id=0).
 func (h *Hub) BroadcastNewMessage(recipientID int64, msg map[string]any) {
-	h.BroadcastToAgent(recipientID, &WSMessage{
+	wsMsg := &WSMessage{
 		Type:    WSMsgTypeNewMessage,
 		Payload: msg,
-	})
+	}
+
+	// Broadcast to the specific recipient.
+	h.BroadcastToAgent(recipientID, wsMsg)
+
+	// Also broadcast to "global" viewers (agent_id=0) so they see new messages.
+	h.BroadcastToAgent(0, wsMsg)
 }
 
 // ClientCount returns the number of connected clients.
