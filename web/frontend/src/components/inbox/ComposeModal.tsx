@@ -166,7 +166,7 @@ export function ComposeModal({
   }, [isDirty, handleReset, onClose]);
 
   return (
-    <Modal isOpen={isOpen} onClose={handleClose} size="lg" title={title}>
+    <Modal isOpen={isOpen} onClose={handleClose} size="3xl" title={title}>
       <form onSubmit={(e) => void handleSubmit(e)} className="space-y-4">
         {/* Recipients. */}
         <RecipientInput
@@ -195,7 +195,7 @@ export function ComposeModal({
           value={form.body}
           onChange={(e) => handleChange('body', e.target.value)}
           placeholder="Write your message... (Markdown supported)"
-          rows={8}
+          rows={12}
           disabled={isSending}
           error={errors.body}
         />

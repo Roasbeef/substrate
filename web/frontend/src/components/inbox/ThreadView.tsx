@@ -310,7 +310,7 @@ export function ThreadView({
     <Modal
       isOpen={isOpen}
       onClose={onClose}
-      size="xl"
+      size="3xl"
       className="flex h-[80vh] flex-col overflow-hidden"
       rawContent
       showCloseButton={false}
