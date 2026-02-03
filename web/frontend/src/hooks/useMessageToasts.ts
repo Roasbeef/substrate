@@ -3,7 +3,7 @@
 import { useCallback, useRef } from 'react';
 import { useNewMessages, useWebSocketConnection, type NewMessagePayload } from '@/hooks/useWebSocket.js';
 import { useUIStore } from '@/stores/ui.js';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 
 // Priority levels for styling.
 type MessagePriority = 'urgent' | 'normal' | 'low';
@@ -61,9 +61,10 @@ function getMessagePriority(priority: string): MessagePriority {
 // This provides immediate visual feedback in the UI when messages arrive.
 export function useMessageToasts(): void {
   const addToast = useUIStore((state) => state.addToast);
-  const openModal = useUIStore((state) => state.openModal);
+  const setPendingThread = useUIStore((state) => state.setPendingThread);
   const { state } = useWebSocketConnection();
   const navigate = useNavigate();
+  const location = useLocation();
 
   // Track shown message IDs to prevent duplicates.
   const shownIds = useRef(new Set<number>());
@@ -123,15 +124,22 @@ export function useMessageToasts(): void {
         action: {
           label: 'View',
           onClick: () => {
-            // Navigate to inbox and open the thread view.
-            navigate('/');
-            // Open thread modal with the message.
-            openModal('thread', { threadId: payload.id });
+            // Set the pending thread ID for InboxPage to pick up.
+            setPendingThread(payload.thread_id);
+
+            // If already on inbox, force navigation with thread param.
+            // Otherwise, navigate to inbox and let useEffect handle it.
+            if (location.pathname === '/inbox' || location.pathname === '/') {
+              // Navigate with thread ID in URL to force InboxPage to open it.
+              navigate(`/inbox/thread/${payload.thread_id}`);
+            } else {
+              navigate('/inbox');
+            }
           },
         },
       });
     },
-    [state, addToast, navigate, openModal],
+    [state, addToast, navigate, setPendingThread, location.pathname],
   );
 
   // Subscribe to new messages.

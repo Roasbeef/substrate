@@ -1,7 +1,7 @@
 // AppShell component - the main layout wrapper for the application.
 
 import { type ReactNode, useCallback } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { clsx } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 import { Header } from './Header.js';
@@ -56,15 +56,24 @@ export function AppShell({
   mainClassName,
 }: AppShellProps) {
   const navigate = useNavigate();
+  const location = useLocation();
   const setPendingThread = useUIStore((state) => state.setPendingThread);
 
   // Handle notification thread click - navigate to inbox and open thread.
   const handleThreadClick = useCallback(
     (threadId: string) => {
+      // Set pending thread for InboxPage to pick up.
       setPendingThread(threadId);
-      navigate('/');
+
+      // If already on inbox-related pages, navigate with thread ID in URL to force open.
+      // Otherwise, navigate to the thread URL directly.
+      if (location.pathname === '/inbox' || location.pathname === '/') {
+        navigate(`/inbox/thread/${threadId}`);
+      } else {
+        navigate(`/inbox/thread/${threadId}`);
+      }
     },
-    [setPendingThread, navigate],
+    [setPendingThread, navigate, location.pathname],
   );
 
   // Enable automatic notifications for new messages.
