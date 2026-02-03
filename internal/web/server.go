@@ -69,8 +69,8 @@ func DefaultConfig() *Config {
 // NewServer creates a new web server. The config must have non-nil MailRef and
 // ActivityRef since the server requires actor system support for all operations.
 func NewServer(cfg *Config, st store.Storage,
-	registry *agent.Registry) (*Server, error) {
-
+	registry *agent.Registry,
+) (*Server, error) {
 	// Validate required actor refs are provided.
 	if cfg.MailRef == nil {
 		return nil, fmt.Errorf("config.MailRef is required")

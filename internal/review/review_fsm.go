@@ -14,8 +14,8 @@ type ReviewFSM struct {
 
 // NewReviewFSM creates a new review FSM starting in the New state.
 func NewReviewFSM(reviewID, threadID, repoPath string,
-	requesterID int64) *ReviewFSM {
-
+	requesterID int64,
+) *ReviewFSM {
 	return &ReviewFSM{
 		state: &StateNew{},
 		env: &ReviewEnvironment{
@@ -30,8 +30,8 @@ func NewReviewFSM(reviewID, threadID, repoPath string,
 // NewReviewFSMFromDB creates a review FSM from a persisted state string.
 // Used when recovering active reviews on restart.
 func NewReviewFSMFromDB(reviewID, threadID, repoPath string,
-	requesterID int64, stateStr string) *ReviewFSM {
-
+	requesterID int64, stateStr string,
+) *ReviewFSM {
 	return &ReviewFSM{
 		state: StateFromString(stateStr),
 		env: &ReviewEnvironment{
@@ -46,8 +46,8 @@ func NewReviewFSMFromDB(reviewID, threadID, repoPath string,
 // ProcessEvent processes an event and returns the outbox events that should
 // be dispatched to external actors.
 func (f *ReviewFSM) ProcessEvent(ctx context.Context,
-	event ReviewEvent) ([]ReviewOutboxEvent, error) {
-
+	event ReviewEvent,
+) ([]ReviewOutboxEvent, error) {
 	transition, err := f.state.ProcessEvent(ctx, event, f.env)
 	if err != nil {
 		return nil, fmt.Errorf("process event %T: %w", event, err)

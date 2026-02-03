@@ -14,8 +14,8 @@ import (
 
 // CreateReview creates a new review record.
 func (s *SqlcStore) CreateReview(ctx context.Context,
-	params CreateReviewParams) (Review, error) {
-
+	params CreateReviewParams,
+) (Review, error) {
 	now := time.Now().Unix()
 
 	row, err := s.db.CreateReview(ctx, sqlc.CreateReviewParams{
@@ -43,8 +43,8 @@ func (s *SqlcStore) CreateReview(ctx context.Context,
 
 // GetReview retrieves a review by its UUID.
 func (s *SqlcStore) GetReview(ctx context.Context,
-	reviewID string) (Review, error) {
-
+	reviewID string,
+) (Review, error) {
 	row, err := s.db.GetReview(ctx, reviewID)
 	if err != nil {
 		return Review{}, err
@@ -55,8 +55,8 @@ func (s *SqlcStore) GetReview(ctx context.Context,
 
 // ListReviews lists reviews ordered by creation time.
 func (s *SqlcStore) ListReviews(ctx context.Context,
-	limit, offset int) ([]Review, error) {
-
+	limit, offset int,
+) ([]Review, error) {
 	rows, err := s.db.ListReviews(ctx, sqlc.ListReviewsParams{
 		Limit:  int64(limit),
 		Offset: int64(offset),
@@ -74,8 +74,8 @@ func (s *SqlcStore) ListReviews(ctx context.Context,
 
 // ListReviewsByState lists reviews matching the given state.
 func (s *SqlcStore) ListReviewsByState(ctx context.Context,
-	state string, limit int) ([]Review, error) {
-
+	state string, limit int,
+) ([]Review, error) {
 	rows, err := s.db.ListReviewsByState(ctx, sqlc.ListReviewsByStateParams{
 		State: state,
 		Limit: int64(limit),
@@ -93,8 +93,8 @@ func (s *SqlcStore) ListReviewsByState(ctx context.Context,
 
 // ListReviewsByRequester lists reviews by the requesting agent.
 func (s *SqlcStore) ListReviewsByRequester(ctx context.Context,
-	requesterID int64, limit int) ([]Review, error) {
-
+	requesterID int64, limit int,
+) ([]Review, error) {
 	rows, err := s.db.ListReviewsByRequester(
 		ctx, sqlc.ListReviewsByRequesterParams{
 			RequesterID: requesterID,
@@ -114,8 +114,8 @@ func (s *SqlcStore) ListReviewsByRequester(ctx context.Context,
 
 // ListActiveReviews returns reviews in non-terminal states.
 func (s *SqlcStore) ListActiveReviews(
-	ctx context.Context) ([]Review, error) {
-
+	ctx context.Context,
+) ([]Review, error) {
 	rows, err := s.db.ListActiveReviews(ctx)
 	if err != nil {
 		return nil, err
@@ -130,8 +130,8 @@ func (s *SqlcStore) ListActiveReviews(
 
 // UpdateReviewState updates the FSM state of a review.
 func (s *SqlcStore) UpdateReviewState(ctx context.Context,
-	reviewID, state string) error {
-
+	reviewID, state string,
+) error {
 	return s.db.UpdateReviewState(ctx, sqlc.UpdateReviewStateParams{
 		ReviewID:  reviewID,
 		State:     state,
@@ -141,8 +141,8 @@ func (s *SqlcStore) UpdateReviewState(ctx context.Context,
 
 // UpdateReviewCompleted marks a review as completed with a terminal state.
 func (s *SqlcStore) UpdateReviewCompleted(ctx context.Context,
-	reviewID, state string) error {
-
+	reviewID, state string,
+) error {
 	now := time.Now().Unix()
 	return s.db.UpdateReviewCompleted(ctx, sqlc.UpdateReviewCompletedParams{
 		ReviewID:    reviewID,
@@ -154,8 +154,8 @@ func (s *SqlcStore) UpdateReviewCompleted(ctx context.Context,
 
 // CreateReviewIteration records a review iteration result.
 func (s *SqlcStore) CreateReviewIteration(ctx context.Context,
-	params CreateReviewIterationParams) (ReviewIteration, error) {
-
+	params CreateReviewIterationParams,
+) (ReviewIteration, error) {
 	row, err := s.db.CreateReviewIteration(
 		ctx, sqlc.CreateReviewIterationParams{
 			ReviewID:          params.ReviewID,
@@ -183,8 +183,8 @@ func (s *SqlcStore) CreateReviewIteration(ctx context.Context,
 
 // GetReviewIterations gets all iterations for a review.
 func (s *SqlcStore) GetReviewIterations(ctx context.Context,
-	reviewID string) ([]ReviewIteration, error) {
-
+	reviewID string,
+) ([]ReviewIteration, error) {
 	rows, err := s.db.GetReviewIterations(ctx, reviewID)
 	if err != nil {
 		return nil, err
@@ -199,8 +199,8 @@ func (s *SqlcStore) GetReviewIterations(ctx context.Context,
 
 // CreateReviewIssue records a specific issue found during review.
 func (s *SqlcStore) CreateReviewIssue(ctx context.Context,
-	params CreateReviewIssueParams) (ReviewIssue, error) {
-
+	params CreateReviewIssueParams,
+) (ReviewIssue, error) {
 	row, err := s.db.CreateReviewIssue(ctx, sqlc.CreateReviewIssueParams{
 		ReviewID:     params.ReviewID,
 		IterationNum: int64(params.IterationNum),
@@ -226,8 +226,8 @@ func (s *SqlcStore) CreateReviewIssue(ctx context.Context,
 
 // GetReviewIssues gets all issues for a review.
 func (s *SqlcStore) GetReviewIssues(ctx context.Context,
-	reviewID string) ([]ReviewIssue, error) {
-
+	reviewID string,
+) ([]ReviewIssue, error) {
 	rows, err := s.db.GetReviewIssues(ctx, reviewID)
 	if err != nil {
 		return nil, err
@@ -242,8 +242,8 @@ func (s *SqlcStore) GetReviewIssues(ctx context.Context,
 
 // GetOpenReviewIssues gets open issues for a review.
 func (s *SqlcStore) GetOpenReviewIssues(ctx context.Context,
-	reviewID string) ([]ReviewIssue, error) {
-
+	reviewID string,
+) ([]ReviewIssue, error) {
 	rows, err := s.db.GetOpenReviewIssues(ctx, reviewID)
 	if err != nil {
 		return nil, err
@@ -258,8 +258,8 @@ func (s *SqlcStore) GetOpenReviewIssues(ctx context.Context,
 
 // UpdateReviewIssueStatus updates an issue's resolution status.
 func (s *SqlcStore) UpdateReviewIssueStatus(ctx context.Context,
-	issueID int64, status string, resolvedInIteration *int) error {
-
+	issueID int64, status string, resolvedInIteration *int,
+) error {
 	var resolvedAt sql.NullInt64
 	if status == "fixed" || status == "wont_fix" || status == "duplicate" {
 		resolvedAt = sql.NullInt64{
@@ -279,8 +279,8 @@ func (s *SqlcStore) UpdateReviewIssueStatus(ctx context.Context,
 
 // CountOpenIssues counts open issues for a review.
 func (s *SqlcStore) CountOpenIssues(ctx context.Context,
-	reviewID string) (int64, error) {
-
+	reviewID string,
+) (int64, error) {
 	return s.db.CountOpenIssues(ctx, reviewID)
 }
 
@@ -290,8 +290,8 @@ func (s *SqlcStore) CountOpenIssues(ctx context.Context,
 
 // CreateReview creates a new review record within a transaction.
 func (s *txSqlcStore) CreateReview(ctx context.Context,
-	params CreateReviewParams) (Review, error) {
-
+	params CreateReviewParams,
+) (Review, error) {
 	now := time.Now().Unix()
 
 	row, err := s.queries.CreateReview(ctx, sqlc.CreateReviewParams{
@@ -319,8 +319,8 @@ func (s *txSqlcStore) CreateReview(ctx context.Context,
 
 // GetReview retrieves a review by its UUID within a transaction.
 func (s *txSqlcStore) GetReview(ctx context.Context,
-	reviewID string) (Review, error) {
-
+	reviewID string,
+) (Review, error) {
 	row, err := s.queries.GetReview(ctx, reviewID)
 	if err != nil {
 		return Review{}, err
@@ -331,8 +331,8 @@ func (s *txSqlcStore) GetReview(ctx context.Context,
 
 // ListReviews lists reviews ordered by creation time within a transaction.
 func (s *txSqlcStore) ListReviews(ctx context.Context,
-	limit, offset int) ([]Review, error) {
-
+	limit, offset int,
+) ([]Review, error) {
 	rows, err := s.queries.ListReviews(ctx, sqlc.ListReviewsParams{
 		Limit:  int64(limit),
 		Offset: int64(offset),
@@ -351,8 +351,8 @@ func (s *txSqlcStore) ListReviews(ctx context.Context,
 // ListReviewsByState lists reviews matching the given state within a
 // transaction.
 func (s *txSqlcStore) ListReviewsByState(ctx context.Context,
-	state string, limit int) ([]Review, error) {
-
+	state string, limit int,
+) ([]Review, error) {
 	rows, err := s.queries.ListReviewsByState(
 		ctx, sqlc.ListReviewsByStateParams{
 			State: state,
@@ -373,8 +373,8 @@ func (s *txSqlcStore) ListReviewsByState(ctx context.Context,
 // ListReviewsByRequester lists reviews by the requesting agent within a
 // transaction.
 func (s *txSqlcStore) ListReviewsByRequester(ctx context.Context,
-	requesterID int64, limit int) ([]Review, error) {
-
+	requesterID int64, limit int,
+) ([]Review, error) {
 	rows, err := s.queries.ListReviewsByRequester(
 		ctx, sqlc.ListReviewsByRequesterParams{
 			RequesterID: requesterID,
@@ -395,8 +395,8 @@ func (s *txSqlcStore) ListReviewsByRequester(ctx context.Context,
 // ListActiveReviews returns reviews in non-terminal states within a
 // transaction.
 func (s *txSqlcStore) ListActiveReviews(
-	ctx context.Context) ([]Review, error) {
-
+	ctx context.Context,
+) ([]Review, error) {
 	rows, err := s.queries.ListActiveReviews(ctx)
 	if err != nil {
 		return nil, err
@@ -411,8 +411,8 @@ func (s *txSqlcStore) ListActiveReviews(
 
 // UpdateReviewState updates the FSM state of a review within a transaction.
 func (s *txSqlcStore) UpdateReviewState(ctx context.Context,
-	reviewID, state string) error {
-
+	reviewID, state string,
+) error {
 	return s.queries.UpdateReviewState(ctx, sqlc.UpdateReviewStateParams{
 		ReviewID:  reviewID,
 		State:     state,
@@ -422,8 +422,8 @@ func (s *txSqlcStore) UpdateReviewState(ctx context.Context,
 
 // UpdateReviewCompleted marks a review as completed within a transaction.
 func (s *txSqlcStore) UpdateReviewCompleted(ctx context.Context,
-	reviewID, state string) error {
-
+	reviewID, state string,
+) error {
 	now := time.Now().Unix()
 	return s.queries.UpdateReviewCompleted(
 		ctx, sqlc.UpdateReviewCompletedParams{
@@ -438,8 +438,8 @@ func (s *txSqlcStore) UpdateReviewCompleted(ctx context.Context,
 // CreateReviewIteration records a review iteration result within a
 // transaction.
 func (s *txSqlcStore) CreateReviewIteration(ctx context.Context,
-	params CreateReviewIterationParams) (ReviewIteration, error) {
-
+	params CreateReviewIterationParams,
+) (ReviewIteration, error) {
 	row, err := s.queries.CreateReviewIteration(
 		ctx, sqlc.CreateReviewIterationParams{
 			ReviewID:          params.ReviewID,
@@ -467,8 +467,8 @@ func (s *txSqlcStore) CreateReviewIteration(ctx context.Context,
 
 // GetReviewIterations gets all iterations for a review within a transaction.
 func (s *txSqlcStore) GetReviewIterations(ctx context.Context,
-	reviewID string) ([]ReviewIteration, error) {
-
+	reviewID string,
+) ([]ReviewIteration, error) {
 	rows, err := s.queries.GetReviewIterations(ctx, reviewID)
 	if err != nil {
 		return nil, err
@@ -484,8 +484,8 @@ func (s *txSqlcStore) GetReviewIterations(ctx context.Context,
 // CreateReviewIssue records a specific issue found during review within a
 // transaction.
 func (s *txSqlcStore) CreateReviewIssue(ctx context.Context,
-	params CreateReviewIssueParams) (ReviewIssue, error) {
-
+	params CreateReviewIssueParams,
+) (ReviewIssue, error) {
 	row, err := s.queries.CreateReviewIssue(
 		ctx, sqlc.CreateReviewIssueParams{
 			ReviewID:     params.ReviewID,
@@ -513,8 +513,8 @@ func (s *txSqlcStore) CreateReviewIssue(ctx context.Context,
 
 // GetReviewIssues gets all issues for a review within a transaction.
 func (s *txSqlcStore) GetReviewIssues(ctx context.Context,
-	reviewID string) ([]ReviewIssue, error) {
-
+	reviewID string,
+) ([]ReviewIssue, error) {
 	rows, err := s.queries.GetReviewIssues(ctx, reviewID)
 	if err != nil {
 		return nil, err
@@ -529,8 +529,8 @@ func (s *txSqlcStore) GetReviewIssues(ctx context.Context,
 
 // GetOpenReviewIssues gets open issues for a review within a transaction.
 func (s *txSqlcStore) GetOpenReviewIssues(ctx context.Context,
-	reviewID string) ([]ReviewIssue, error) {
-
+	reviewID string,
+) ([]ReviewIssue, error) {
 	rows, err := s.queries.GetOpenReviewIssues(ctx, reviewID)
 	if err != nil {
 		return nil, err
@@ -546,8 +546,8 @@ func (s *txSqlcStore) GetOpenReviewIssues(ctx context.Context,
 // UpdateReviewIssueStatus updates an issue's resolution status within a
 // transaction.
 func (s *txSqlcStore) UpdateReviewIssueStatus(ctx context.Context,
-	issueID int64, status string, resolvedInIteration *int) error {
-
+	issueID int64, status string, resolvedInIteration *int,
+) error {
 	var resolvedAt sql.NullInt64
 	if status == "fixed" || status == "wont_fix" || status == "duplicate" {
 		resolvedAt = sql.NullInt64{
@@ -567,7 +567,7 @@ func (s *txSqlcStore) UpdateReviewIssueStatus(ctx context.Context,
 
 // CountOpenIssues counts open issues for a review within a transaction.
 func (s *txSqlcStore) CountOpenIssues(ctx context.Context,
-	reviewID string) (int64, error) {
-
+	reviewID string,
+) (int64, error) {
 	return s.queries.CountOpenIssues(ctx, reviewID)
 }

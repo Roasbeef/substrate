@@ -225,7 +225,6 @@ func (m *IdentityManager) RestoreIdentity(ctx context.Context,
 
 		return nil
 	})
-
 	if err != nil {
 		return nil, err
 	}
@@ -353,7 +352,6 @@ func (m *IdentityManager) GetProjectDefaultIdentity(ctx context.Context,
 
 		return nil
 	})
-
 	if err != nil {
 		return nil, err
 	}

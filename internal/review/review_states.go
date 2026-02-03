@@ -59,8 +59,8 @@ type StateNew struct{}
 
 // ProcessEvent handles events in the New state.
 func (s *StateNew) ProcessEvent(_ context.Context, event ReviewEvent,
-	env *ReviewEnvironment) (*ReviewTransition, error) {
-
+	env *ReviewEnvironment,
+) (*ReviewTransition, error) {
 	switch e := event.(type) {
 	case SubmitForReviewEvent:
 		return &ReviewTransition{
@@ -113,9 +113,9 @@ func (s *StateNew) ProcessEvent(_ context.Context, event ReviewEvent,
 	}
 }
 
-func (s *StateNew) IsTerminal() bool  { return false }
-func (s *StateNew) String() string    { return "new" }
-func (s *StateNew) isReviewState()    {}
+func (s *StateNew) IsTerminal() bool { return false }
+func (s *StateNew) String() string   { return "new" }
+func (s *StateNew) isReviewState()   {}
 
 // =============================================================================
 // StatePendingReview: Waiting for a reviewer agent to start.
@@ -129,7 +129,6 @@ type StatePendingReview struct{}
 func (s *StatePendingReview) ProcessEvent(_ context.Context,
 	event ReviewEvent, env *ReviewEnvironment,
 ) (*ReviewTransition, error) {
-
 	switch e := event.(type) {
 	case StartReviewEvent:
 		return &ReviewTransition{
@@ -179,9 +178,9 @@ func (s *StatePendingReview) ProcessEvent(_ context.Context,
 	}
 }
 
-func (s *StatePendingReview) IsTerminal() bool  { return false }
-func (s *StatePendingReview) String() string    { return "pending_review" }
-func (s *StatePendingReview) isReviewState()    {}
+func (s *StatePendingReview) IsTerminal() bool { return false }
+func (s *StatePendingReview) String() string   { return "pending_review" }
+func (s *StatePendingReview) isReviewState()   {}
 
 // =============================================================================
 // StateUnderReview: A reviewer agent is actively analyzing the code.
@@ -196,7 +195,6 @@ type StateUnderReview struct {
 func (s *StateUnderReview) ProcessEvent(_ context.Context,
 	event ReviewEvent, env *ReviewEnvironment,
 ) (*ReviewTransition, error) {
-
 	switch e := event.(type) {
 	case ApproveEvent:
 		return &ReviewTransition{
@@ -305,9 +303,9 @@ func (s *StateUnderReview) ProcessEvent(_ context.Context,
 	}
 }
 
-func (s *StateUnderReview) IsTerminal() bool  { return false }
-func (s *StateUnderReview) String() string    { return "under_review" }
-func (s *StateUnderReview) isReviewState()    {}
+func (s *StateUnderReview) IsTerminal() bool { return false }
+func (s *StateUnderReview) String() string   { return "under_review" }
+func (s *StateUnderReview) isReviewState()   {}
 
 // =============================================================================
 // StateChangesRequested: Reviewer found issues, waiting for author to fix.
@@ -323,7 +321,6 @@ type StateChangesRequested struct {
 func (s *StateChangesRequested) ProcessEvent(_ context.Context,
 	event ReviewEvent, env *ReviewEnvironment,
 ) (*ReviewTransition, error) {
-
 	switch e := event.(type) {
 	case ResubmitEvent:
 		_ = e
@@ -371,9 +368,9 @@ func (s *StateChangesRequested) ProcessEvent(_ context.Context,
 	}
 }
 
-func (s *StateChangesRequested) IsTerminal() bool  { return false }
-func (s *StateChangesRequested) String() string    { return "changes_requested" }
-func (s *StateChangesRequested) isReviewState()    {}
+func (s *StateChangesRequested) IsTerminal() bool { return false }
+func (s *StateChangesRequested) String() string   { return "changes_requested" }
+func (s *StateChangesRequested) isReviewState()   {}
 
 // =============================================================================
 // StateReReview: Author resubmitted, reviewer re-analyzing.
@@ -388,7 +385,6 @@ type StateReReview struct{}
 func (s *StateReReview) ProcessEvent(_ context.Context,
 	event ReviewEvent, env *ReviewEnvironment,
 ) (*ReviewTransition, error) {
-
 	switch e := event.(type) {
 	case StartReviewEvent:
 		return &ReviewTransition{
@@ -429,9 +425,9 @@ func (s *StateReReview) ProcessEvent(_ context.Context,
 	}
 }
 
-func (s *StateReReview) IsTerminal() bool  { return false }
-func (s *StateReReview) String() string    { return "re_review" }
-func (s *StateReReview) isReviewState()    {}
+func (s *StateReReview) IsTerminal() bool { return false }
+func (s *StateReReview) String() string   { return "re_review" }
+func (s *StateReReview) isReviewState()   {}
 
 // =============================================================================
 // Terminal states: Approved, Rejected, Cancelled.
@@ -452,9 +448,9 @@ func (s *StateApproved) ProcessEvent(_ context.Context,
 	)
 }
 
-func (s *StateApproved) IsTerminal() bool  { return true }
-func (s *StateApproved) String() string    { return "approved" }
-func (s *StateApproved) isReviewState()    {}
+func (s *StateApproved) IsTerminal() bool { return true }
+func (s *StateApproved) String() string   { return "approved" }
+func (s *StateApproved) isReviewState()   {}
 
 // StateRejected indicates the review has been permanently rejected.
 type StateRejected struct {
@@ -472,9 +468,9 @@ func (s *StateRejected) ProcessEvent(_ context.Context,
 	)
 }
 
-func (s *StateRejected) IsTerminal() bool  { return true }
-func (s *StateRejected) String() string    { return "rejected" }
-func (s *StateRejected) isReviewState()    {}
+func (s *StateRejected) IsTerminal() bool { return true }
+func (s *StateRejected) String() string   { return "rejected" }
+func (s *StateRejected) isReviewState()   {}
 
 // StateCancelled indicates the review has been cancelled.
 type StateCancelled struct{}
@@ -489,9 +485,9 @@ func (s *StateCancelled) ProcessEvent(_ context.Context,
 	)
 }
 
-func (s *StateCancelled) IsTerminal() bool  { return true }
-func (s *StateCancelled) String() string    { return "cancelled" }
-func (s *StateCancelled) isReviewState()    {}
+func (s *StateCancelled) IsTerminal() bool { return true }
+func (s *StateCancelled) String() string   { return "cancelled" }
+func (s *StateCancelled) isReviewState()   {}
 
 // StateFromString reconstructs a ReviewState from its string representation.
 // Used when loading review state from the database.

@@ -495,7 +495,6 @@ func (m *MockStore) SearchMessagesForAgent(
 func (m *MockStore) GetAllInboxMessages(
 	ctx context.Context, limit, offset int,
 ) ([]InboxMessage, error) {
-
 	m.mu.RLock()
 	defer m.mu.RUnlock()
 
@@ -551,7 +550,6 @@ func (m *MockStore) GetAllInboxMessages(
 func (m *MockStore) GetMessageRecipients(
 	ctx context.Context, messageID int64,
 ) ([]MessageRecipientWithAgent, error) {
-
 	m.mu.RLock()
 	defer m.mu.RUnlock()
 
@@ -578,7 +576,6 @@ func (m *MockStore) GetMessageRecipients(
 func (m *MockStore) GetMessageRecipientsBulk(
 	ctx context.Context, messageIDs []int64,
 ) (map[int64][]MessageRecipientWithAgent, error) {
-
 	m.mu.RLock()
 	defer m.mu.RUnlock()
 
@@ -606,7 +603,6 @@ func (m *MockStore) GetMessageRecipientsBulk(
 func (m *MockStore) SearchMessages(
 	ctx context.Context, query string, limit int,
 ) ([]InboxMessage, error) {
-
 	m.mu.RLock()
 	defer m.mu.RUnlock()
 
@@ -637,7 +633,6 @@ func (m *MockStore) SearchMessages(
 func (m *MockStore) GetMessagesByTopic(
 	ctx context.Context, topicID int64,
 ) ([]Message, error) {
-
 	m.mu.RLock()
 	defer m.mu.RUnlock()
 
@@ -654,7 +649,6 @@ func (m *MockStore) GetMessagesByTopic(
 func (m *MockStore) GetSentMessages(
 	ctx context.Context, senderID int64, limit int,
 ) ([]Message, error) {
-
 	m.mu.RLock()
 	defer m.mu.RUnlock()
 
@@ -674,7 +668,6 @@ func (m *MockStore) GetSentMessages(
 func (m *MockStore) GetAllSentMessages(
 	ctx context.Context, limit int,
 ) ([]InboxMessage, error) {
-
 	m.mu.RLock()
 	defer m.mu.RUnlock()
 
@@ -848,7 +841,6 @@ func (m *MockStore) UpdateSession(
 func (m *MockStore) UpdateAgentName(
 	ctx context.Context, id int64, name string,
 ) error {
-
 	m.mu.Lock()
 	defer m.mu.Unlock()
 

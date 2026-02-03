@@ -69,7 +69,6 @@ func (r *Registry) RegisterAgent(ctx context.Context, name string,
 
 		return nil
 	})
-
 	if err != nil {
 		return nil, err
 	}
@@ -83,7 +82,6 @@ func (r *Registry) RegisterAgent(ctx context.Context, name string,
 func (r *Registry) EnsureDefaultAgent(ctx context.Context,
 	name string,
 ) (*sqlc.Agent, error) {
-
 	agent, err := r.store.Queries().GetAgentByName(ctx, name)
 	if err == nil {
 		return &agent, nil

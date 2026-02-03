@@ -10,7 +10,7 @@ type ReviewOutboxEvent interface {
 }
 
 // Ensure all outbox event types implement ReviewOutboxEvent.
-func (PersistReviewState) isReviewOutboxEvent()     {}
+func (PersistReviewState) isReviewOutboxEvent()      {}
 func (NotifyReviewStateChange) isReviewOutboxEvent() {}
 func (SpawnReviewerAgent) isReviewOutboxEvent()      {}
 func (CreateReviewIteration) isReviewOutboxEvent()   {}

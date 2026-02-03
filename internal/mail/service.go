@@ -423,7 +423,6 @@ func (s *Service) handleReadMessage(ctx context.Context,
 		response.Message = &inboxMsg
 		return nil
 	})
-
 	if err != nil {
 		response.Error = err
 	}

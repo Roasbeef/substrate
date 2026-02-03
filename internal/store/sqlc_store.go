@@ -671,8 +671,8 @@ func (s *SqlcStore) SearchMessagesForAgent(ctx context.Context, query string,
 
 // GetAllInboxMessages retrieves inbox messages across all agents (global view).
 func (s *SqlcStore) GetAllInboxMessages(ctx context.Context, limit,
-	offset int) ([]InboxMessage, error) {
-
+	offset int,
+) ([]InboxMessage, error) {
 	rows, err := s.db.GetAllInboxMessagesPaginated(ctx, sqlc.GetAllInboxMessagesPaginatedParams{
 		Limit:  int64(limit),
 		Offset: int64(offset),
@@ -709,8 +709,8 @@ func (s *SqlcStore) GetAllInboxMessages(ctx context.Context, limit,
 
 // GetMessageRecipients retrieves all recipients for a message.
 func (s *SqlcStore) GetMessageRecipients(ctx context.Context,
-	messageID int64) ([]MessageRecipientWithAgent, error) {
-
+	messageID int64,
+) ([]MessageRecipientWithAgent, error) {
 	rows, err := s.db.GetMessageRecipients(ctx, messageID)
 	if err != nil {
 		return nil, err
@@ -737,8 +737,8 @@ func (s *SqlcStore) GetMessageRecipients(ctx context.Context,
 
 // GetMessageRecipientsBulk retrieves recipients for multiple messages.
 func (s *SqlcStore) GetMessageRecipientsBulk(ctx context.Context,
-	messageIDs []int64) (map[int64][]MessageRecipientWithAgent, error) {
-
+	messageIDs []int64,
+) (map[int64][]MessageRecipientWithAgent, error) {
 	rows, err := s.db.GetMessageRecipientsWithAgentsBulk(ctx, messageIDs)
 	if err != nil {
 		return nil, err
@@ -764,8 +764,8 @@ func (s *SqlcStore) GetMessageRecipientsBulk(ctx context.Context,
 
 // SearchMessages performs global search across all messages.
 func (s *SqlcStore) SearchMessages(ctx context.Context, query string,
-	limit int) ([]InboxMessage, error) {
-
+	limit int,
+) ([]InboxMessage, error) {
 	// Escape LIKE wildcards.
 	escapedQuery := "%" + query + "%"
 	rows, err := s.db.SearchMessages(ctx, sqlc.SearchMessagesParams{
@@ -800,8 +800,8 @@ func (s *SqlcStore) SearchMessages(ctx context.Context, query string,
 
 // GetMessagesByTopic retrieves all messages for a topic.
 func (s *SqlcStore) GetMessagesByTopic(ctx context.Context,
-	topicID int64) ([]Message, error) {
-
+	topicID int64,
+) ([]Message, error) {
 	rows, err := s.db.GetMessagesByTopic(ctx, topicID)
 	if err != nil {
 		return nil, err
@@ -816,8 +816,8 @@ func (s *SqlcStore) GetMessagesByTopic(ctx context.Context,
 
 // GetSentMessages retrieves messages sent by a specific agent.
 func (s *SqlcStore) GetSentMessages(ctx context.Context, senderID int64,
-	limit int) ([]Message, error) {
-
+	limit int,
+) ([]Message, error) {
 	rows, err := s.db.GetSentMessages(ctx, sqlc.GetSentMessagesParams{
 		SenderID: senderID,
 		Limit:    int64(limit),
@@ -854,8 +854,8 @@ func (s *SqlcStore) GetSentMessages(ctx context.Context, senderID int64,
 
 // GetAllSentMessages retrieves all sent messages across all agents.
 func (s *SqlcStore) GetAllSentMessages(ctx context.Context,
-	limit int) ([]InboxMessage, error) {
-
+	limit int,
+) ([]InboxMessage, error) {
 	rows, err := s.db.GetAllSentMessages(ctx, int64(limit))
 	if err != nil {
 		return nil, err
@@ -986,8 +986,8 @@ func (s *SqlcStore) UpdateSession(ctx context.Context, id int64,
 
 // UpdateAgentName updates an agent's display name.
 func (s *SqlcStore) UpdateAgentName(ctx context.Context, id int64,
-	name string) error {
-
+	name string,
+) error {
 	return s.db.UpdateAgentName(ctx, sqlc.UpdateAgentNameParams{
 		Name: name,
 		ID:   id,
@@ -1975,8 +1975,8 @@ func (s *txSqlcStore) UpdateSessionIdentityLastActive(ctx context.Context,
 
 // GetAllInboxMessages retrieves inbox messages across all agents (global view).
 func (s *txSqlcStore) GetAllInboxMessages(ctx context.Context, limit,
-	offset int) ([]InboxMessage, error) {
-
+	offset int,
+) ([]InboxMessage, error) {
 	rows, err := s.queries.GetAllInboxMessagesPaginated(
 		ctx, sqlc.GetAllInboxMessagesPaginatedParams{
 			Limit:  int64(limit),
@@ -2015,8 +2015,8 @@ func (s *txSqlcStore) GetAllInboxMessages(ctx context.Context, limit,
 
 // GetMessageRecipients retrieves all recipients for a message.
 func (s *txSqlcStore) GetMessageRecipients(ctx context.Context,
-	messageID int64) ([]MessageRecipientWithAgent, error) {
-
+	messageID int64,
+) ([]MessageRecipientWithAgent, error) {
 	rows, err := s.queries.GetMessageRecipients(ctx, messageID)
 	if err != nil {
 		return nil, err
@@ -2043,8 +2043,8 @@ func (s *txSqlcStore) GetMessageRecipients(ctx context.Context,
 
 // GetMessageRecipientsBulk retrieves recipients for multiple messages.
 func (s *txSqlcStore) GetMessageRecipientsBulk(ctx context.Context,
-	messageIDs []int64) (map[int64][]MessageRecipientWithAgent, error) {
-
+	messageIDs []int64,
+) (map[int64][]MessageRecipientWithAgent, error) {
 	rows, err := s.queries.GetMessageRecipientsWithAgentsBulk(ctx, messageIDs)
 	if err != nil {
 		return nil, err
@@ -2070,8 +2070,8 @@ func (s *txSqlcStore) GetMessageRecipientsBulk(ctx context.Context,
 
 // SearchMessages performs global search across all messages.
 func (s *txSqlcStore) SearchMessages(ctx context.Context, query string,
-	limit int) ([]InboxMessage, error) {
-
+	limit int,
+) ([]InboxMessage, error) {
 	escapedQuery := "%" + query + "%"
 	rows, err := s.queries.SearchMessages(ctx, sqlc.SearchMessagesParams{
 		Subject: escapedQuery,
@@ -2103,8 +2103,8 @@ func (s *txSqlcStore) SearchMessages(ctx context.Context, query string,
 
 // GetMessagesByTopic retrieves all messages for a topic.
 func (s *txSqlcStore) GetMessagesByTopic(ctx context.Context,
-	topicID int64) ([]Message, error) {
-
+	topicID int64,
+) ([]Message, error) {
 	rows, err := s.queries.GetMessagesByTopic(ctx, topicID)
 	if err != nil {
 		return nil, err
@@ -2119,8 +2119,8 @@ func (s *txSqlcStore) GetMessagesByTopic(ctx context.Context,
 
 // GetSentMessages retrieves messages sent by a specific agent.
 func (s *txSqlcStore) GetSentMessages(ctx context.Context, senderID int64,
-	limit int) ([]Message, error) {
-
+	limit int,
+) ([]Message, error) {
 	rows, err := s.queries.GetSentMessages(ctx, sqlc.GetSentMessagesParams{
 		SenderID: senderID,
 		Limit:    int64(limit),
@@ -2157,8 +2157,8 @@ func (s *txSqlcStore) GetSentMessages(ctx context.Context, senderID int64,
 
 // GetAllSentMessages retrieves all sent messages across all agents.
 func (s *txSqlcStore) GetAllSentMessages(ctx context.Context,
-	limit int) ([]InboxMessage, error) {
-
+	limit int,
+) ([]InboxMessage, error) {
 	rows, err := s.queries.GetAllSentMessages(ctx, int64(limit))
 	if err != nil {
 		return nil, err
@@ -2188,8 +2188,8 @@ func (s *txSqlcStore) GetAllSentMessages(ctx context.Context,
 
 // UpdateAgentName updates an agent's display name.
 func (s *txSqlcStore) UpdateAgentName(ctx context.Context, id int64,
-	name string) error {
-
+	name string,
+) error {
 	return s.queries.UpdateAgentName(ctx, sqlc.UpdateAgentNameParams{
 		Name: name,
 		ID:   id,

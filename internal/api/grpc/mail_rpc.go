@@ -535,7 +535,6 @@ func (s *Server) HasUnackedStatusTo(
 func (s *Server) ReplyToThread(
 	ctx context.Context, req *ReplyToThreadRequest,
 ) (*ReplyToThreadResponse, error) {
-
 	senderID := req.SenderId
 	if senderID == 0 {
 		// Use the default "User" agent.
@@ -610,7 +609,6 @@ func hasPrefix(s, prefix string) bool {
 func (s *Server) ArchiveThread(
 	ctx context.Context, req *ArchiveThreadRequest,
 ) (*ArchiveThreadResponse, error) {
-
 	agentID := req.AgentId
 	if agentID == 0 {
 		// Use the default "User" agent.
@@ -654,7 +652,6 @@ func (s *Server) ArchiveThread(
 func (s *Server) DeleteThread(
 	ctx context.Context, req *DeleteThreadRequest,
 ) (*DeleteThreadResponse, error) {
-
 	agentID := req.AgentId
 	if agentID == 0 {
 		// Use the default "User" agent.
@@ -698,7 +695,6 @@ func (s *Server) DeleteThread(
 func (s *Server) MarkThreadUnread(
 	ctx context.Context, req *MarkThreadUnreadRequest,
 ) (*MarkThreadUnreadResponse, error) {
-
 	agentID := req.AgentId
 	if agentID == 0 {
 		// Use the default "User" agent.
@@ -732,7 +728,6 @@ func (s *Server) MarkThreadUnread(
 func (s *Server) DeleteMessage(
 	ctx context.Context, req *DeleteMessageRequest,
 ) (*DeleteMessageResponse, error) {
-
 	agentID := req.AgentId
 	if agentID == 0 {
 		// Use the default "User" agent.
@@ -1010,7 +1005,6 @@ func (s *Server) SaveIdentity(ctx context.Context, req *SaveIdentityRequest) (*S
 func (s *Server) HealthCheck(
 	ctx context.Context, req *HealthCheckRequest,
 ) (*HealthCheckResponse, error) {
-
 	return &HealthCheckResponse{
 		Status: "ok",
 		Time:   timestamppb.Now(),
@@ -1021,7 +1015,6 @@ func (s *Server) HealthCheck(
 func (s *Server) GetDashboardStats(
 	ctx context.Context, req *GetDashboardStatsRequest,
 ) (*GetDashboardStatsResponse, error) {
-
 	// TODO: Implement actual stats queries.
 	return &GetDashboardStatsResponse{
 		Stats: &DashboardStats{
@@ -1037,7 +1030,6 @@ func (s *Server) GetDashboardStats(
 func (s *Server) GetAgentsStatus(
 	ctx context.Context, req *GetAgentsStatusRequest,
 ) (*GetAgentsStatusResponse, error) {
-
 	// Get all agents with their computed status.
 	agents, err := s.heartbeatMgr.ListAgentsWithStatus(ctx)
 	if err != nil {
@@ -1083,7 +1075,6 @@ func (s *Server) GetAgentsStatus(
 func (s *Server) Heartbeat(
 	ctx context.Context, req *HeartbeatRequest,
 ) (*HeartbeatResponse, error) {
-
 	agentID := req.AgentId
 
 	// If agent_id is not provided, look up by agent_name.
@@ -1144,7 +1135,6 @@ func agentStatusToProto(s agent.AgentStatus) AgentStatus {
 func (s *Server) ListSessions(
 	ctx context.Context, req *ListSessionsRequest,
 ) (*ListSessionsResponse, error) {
-
 	// Get all session identities from the database.
 	agents, err := s.store.Queries().ListAgents(ctx)
 	if err != nil {
@@ -1191,7 +1181,6 @@ func (s *Server) ListSessions(
 func (s *Server) GetSession(
 	ctx context.Context, req *GetSessionRequest,
 ) (*GetSessionResponse, error) {
-
 	if req.SessionId == 0 {
 		return nil, status.Error(codes.InvalidArgument, "session_id is required")
 	}
@@ -1226,7 +1215,6 @@ func (s *Server) GetSession(
 func (s *Server) StartSession(
 	ctx context.Context, req *StartSessionRequest,
 ) (*StartSessionResponse, error) {
-
 	if req.AgentId == 0 {
 		return nil, status.Error(codes.InvalidArgument, "agent_id is required")
 	}
@@ -1267,7 +1255,6 @@ func (s *Server) StartSession(
 func (s *Server) CompleteSession(
 	ctx context.Context, req *CompleteSessionRequest,
 ) (*CompleteSessionResponse, error) {
-
 	if req.SessionId == 0 {
 		return nil, status.Error(codes.InvalidArgument, "session_id is required")
 	}
@@ -1301,7 +1288,6 @@ var _ SessionServer = (*Server)(nil)
 func (s *Server) ListActivities(
 	ctx context.Context, req *ListActivitiesRequest,
 ) (*ListActivitiesResponse, error) {
-
 	pageSize := int64(20)
 	if req.PageSize > 0 {
 		pageSize = int64(req.PageSize)

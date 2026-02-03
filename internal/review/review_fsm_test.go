@@ -43,7 +43,7 @@ func TestFSM_HappyPath(t *testing.T) {
 	assertHasOutboxEvent[RecordActivity](t, outbox)
 
 	// Start review: pending_review → under_review.
-	outbox, err = fsm.ProcessEvent(ctx, StartReviewEvent{
+	_, err = fsm.ProcessEvent(ctx, StartReviewEvent{
 		ReviewerID: "CodeReviewer",
 	})
 	if err != nil {
@@ -438,7 +438,6 @@ func TestStateFromString_Unknown(t *testing.T) {
 func assertHasOutboxEvent[T ReviewOutboxEvent](
 	t *testing.T, events []ReviewOutboxEvent,
 ) {
-
 	t.Helper()
 	for _, evt := range events {
 		if _, ok := evt.(T); ok {

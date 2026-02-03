@@ -18,6 +18,7 @@ import (
 	"github.com/roasbeef/subtrate/internal/db"
 	"github.com/roasbeef/subtrate/internal/mail"
 	"github.com/roasbeef/subtrate/internal/mcp"
+	"github.com/roasbeef/subtrate/internal/review"
 	"github.com/roasbeef/subtrate/internal/store"
 	"github.com/roasbeef/subtrate/internal/web"
 )
@@ -115,6 +116,32 @@ func main() {
 		activitySvc,
 	)
 	log.Println("Activity actor started")
+
+	// Create and register the review service actor. This handles code
+	// review orchestration, FSM state management, and reviewer agent
+	// coordination.
+	reviewSvc := review.NewService(review.ServiceConfig{
+		Store: storage,
+	})
+	_ = actor.RegisterWithSystem(
+		actorSystem,
+		"review-service",
+		review.ReviewServiceKey,
+		reviewSvc,
+	)
+
+	// Recover any active reviews from the database (restart recovery).
+	if err := reviewSvc.RecoverActiveReviews(
+		context.Background(),
+	); err != nil {
+		log.Printf(
+			"Warning: failed to recover active reviews: %v", err,
+		)
+	}
+	log.Printf(
+		"Review actor started (%d active reviews recovered)",
+		reviewSvc.ActiveReviewCount(),
+	)
 
 	// Create the MCP server (unless web-only mode).
 	var mcpServer *mcp.Server

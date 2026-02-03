@@ -23,10 +23,7 @@ type mockReviewData struct {
 }
 
 // reviewDataMap stores per-MockStore review data.
-var (
-	reviewDataMap   = make(map[*MockStore]*mockReviewData)
-	reviewDataMutex = &MockStore{} // Use a zero-value MockStore just for its mutex.
-)
+var reviewDataMap = make(map[*MockStore]*mockReviewData)
 
 // getReviewData returns or initializes review data for a MockStore.
 func getReviewData(m *MockStore) *mockReviewData {
@@ -52,8 +49,8 @@ func getReviewData(m *MockStore) *mockReviewData {
 
 // CreateReview creates a new review record.
 func (m *MockStore) CreateReview(ctx context.Context,
-	params CreateReviewParams) (Review, error) {
-
+	params CreateReviewParams,
+) (Review, error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
@@ -85,8 +82,8 @@ func (m *MockStore) CreateReview(ctx context.Context,
 
 // GetReview retrieves a review by its UUID.
 func (m *MockStore) GetReview(ctx context.Context,
-	reviewID string) (Review, error) {
-
+	reviewID string,
+) (Review, error) {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
 
@@ -101,8 +98,8 @@ func (m *MockStore) GetReview(ctx context.Context,
 
 // ListReviews lists reviews ordered by creation time.
 func (m *MockStore) ListReviews(ctx context.Context,
-	limit, offset int) ([]Review, error) {
-
+	limit, offset int,
+) ([]Review, error) {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
 
@@ -131,8 +128,8 @@ func (m *MockStore) ListReviews(ctx context.Context,
 
 // ListReviewsByState lists reviews matching the given state.
 func (m *MockStore) ListReviewsByState(ctx context.Context,
-	state string, limit int) ([]Review, error) {
-
+	state string, limit int,
+) ([]Review, error) {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
 
@@ -152,8 +149,8 @@ func (m *MockStore) ListReviewsByState(ctx context.Context,
 
 // ListReviewsByRequester lists reviews by the requesting agent.
 func (m *MockStore) ListReviewsByRequester(ctx context.Context,
-	requesterID int64, limit int) ([]Review, error) {
-
+	requesterID int64, limit int,
+) ([]Review, error) {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
 
@@ -173,8 +170,8 @@ func (m *MockStore) ListReviewsByRequester(ctx context.Context,
 
 // ListActiveReviews returns reviews in non-terminal states.
 func (m *MockStore) ListActiveReviews(
-	ctx context.Context) ([]Review, error) {
-
+	ctx context.Context,
+) ([]Review, error) {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
 
@@ -197,8 +194,8 @@ func (m *MockStore) ListActiveReviews(
 
 // UpdateReviewState updates the FSM state of a review.
 func (m *MockStore) UpdateReviewState(ctx context.Context,
-	reviewID, state string) error {
-
+	reviewID, state string,
+) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
@@ -217,8 +214,8 @@ func (m *MockStore) UpdateReviewState(ctx context.Context,
 
 // UpdateReviewCompleted marks a review as completed with a terminal state.
 func (m *MockStore) UpdateReviewCompleted(ctx context.Context,
-	reviewID, state string) error {
-
+	reviewID, state string,
+) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
@@ -239,8 +236,8 @@ func (m *MockStore) UpdateReviewCompleted(ctx context.Context,
 
 // CreateReviewIteration records a review iteration result.
 func (m *MockStore) CreateReviewIteration(ctx context.Context,
-	params CreateReviewIterationParams) (ReviewIteration, error) {
-
+	params CreateReviewIterationParams,
+) (ReviewIteration, error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
@@ -273,8 +270,8 @@ func (m *MockStore) CreateReviewIteration(ctx context.Context,
 
 // GetReviewIterations gets all iterations for a review.
 func (m *MockStore) GetReviewIterations(ctx context.Context,
-	reviewID string) ([]ReviewIteration, error) {
-
+	reviewID string,
+) ([]ReviewIteration, error) {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
 
@@ -284,8 +281,8 @@ func (m *MockStore) GetReviewIterations(ctx context.Context,
 
 // CreateReviewIssue records a specific issue found during review.
 func (m *MockStore) CreateReviewIssue(ctx context.Context,
-	params CreateReviewIssueParams) (ReviewIssue, error) {
-
+	params CreateReviewIssueParams,
+) (ReviewIssue, error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
@@ -318,8 +315,8 @@ func (m *MockStore) CreateReviewIssue(ctx context.Context,
 
 // GetReviewIssues gets all issues for a review.
 func (m *MockStore) GetReviewIssues(ctx context.Context,
-	reviewID string) ([]ReviewIssue, error) {
-
+	reviewID string,
+) ([]ReviewIssue, error) {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
 
@@ -329,8 +326,8 @@ func (m *MockStore) GetReviewIssues(ctx context.Context,
 
 // GetOpenReviewIssues gets open issues for a review.
 func (m *MockStore) GetOpenReviewIssues(ctx context.Context,
-	reviewID string) ([]ReviewIssue, error) {
-
+	reviewID string,
+) ([]ReviewIssue, error) {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
 
@@ -347,8 +344,8 @@ func (m *MockStore) GetOpenReviewIssues(ctx context.Context,
 
 // UpdateReviewIssueStatus updates an issue's resolution status.
 func (m *MockStore) UpdateReviewIssueStatus(ctx context.Context,
-	issueID int64, status string, resolvedInIteration *int) error {
-
+	issueID int64, status string, resolvedInIteration *int,
+) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
@@ -377,8 +374,8 @@ func (m *MockStore) UpdateReviewIssueStatus(ctx context.Context,
 
 // CountOpenIssues counts open issues for a review.
 func (m *MockStore) CountOpenIssues(ctx context.Context,
-	reviewID string) (int64, error) {
-
+	reviewID string,
+) (int64, error) {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
 
