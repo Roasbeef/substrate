@@ -3,6 +3,8 @@ version: "2"
 run:
   timeout: 5m
   modules-download-mode: readonly
+  skip-dirs:
+    - internal/db/sqlc
 
 linters:
   enable:
@@ -23,9 +25,3 @@ linters:
 formatters:
   enable:
     - gofmt
-
-issues:
-  exclude-dirs:
-    - internal/db/sqlc
-  exclude-files:
-    - ".*_test\\.go$"

@@ -1,7 +1,7 @@
 // AppShell component - the main layout wrapper for the application.
 
 import { type ReactNode, useCallback, useEffect } from 'react';
-import { useNavigate, useLocation } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import { clsx } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 import { Header } from './Header.js';
@@ -59,7 +59,6 @@ export function AppShell({
   mainClassName,
 }: AppShellProps) {
   const navigate = useNavigate();
-  const location = useLocation();
   const setPendingThread = useUIStore((state) => state.setPendingThread);
 
   // Handle notification thread click - navigate to inbox and open thread.
