@@ -5,6 +5,7 @@ import { defineConfig, devices } from '@playwright/test';
 // Read from environment variables with test defaults.
 const VITE_DEV_PORT = process.env.VITE_DEV_PORT ?? '5175';
 const API_PORT = process.env.API_PORT ?? '8082';
+const GRPC_PORT = process.env.GRPC_PORT ?? '10012';
 const PROD_PORT = process.env.PROD_PORT ?? '8090';
 
 // Check if we're testing against production build.
@@ -101,8 +102,9 @@ export default defineConfig({
       ]
     : [
         // Development: Start Go API server + Vite dev server.
+        // Note: gRPC must be enabled for grpc-gateway REST API to work.
         {
-          command: `cd ../.. && CGO_CFLAGS="-DSQLITE_ENABLE_FTS5" go run ./cmd/substrated -web-only -web :${API_PORT} -grpc "" -db .test-data/test.db`,
+          command: `cd ../.. && CGO_CFLAGS="-DSQLITE_ENABLE_FTS5" go run ./cmd/substrated -web-only -web :${API_PORT} -grpc localhost:${GRPC_PORT} -db .test-data/test.db`,
           url: `http://localhost:${API_PORT}/api/v1/health`,
           reuseExistingServer: !process.env.CI,
           timeout: 120000,

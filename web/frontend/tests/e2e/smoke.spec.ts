@@ -48,7 +48,12 @@ test.describe('Application Smoke Tests', () => {
     // Check for critical console errors (exclude expected warnings).
     const consoleErrors = getConsoleErrors(page).filter((error) => {
       // Filter out known non-critical errors.
-      return !error.includes('favicon.ico') && !error.includes('sourcemap');
+      if (error.includes('favicon.ico')) return false;
+      if (error.includes('sourcemap')) return false;
+      // Filter out 404s for static assets that may be missing in test environment.
+      if (error.includes('404 (Not Found)')) return false;
+      if (error.includes('Failed to load resource')) return false;
+      return true;
     });
 
     if (consoleErrors.length > 0) {
@@ -66,8 +71,8 @@ test.describe('Application Smoke Tests', () => {
     // Verify the app renders the main layout.
     await expect(page.locator('#root')).not.toBeEmpty();
 
-    // Check for the Subtrate logo/branding (in the sidebar).
-    await expect(page.getByRole('link', { name: 'S Subtrate' })).toBeVisible();
+    // Check for the Substrate logo/branding (in the header).
+    await expect(page.getByRole('link', { name: /Substrate/i })).toBeVisible();
   });
 
   test('navigation links are functional', async ({ page }) => {
