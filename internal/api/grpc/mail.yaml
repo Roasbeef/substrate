@@ -117,11 +117,14 @@ http:
       body: "*"
 
     - selector: subtraterpc.Agent.GetAgentsStatus
-      get: "/api/v1/agents/status"
+      get: "/api/v1/agents-status"
 
     - selector: subtraterpc.Agent.Heartbeat
       post: "/api/v1/heartbeat"
       body: "*"
+      additional_bindings:
+        - post: "/api/v1/agents/heartbeat"
+          body: "*"
 
     # Agent Service - Identity Management
     - selector: subtraterpc.Agent.EnsureIdentity

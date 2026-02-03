@@ -312,23 +312,25 @@ func (ActivityType) EnumDescriptor() ([]byte, []int) {
 // Note: int64 fields serialize as strings in JSON (protobuf standard).
 // Timestamps use RFC 3339 format. Priority/state serialize as enum strings.
 type InboxMessage struct {
-	state          protoimpl.MessageState `protogen:"open.v1"`
-	Id             int64                  `protobuf:"varint,1,opt,name=id,proto3" json:"id,omitempty"`
-	ThreadId       string                 `protobuf:"bytes,2,opt,name=thread_id,json=threadId,proto3" json:"thread_id,omitempty"`
-	TopicId        int64                  `protobuf:"varint,3,opt,name=topic_id,json=topicId,proto3" json:"topic_id,omitempty"`
-	SenderId       int64                  `protobuf:"varint,4,opt,name=sender_id,json=senderId,proto3" json:"sender_id,omitempty"`
-	SenderName     string                 `protobuf:"bytes,5,opt,name=sender_name,json=senderName,proto3" json:"sender_name,omitempty"`
-	Subject        string                 `protobuf:"bytes,6,opt,name=subject,proto3" json:"subject,omitempty"`
-	Body           string                 `protobuf:"bytes,7,opt,name=body,proto3" json:"body,omitempty"`
-	Priority       Priority               `protobuf:"varint,8,opt,name=priority,proto3,enum=subtraterpc.Priority" json:"priority,omitempty"`
-	State          MessageState           `protobuf:"varint,9,opt,name=state,proto3,enum=subtraterpc.MessageState" json:"state,omitempty"`
-	CreatedAt      *timestamppb.Timestamp `protobuf:"bytes,10,opt,name=created_at,json=createdAt,proto3" json:"created_at,omitempty"`
-	DeadlineAt     *timestamppb.Timestamp `protobuf:"bytes,11,opt,name=deadline_at,json=deadlineAt,proto3" json:"deadline_at,omitempty"`             // null if no deadline
-	SnoozedUntil   *timestamppb.Timestamp `protobuf:"bytes,12,opt,name=snoozed_until,json=snoozedUntil,proto3" json:"snoozed_until,omitempty"`       // null if not snoozed
-	ReadAt         *timestamppb.Timestamp `protobuf:"bytes,13,opt,name=read_at,json=readAt,proto3" json:"read_at,omitempty"`                         // null if unread
-	AcknowledgedAt *timestamppb.Timestamp `protobuf:"bytes,14,opt,name=acknowledged_at,json=acknowledgedAt,proto3" json:"acknowledged_at,omitempty"` // null if not acked
-	unknownFields  protoimpl.UnknownFields
-	sizeCache      protoimpl.SizeCache
+	state            protoimpl.MessageState `protogen:"open.v1"`
+	Id               int64                  `protobuf:"varint,1,opt,name=id,proto3" json:"id,omitempty"`
+	ThreadId         string                 `protobuf:"bytes,2,opt,name=thread_id,json=threadId,proto3" json:"thread_id,omitempty"`
+	TopicId          int64                  `protobuf:"varint,3,opt,name=topic_id,json=topicId,proto3" json:"topic_id,omitempty"`
+	SenderId         int64                  `protobuf:"varint,4,opt,name=sender_id,json=senderId,proto3" json:"sender_id,omitempty"`
+	SenderName       string                 `protobuf:"bytes,5,opt,name=sender_name,json=senderName,proto3" json:"sender_name,omitempty"`
+	SenderProjectKey string                 `protobuf:"bytes,15,opt,name=sender_project_key,json=senderProjectKey,proto3" json:"sender_project_key,omitempty"` // Agent's project key (e.g., "substrate").
+	SenderGitBranch  string                 `protobuf:"bytes,16,opt,name=sender_git_branch,json=senderGitBranch,proto3" json:"sender_git_branch,omitempty"`    // Agent's git branch (e.g., "main").
+	Subject          string                 `protobuf:"bytes,6,opt,name=subject,proto3" json:"subject,omitempty"`
+	Body             string                 `protobuf:"bytes,7,opt,name=body,proto3" json:"body,omitempty"`
+	Priority         Priority               `protobuf:"varint,8,opt,name=priority,proto3,enum=subtraterpc.Priority" json:"priority,omitempty"`
+	State            MessageState           `protobuf:"varint,9,opt,name=state,proto3,enum=subtraterpc.MessageState" json:"state,omitempty"`
+	CreatedAt        *timestamppb.Timestamp `protobuf:"bytes,10,opt,name=created_at,json=createdAt,proto3" json:"created_at,omitempty"`
+	DeadlineAt       *timestamppb.Timestamp `protobuf:"bytes,11,opt,name=deadline_at,json=deadlineAt,proto3" json:"deadline_at,omitempty"`             // null if no deadline
+	SnoozedUntil     *timestamppb.Timestamp `protobuf:"bytes,12,opt,name=snoozed_until,json=snoozedUntil,proto3" json:"snoozed_until,omitempty"`       // null if not snoozed
+	ReadAt           *timestamppb.Timestamp `protobuf:"bytes,13,opt,name=read_at,json=readAt,proto3" json:"read_at,omitempty"`                         // null if unread
+	AcknowledgedAt   *timestamppb.Timestamp `protobuf:"bytes,14,opt,name=acknowledged_at,json=acknowledgedAt,proto3" json:"acknowledged_at,omitempty"` // null if not acked
+	unknownFields    protoimpl.UnknownFields
+	sizeCache        protoimpl.SizeCache
 }
 
 func (x *InboxMessage) Reset() {
@@ -392,6 +394,20 @@ func (x *InboxMessage) GetSenderId() int64 {
 func (x *InboxMessage) GetSenderName() string {
 	if x != nil {
 		return x.SenderName
+	}
+	return ""
+}
+
+func (x *InboxMessage) GetSenderProjectKey() string {
+	if x != nil {
+		return x.SenderProjectKey
+	}
+	return ""
+}
+
+func (x *InboxMessage) GetSenderGitBranch() string {
+	if x != nil {
+		return x.SenderGitBranch
 	}
 	return ""
 }
@@ -628,6 +644,7 @@ type FetchInboxRequest struct {
 	Limit         int32                  `protobuf:"varint,2,opt,name=limit,proto3" json:"limit,omitempty"`                                                              // Maximum messages to return
 	UnreadOnly    bool                   `protobuf:"varint,3,opt,name=unread_only,json=unreadOnly,proto3" json:"unread_only,omitempty"`                                  // Only return unread messages
 	StateFilter   MessageState           `protobuf:"varint,4,opt,name=state_filter,json=stateFilter,proto3,enum=subtraterpc.MessageState" json:"state_filter,omitempty"` // Filter by state
+	SentOnly      bool                   `protobuf:"varint,5,opt,name=sent_only,json=sentOnly,proto3" json:"sent_only,omitempty"`                                        // Only return messages sent by the agent
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -688,6 +705,13 @@ func (x *FetchInboxRequest) GetStateFilter() MessageState {
 		return x.StateFilter
 	}
 	return MessageState_STATE_UNSPECIFIED
+}
+
+func (x *FetchInboxRequest) GetSentOnly() bool {
+	if x != nil {
+		return x.SentOnly
+	}
+	return false
 }
 
 // FetchInboxResponse is the response for FetchInbox.
@@ -1765,6 +1789,7 @@ type Topic struct {
 	Name          string                 `protobuf:"bytes,2,opt,name=name,proto3" json:"name,omitempty"`
 	TopicType     string                 `protobuf:"bytes,3,opt,name=topic_type,json=topicType,proto3" json:"topic_type,omitempty"` // "direct", "broadcast", "queue"
 	CreatedAt     *timestamppb.Timestamp `protobuf:"bytes,4,opt,name=created_at,json=createdAt,proto3" json:"created_at,omitempty"`
+	MessageCount  int64                  `protobuf:"varint,5,opt,name=message_count,json=messageCount,proto3" json:"message_count,omitempty"` // Number of messages in this topic
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -1825,6 +1850,13 @@ func (x *Topic) GetCreatedAt() *timestamppb.Timestamp {
 		return x.CreatedAt
 	}
 	return nil
+}
+
+func (x *Topic) GetMessageCount() int64 {
+	if x != nil {
+		return x.MessageCount
+	}
+	return 0
 }
 
 // ListTopicsRequest is the request for ListTopics.
@@ -3936,10 +3968,13 @@ func (x *GetAgentsStatusResponse) GetCounts() *AgentStatusCounts {
 }
 
 // HeartbeatRequest is the request for Heartbeat.
+// Either agent_id or agent_name must be provided. If both are given,
+// agent_id takes precedence.
 type HeartbeatRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
-	AgentId       int64                  `protobuf:"varint,1,opt,name=agent_id,json=agentId,proto3" json:"agent_id,omitempty"`
-	SessionId     string                 `protobuf:"bytes,2,opt,name=session_id,json=sessionId,proto3" json:"session_id,omitempty"`
+	AgentId       int64                  `protobuf:"varint,1,opt,name=agent_id,proto3" json:"agent_id,omitempty"`
+	SessionId     string                 `protobuf:"bytes,2,opt,name=session_id,proto3" json:"session_id,omitempty"`
+	AgentName     string                 `protobuf:"bytes,3,opt,name=agent_name,proto3" json:"agent_name,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -3984,6 +4019,13 @@ func (x *HeartbeatRequest) GetAgentId() int64 {
 func (x *HeartbeatRequest) GetSessionId() string {
 	if x != nil {
 		return x.SessionId
+	}
+	return ""
+}
+
+func (x *HeartbeatRequest) GetAgentName() string {
+	if x != nil {
+		return x.AgentName
 	}
 	return ""
 }
@@ -4995,14 +5037,16 @@ var File_mail_proto protoreflect.FileDescriptor
 const file_mail_proto_rawDesc = "" +
 	"\n" +
 	"\n" +
-	"mail.proto\x12\vsubtraterpc\x1a\x1fgoogle/protobuf/timestamp.proto\"\xd9\x04\n" +
+	"mail.proto\x12\vsubtraterpc\x1a\x1fgoogle/protobuf/timestamp.proto\"\xb3\x05\n" +
 	"\fInboxMessage\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\x03R\x02id\x12\x1b\n" +
 	"\tthread_id\x18\x02 \x01(\tR\bthreadId\x12\x19\n" +
 	"\btopic_id\x18\x03 \x01(\x03R\atopicId\x12\x1b\n" +
 	"\tsender_id\x18\x04 \x01(\x03R\bsenderId\x12\x1f\n" +
 	"\vsender_name\x18\x05 \x01(\tR\n" +
-	"senderName\x12\x18\n" +
+	"senderName\x12,\n" +
+	"\x12sender_project_key\x18\x0f \x01(\tR\x10senderProjectKey\x12*\n" +
+	"\x11sender_git_branch\x18\x10 \x01(\tR\x0fsenderGitBranch\x12\x18\n" +
 	"\asubject\x18\x06 \x01(\tR\asubject\x12\x12\n" +
 	"\x04body\x18\a \x01(\tR\x04body\x121\n" +
 	"\bpriority\x18\b \x01(\x0e2\x15.subtraterpc.PriorityR\bpriority\x12/\n" +
@@ -5030,13 +5074,14 @@ const file_mail_proto_rawDesc = "" +
 	"\x10SendMailResponse\x12\x1d\n" +
 	"\n" +
 	"message_id\x18\x01 \x01(\x03R\tmessageId\x12\x1b\n" +
-	"\tthread_id\x18\x02 \x01(\tR\bthreadId\"\xa3\x01\n" +
+	"\tthread_id\x18\x02 \x01(\tR\bthreadId\"\xc0\x01\n" +
 	"\x11FetchInboxRequest\x12\x19\n" +
 	"\bagent_id\x18\x01 \x01(\x03R\aagentId\x12\x14\n" +
 	"\x05limit\x18\x02 \x01(\x05R\x05limit\x12\x1f\n" +
 	"\vunread_only\x18\x03 \x01(\bR\n" +
 	"unreadOnly\x12<\n" +
-	"\fstate_filter\x18\x04 \x01(\x0e2\x19.subtraterpc.MessageStateR\vstateFilter\"K\n" +
+	"\fstate_filter\x18\x04 \x01(\x0e2\x19.subtraterpc.MessageStateR\vstateFilter\x12\x1b\n" +
+	"\tsent_only\x18\x05 \x01(\bR\bsentOnly\"K\n" +
 	"\x12FetchInboxResponse\x125\n" +
 	"\bmessages\x18\x01 \x03(\v2\x19.subtraterpc.InboxMessageR\bmessages\"N\n" +
 	"\x12ReadMessageRequest\x12\x19\n" +
@@ -5112,14 +5157,15 @@ const file_mail_proto_rawDesc = "" +
 	"\n" +
 	"topic_name\x18\x02 \x01(\tR\ttopicName\"/\n" +
 	"\x13UnsubscribeResponse\x12\x18\n" +
-	"\asuccess\x18\x01 \x01(\bR\asuccess\"\x85\x01\n" +
+	"\asuccess\x18\x01 \x01(\bR\asuccess\"\xaa\x01\n" +
 	"\x05Topic\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\x03R\x02id\x12\x12\n" +
 	"\x04name\x18\x02 \x01(\tR\x04name\x12\x1d\n" +
 	"\n" +
 	"topic_type\x18\x03 \x01(\tR\ttopicType\x129\n" +
 	"\n" +
-	"created_at\x18\x04 \x01(\v2\x1a.google.protobuf.TimestampR\tcreatedAt\"W\n" +
+	"created_at\x18\x04 \x01(\v2\x1a.google.protobuf.TimestampR\tcreatedAt\x12#\n" +
+	"\rmessage_count\x18\x05 \x01(\x03R\fmessageCount\"W\n" +
 	"\x11ListTopicsRequest\x12\x19\n" +
 	"\bagent_id\x18\x01 \x01(\x03R\aagentId\x12'\n" +
 	"\x0fsubscribed_only\x18\x02 \x01(\bR\x0esubscribedOnly\"@\n" +
@@ -5265,11 +5311,15 @@ const file_mail_proto_rawDesc = "" +
 	"\x16GetAgentsStatusRequest\"\x87\x01\n" +
 	"\x17GetAgentsStatusResponse\x124\n" +
 	"\x06agents\x18\x01 \x03(\v2\x1c.subtraterpc.AgentWithStatusR\x06agents\x126\n" +
-	"\x06counts\x18\x02 \x01(\v2\x1e.subtraterpc.AgentStatusCountsR\x06counts\"L\n" +
-	"\x10HeartbeatRequest\x12\x19\n" +
-	"\bagent_id\x18\x01 \x01(\x03R\aagentId\x12\x1d\n" +
+	"\x06counts\x18\x02 \x01(\v2\x1e.subtraterpc.AgentStatusCountsR\x06counts\"n\n" +
+	"\x10HeartbeatRequest\x12\x1a\n" +
+	"\bagent_id\x18\x01 \x01(\x03R\bagent_id\x12\x1e\n" +
 	"\n" +
-	"session_id\x18\x02 \x01(\tR\tsessionId\"-\n" +
+	"session_id\x18\x02 \x01(\tR\n" +
+	"session_id\x12\x1e\n" +
+	"\n" +
+	"agent_name\x18\x03 \x01(\tR\n" +
+	"agent_name\"-\n" +
 	"\x11HeartbeatResponse\x12\x18\n" +
 	"\asuccess\x18\x01 \x01(\bR\asuccess\"\xaf\x02\n" +
 	"\vSessionInfo\x12\x0e\n" +

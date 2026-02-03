@@ -165,6 +165,8 @@ message InboxMessage {
     int64 topic_id = 3;
     int64 sender_id = 4;
     string sender_name = 5;
+    string sender_project_key = 15;  // Agent's project key (e.g., "substrate").
+    string sender_git_branch = 16;   // Agent's git branch (e.g., "main").
     string subject = 6;
     string body = 7;
     Priority priority = 8;
@@ -201,6 +203,7 @@ message FetchInboxRequest {
     int32 limit = 2;            // Maximum messages to return
     bool unread_only = 3;       // Only return unread messages
     MessageState state_filter = 4;  // Filter by state
+    bool sent_only = 5;         // Only return messages sent by the agent
 }
 
 // FetchInboxResponse is the response for FetchInbox.
@@ -330,6 +333,7 @@ message Topic {
     string name = 2;
     string topic_type = 3;      // "direct", "broadcast", "queue"
     google.protobuf.Timestamp created_at = 4;
+    int64 message_count = 5;    // Number of messages in this topic
 }
 
 // ListTopicsRequest is the request for ListTopics.
@@ -585,9 +589,12 @@ message GetAgentsStatusResponse {
 }
 
 // HeartbeatRequest is the request for Heartbeat.
+// Either agent_id or agent_name must be provided. If both are given,
+// agent_id takes precedence.
 message HeartbeatRequest {
-    int64 agent_id = 1;
-    string session_id = 2;
+    int64 agent_id = 1 [json_name = "agent_id"];
+    string session_id = 2 [json_name = "session_id"];
+    string agent_name = 3 [json_name = "agent_name"];
 }
 
 // HeartbeatResponse is the response for Heartbeat.
