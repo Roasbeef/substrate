@@ -217,8 +217,9 @@ func formatContext(msgs []mail.InboxMessage) string {
 		if senderDisplay == "" {
 			senderDisplay = fmt.Sprintf("Agent#%d", msg.SenderID)
 		}
-		sb.WriteString(fmt.Sprintf("From: %s - %q",
-			senderDisplay, msg.Subject))
+		// Include message ID and thread ID for replies.
+		sb.WriteString(fmt.Sprintf("#%d From: %s - %q (thread: %s)",
+			msg.ID, senderDisplay, msg.Subject, msg.ThreadID))
 		if msg.Deadline != nil {
 			remaining := time.Until(*msg.Deadline)
 			if remaining > 0 {
@@ -231,8 +232,9 @@ func formatContext(msgs []mail.InboxMessage) string {
 		sb.WriteString("\n")
 	}
 
-	sb.WriteString("\nUse `substrate inbox` to see details, or " +
-		"`substrate read <id>` to read a message.")
+	sb.WriteString("\nUse `substrate read <id>` to read a message.\n")
+	sb.WriteString("To reply in thread: `substrate send --to <sender> " +
+		"--thread <thread-id> --subject \"Re: ...\" --body \"...\"`")
 
 	return sb.String()
 }

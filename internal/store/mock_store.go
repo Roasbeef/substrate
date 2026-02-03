@@ -66,6 +66,15 @@ func (m *MockStore) WithTx(
 	return fn(ctx, m)
 }
 
+// WithReadTx executes the function within a read-only "transaction" (just runs
+// the function for the mock).
+func (m *MockStore) WithReadTx(
+	ctx context.Context,
+	fn func(ctx context.Context, s Storage) error,
+) error {
+	return fn(ctx, m)
+}
+
 // IsConsistent verifies that the store's internal state is consistent.
 // Used for property-based testing.
 func (m *MockStore) IsConsistent() bool {
@@ -105,7 +114,6 @@ func (m *MockStore) IsConsistent() bool {
 
 // MessageStore implementation.
 
-// CreateMessage creates a new message in the mock store.
 func (m *MockStore) CreateMessage(
 	ctx context.Context, params CreateMessageParams,
 ) (Message, error) {
@@ -134,7 +142,6 @@ func (m *MockStore) CreateMessage(
 	return msg, nil
 }
 
-// GetMessage retrieves a message by its ID.
 func (m *MockStore) GetMessage(ctx context.Context, id int64) (Message, error) {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
@@ -146,7 +153,6 @@ func (m *MockStore) GetMessage(ctx context.Context, id int64) (Message, error) {
 	return msg, nil
 }
 
-// GetMessagesByThread retrieves all messages in a thread.
 func (m *MockStore) GetMessagesByThread(
 	ctx context.Context, threadID string,
 ) ([]Message, error) {
@@ -162,7 +168,35 @@ func (m *MockStore) GetMessagesByThread(
 	return result, nil
 }
 
-// GetInboxMessages retrieves inbox messages for an agent.
+// GetMessagesByThreadWithSender retrieves all messages in a thread with sender
+// information (name, project, branch).
+func (m *MockStore) GetMessagesByThreadWithSender(
+	ctx context.Context, threadID string,
+) ([]InboxMessage, error) {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+
+	var result []InboxMessage
+	for _, msg := range m.messages {
+		if msg.ThreadID == threadID {
+			// Look up sender info.
+			var senderName, senderProjectKey, senderGitBranch string
+			if agent, ok := m.agents[msg.SenderID]; ok {
+				senderName = agent.Name
+				senderProjectKey = agent.ProjectKey
+				senderGitBranch = agent.GitBranch
+			}
+			result = append(result, InboxMessage{
+				Message:          msg,
+				SenderName:       senderName,
+				SenderProjectKey: senderProjectKey,
+				SenderGitBranch:  senderGitBranch,
+			})
+		}
+	}
+	return result, nil
+}
+
 func (m *MockStore) GetInboxMessages(
 	ctx context.Context, agentID int64, limit int,
 ) ([]InboxMessage, error) {
@@ -192,7 +226,6 @@ func (m *MockStore) GetInboxMessages(
 	return result, nil
 }
 
-// GetUnreadMessages retrieves unread messages for an agent.
 func (m *MockStore) GetUnreadMessages(
 	ctx context.Context, agentID int64, limit int,
 ) ([]InboxMessage, error) {
@@ -220,7 +253,6 @@ func (m *MockStore) GetUnreadMessages(
 	return result, nil
 }
 
-// GetArchivedMessages retrieves archived messages for an agent.
 func (m *MockStore) GetArchivedMessages(
 	ctx context.Context, agentID int64, limit int,
 ) ([]InboxMessage, error) {
@@ -246,7 +278,6 @@ func (m *MockStore) GetArchivedMessages(
 	return result, nil
 }
 
-// UpdateRecipientState updates the state of a message recipient.
 func (m *MockStore) UpdateRecipientState(
 	ctx context.Context, messageID, agentID int64, state string,
 ) error {
@@ -270,14 +301,12 @@ func (m *MockStore) UpdateRecipientState(
 	return nil
 }
 
-// MarkMessageRead marks a message as read for a recipient.
 func (m *MockStore) MarkMessageRead(
 	ctx context.Context, messageID, agentID int64,
 ) error {
 	return m.UpdateRecipientState(ctx, messageID, agentID, "read")
 }
 
-// AckMessage acknowledges a message for a recipient.
 func (m *MockStore) AckMessage(
 	ctx context.Context, messageID, agentID int64,
 ) error {
@@ -300,7 +329,6 @@ func (m *MockStore) AckMessage(
 	return nil
 }
 
-// SnoozeMessage snoozes a message until a specified time.
 func (m *MockStore) SnoozeMessage(
 	ctx context.Context, messageID, agentID int64, until time.Time,
 ) error {
@@ -323,7 +351,6 @@ func (m *MockStore) SnoozeMessage(
 	return nil
 }
 
-// CreateMessageRecipient adds a recipient to a message.
 func (m *MockStore) CreateMessageRecipient(
 	ctx context.Context, messageID, agentID int64,
 ) error {
@@ -350,7 +377,6 @@ func (m *MockStore) CreateMessageRecipient(
 	return nil
 }
 
-// GetMessageRecipient retrieves a message recipient entry.
 func (m *MockStore) GetMessageRecipient(
 	ctx context.Context, messageID, agentID int64,
 ) (MessageRecipient, error) {
@@ -368,7 +394,6 @@ func (m *MockStore) GetMessageRecipient(
 	return recip, nil
 }
 
-// CountUnreadByAgent counts unread messages for an agent.
 func (m *MockStore) CountUnreadByAgent(
 	ctx context.Context, agentID int64,
 ) (int64, error) {
@@ -384,7 +409,6 @@ func (m *MockStore) CountUnreadByAgent(
 	return count, nil
 }
 
-// CountUnreadUrgentByAgent counts unread urgent messages for an agent.
 func (m *MockStore) CountUnreadUrgentByAgent(
 	ctx context.Context, agentID int64,
 ) (int64, error) {
@@ -402,7 +426,6 @@ func (m *MockStore) CountUnreadUrgentByAgent(
 	return count, nil
 }
 
-// GetMessagesSinceOffset retrieves messages in a topic since a given offset.
 func (m *MockStore) GetMessagesSinceOffset(
 	ctx context.Context, topicID, offset int64, limit int,
 ) ([]Message, error) {
@@ -421,7 +444,6 @@ func (m *MockStore) GetMessagesSinceOffset(
 	return result, nil
 }
 
-// NextLogOffset returns the next available log offset for a topic.
 func (m *MockStore) NextLogOffset(
 	ctx context.Context, topicID int64,
 ) (int64, error) {
@@ -469,6 +491,216 @@ func (m *MockStore) SearchMessagesForAgent(
 	return results, nil
 }
 
+// GetAllInboxMessages retrieves inbox messages across all agents (global view).
+func (m *MockStore) GetAllInboxMessages(
+	ctx context.Context, limit, offset int,
+) ([]InboxMessage, error) {
+
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+
+	var results []InboxMessage
+	count := 0
+	skipped := 0
+
+	for msgID, msg := range m.messages {
+		recipients, ok := m.messageRecipients[msgID]
+		if !ok {
+			continue
+		}
+
+		// Find first non-archived recipient.
+		for agentID, recip := range recipients {
+			if recip.State == "archived" || recip.State == "trash" {
+				continue
+			}
+
+			if skipped < offset {
+				skipped++
+				continue
+			}
+
+			// Get sender name.
+			var senderName string
+			if sender, ok := m.agents[msg.SenderID]; ok {
+				senderName = sender.Name
+			}
+
+			results = append(results, InboxMessage{
+				Message:      msg,
+				SenderName:   senderName,
+				State:        recip.State,
+				SnoozedUntil: recip.SnoozedUntil,
+				ReadAt:       recip.ReadAt,
+				AckedAt:      recip.AckedAt,
+			})
+			_ = agentID
+			count++
+			break
+		}
+
+		if count >= limit {
+			break
+		}
+	}
+
+	return results, nil
+}
+
+// GetMessageRecipients retrieves all recipients for a message.
+func (m *MockStore) GetMessageRecipients(
+	ctx context.Context, messageID int64,
+) ([]MessageRecipientWithAgent, error) {
+
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+
+	recipients, ok := m.messageRecipients[messageID]
+	if !ok {
+		return nil, nil
+	}
+
+	var results []MessageRecipientWithAgent
+	for agentID, recip := range recipients {
+		var agentName string
+		if agent, ok := m.agents[agentID]; ok {
+			agentName = agent.Name
+		}
+		results = append(results, MessageRecipientWithAgent{
+			MessageRecipient: recip,
+			AgentName:        agentName,
+		})
+	}
+	return results, nil
+}
+
+// GetMessageRecipientsBulk retrieves recipients for multiple messages.
+func (m *MockStore) GetMessageRecipientsBulk(
+	ctx context.Context, messageIDs []int64,
+) (map[int64][]MessageRecipientWithAgent, error) {
+
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+
+	result := make(map[int64][]MessageRecipientWithAgent)
+	for _, msgID := range messageIDs {
+		recipients, ok := m.messageRecipients[msgID]
+		if !ok {
+			continue
+		}
+		for agentID, recip := range recipients {
+			var agentName string
+			if agent, ok := m.agents[agentID]; ok {
+				agentName = agent.Name
+			}
+			result[msgID] = append(result[msgID], MessageRecipientWithAgent{
+				MessageRecipient: recip,
+				AgentName:        agentName,
+			})
+		}
+	}
+	return result, nil
+}
+
+// SearchMessages performs global search across all messages.
+func (m *MockStore) SearchMessages(
+	ctx context.Context, query string, limit int,
+) ([]InboxMessage, error) {
+
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+
+	var results []InboxMessage
+	for _, msg := range m.messages {
+		if !contains(msg.Subject, query) && !contains(msg.Body, query) {
+			continue
+		}
+
+		var senderName string
+		if sender, ok := m.agents[msg.SenderID]; ok {
+			senderName = sender.Name
+		}
+
+		results = append(results, InboxMessage{
+			Message:    msg,
+			SenderName: senderName,
+		})
+
+		if len(results) >= limit {
+			break
+		}
+	}
+	return results, nil
+}
+
+// GetMessagesByTopic retrieves all messages for a topic.
+func (m *MockStore) GetMessagesByTopic(
+	ctx context.Context, topicID int64,
+) ([]Message, error) {
+
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+
+	var results []Message
+	for _, msg := range m.messages {
+		if msg.TopicID == topicID {
+			results = append(results, msg)
+		}
+	}
+	return results, nil
+}
+
+// GetSentMessages retrieves messages sent by a specific agent.
+func (m *MockStore) GetSentMessages(
+	ctx context.Context, senderID int64, limit int,
+) ([]Message, error) {
+
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+
+	var results []Message
+	for _, msg := range m.messages {
+		if msg.SenderID == senderID {
+			results = append(results, msg)
+			if len(results) >= limit {
+				break
+			}
+		}
+	}
+	return results, nil
+}
+
+// GetAllSentMessages retrieves all sent messages across all agents.
+func (m *MockStore) GetAllSentMessages(
+	ctx context.Context, limit int,
+) ([]InboxMessage, error) {
+
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+
+	var results []InboxMessage
+	for _, msg := range m.messages {
+		var senderName, senderProjectKey, senderGitBranch string
+		if sender, ok := m.agents[msg.SenderID]; ok {
+			senderName = sender.Name
+			senderProjectKey = sender.ProjectKey
+			senderGitBranch = sender.GitBranch
+		}
+
+		results = append(results, InboxMessage{
+			Message:          msg,
+			SenderName:       senderName,
+			SenderProjectKey: senderProjectKey,
+			SenderGitBranch:  senderGitBranch,
+		})
+
+		if len(results) >= limit {
+			break
+		}
+	}
+	return results, nil
+}
+
 // contains checks if s contains substr (case-insensitive).
 func contains(s, substr string) bool {
 	return len(s) >= len(substr) &&
@@ -480,7 +712,6 @@ func contains(s, substr string) bool {
 
 // AgentStore implementation.
 
-// CreateAgent creates a new agent in the mock store.
 func (m *MockStore) CreateAgent(
 	ctx context.Context, params CreateAgentParams,
 ) (Agent, error) {
@@ -507,7 +738,6 @@ func (m *MockStore) CreateAgent(
 	return agent, nil
 }
 
-// GetAgent retrieves an agent by its ID.
 func (m *MockStore) GetAgent(ctx context.Context, id int64) (Agent, error) {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
@@ -519,7 +749,6 @@ func (m *MockStore) GetAgent(ctx context.Context, id int64) (Agent, error) {
 	return agent, nil
 }
 
-// GetAgentByName retrieves an agent by its name.
 func (m *MockStore) GetAgentByName(
 	ctx context.Context, name string,
 ) (Agent, error) {
@@ -533,7 +762,6 @@ func (m *MockStore) GetAgentByName(
 	return m.agents[id], nil
 }
 
-// GetAgentBySessionID retrieves an agent by its current session ID.
 func (m *MockStore) GetAgentBySessionID(
 	ctx context.Context, sessionID string,
 ) (Agent, error) {
@@ -547,7 +775,6 @@ func (m *MockStore) GetAgentBySessionID(
 	return m.agents[id], nil
 }
 
-// ListAgents lists all agents in the store.
 func (m *MockStore) ListAgents(ctx context.Context) ([]Agent, error) {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
@@ -559,7 +786,6 @@ func (m *MockStore) ListAgents(ctx context.Context) ([]Agent, error) {
 	return result, nil
 }
 
-// ListAgentsByProject lists all agents for a project.
 func (m *MockStore) ListAgentsByProject(
 	ctx context.Context, projectKey string,
 ) ([]Agent, error) {
@@ -575,7 +801,6 @@ func (m *MockStore) ListAgentsByProject(
 	return result, nil
 }
 
-// UpdateLastActive updates an agent's last active timestamp.
 func (m *MockStore) UpdateLastActive(
 	ctx context.Context, id int64, ts time.Time,
 ) error {
@@ -591,7 +816,6 @@ func (m *MockStore) UpdateLastActive(
 	return nil
 }
 
-// UpdateSession updates an agent's current session ID.
 func (m *MockStore) UpdateSession(
 	ctx context.Context, id int64, sessionID string,
 ) error {
@@ -620,7 +844,30 @@ func (m *MockStore) UpdateSession(
 	return nil
 }
 
-// DeleteAgent deletes an agent and its associated data.
+// UpdateAgentName updates an agent's display name.
+func (m *MockStore) UpdateAgentName(
+	ctx context.Context, id int64, name string,
+) error {
+
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	agent, ok := m.agents[id]
+	if !ok {
+		return sql.ErrNoRows
+	}
+
+	// Remove old name mapping.
+	delete(m.agentsByName, agent.Name)
+
+	// Update agent name.
+	agent.Name = name
+	m.agents[id] = agent
+	m.agentsByName[name] = id
+
+	return nil
+}
+
 func (m *MockStore) DeleteAgent(ctx context.Context, id int64) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
@@ -641,7 +888,6 @@ func (m *MockStore) DeleteAgent(ctx context.Context, id int64) error {
 
 // TopicStore implementation.
 
-// CreateTopic creates a new topic in the mock store.
 func (m *MockStore) CreateTopic(
 	ctx context.Context, params CreateTopicParams,
 ) (Topic, error) {
@@ -667,7 +913,6 @@ func (m *MockStore) CreateTopic(
 	return topic, nil
 }
 
-// GetTopic retrieves a topic by its ID.
 func (m *MockStore) GetTopic(ctx context.Context, id int64) (Topic, error) {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
@@ -679,7 +924,6 @@ func (m *MockStore) GetTopic(ctx context.Context, id int64) (Topic, error) {
 	return topic, nil
 }
 
-// GetTopicByName retrieves a topic by its name.
 func (m *MockStore) GetTopicByName(
 	ctx context.Context, name string,
 ) (Topic, error) {
@@ -693,7 +937,6 @@ func (m *MockStore) GetTopicByName(
 	return m.topics[id], nil
 }
 
-// GetOrCreateAgentInboxTopic gets or creates an inbox topic for an agent.
 func (m *MockStore) GetOrCreateAgentInboxTopic(
 	ctx context.Context, agentName string,
 ) (Topic, error) {
@@ -701,7 +944,6 @@ func (m *MockStore) GetOrCreateAgentInboxTopic(
 	return m.GetOrCreateTopic(ctx, topicName, "inbox")
 }
 
-// GetOrCreateTopic gets or creates a topic by name and type.
 func (m *MockStore) GetOrCreateTopic(
 	ctx context.Context, name, topicType string,
 ) (Topic, error) {
@@ -726,7 +968,6 @@ func (m *MockStore) GetOrCreateTopic(
 	return topic, nil
 }
 
-// ListTopics lists all topics in the store.
 func (m *MockStore) ListTopics(ctx context.Context) ([]Topic, error) {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
@@ -738,7 +979,6 @@ func (m *MockStore) ListTopics(ctx context.Context) ([]Topic, error) {
 	return result, nil
 }
 
-// ListTopicsByType lists all topics of a given type.
 func (m *MockStore) ListTopicsByType(
 	ctx context.Context, topicType string,
 ) ([]Topic, error) {
@@ -754,7 +994,6 @@ func (m *MockStore) ListTopicsByType(
 	return result, nil
 }
 
-// CreateSubscription subscribes an agent to a topic.
 func (m *MockStore) CreateSubscription(
 	ctx context.Context, agentID, topicID int64,
 ) error {
@@ -769,7 +1008,6 @@ func (m *MockStore) CreateSubscription(
 	return nil
 }
 
-// DeleteSubscription unsubscribes an agent from a topic.
 func (m *MockStore) DeleteSubscription(
 	ctx context.Context, agentID, topicID int64,
 ) error {
@@ -782,7 +1020,6 @@ func (m *MockStore) DeleteSubscription(
 	return nil
 }
 
-// ListSubscriptionsByAgent lists all topics an agent is subscribed to.
 func (m *MockStore) ListSubscriptionsByAgent(
 	ctx context.Context, agentID int64,
 ) ([]Topic, error) {
@@ -800,7 +1037,6 @@ func (m *MockStore) ListSubscriptionsByAgent(
 	return result, nil
 }
 
-// ListSubscriptionsByTopic lists all agents subscribed to a topic.
 func (m *MockStore) ListSubscriptionsByTopic(
 	ctx context.Context, topicID int64,
 ) ([]Agent, error) {
@@ -820,7 +1056,6 @@ func (m *MockStore) ListSubscriptionsByTopic(
 
 // ActivityStore implementation.
 
-// CreateActivity records a new activity event.
 func (m *MockStore) CreateActivity(
 	ctx context.Context, params CreateActivityParams,
 ) error {
@@ -842,7 +1077,6 @@ func (m *MockStore) CreateActivity(
 	return nil
 }
 
-// ListRecentActivities lists the most recent activities.
 func (m *MockStore) ListRecentActivities(
 	ctx context.Context, limit int,
 ) ([]Activity, error) {
@@ -861,7 +1095,6 @@ func (m *MockStore) ListRecentActivities(
 	return result, nil
 }
 
-// ListActivitiesByAgent lists activities for a specific agent.
 func (m *MockStore) ListActivitiesByAgent(
 	ctx context.Context, agentID int64, limit int,
 ) ([]Activity, error) {
@@ -878,7 +1111,6 @@ func (m *MockStore) ListActivitiesByAgent(
 	return result, nil
 }
 
-// ListActivitiesSince lists activities since a given time.
 func (m *MockStore) ListActivitiesSince(
 	ctx context.Context, since time.Time, limit int,
 ) ([]Activity, error) {
@@ -894,7 +1126,6 @@ func (m *MockStore) ListActivitiesSince(
 	return result, nil
 }
 
-// DeleteOldActivities deletes activities older than a given time.
 func (m *MockStore) DeleteOldActivities(
 	ctx context.Context, olderThan time.Time,
 ) error {
@@ -913,7 +1144,6 @@ func (m *MockStore) DeleteOldActivities(
 
 // SessionStore implementation.
 
-// CreateSessionIdentity creates a new session-to-agent mapping.
 func (m *MockStore) CreateSessionIdentity(
 	ctx context.Context, params CreateSessionIdentityParams,
 ) error {
@@ -939,7 +1169,6 @@ func (m *MockStore) CreateSessionIdentity(
 	return nil
 }
 
-// GetSessionIdentity retrieves a session identity by session ID.
 func (m *MockStore) GetSessionIdentity(
 	ctx context.Context, sessionID string,
 ) (SessionIdentity, error) {
@@ -953,7 +1182,6 @@ func (m *MockStore) GetSessionIdentity(
 	return si, nil
 }
 
-// DeleteSessionIdentity deletes a session identity mapping.
 func (m *MockStore) DeleteSessionIdentity(
 	ctx context.Context, sessionID string,
 ) error {
@@ -965,7 +1193,6 @@ func (m *MockStore) DeleteSessionIdentity(
 	return nil
 }
 
-// ListSessionIdentitiesByAgent lists all sessions for an agent.
 func (m *MockStore) ListSessionIdentitiesByAgent(
 	ctx context.Context, agentID int64,
 ) ([]SessionIdentity, error) {
@@ -981,7 +1208,6 @@ func (m *MockStore) ListSessionIdentitiesByAgent(
 	return result, nil
 }
 
-// UpdateSessionIdentityLastActive updates a session's last active timestamp.
 func (m *MockStore) UpdateSessionIdentityLastActive(
 	ctx context.Context, sessionID string, ts time.Time,
 ) error {

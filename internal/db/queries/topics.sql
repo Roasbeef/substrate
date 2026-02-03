@@ -12,6 +12,13 @@ SELECT * FROM topics WHERE name = ?;
 -- name: ListTopics :many
 SELECT * FROM topics ORDER BY name;
 
+-- name: ListTopicsWithMessageCount :many
+SELECT t.*, COUNT(m.id) as message_count
+FROM topics t
+LEFT JOIN messages m ON t.id = m.topic_id
+GROUP BY t.id
+ORDER BY t.name;
+
 -- name: ListTopicsByType :many
 SELECT * FROM topics WHERE topic_type = ? ORDER BY name;
 

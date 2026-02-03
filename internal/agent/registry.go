@@ -21,46 +21,80 @@ func NewRegistry(store *db.Store) *Registry {
 	return &Registry{store: store}
 }
 
-// RegisterAgent creates a new agent with the given name.
+// RegisterAgent creates a new agent with the given name. The agent creation
+// and inbox topic creation are wrapped in a transaction to ensure atomicity.
 func (r *Registry) RegisterAgent(ctx context.Context, name string,
 	projectKey string, gitBranch string,
 ) (*sqlc.Agent, error) {
 	now := time.Now().Unix()
 
-	agent, err := r.store.Queries().CreateAgent(
-		ctx, sqlc.CreateAgentParams{
-			Name: name,
-			ProjectKey: sql.NullString{
-				String: projectKey,
-				Valid:  projectKey != "",
-			},
-			GitBranch: sql.NullString{
-				String: gitBranch,
-				Valid:  gitBranch != "",
-			},
-			CreatedAt:    now,
-			LastActiveAt: now,
-		},
-	)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create agent: %w", err)
-	}
+	var agent sqlc.Agent
 
-	// Create the agent's inbox topic.
-	_, err = r.store.Queries().GetOrCreateAgentInboxTopic(
-		ctx, sqlc.GetOrCreateAgentInboxTopicParams{
-			Column1: sql.NullString{
-				String: name,
-				Valid:  true,
+	err := r.store.WithTx(ctx, func(ctx context.Context,
+		q *sqlc.Queries,
+	) error {
+		var err error
+		agent, err = q.CreateAgent(
+			ctx, sqlc.CreateAgentParams{
+				Name: name,
+				ProjectKey: sql.NullString{
+					String: projectKey,
+					Valid:  projectKey != "",
+				},
+				GitBranch: sql.NullString{
+					String: gitBranch,
+					Valid:  gitBranch != "",
+				},
+				CreatedAt:    now,
+				LastActiveAt: now,
 			},
-			CreatedAt: now,
-		},
-	)
+		)
+		if err != nil {
+			return fmt.Errorf("failed to create agent: %w", err)
+		}
+
+		// Create the agent's inbox topic.
+		_, err = q.GetOrCreateAgentInboxTopic(
+			ctx, sqlc.GetOrCreateAgentInboxTopicParams{
+				Column1: sql.NullString{
+					String: name,
+					Valid:  true,
+				},
+				CreatedAt: now,
+			},
+		)
+		if err != nil {
+			return fmt.Errorf("failed to create inbox topic: %w", err)
+		}
+
+		return nil
+	})
+
 	if err != nil {
-		return nil, fmt.Errorf("failed to create inbox topic: %w", err)
+		return nil, err
 	}
 
 	return &agent, nil
+}
+
+// EnsureDefaultAgent ensures that an agent with the given name exists,
+// creating it if necessary. This is used to guarantee that system agents
+// (like "User") are present in the database on startup.
+func (r *Registry) EnsureDefaultAgent(ctx context.Context,
+	name string,
+) (*sqlc.Agent, error) {
+
+	agent, err := r.store.Queries().GetAgentByName(ctx, name)
+	if err == nil {
+		return &agent, nil
+	}
+
+	if err != sql.ErrNoRows {
+		return nil, fmt.Errorf("failed to check for agent: %w", err)
+	}
+
+	// Agent doesn't exist, create it.
+	return r.RegisterAgent(ctx, name, "", "")
 }
 
 // GetAgent retrieves an agent by ID.

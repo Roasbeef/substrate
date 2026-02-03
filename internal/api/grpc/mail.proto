@@ -4,6 +4,8 @@ package subtraterpc;
 
 option go_package = "github.com/roasbeef/subtrate/internal/api/grpc/subtraterpc";
 
+import "google/protobuf/timestamp.proto";
+
 // Mail is the main RPC service for the Subtrate mail system. It provides
 // methods for sending, receiving, and managing messages between agents.
 service Mail {
@@ -52,6 +54,27 @@ service Mail {
     // HasUnackedStatusTo checks if there are unacked status messages from
     // sender to recipient. Used for deduplication in status-update command.
     rpc HasUnackedStatusTo (HasUnackedStatusToRequest) returns (HasUnackedStatusToResponse);
+
+    // ReplyToThread sends a reply message to an existing thread.
+    rpc ReplyToThread (ReplyToThreadRequest) returns (ReplyToThreadResponse);
+
+    // ArchiveThread archives all messages in a thread.
+    rpc ArchiveThread (ArchiveThreadRequest) returns (ArchiveThreadResponse);
+
+    // DeleteThread deletes all messages in a thread.
+    rpc DeleteThread (DeleteThreadRequest) returns (DeleteThreadResponse);
+
+    // MarkThreadUnread marks a thread as unread.
+    rpc MarkThreadUnread (MarkThreadUnreadRequest) returns (MarkThreadUnreadResponse);
+
+    // GetTopic retrieves a single topic by ID.
+    rpc GetTopic (GetTopicRequest) returns (GetTopicResponse);
+
+    // AutocompleteRecipients returns matching agents for autocomplete.
+    rpc AutocompleteRecipients (AutocompleteRecipientsRequest) returns (AutocompleteRecipientsResponse);
+
+    // DeleteMessage marks a message as deleted/trash.
+    rpc DeleteMessage (DeleteMessageRequest) returns (DeleteMessageResponse);
 }
 
 // Agent is the RPC service for managing agent identities.
@@ -68,11 +91,50 @@ service Agent {
     // DeleteAgent removes an agent by ID.
     rpc DeleteAgent (DeleteAgentRequest) returns (DeleteAgentResponse);
 
+    // UpdateAgent updates an agent's properties.
+    rpc UpdateAgent (UpdateAgentRequest) returns (UpdateAgentResponse);
+
+    // GetAgentsStatus returns all agents with their status and counts.
+    rpc GetAgentsStatus (GetAgentsStatusRequest) returns (GetAgentsStatusResponse);
+
+    // Heartbeat records a heartbeat for an agent.
+    rpc Heartbeat (HeartbeatRequest) returns (HeartbeatResponse);
+
     // EnsureIdentity creates or retrieves an agent identity for a session.
     rpc EnsureIdentity (EnsureIdentityRequest) returns (EnsureIdentityResponse);
 
     // SaveIdentity persists an agent's current state.
     rpc SaveIdentity (SaveIdentityRequest) returns (SaveIdentityResponse);
+}
+
+// Session is the RPC service for managing agent sessions.
+service Session {
+    // ListSessions lists all sessions with optional filters.
+    rpc ListSessions (ListSessionsRequest) returns (ListSessionsResponse);
+
+    // GetSession retrieves a single session by ID.
+    rpc GetSession (GetSessionRequest) returns (GetSessionResponse);
+
+    // StartSession starts a new session for an agent.
+    rpc StartSession (StartSessionRequest) returns (StartSessionResponse);
+
+    // CompleteSession marks a session as completed.
+    rpc CompleteSession (CompleteSessionRequest) returns (CompleteSessionResponse);
+}
+
+// Activity is the RPC service for activity feeds.
+service Activity {
+    // ListActivities lists activities with optional filters.
+    rpc ListActivities (ListActivitiesRequest) returns (ListActivitiesResponse);
+}
+
+// Stats is the RPC service for dashboard statistics.
+service Stats {
+    // GetDashboardStats returns dashboard statistics.
+    rpc GetDashboardStats (GetDashboardStatsRequest) returns (GetDashboardStatsResponse);
+
+    // HealthCheck returns server health status.
+    rpc HealthCheck (HealthCheckRequest) returns (HealthCheckResponse);
 }
 
 // Priority represents message priority levels.
@@ -95,21 +157,25 @@ enum MessageState {
 }
 
 // InboxMessage represents a message in an agent's inbox.
+// Note: int64 fields serialize as strings in JSON (protobuf standard).
+// Timestamps use RFC 3339 format. Priority/state serialize as enum strings.
 message InboxMessage {
     int64 id = 1;
     string thread_id = 2;
     int64 topic_id = 3;
     int64 sender_id = 4;
     string sender_name = 5;
+    string sender_project_key = 15;  // Agent's project key (e.g., "substrate").
+    string sender_git_branch = 16;   // Agent's git branch (e.g., "main").
     string subject = 6;
     string body = 7;
     Priority priority = 8;
     MessageState state = 9;
-    int64 created_at = 10;      // Unix timestamp
-    int64 deadline_at = 11;     // Unix timestamp, 0 if no deadline
-    int64 snoozed_until = 12;   // Unix timestamp, 0 if not snoozed
-    int64 read_at = 13;         // Unix timestamp, 0 if unread
-    int64 acked_at = 14;        // Unix timestamp, 0 if not acked
+    google.protobuf.Timestamp created_at = 10;
+    google.protobuf.Timestamp deadline_at = 11;      // null if no deadline
+    google.protobuf.Timestamp snoozed_until = 12;    // null if not snoozed
+    google.protobuf.Timestamp read_at = 13;          // null if unread
+    google.protobuf.Timestamp acknowledged_at = 14;  // null if not acked
 }
 
 // SendMailRequest is the request for SendMail.
@@ -121,7 +187,7 @@ message SendMailRequest {
     string subject = 5;
     string body = 6;
     Priority priority = 7;
-    int64 deadline_at = 8;          // Unix timestamp, 0 for no deadline
+    google.protobuf.Timestamp deadline_at = 8;  // Optional deadline
     string attachments_json = 9;    // JSON string of attachments
 }
 
@@ -137,6 +203,7 @@ message FetchInboxRequest {
     int32 limit = 2;            // Maximum messages to return
     bool unread_only = 3;       // Only return unread messages
     MessageState state_filter = 4;  // Filter by state
+    bool sent_only = 5;         // Only return messages sent by the agent
 }
 
 // FetchInboxResponse is the response for FetchInbox.
@@ -171,7 +238,7 @@ message UpdateStateRequest {
     int64 agent_id = 1;
     int64 message_id = 2;
     MessageState new_state = 3;
-    int64 snoozed_until = 4;    // Required for STATE_SNOOZED
+    google.protobuf.Timestamp snoozed_until = 4;    // Required for STATE_SNOOZED
 }
 
 // UpdateStateResponse is the response for UpdateState.
@@ -265,7 +332,8 @@ message Topic {
     int64 id = 1;
     string name = 2;
     string topic_type = 3;      // "direct", "broadcast", "queue"
-    int64 created_at = 4;
+    google.protobuf.Timestamp created_at = 4;
+    int64 message_count = 5;    // Number of messages in this topic
 }
 
 // ListTopicsRequest is the request for ListTopics.
@@ -322,13 +390,14 @@ message GetAgentRequest {
 }
 
 // GetAgentResponse is the response for GetAgent.
+// Note: int64 fields serialize as strings in JSON (protobuf standard).
 message GetAgentResponse {
     int64 id = 1;
     string name = 2;
     string project_key = 3;
-    string current_session_id = 4;
-    int64 created_at = 5;
-    int64 last_active_at = 6;
+    string session_id = 4;  // Current session ID (renamed from current_session_id)
+    google.protobuf.Timestamp created_at = 5;
+    google.protobuf.Timestamp last_active_at = 6;
 }
 
 // ListAgentsRequest is the request for ListAgents.
@@ -375,4 +444,298 @@ message DeleteAgentRequest {
 // DeleteAgentResponse is the response for DeleteAgent.
 message DeleteAgentResponse {
     bool success = 1;
+}
+
+// =============================================================================
+// New Message Types for Extended API
+// =============================================================================
+
+// ReplyToThreadRequest is the request for ReplyToThread.
+message ReplyToThreadRequest {
+    int64 sender_id = 1;
+    string thread_id = 2;
+    string body = 3;
+}
+
+// ReplyToThreadResponse is the response for ReplyToThread.
+message ReplyToThreadResponse {
+    int64 message_id = 1;
+}
+
+// ArchiveThreadRequest is the request for ArchiveThread.
+message ArchiveThreadRequest {
+    int64 agent_id = 1;
+    string thread_id = 2;
+}
+
+// ArchiveThreadResponse is the response for ArchiveThread.
+message ArchiveThreadResponse {
+    bool success = 1;
+    int32 messages_archived = 2;
+}
+
+// DeleteThreadRequest is the request for DeleteThread.
+message DeleteThreadRequest {
+    int64 agent_id = 1;
+    string thread_id = 2;
+}
+
+// DeleteThreadResponse is the response for DeleteThread.
+message DeleteThreadResponse {
+    bool success = 1;
+    int32 messages_deleted = 2;
+}
+
+// MarkThreadUnreadRequest is the request for MarkThreadUnread.
+message MarkThreadUnreadRequest {
+    int64 agent_id = 1;
+    string thread_id = 2;
+}
+
+// MarkThreadUnreadResponse is the response for MarkThreadUnread.
+message MarkThreadUnreadResponse {
+    bool success = 1;
+}
+
+// GetTopicRequest is the request for GetTopic.
+message GetTopicRequest {
+    int64 topic_id = 1;
+}
+
+// GetTopicResponse is the response for GetTopic.
+message GetTopicResponse {
+    Topic topic = 1;
+}
+
+// AutocompleteRecipientsRequest is the request for AutocompleteRecipients.
+message AutocompleteRecipientsRequest {
+    string query = 1;
+    int32 limit = 2;
+}
+
+// AutocompleteRecipient represents a recipient suggestion.
+message AutocompleteRecipient {
+    int64 id = 1;
+    string name = 2;
+    string project_key = 3;
+    string git_branch = 4;
+    string status = 5;  // "active", "busy", "idle", "offline"
+}
+
+// AutocompleteRecipientsResponse is the response for AutocompleteRecipients.
+message AutocompleteRecipientsResponse {
+    repeated AutocompleteRecipient recipients = 1;
+}
+
+// DeleteMessageRequest is the request for DeleteMessage.
+message DeleteMessageRequest {
+    int64 agent_id = 1;
+    int64 message_id = 2;
+}
+
+// DeleteMessageResponse is the response for DeleteMessage.
+message DeleteMessageResponse {
+    bool success = 1;
+}
+
+// UpdateAgentRequest is the request for UpdateAgent.
+message UpdateAgentRequest {
+    int64 id = 1;
+    string project_key = 2;
+    string git_branch = 3;
+}
+
+// UpdateAgentResponse is the response for UpdateAgent.
+message UpdateAgentResponse {
+    GetAgentResponse agent = 1;
+}
+
+// AgentStatus represents an agent's current status.
+enum AgentStatus {
+    AGENT_STATUS_UNSPECIFIED = 0;
+    AGENT_STATUS_ACTIVE = 1;
+    AGENT_STATUS_BUSY = 2;
+    AGENT_STATUS_IDLE = 3;
+    AGENT_STATUS_OFFLINE = 4;
+}
+
+// AgentWithStatus represents an agent with its current status.
+message AgentWithStatus {
+    int64 id = 1;
+    string name = 2;
+    string project_key = 3;
+    string git_branch = 4;
+    AgentStatus status = 5;
+    google.protobuf.Timestamp last_active_at = 6;
+    int64 session_id = 7;
+    int64 seconds_since_heartbeat = 8;
+}
+
+// AgentStatusCounts represents counts of agents by status.
+message AgentStatusCounts {
+    int32 active = 1;
+    int32 busy = 2;
+    int32 idle = 3;
+    int32 offline = 4;
+}
+
+// GetAgentsStatusRequest is the request for GetAgentsStatus.
+message GetAgentsStatusRequest {}
+
+// GetAgentsStatusResponse is the response for GetAgentsStatus.
+message GetAgentsStatusResponse {
+    repeated AgentWithStatus agents = 1;
+    AgentStatusCounts counts = 2;
+}
+
+// HeartbeatRequest is the request for Heartbeat.
+// Either agent_id or agent_name must be provided. If both are given,
+// agent_id takes precedence.
+message HeartbeatRequest {
+    int64 agent_id = 1 [json_name = "agent_id"];
+    string session_id = 2 [json_name = "session_id"];
+    string agent_name = 3 [json_name = "agent_name"];
+}
+
+// HeartbeatResponse is the response for Heartbeat.
+message HeartbeatResponse {
+    bool success = 1;
+}
+
+// =============================================================================
+// Session Service Messages
+// =============================================================================
+
+// SessionStatus represents the status of a session.
+enum SessionStatus {
+    SESSION_STATUS_UNSPECIFIED = 0;
+    SESSION_STATUS_ACTIVE = 1;
+    SESSION_STATUS_COMPLETED = 2;
+    SESSION_STATUS_ABANDONED = 3;
+}
+
+// SessionInfo represents a session.
+message SessionInfo {
+    int64 id = 1;
+    int64 agent_id = 2;
+    string agent_name = 3;
+    string project = 4;
+    string branch = 5;
+    google.protobuf.Timestamp started_at = 6;
+    google.protobuf.Timestamp ended_at = 7;
+    SessionStatus status = 8;
+}
+
+// ListSessionsRequest is the request for ListSessions.
+message ListSessionsRequest {
+    bool active_only = 1;
+    int32 limit = 2;
+}
+
+// ListSessionsResponse is the response for ListSessions.
+message ListSessionsResponse {
+    repeated SessionInfo sessions = 1;
+}
+
+// GetSessionRequest is the request for GetSession.
+message GetSessionRequest {
+    int64 session_id = 1;
+}
+
+// GetSessionResponse is the response for GetSession.
+message GetSessionResponse {
+    SessionInfo session = 1;
+}
+
+// StartSessionRequest is the request for StartSession.
+message StartSessionRequest {
+    int64 agent_id = 1;
+    string project = 2;
+    string branch = 3;
+}
+
+// StartSessionResponse is the response for StartSession.
+message StartSessionResponse {
+    SessionInfo session = 1;
+}
+
+// CompleteSessionRequest is the request for CompleteSession.
+message CompleteSessionRequest {
+    int64 session_id = 1;
+}
+
+// CompleteSessionResponse is the response for CompleteSession.
+message CompleteSessionResponse {
+    bool success = 1;
+}
+
+// =============================================================================
+// Activity Service Messages
+// =============================================================================
+
+// ActivityType represents the type of an activity.
+enum ActivityType {
+    ACTIVITY_TYPE_UNSPECIFIED = 0;
+    ACTIVITY_TYPE_MESSAGE_SENT = 1;
+    ACTIVITY_TYPE_MESSAGE_READ = 2;
+    ACTIVITY_TYPE_SESSION_STARTED = 3;
+    ACTIVITY_TYPE_SESSION_COMPLETED = 4;
+    ACTIVITY_TYPE_AGENT_REGISTERED = 5;
+    ACTIVITY_TYPE_HEARTBEAT = 6;
+}
+
+// ActivityInfo represents an activity entry.
+message ActivityInfo {
+    int64 id = 1;
+    int64 agent_id = 2;
+    string agent_name = 3;
+    ActivityType type = 4;
+    string description = 5;
+    google.protobuf.Timestamp created_at = 6;
+    string metadata_json = 7;  // JSON-encoded metadata
+}
+
+// ListActivitiesRequest is the request for ListActivities.
+message ListActivitiesRequest {
+    int64 agent_id = 1;         // Filter by agent (0 = all)
+    ActivityType type = 2;      // Filter by type (UNSPECIFIED = all)
+    int32 page = 3;
+    int32 page_size = 4;
+}
+
+// ListActivitiesResponse is the response for ListActivities.
+message ListActivitiesResponse {
+    repeated ActivityInfo activities = 1;
+    int64 total = 2;
+    int32 page = 3;
+    int32 page_size = 4;
+}
+
+// =============================================================================
+// Stats Service Messages
+// =============================================================================
+
+// DashboardStats represents dashboard statistics.
+message DashboardStats {
+    int32 active_agents = 1;
+    int32 running_sessions = 2;
+    int32 pending_messages = 3;
+    int32 completed_today = 4;
+}
+
+// GetDashboardStatsRequest is the request for GetDashboardStats.
+message GetDashboardStatsRequest {}
+
+// GetDashboardStatsResponse is the response for GetDashboardStats.
+message GetDashboardStatsResponse {
+    DashboardStats stats = 1;
+}
+
+// HealthCheckRequest is the request for HealthCheck.
+message HealthCheckRequest {}
+
+// HealthCheckResponse is the response for HealthCheck.
+message HealthCheckResponse {
+    string status = 1;  // "ok" or "error"
+    google.protobuf.Timestamp time = 2;
 }

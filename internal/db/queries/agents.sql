@@ -23,6 +23,9 @@ SELECT * FROM agents WHERE project_key = ? ORDER BY last_active_at DESC;
 -- name: UpdateAgentLastActive :exec
 UPDATE agents SET last_active_at = ? WHERE id = ?;
 
+-- name: UpdateAgentName :exec
+UPDATE agents SET name = ? WHERE id = ?;
+
 -- name: UpdateAgentSession :exec
 UPDATE agents SET current_session_id = ?, last_active_at = ? WHERE id = ?;
 

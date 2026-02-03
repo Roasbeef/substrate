@@ -57,19 +57,29 @@ func main() {
 	dbStore := sqliteStore.Store
 	storage := store.FromDB(dbStore.DB())
 
-	// Create core services.
-	mailSvc := mail.NewService(storage)
+	// Create agent registry, heartbeat manager, and identity manager.
 	agentReg := agent.NewRegistry(dbStore)
+
+	// Ensure the default "User" agent exists for the web UI inbox.
+	if _, err := agentReg.EnsureDefaultAgent(
+		context.Background(), web.UserAgentName,
+	); err != nil {
+		log.Fatalf("Failed to ensure User agent: %v", err)
+	}
+
+	heartbeatMgr := agent.NewHeartbeatManager(agentReg, nil)
 	identityMgr, err := agent.NewIdentityManager(dbStore, agentReg)
 	if err != nil {
 		log.Fatalf("Failed to create identity manager: %v", err)
 	}
 
-	// Create the actor system and register core actors.
+	// Create the actor system.
 	actorSystem := actor.NewActorSystem()
 	defer actorSystem.Shutdown(context.Background())
 
-	// Create and register the notification hub for gRPC streaming.
+	// Create and register the notification hub for real-time notifications.
+	// This hub receives notifications from the mail service and delivers them
+	// to WebSocket clients and gRPC streams.
 	notificationHub := actor.RegisterWithSystem(
 		actorSystem,
 		"notification-hub",
@@ -78,14 +88,21 @@ func main() {
 	)
 	log.Println("NotificationHub actor started")
 
-	// Create and register the mail actor.
+	// Create the mail service with the notification hub reference.
+	// This enables real-time notifications when messages are sent.
+	mailSvc := mail.NewService(mail.ServiceConfig{
+		Store:           storage,
+		NotificationHub: notificationHub,
+	})
+
+	// Register the mail service as an actor.
 	mailRef := actor.RegisterWithSystem(
 		actorSystem,
 		"mail-service",
 		mail.MailServiceKey,
 		mailSvc,
 	)
-	log.Println("Mail actor started")
+	log.Println("Mail actor started with NotificationHub integration")
 
 	// Create and register the activity actor.
 	activitySvc := activity.NewService(activity.ServiceConfig{
@@ -129,7 +146,7 @@ func main() {
 		// Pass the notification hub actor for gRPC streaming RPCs.
 		grpcServer = subtraterpc.NewServer(
 			grpcCfg, dbStore, mailSvc, agentReg, identityMgr,
-			notificationHub,
+			heartbeatMgr, notificationHub,
 		)
 		if err := grpcServer.Start(); err != nil {
 			log.Fatalf("Failed to start gRPC server: %v", err)
@@ -144,8 +161,14 @@ func main() {
 		webCfg.Addr = *webAddr
 		webCfg.MailRef = mailRef
 		webCfg.ActivityRef = activityRef
+		webCfg.NotificationHubRef = web.NewActorNotificationHubRef(notificationHub)
 
-		webServer, err := web.NewServer(webCfg, dbStore)
+		// Enable grpc-gateway REST proxy if gRPC server is running.
+		if *grpcAddr != "" {
+			webCfg.GRPCEndpoint = *grpcAddr
+		}
+
+		webServer, err := web.NewServer(webCfg, storage, agentReg)
 		if err != nil {
 			log.Fatalf("Failed to create web server: %v", err)
 		}

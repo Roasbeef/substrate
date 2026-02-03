@@ -53,7 +53,7 @@ func newTestEnv(t *testing.T) *testEnv {
 	require.NoError(t, err)
 
 	// Create services.
-	mailSvc := mail.NewService(store.FromDB(dbStore.DB()))
+	mailSvc := mail.NewServiceWithStore(store.FromDB(dbStore.DB()))
 
 	env := &testEnv{
 		t:       t,
@@ -83,9 +83,11 @@ func (e *testEnv) cleanup() {
 func (e *testEnv) createAgent(name string) sqlc.Agent {
 	e.t.Helper()
 
+	now := time.Now().Unix()
 	agent, err := e.store.Queries().CreateAgent(context.Background(), sqlc.CreateAgentParams{
-		Name:      name,
-		CreatedAt: time.Now().Unix(),
+		Name:         name,
+		CreatedAt:    now,
+		LastActiveAt: now,
 	})
 	require.NoError(e.t, err)
 

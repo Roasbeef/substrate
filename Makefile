@@ -12,6 +12,7 @@ export CGO_CFLAGS := -DSQLITE_ENABLE_FTS5
 # Variables
 PKG := ./...
 TIMEOUT := 5m
+FRONTEND_DIR := web/frontend
 
 # Build targets
 .PHONY: build
@@ -28,6 +29,91 @@ build-daemon:
 
 .PHONY: build-all
 build-all: build-cli build-daemon
+
+# Frontend targets
+.PHONY: bun-install
+bun-install:
+	cd $(FRONTEND_DIR) && bun install
+
+.PHONY: bun-build
+bun-build:
+	cd $(FRONTEND_DIR) && bun run build
+
+.PHONY: bun-dev
+bun-dev:
+	cd $(FRONTEND_DIR) && bun run dev
+
+.PHONY: bun-test
+bun-test:
+	cd $(FRONTEND_DIR) && bun run test
+
+.PHONY: bun-test-e2e
+bun-test-e2e:
+	cd $(FRONTEND_DIR) && bun run test:e2e
+
+# E2E test with full rebuild (frontend + daemon).
+# Cleans test data and runs E2E tests against production build.
+.PHONY: bun-test-e2e-full
+bun-test-e2e-full: bun-build build-daemon
+	@rm -rf .test-data
+	cd $(FRONTEND_DIR) && PLAYWRIGHT_USE_PRODUCTION=true bun run test:e2e
+
+# E2E test specific file with full rebuild.
+# Usage: make bun-test-e2e-file file=tests/e2e/inbox/message-delete.spec.ts
+.PHONY: bun-test-e2e-file
+bun-test-e2e-file: bun-build build-daemon
+	@rm -rf .test-data
+	cd $(FRONTEND_DIR) && PLAYWRIGHT_USE_PRODUCTION=true bun run test:e2e $(file) --project=chromium
+
+# E2E test without rebuild (for iterating on tests only).
+.PHONY: bun-test-e2e-quick
+bun-test-e2e-quick:
+	@rm -rf .test-data
+	cd $(FRONTEND_DIR) && PLAYWRIGHT_USE_PRODUCTION=true bun run test:e2e --project=chromium
+
+.PHONY: bun-lint
+bun-lint:
+	cd $(FRONTEND_DIR) && bun run lint
+
+# Build daemon with embedded frontend (production build).
+.PHONY: build-production
+build-production: bun-build build-daemon
+	@echo "Production build complete with embedded frontend."
+
+# Full test suite (Go + frontend).
+.PHONY: test-all
+test-all: test bun-test
+	@echo "All tests passed (Go + frontend)."
+
+# Full lint (Go + frontend).
+.PHONY: lint-all
+lint-all: lint bun-lint
+	@echo "All linting passed (Go + frontend)."
+
+# Development mode: run Go backend and frontend dev server concurrently.
+# Use with 'make dev' - requires terminal multiplexer or run in separate terminals.
+.PHONY: dev
+dev:
+	@echo "Starting development servers..."
+	@echo "  Backend:  http://localhost:$(WEB_PORT)"
+	@echo "  Frontend: http://localhost:5174 (proxies to backend)"
+	@echo ""
+	@echo "Run these in separate terminals:"
+	@echo "  Terminal 1: make run"
+	@echo "  Terminal 2: make bun-dev"
+
+# CI targets - used by GitHub Actions.
+.PHONY: ci-go
+ci-go: tidy-check lint test
+	@echo "Go CI checks passed."
+
+.PHONY: ci-frontend
+ci-frontend: bun-install bun-lint bun-test
+	@echo "Frontend CI checks passed."
+
+.PHONY: ci
+ci: ci-go ci-frontend
+	@echo "All CI checks passed."
 
 .PHONY: install
 install:
@@ -134,6 +220,8 @@ migrate-down:
 clean:
 	rm -f substrate substrated
 	rm -f coverage.out coverage.html
+	rm -rf $(FRONTEND_DIR)/dist
+	rm -rf $(FRONTEND_DIR)/node_modules/.vite
 
 # Server execution
 WEB_PORT ?= 8080
@@ -231,6 +319,7 @@ help:
 	@echo "  build-cli      Build CLI binary (./substrate)"
 	@echo "  build-daemon   Build daemon binary (./substrated with web UI)"
 	@echo "  build-all      Build all binaries (CLI + daemon)"
+	@echo "  build-production Build daemon with embedded frontend"
 	@echo "  install        Install binaries to GOPATH/bin"
 	@echo "  quick          Quick build check (compile only)"
 	@echo ""
@@ -274,6 +363,22 @@ help:
 	@echo "  stop           Stop running server"
 	@echo "  restart        Stop, rebuild, and start server"
 	@echo "                 Usage: make restart WEB_PORT=8081"
+	@echo ""
+	@echo "Frontend targets:"
+	@echo "  bun-install    Install frontend dependencies"
+	@echo "  bun-build      Build frontend for production"
+	@echo "  bun-dev        Start frontend dev server"
+	@echo "  bun-test       Run frontend unit/integration tests"
+	@echo "  bun-test-e2e   Run frontend E2E tests with Playwright"
+	@echo "  bun-lint       Lint frontend code"
+	@echo ""
+	@echo "Combined targets:"
+	@echo "  dev            Show instructions for development mode"
+	@echo "  test-all       Run all tests (Go + frontend)"
+	@echo "  lint-all       Run all linting (Go + frontend)"
+	@echo "  ci             Run full CI pipeline (Go + frontend)"
+	@echo "  ci-go          Run Go CI checks only"
+	@echo "  ci-frontend    Run frontend CI checks only"
 	@echo ""
 	@echo "Development:"
 	@echo "  check          Run fmt, vet, lint, and tests"

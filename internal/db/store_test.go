@@ -92,8 +92,9 @@ func TestWithTx_Commit(t *testing.T) {
 	// Create an agent within a transaction.
 	err := store.WithTx(ctx, func(ctx context.Context, q *sqlc.Queries) error {
 		_, err := q.CreateAgent(ctx, sqlc.CreateAgentParams{
-			Name:      "TestAgent",
-			CreatedAt: 1234567890,
+			Name:         "TestAgent",
+			CreatedAt:    1234567890,
+			LastActiveAt: 1234567890,
 		})
 		return err
 	})
@@ -116,8 +117,9 @@ func TestWithTx_Rollback(t *testing.T) {
 	// Create an agent, then return an error to trigger rollback.
 	err := store.WithTx(ctx, func(ctx context.Context, q *sqlc.Queries) error {
 		_, err := q.CreateAgent(ctx, sqlc.CreateAgentParams{
-			Name:      "RollbackAgent",
-			CreatedAt: 1234567890,
+			Name:         "RollbackAgent",
+			CreatedAt:    1234567890,
+			LastActiveAt: 1234567890,
 		})
 		if err != nil {
 			return err
@@ -162,8 +164,9 @@ func TestNextLogOffset(t *testing.T) {
 	err = store.WithTx(ctx, func(ctx context.Context, q *sqlc.Queries) error {
 		// First create an agent for the sender.
 		agent, err := q.CreateAgent(ctx, sqlc.CreateAgentParams{
-			Name:      "Sender",
-			CreatedAt: 1234567890,
+			Name:         "Sender",
+			CreatedAt:    1234567890,
+			LastActiveAt: 1234567890,
 		})
 		if err != nil {
 			return err

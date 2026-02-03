@@ -47,14 +47,41 @@ func (GetStatusResponse) isMailResponse()   {}
 func (PollChangesResponse) isMailResponse() {}
 func (PublishResponse) isMailResponse()     {}
 
-// Service is the mail service actor behavior.
-type Service struct {
-	store store.Storage
+// ServiceConfig holds configuration for the mail service.
+type ServiceConfig struct {
+	// Store is the storage backend for persisting messages.
+	Store store.Storage
+
+	// NotificationHub is the optional notification hub actor reference. When
+	// set, the service notifies recipients via the hub after sending messages
+	// using fire-and-forget Tell semantics for optimal performance.
+	NotificationHub NotificationActorRef
 }
 
-// NewService creates a new mail service with the given store.
-func NewService(s store.Storage) *Service {
+// Service is the mail service actor behavior.
+type Service struct {
+	store    store.Storage
+	notifHub NotificationActorRef
+}
+
+// NewService creates a new mail service with the given configuration.
+func NewService(cfg ServiceConfig) *Service {
+	return &Service{
+		store:    cfg.Store,
+		notifHub: cfg.NotificationHub,
+	}
+}
+
+// NewServiceWithStore creates a new mail service with just a store (no
+// notifications). This is a convenience constructor for simple use cases.
+func NewServiceWithStore(s store.Storage) *Service {
 	return &Service{store: s}
+}
+
+// SetNotificationHub sets the notification hub actor reference. This allows
+// deferred initialization when the hub is spawned after the mail service.
+func (s *Service) SetNotificationHub(hub NotificationActorRef) {
+	s.notifHub = hub
 }
 
 // Receive implements actor.ActorBehavior by dispatching to type-specific
@@ -108,6 +135,11 @@ func (s *Service) handleSendMail(ctx context.Context,
 ) SendMailResponse {
 	var response SendMailResponse
 
+	// Variables to capture data for notification after successful transaction.
+	var recipientIDs []int64
+	var senderName string
+	var msgCreatedAt time.Time
+
 	err := s.store.WithTx(ctx, func(ctx context.Context,
 		txStore store.Storage,
 	) error {
@@ -119,7 +151,6 @@ func (s *Service) handleSendMail(ctx context.Context,
 		response.ThreadID = threadID
 
 		// Resolve recipient agent IDs.
-		var recipientIDs []int64
 		for _, name := range req.RecipientNames {
 			agent, err := txStore.GetAgentByName(ctx, name)
 			if err != nil {
@@ -134,6 +165,7 @@ func (s *Service) handleSendMail(ctx context.Context,
 		if err != nil {
 			return fmt.Errorf("sender not found: %w", err)
 		}
+		senderName = sender.Name
 
 		// For direct messages, use the first recipient's inbox topic.
 		var topicID int64
@@ -186,6 +218,7 @@ func (s *Service) handleSendMail(ctx context.Context,
 			return fmt.Errorf("failed to create message: %w", err)
 		}
 		response.MessageID = msg.ID
+		msgCreatedAt = msg.CreatedAt
 
 		// Create recipient entries.
 		for _, recipientID := range recipientIDs {
@@ -202,6 +235,41 @@ func (s *Service) handleSendMail(ctx context.Context,
 	})
 	if err != nil {
 		response.Error = err
+		return response
+	}
+
+	// After successful transaction, notify recipients via notification hub actor.
+	// Use fire-and-forget Tell for optimal performance - we don't need to wait
+	// for the notification to be delivered.
+	if s.notifHub != nil && len(recipientIDs) > 0 {
+		notifMsg := InboxMessage{
+			ID:         response.MessageID,
+			ThreadID:   response.ThreadID,
+			SenderID:   req.SenderID,
+			SenderName: senderName,
+			Subject:    req.Subject,
+			Body:       req.Body,
+			Priority:   req.Priority,
+			State:      StateUnreadStr.String(),
+			CreatedAt:  msgCreatedAt,
+			Deadline:   req.Deadline,
+		}
+
+		// Notify each recipient via the hub actor using fire-and-forget.
+		for _, recipientID := range recipientIDs {
+			s.notifHub.Tell(ctx, NotifyAgentMsg{
+				AgentID: recipientID,
+				Message: notifMsg,
+			})
+		}
+
+		// Also notify agent_id=0 for global inbox viewers (web UI without
+		// a specific agent selected). This ensures real-time updates work
+		// for the default inbox view.
+		s.notifHub.Tell(ctx, NotifyAgentMsg{
+			AgentID: 0,
+			Message: notifMsg,
+		})
 	}
 
 	return response
@@ -216,6 +284,57 @@ func (s *Service) handleFetchInbox(ctx context.Context,
 	limit := req.Limit
 	if limit <= 0 {
 		limit = 50
+	}
+
+	// Handle sent messages view.
+	if req.SentOnly {
+		// If AgentID is provided, get sent messages for that agent.
+		// Otherwise, get all sent messages globally.
+		if req.AgentID != 0 {
+			msgs, err := s.store.GetSentMessages(ctx, req.AgentID, limit)
+			if err != nil {
+				response.Error = fmt.Errorf("failed to fetch sent: %w", err)
+				return response
+			}
+
+			// Get agent info for sender details.
+			agent, err := s.store.GetAgent(ctx, req.AgentID)
+			if err != nil {
+				response.Error = fmt.Errorf("failed to get agent: %w", err)
+				return response
+			}
+
+			for _, m := range msgs {
+				response.Messages = append(response.Messages, InboxMessage{
+					ID:               m.ID,
+					ThreadID:         m.ThreadID,
+					TopicID:          m.TopicID,
+					SenderID:         m.SenderID,
+					SenderName:       agent.Name,
+					SenderProjectKey: agent.ProjectKey,
+					SenderGitBranch:  agent.GitBranch,
+					Subject:          m.Subject,
+					Body:             m.Body,
+					Priority:         Priority(m.Priority),
+					CreatedAt:        m.CreatedAt,
+					Deadline:         m.DeadlineAt,
+					State:            "read", // Sent messages are always "read".
+				})
+			}
+		} else {
+			msgs, err := s.store.GetAllSentMessages(ctx, limit)
+			if err != nil {
+				response.Error = fmt.Errorf("failed to fetch all sent: %w", err)
+				return response
+			}
+
+			for _, m := range msgs {
+				response.Messages = append(
+					response.Messages, storeInboxToMail(m),
+				)
+			}
+		}
+		return response
 	}
 
 	if req.UnreadOnly {
@@ -249,59 +368,65 @@ func (s *Service) handleFetchInbox(ctx context.Context,
 	return response
 }
 
-// handleReadMessage processes a ReadMessageRequest.
+// handleReadMessage processes a ReadMessageRequest. The read-and-mark-read
+// operation is wrapped in a transaction to ensure atomic state transition.
 func (s *Service) handleReadMessage(ctx context.Context,
 	req ReadMessageRequest,
 ) ReadMessageResponse {
 	var response ReadMessageResponse
 
-	// Get the message.
-	msg, err := s.store.GetMessage(ctx, req.MessageID)
-	if err != nil {
-		response.Error = fmt.Errorf("message not found: %w", err)
-		return response
-	}
-
-	// Get the recipient state.
-	recipient, err := s.store.GetMessageRecipient(
-		ctx, req.MessageID, req.AgentID,
-	)
-	if err != nil {
-		response.Error = fmt.Errorf("not a recipient: %w", err)
-		return response
-	}
-
-	// Mark as read if currently unread.
-	if recipient.State == "unread" {
-		err = s.store.MarkMessageRead(ctx, req.MessageID, req.AgentID)
+	err := s.store.WithTx(ctx, func(ctx context.Context,
+		txStore store.Storage,
+	) error {
+		// Get the message.
+		msg, err := txStore.GetMessage(ctx, req.MessageID)
 		if err != nil {
-			response.Error = fmt.Errorf("failed to mark read: %w",
-				err)
-			return response
+			return fmt.Errorf("message not found: %w", err)
 		}
-		recipient.State = "read"
-		now := time.Now()
-		recipient.ReadAt = &now
-	}
 
-	// Build response.
-	inboxMsg := InboxMessage{
-		ID:           msg.ID,
-		ThreadID:     msg.ThreadID,
-		TopicID:      msg.TopicID,
-		SenderID:     msg.SenderID,
-		Subject:      msg.Subject,
-		Body:         msg.Body,
-		Priority:     Priority(msg.Priority),
-		State:        recipient.State,
-		CreatedAt:    msg.CreatedAt,
-		Deadline:     msg.DeadlineAt,
-		SnoozedUntil: recipient.SnoozedUntil,
-		ReadAt:       recipient.ReadAt,
-		AckedAt:      recipient.AckedAt,
-	}
+		// Get the recipient state.
+		recipient, err := txStore.GetMessageRecipient(
+			ctx, req.MessageID, req.AgentID,
+		)
+		if err != nil {
+			return fmt.Errorf("not a recipient: %w", err)
+		}
 
-	response.Message = &inboxMsg
+		// Mark as read if currently unread.
+		if recipient.State == StateUnreadStr.String() {
+			err = txStore.MarkMessageRead(ctx, req.MessageID, req.AgentID)
+			if err != nil {
+				return fmt.Errorf("failed to mark read: %w", err)
+			}
+			recipient.State = StateReadStr.String()
+			now := time.Now()
+			recipient.ReadAt = &now
+		}
+
+		// Build response.
+		inboxMsg := InboxMessage{
+			ID:           msg.ID,
+			ThreadID:     msg.ThreadID,
+			TopicID:      msg.TopicID,
+			SenderID:     msg.SenderID,
+			Subject:      msg.Subject,
+			Body:         msg.Body,
+			Priority:     Priority(msg.Priority),
+			State:        recipient.State,
+			CreatedAt:    msg.CreatedAt,
+			Deadline:     msg.DeadlineAt,
+			SnoozedUntil: recipient.SnoozedUntil,
+			ReadAt:       recipient.ReadAt,
+			AckedAt:      recipient.AckedAt,
+		}
+
+		response.Message = &inboxMsg
+		return nil
+	})
+
+	if err != nil {
+		response.Error = err
+	}
 	return response
 }
 
@@ -465,20 +590,22 @@ func (s *Service) handlePollChanges(ctx context.Context,
 // storeInboxToMail converts a store.InboxMessage to mail.InboxMessage.
 func storeInboxToMail(m store.InboxMessage) InboxMessage {
 	return InboxMessage{
-		ID:           m.ID,
-		ThreadID:     m.ThreadID,
-		TopicID:      m.TopicID,
-		SenderID:     m.SenderID,
-		SenderName:   m.SenderName,
-		Subject:      m.Subject,
-		Body:         m.Body,
-		Priority:     Priority(m.Priority),
-		State:        m.State,
-		CreatedAt:    m.CreatedAt,
-		Deadline:     m.DeadlineAt,
-		SnoozedUntil: m.SnoozedUntil,
-		ReadAt:       m.ReadAt,
-		AckedAt:      m.AckedAt,
+		ID:               m.ID,
+		ThreadID:         m.ThreadID,
+		TopicID:          m.TopicID,
+		SenderID:         m.SenderID,
+		SenderName:       m.SenderName,
+		SenderProjectKey: m.SenderProjectKey,
+		SenderGitBranch:  m.SenderGitBranch,
+		Subject:          m.Subject,
+		Body:             m.Body,
+		Priority:         Priority(m.Priority),
+		State:            m.State,
+		CreatedAt:        m.CreatedAt,
+		Deadline:         m.DeadlineAt,
+		SnoozedUntil:     m.SnoozedUntil,
+		ReadAt:           m.ReadAt,
+		AckedAt:          m.AckedAt,
 	}
 }
 
@@ -494,6 +621,29 @@ func storeMessageToMail(m store.Message) InboxMessage {
 		Priority:  Priority(m.Priority),
 		CreatedAt: m.CreatedAt,
 		Deadline:  m.DeadlineAt,
+	}
+}
+
+// storeInboxMessageToMail converts a store.InboxMessage to mail.InboxMessage.
+// This variant includes sender information (name, project, branch).
+func storeInboxMessageToMail(m store.InboxMessage) InboxMessage {
+	return InboxMessage{
+		ID:               m.ID,
+		ThreadID:         m.ThreadID,
+		TopicID:          m.TopicID,
+		SenderID:         m.SenderID,
+		SenderName:       m.SenderName,
+		SenderProjectKey: m.SenderProjectKey,
+		SenderGitBranch:  m.SenderGitBranch,
+		Subject:          m.Subject,
+		Body:             m.Body,
+		Priority:         Priority(m.Priority),
+		CreatedAt:        m.CreatedAt,
+		Deadline:         m.DeadlineAt,
+		State:            m.State,
+		SnoozedUntil:     m.SnoozedUntil,
+		ReadAt:           m.ReadAt,
+		AckedAt:          m.AckedAt,
 	}
 }
 
@@ -593,15 +743,15 @@ func (s *Service) ReadMessage(ctx context.Context, agentID, messageID int64) (*I
 
 // ReadThread reads all messages in a thread synchronously.
 func (s *Service) ReadThread(ctx context.Context, agentID int64, threadID string) ([]InboxMessage, error) {
-	// Get messages by thread ID.
-	rows, err := s.store.GetMessagesByThread(ctx, threadID)
+	// Get messages by thread ID with sender information.
+	rows, err := s.store.GetMessagesByThreadWithSender(ctx, threadID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get thread messages: %w", err)
 	}
 
-	var messages []InboxMessage
+	messages := make([]InboxMessage, 0, len(rows))
 	for _, r := range rows {
-		messages = append(messages, storeMessageToMail(r))
+		messages = append(messages, storeInboxMessageToMail(r))
 	}
 
 	return messages, nil
@@ -687,10 +837,11 @@ func (s *Service) Unsubscribe(ctx context.Context, agentID int64, topicName stri
 
 // TopicInfo represents basic topic information.
 type TopicInfo struct {
-	ID        int64
-	Name      string
-	TopicType string
-	CreatedAt time.Time
+	ID           int64
+	Name         string
+	TopicType    string
+	CreatedAt    time.Time
+	MessageCount int64
 }
 
 // ListTopics lists topics, optionally filtered by agent subscription.
@@ -717,10 +868,11 @@ func (s *Service) ListTopics(ctx context.Context, req ListTopicsRequest) ([]Topi
 		}
 		for _, r := range rows {
 			topics = append(topics, TopicInfo{
-				ID:        r.ID,
-				Name:      r.Name,
-				TopicType: r.TopicType,
-				CreatedAt: r.CreatedAt,
+				ID:           r.ID,
+				Name:         r.Name,
+				TopicType:    r.TopicType,
+				CreatedAt:    r.CreatedAt,
+				MessageCount: r.MessageCount,
 			})
 		}
 	}
@@ -749,6 +901,21 @@ func (s *Service) Search(ctx context.Context, req SearchRequest) ([]InboxMessage
 		limit = 50
 	}
 
+	if req.AgentID == 0 {
+		// Global search across all messages.
+		rows, err := s.store.SearchMessages(ctx, req.Query, limit)
+		if err != nil {
+			return nil, fmt.Errorf("search failed: %w", err)
+		}
+
+		var messages []InboxMessage
+		for _, r := range rows {
+			messages = append(messages, storeInboxToMail(r))
+		}
+		return messages, nil
+	}
+
+	// Agent-specific search.
 	rows, err := s.store.SearchMessagesForAgent(
 		ctx, req.Query, req.AgentID, limit,
 	)

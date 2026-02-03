@@ -19,6 +19,12 @@ type MessageStore interface {
 	// GetMessagesByThread retrieves all messages in a thread.
 	GetMessagesByThread(ctx context.Context, threadID string) ([]Message, error)
 
+	// GetMessagesByThreadWithSender retrieves all messages in a thread with
+	// sender information (name, project, branch).
+	GetMessagesByThreadWithSender(
+		ctx context.Context, threadID string,
+	) ([]InboxMessage, error)
+
 	// GetInboxMessages retrieves inbox messages for an agent.
 	GetInboxMessages(
 		ctx context.Context, agentID int64, limit int,
@@ -79,6 +85,38 @@ type MessageStore interface {
 	SearchMessagesForAgent(
 		ctx context.Context, query string, agentID int64, limit int,
 	) ([]Message, error)
+
+	// GetAllInboxMessages retrieves inbox messages across all agents (global view).
+	GetAllInboxMessages(
+		ctx context.Context, limit, offset int,
+	) ([]InboxMessage, error)
+
+	// GetMessageRecipients retrieves all recipients for a message.
+	GetMessageRecipients(
+		ctx context.Context, messageID int64,
+	) ([]MessageRecipientWithAgent, error)
+
+	// GetMessageRecipientsBulk retrieves recipients for multiple messages in a
+	// single query. Returns a map of message ID to recipients.
+	GetMessageRecipientsBulk(
+		ctx context.Context, messageIDs []int64,
+	) (map[int64][]MessageRecipientWithAgent, error)
+
+	// SearchMessages performs global search across all messages.
+	SearchMessages(
+		ctx context.Context, query string, limit int,
+	) ([]InboxMessage, error)
+
+	// GetMessagesByTopic retrieves all messages for a topic.
+	GetMessagesByTopic(ctx context.Context, topicID int64) ([]Message, error)
+
+	// GetSentMessages retrieves messages sent by a specific agent.
+	GetSentMessages(
+		ctx context.Context, senderID int64, limit int,
+	) ([]Message, error)
+
+	// GetAllSentMessages retrieves all sent messages across all agents.
+	GetAllSentMessages(ctx context.Context, limit int) ([]InboxMessage, error)
 }
 
 // AgentStore handles agent persistence operations.
@@ -108,6 +146,9 @@ type AgentStore interface {
 
 	// UpdateSession updates the session ID for an agent.
 	UpdateSession(ctx context.Context, id int64, sessionID string) error
+
+	// UpdateAgentName updates an agent's display name.
+	UpdateAgentName(ctx context.Context, id int64, name string) error
 
 	// DeleteAgent deletes an agent by its ID.
 	DeleteAgent(ctx context.Context, id int64) error
@@ -211,8 +252,12 @@ type Storage interface {
 	ActivityStore
 	SessionStore
 
-	// WithTx executes a function within a database transaction.
+	// WithTx executes a function within a write database transaction.
 	WithTx(ctx context.Context, fn func(ctx context.Context, s Storage) error) error
+
+	// WithReadTx executes a function within a read-only database transaction.
+	// This ensures consistent snapshot reads across multiple queries.
+	WithReadTx(ctx context.Context, fn func(ctx context.Context, s Storage) error) error
 
 	// Close closes the store and releases resources.
 	Close() error
@@ -246,14 +291,22 @@ type MessageRecipient struct {
 	AckedAt      *time.Time
 }
 
+// MessageRecipientWithAgent extends MessageRecipient with agent name.
+type MessageRecipientWithAgent struct {
+	MessageRecipient
+	AgentName string
+}
+
 // InboxMessage represents a message in an agent's inbox with metadata.
 type InboxMessage struct {
 	Message
-	SenderName   string
-	State        string
-	SnoozedUntil *time.Time
-	ReadAt       *time.Time
-	AckedAt      *time.Time
+	SenderName       string
+	SenderProjectKey string
+	SenderGitBranch  string
+	State            string
+	SnoozedUntil     *time.Time
+	ReadAt           *time.Time
+	AckedAt          *time.Time
 }
 
 // Agent represents an agent in the system.
@@ -274,6 +327,7 @@ type Topic struct {
 	TopicType        string
 	RetentionSeconds int64
 	CreatedAt        time.Time
+	MessageCount     int64
 }
 
 // Activity represents an activity event.
@@ -389,6 +443,19 @@ func TopicFromSqlc(t sqlc.Topic) Topic {
 		TopicType:        t.TopicType,
 		RetentionSeconds: t.RetentionSeconds.Int64,
 		CreatedAt:        time.Unix(t.CreatedAt, 0),
+	}
+}
+
+// TopicWithCountFromSqlc converts a sqlc.ListTopicsWithMessageCountRow to a
+// store.Topic.
+func TopicWithCountFromSqlc(t sqlc.ListTopicsWithMessageCountRow) Topic {
+	return Topic{
+		ID:               t.ID,
+		Name:             t.Name,
+		TopicType:        t.TopicType,
+		RetentionSeconds: t.RetentionSeconds.Int64,
+		CreatedAt:        time.Unix(t.CreatedAt, 0),
+		MessageCount:     t.MessageCount,
 	}
 }
 

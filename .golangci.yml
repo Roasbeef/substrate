@@ -2,36 +2,25 @@ version: "2"
 
 run:
   timeout: 5m
-  modules-download-mode: readonly
 
 linters:
+  default: none
   enable:
     - govet
     - staticcheck
     - unused
     - ineffassign
-  disable:
-    # TODO: Fix these and re-enable
-    - errcheck  # Many unchecked errors in codebase, fix incrementally
+  settings:
+    govet:
+      disable:
+        - fieldalignment
+        - shadow
 
 formatters:
   enable:
     - gofmt
 
-linters-settings:
-  govet:
-    enable-all: true
-    disable:
-      - fieldalignment
-      - shadow
-
-issues:
-  exclude-rules:
-    # Ignore test files for some linters
-    - path: _test\.go
-      linters:
-        - errcheck
-    # Ignore generated files
-    - path: internal/db/sqlc/
-      linters:
-        - all
+output:
+  formats:
+    text:
+      path: stdout

@@ -49,7 +49,7 @@ func NewServerWithConfig(cfg Config) *Server {
 		server:   mcpServer,
 		dbStore:  cfg.Store,
 		storage:  storage,
-		mailSvc:  mail.NewService(storage),
+		mailSvc:  mail.NewServiceWithStore(storage),
 		mailRef:  cfg.MailActorRef,
 		registry: agent.NewRegistry(cfg.Store),
 	}

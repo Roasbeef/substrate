@@ -102,7 +102,7 @@ func TestService_SendMail(t *testing.T) {
 	storage, cleanup := testDB(t)
 	defer cleanup()
 
-	svc := NewService(storage)
+	svc := NewServiceWithStore(storage)
 	ctx := context.Background()
 
 	// Create sender and recipient agents.
@@ -134,7 +134,7 @@ func TestService_SendMail_WithThread(t *testing.T) {
 	storage, cleanup := testDB(t)
 	defer cleanup()
 
-	svc := NewService(storage)
+	svc := NewServiceWithStore(storage)
 	ctx := context.Background()
 
 	sender := createTestAgent(t, storage, "Sender")
@@ -179,7 +179,7 @@ func TestService_FetchInbox(t *testing.T) {
 	storage, cleanup := testDB(t)
 	defer cleanup()
 
-	svc := NewService(storage)
+	svc := NewServiceWithStore(storage)
 	ctx := context.Background()
 
 	sender := createTestAgent(t, storage, "Sender")
@@ -223,7 +223,7 @@ func TestService_FetchInbox_UnreadOnly(t *testing.T) {
 	storage, cleanup := testDB(t)
 	defer cleanup()
 
-	svc := NewService(storage)
+	svc := NewServiceWithStore(storage)
 	ctx := context.Background()
 
 	sender := createTestAgent(t, storage, "Sender")
@@ -279,7 +279,7 @@ func TestService_ReadMessage(t *testing.T) {
 	storage, cleanup := testDB(t)
 	defer cleanup()
 
-	svc := NewService(storage)
+	svc := NewServiceWithStore(storage)
 	ctx := context.Background()
 
 	sender := createTestAgent(t, storage, "Sender")
@@ -325,7 +325,7 @@ func TestService_UpdateState(t *testing.T) {
 	storage, cleanup := testDB(t)
 	defer cleanup()
 
-	svc := NewService(storage)
+	svc := NewServiceWithStore(storage)
 	ctx := context.Background()
 
 	sender := createTestAgent(t, storage, "Sender")
@@ -367,7 +367,7 @@ func TestService_UpdateState_Snooze(t *testing.T) {
 	storage, cleanup := testDB(t)
 	defer cleanup()
 
-	svc := NewService(storage)
+	svc := NewServiceWithStore(storage)
 	ctx := context.Background()
 
 	sender := createTestAgent(t, storage, "Sender")
@@ -411,7 +411,7 @@ func TestService_AckMessage(t *testing.T) {
 	storage, cleanup := testDB(t)
 	defer cleanup()
 
-	svc := NewService(storage)
+	svc := NewServiceWithStore(storage)
 	ctx := context.Background()
 
 	sender := createTestAgent(t, storage, "Sender")
@@ -454,7 +454,7 @@ func TestService_GetStatus(t *testing.T) {
 	storage, cleanup := testDB(t)
 	defer cleanup()
 
-	svc := NewService(storage)
+	svc := NewServiceWithStore(storage)
 	ctx := context.Background()
 
 	sender := createTestAgent(t, storage, "Sender")
@@ -500,7 +500,7 @@ func TestService_Publish(t *testing.T) {
 	storage, cleanup := testDB(t)
 	defer cleanup()
 
-	svc := NewService(storage)
+	svc := NewServiceWithStore(storage)
 	ctx := context.Background()
 
 	// Create publisher and subscribers.
@@ -543,7 +543,7 @@ func TestService_PollChanges(t *testing.T) {
 	storage, cleanup := testDB(t)
 	defer cleanup()
 
-	svc := NewService(storage)
+	svc := NewServiceWithStore(storage)
 	ctx := context.Background()
 
 	// Create agents.
@@ -621,7 +621,7 @@ func TestService_UnknownMessageType(t *testing.T) {
 	storage, cleanup := testDB(t)
 	defer cleanup()
 
-	svc := NewService(storage)
+	svc := NewServiceWithStore(storage)
 	ctx := context.Background()
 
 	// Create a fake message type that implements MailRequest.
@@ -639,7 +639,7 @@ func TestService_ReadMessage_NotFound(t *testing.T) {
 	storage, cleanup := testDB(t)
 	defer cleanup()
 
-	svc := NewService(storage)
+	svc := NewServiceWithStore(storage)
 	ctx := context.Background()
 
 	recipient := createTestAgent(t, storage, "Recipient")
@@ -664,7 +664,7 @@ func TestService_UpdateState_NonExistentMessage(t *testing.T) {
 	storage, cleanup := testDB(t)
 	defer cleanup()
 
-	svc := NewService(storage)
+	svc := NewServiceWithStore(storage)
 	ctx := context.Background()
 
 	agent := createTestAgent(t, storage, "Agent")
@@ -693,7 +693,7 @@ func TestService_AckMessage_NonExistentMessage(t *testing.T) {
 	storage, cleanup := testDB(t)
 	defer cleanup()
 
-	svc := NewService(storage)
+	svc := NewServiceWithStore(storage)
 	ctx := context.Background()
 
 	agent := createTestAgent(t, storage, "Agent")
@@ -721,7 +721,7 @@ func TestService_Publish_TopicNotFound(t *testing.T) {
 	storage, cleanup := testDB(t)
 	defer cleanup()
 
-	svc := NewService(storage)
+	svc := NewServiceWithStore(storage)
 	ctx := context.Background()
 
 	publisher := createTestAgent(t, storage, "Publisher")
@@ -749,7 +749,7 @@ func TestService_SendMail_RecipientNotFound(t *testing.T) {
 	storage, cleanup := testDB(t)
 	defer cleanup()
 
-	svc := NewService(storage)
+	svc := NewServiceWithStore(storage)
 	ctx := context.Background()
 
 	sender := createTestAgent(t, storage, "Sender")
@@ -778,7 +778,7 @@ func TestService_GetStatus_NoMessages(t *testing.T) {
 	storage, cleanup := testDB(t)
 	defer cleanup()
 
-	svc := NewService(storage)
+	svc := NewServiceWithStore(storage)
 	ctx := context.Background()
 
 	agent := createTestAgent(t, storage, "Agent")
@@ -804,7 +804,7 @@ func TestService_UpdateState_Archive(t *testing.T) {
 	storage, cleanup := testDB(t)
 	defer cleanup()
 
-	svc := NewService(storage)
+	svc := NewServiceWithStore(storage)
 	ctx := context.Background()
 
 	sender := createTestAgent(t, storage, "Sender")
@@ -846,7 +846,7 @@ func TestService_UpdateState_Trash(t *testing.T) {
 	storage, cleanup := testDB(t)
 	defer cleanup()
 
-	svc := NewService(storage)
+	svc := NewServiceWithStore(storage)
 	ctx := context.Background()
 
 	sender := createTestAgent(t, storage, "Sender")
@@ -880,4 +880,167 @@ func TestService_UpdateState_Trash(t *testing.T) {
 	trashResp := val.(UpdateStateResponse)
 	require.NoError(t, trashResp.Error)
 	require.True(t, trashResp.Success)
+}
+
+// TestService_FetchInbox_SenderContext verifies that sender context
+// (project_key and git_branch) is properly returned in inbox messages.
+func TestService_FetchInbox_SenderContext(t *testing.T) {
+	t.Parallel()
+
+	storage, cleanup := testDB(t)
+	defer cleanup()
+
+	svc := NewServiceWithStore(storage)
+	ctx := context.Background()
+
+	// Create sender with project context.
+	sender, err := storage.CreateAgent(ctx, store.CreateAgentParams{
+		Name:       "ContextSender",
+		ProjectKey: "/Users/dev/myproject",
+		GitBranch:  "feature/context-test",
+	})
+	require.NoError(t, err)
+
+	// Create recipient without project context.
+	recipient := createTestAgent(t, storage, "ContextRecipient")
+
+	// Send a message.
+	req := SendMailRequest{
+		SenderID:       sender.ID,
+		RecipientNames: []string{recipient.Name},
+		Subject:        "Context Test",
+		Body:           "Testing sender context propagation",
+		Priority:       PriorityNormal,
+	}
+
+	result := svc.Receive(ctx, req)
+	val, err := result.Unpack()
+	require.NoError(t, err)
+	resp := val.(SendMailResponse)
+	require.NoError(t, resp.Error)
+
+	// Fetch inbox and verify sender context is present.
+	fetchReq := FetchInboxRequest{
+		AgentID: recipient.ID,
+		Limit:   10,
+	}
+
+	result = svc.Receive(ctx, fetchReq)
+	val, err = result.Unpack()
+	require.NoError(t, err)
+
+	fetchResp := val.(FetchInboxResponse)
+	require.NoError(t, fetchResp.Error)
+	require.Len(t, fetchResp.Messages, 1)
+
+	msg := fetchResp.Messages[0]
+	require.Equal(t, "ContextSender", msg.SenderName)
+	require.Equal(t, "/Users/dev/myproject", msg.SenderProjectKey)
+	require.Equal(t, "feature/context-test", msg.SenderGitBranch)
+}
+
+// TestService_ReadThread_SenderContext verifies that sender context
+// is properly returned when reading a thread.
+func TestService_ReadThread_SenderContext(t *testing.T) {
+	t.Parallel()
+
+	storage, cleanup := testDB(t)
+	defer cleanup()
+
+	svc := NewServiceWithStore(storage)
+	ctx := context.Background()
+
+	// Create sender with project context.
+	sender, err := storage.CreateAgent(ctx, store.CreateAgentParams{
+		Name:       "ThreadSender",
+		ProjectKey: "/Users/dev/threadproject",
+		GitBranch:  "develop",
+	})
+	require.NoError(t, err)
+
+	// Create recipient.
+	recipient := createTestAgent(t, storage, "ThreadRecipient")
+
+	// Send a message.
+	req := SendMailRequest{
+		SenderID:       sender.ID,
+		RecipientNames: []string{recipient.Name},
+		Subject:        "Thread View Test",
+		Body:           "Testing thread sender context",
+		Priority:       PriorityNormal,
+	}
+
+	result := svc.Receive(ctx, req)
+	val, err := result.Unpack()
+	require.NoError(t, err)
+	resp := val.(SendMailResponse)
+	require.NoError(t, resp.Error)
+
+	// Read the thread and verify sender context.
+	messages, err := svc.ReadThread(ctx, recipient.ID, resp.ThreadID)
+	require.NoError(t, err)
+	require.Len(t, messages, 1)
+
+	msg := messages[0]
+	require.Equal(t, "ThreadSender", msg.SenderName)
+	require.Equal(t, "/Users/dev/threadproject", msg.SenderProjectKey)
+	require.Equal(t, "develop", msg.SenderGitBranch)
+}
+
+// TestService_FetchSentMessages_SenderContext verifies that sender context
+// is properly returned when fetching sent messages.
+func TestService_FetchSentMessages_SenderContext(t *testing.T) {
+	t.Parallel()
+
+	storage, cleanup := testDB(t)
+	defer cleanup()
+
+	svc := NewServiceWithStore(storage)
+	ctx := context.Background()
+
+	// Create sender with project context.
+	sender, err := storage.CreateAgent(ctx, store.CreateAgentParams{
+		Name:       "SentSender",
+		ProjectKey: "/Users/dev/sentproject",
+		GitBranch:  "feature/sent-test",
+	})
+	require.NoError(t, err)
+
+	// Create recipient.
+	recipient := createTestAgent(t, storage, "SentRecipient")
+
+	// Send a message.
+	req := SendMailRequest{
+		SenderID:       sender.ID,
+		RecipientNames: []string{recipient.Name},
+		Subject:        "Sent Messages Test",
+		Body:           "Testing sent messages sender context",
+		Priority:       PriorityNormal,
+	}
+
+	result := svc.Receive(ctx, req)
+	val, err := result.Unpack()
+	require.NoError(t, err)
+	resp := val.(SendMailResponse)
+	require.NoError(t, resp.Error)
+
+	// Fetch sent messages and verify sender context.
+	fetchReq := FetchInboxRequest{
+		AgentID:  sender.ID,
+		SentOnly: true,
+		Limit:    10,
+	}
+
+	result = svc.Receive(ctx, fetchReq)
+	val, err = result.Unpack()
+	require.NoError(t, err)
+
+	fetchResp := val.(FetchInboxResponse)
+	require.NoError(t, fetchResp.Error)
+	require.Len(t, fetchResp.Messages, 1)
+
+	msg := fetchResp.Messages[0]
+	require.Equal(t, "SentSender", msg.SenderName)
+	require.Equal(t, "/Users/dev/sentproject", msg.SenderProjectKey)
+	require.Equal(t, "feature/sent-test", msg.SenderGitBranch)
 }

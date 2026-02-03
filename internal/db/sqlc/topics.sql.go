@@ -391,6 +391,53 @@ func (q *Queries) ListTopicsByType(ctx context.Context, topicType string) ([]Top
 	return items, nil
 }
 
+const ListTopicsWithMessageCount = `-- name: ListTopicsWithMessageCount :many
+SELECT t.id, t.name, t.topic_type, t.retention_seconds, t.created_at, COUNT(m.id) as message_count
+FROM topics t
+LEFT JOIN messages m ON t.id = m.topic_id
+GROUP BY t.id
+ORDER BY t.name
+`
+
+type ListTopicsWithMessageCountRow struct {
+	ID               int64
+	Name             string
+	TopicType        string
+	RetentionSeconds sql.NullInt64
+	CreatedAt        int64
+	MessageCount     int64
+}
+
+func (q *Queries) ListTopicsWithMessageCount(ctx context.Context) ([]ListTopicsWithMessageCountRow, error) {
+	rows, err := q.db.QueryContext(ctx, ListTopicsWithMessageCount)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ListTopicsWithMessageCountRow
+	for rows.Next() {
+		var i ListTopicsWithMessageCountRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.Name,
+			&i.TopicType,
+			&i.RetentionSeconds,
+			&i.CreatedAt,
+			&i.MessageCount,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const UpdateTopicRetention = `-- name: UpdateTopicRetention :exec
 UPDATE topics SET retention_seconds = ? WHERE id = ?
 `

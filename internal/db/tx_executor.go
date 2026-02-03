@@ -177,8 +177,8 @@ func (t *TransactionExecutor[Q]) ExecTx(ctx context.Context,
 		if err = tx.Commit(); err != nil {
 			dbErr := MapSQLError(err)
 			if IsSerializationOrDeadlockError(dbErr) {
-				// Commit failed due to serialization/deadlock,
-				// clean up transaction state before retry.
+				// Roll back the transaction, then pop back up
+				// to try once again.
 				_ = tx.Rollback()
 
 				waitBeforeRetry(i)

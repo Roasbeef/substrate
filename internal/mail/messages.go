@@ -21,6 +21,87 @@ const (
 	PriorityLow Priority = "low"
 )
 
+// RecipientState represents the state of a message for a recipient.
+type RecipientState string
+
+const (
+	// StateUnreadStr indicates the message has not been read.
+	StateUnreadStr RecipientState = "unread"
+
+	// StateReadStr indicates the message has been read.
+	StateReadStr RecipientState = "read"
+
+	// StateStarredStr indicates the message has been starred/favorited.
+	StateStarredStr RecipientState = "starred"
+
+	// StateSnoozedStr indicates the message has been snoozed until later.
+	StateSnoozedStr RecipientState = "snoozed"
+
+	// StateArchivedStr indicates the message has been archived.
+	StateArchivedStr RecipientState = "archived"
+
+	// StateTrashStr indicates the message has been moved to trash.
+	StateTrashStr RecipientState = "trash"
+)
+
+// String returns the string representation of the state.
+func (s RecipientState) String() string {
+	return string(s)
+}
+
+// IsValid returns true if the state is a recognized value.
+func (s RecipientState) IsValid() bool {
+	switch s {
+	case StateUnreadStr, StateReadStr, StateStarredStr,
+		StateSnoozedStr, StateArchivedStr, StateTrashStr:
+		return true
+	default:
+		return false
+	}
+}
+
+// MessageAction represents an action that can be performed on a message.
+type MessageAction string
+
+const (
+	// ActionStar stars a message.
+	ActionStar MessageAction = "star"
+
+	// ActionArchive archives a message.
+	ActionArchive MessageAction = "archive"
+
+	// ActionSnooze snoozes a message.
+	ActionSnooze MessageAction = "snooze"
+
+	// ActionAck acknowledges a message.
+	ActionAck MessageAction = "ack"
+
+	// ActionRead marks a message as read.
+	ActionRead MessageAction = "read"
+
+	// ActionUnread marks a message as unread.
+	ActionUnread MessageAction = "unread"
+
+	// ActionDelete deletes a message (moves to trash).
+	ActionDelete MessageAction = "delete"
+)
+
+// String returns the string representation of the action.
+func (a MessageAction) String() string {
+	return string(a)
+}
+
+// IsValid returns true if the action is a recognized value.
+func (a MessageAction) IsValid() bool {
+	switch a {
+	case ActionStar, ActionArchive, ActionSnooze,
+		ActionAck, ActionRead, ActionUnread, ActionDelete:
+		return true
+	default:
+		return false
+	}
+}
+
 // SendMailRequest is an actor message requesting to send mail.
 type SendMailRequest struct {
 	actor.BaseMessage
@@ -88,6 +169,9 @@ type FetchInboxRequest struct {
 	// StateFilter filters messages by state (e.g., "unread", "starred").
 	// If nil, no state filtering is applied.
 	StateFilter *string
+
+	// SentOnly retrieves messages sent by the agent instead of received.
+	SentOnly bool
 }
 
 // MessageType implements actor.Message.
@@ -95,20 +179,22 @@ func (FetchInboxRequest) MessageType() string { return "FetchInboxRequest" }
 
 // InboxMessage represents a message in the inbox with its state.
 type InboxMessage struct {
-	ID           int64
-	ThreadID     string
-	TopicID      int64
-	SenderID     int64
-	SenderName   string
-	Subject      string
-	Body         string
-	Priority     Priority
-	Deadline     *time.Time
-	State        string
-	SnoozedUntil *time.Time
-	ReadAt       *time.Time
-	AckedAt      *time.Time
-	CreatedAt    time.Time
+	ID               int64
+	ThreadID         string
+	TopicID          int64
+	SenderID         int64
+	SenderName       string
+	SenderProjectKey string
+	SenderGitBranch  string
+	Subject          string
+	Body             string
+	Priority         Priority
+	Deadline         *time.Time
+	State            string
+	SnoozedUntil     *time.Time
+	ReadAt           *time.Time
+	AckedAt          *time.Time
+	CreatedAt        time.Time
 }
 
 // FetchInboxResponse is the response to a FetchInboxRequest.

@@ -11,18 +11,28 @@ Subtrate is a central command center for managing Claude Code agents with mail/m
 - **substrate** (`cmd/substrate`) - Command-line interface for mail operations
 - **Mail Service** (`internal/mail`) - Core messaging with actor pattern
 - **Agent Registry** (`internal/agent`) - Agent identity and registration
-- **Web UI** (`internal/web`) - HTMX-based web interface served by substrated
+- **Web API** (`internal/web`) - JSON API and embedded React frontend
+- **React Frontend** (`web/frontend`) - React + TypeScript SPA with Vite
 
 ## Essential Commands
 
 ### Building and Testing
 - `make build` - Compile all packages
 - `make build-all` - Build CLI and MCP binaries
+- `make build-production` - Build daemon with embedded frontend (production)
 - `make test` - Run all tests (includes FTS5 CGO flags)
 - `make test-cover` - Run tests with coverage summary
 - `make lint` - Run the linter (must pass before committing)
 - `make fmt` - Format all Go source files
 - `make clean` - Remove build artifacts
+
+### Frontend Commands
+- `make bun-install` - Install frontend dependencies
+- `make bun-build` - Build frontend for production
+- `make bun-dev` - Start frontend dev server (port 5174)
+- `make bun-test` - Run frontend unit/integration tests
+- `make bun-test-e2e` - Run Playwright E2E tests
+- `make bun-lint` - Lint frontend code
 
 ### Code Generation
 - `make sqlc` - Regenerate type-safe database queries (after schema/query changes)
@@ -172,212 +182,229 @@ When adding a new migration:
 - `internal/db/queries/topics.sql` - Topic and subscription queries
 - `internal/db/queries/messages.sql` - Message and recipient queries
 
-### Storage Layer Architecture
+### Storage Interface Architecture
 
-The database layer follows a three-tier architecture:
+The database layer follows a clean architecture with three tiers:
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
-│                    Services (mail, agent, etc.)              │
-│                    Uses: store.Storage interface             │
-└────────────────────────────┬────────────────────────────────┘
-                             │
-┌────────────────────────────▼────────────────────────────────┐
-│                    store.SqlcStore                           │
-│                    Implements: store.Storage                 │
-│                    Wraps: db.BatchedQuerier                  │
-└────────────────────────────┬────────────────────────────────┘
-                             │
-┌────────────────────────────▼────────────────────────────────┐
-│                    db.Store (implements BatchedQuerier)      │
-│                    Wraps: sqlc.Queries                       │
+│                   store.Storage Interface                    │
+│  (Domain types: store.Message, store.Agent, store.Topic)    │
+├─────────────────────────────────────────────────────────────┤
+│              SqlcStore / MockStore / txSqlcStore            │
+│  (Converts between domain types and sqlc types)             │
+├─────────────────────────────────────────────────────────────┤
+│                   QueryStore Interface                       │
+│  (sqlc types: sqlc.Message, sqlc.CreateMessageParams)       │
+├─────────────────────────────────────────────────────────────┤
+│              sqlc.Queries (generated code)                   │
+│  (Raw SQL operations - DO NOT EDIT)                         │
 └─────────────────────────────────────────────────────────────┘
 ```
 
-**Key interfaces:**
-- `db.BatchedQuerier` - Low-level interface for raw sqlc queries + transactions
-- `store.Storage` - Domain-level interface for business operations
+**Key interfaces in `internal/store/interfaces.go`:**
+- `MessageStore` - Message CRUD and inbox operations
+- `AgentStore` - Agent management
+- `TopicStore` - Topics and subscriptions
+- `ActivityStore` - Activity feed
+- `SessionStore` - Session identity mapping
+- `Storage` - Combines all above + `WithTx()` + `Close()`
+
+**Domain types vs sqlc types:**
+- Domain types (e.g., `store.Message`) use native Go types (`time.Time`, `string`)
+- sqlc types use database types (`sql.NullInt64`, `sql.NullString`)
+- Conversion functions: `MessageFromSqlc()`, `AgentFromSqlc()`, etc.
+- Helper functions: `ToSqlcNullString()`, `ToSqlcNullInt64()`, `nullInt64ToTime()`
 
 ### Adding New Database Methods
 
-**Step 1: Add the sqlc query**
+Follow this process when adding a new database operation:
+
+**Step 1: Add sqlc query**
 ```sql
--- internal/db/queries/messages.sql
--- name: GetMessageByID :one
-SELECT * FROM messages WHERE id = ?;
+-- In internal/db/queries/messages.sql
+
+-- name: GetMessagesByPriority :many
+SELECT * FROM messages WHERE priority = ? ORDER BY created_at DESC LIMIT ?;
 ```
 
 **Step 2: Regenerate sqlc**
 ```bash
 make sqlc
 ```
+This creates types like `GetMessagesByPriorityParams` and `GetMessagesByPriorityRow`.
 
-**Step 3: Add to store.Storage interface**
+**Step 3: Add to QueryStore interface** (`internal/store/sqlc_store.go`)
 ```go
-// internal/store/interfaces.go
-type Storage interface {
+type QueryStore interface {
     // ... existing methods ...
-    GetMessageByID(ctx context.Context, id int64) (Message, error)
+    GetMessagesByPriority(
+        ctx context.Context, arg sqlc.GetMessagesByPriorityParams,
+    ) ([]sqlc.Message, error)
 }
 ```
 
-**Step 4: Implement in SqlcStore**
+**Step 4: Add to domain interface** (`internal/store/interfaces.go`)
 ```go
-// internal/store/sqlc_store.go
-func (s *SqlcStore) GetMessageByID(ctx context.Context, id int64) (Message, error) {
-    var msg Message
-    readOp := func(q sqlc.Querier) error {
-        dbMsg, err := q.GetMessageByID(ctx, id)
-        if err != nil {
-            return err
-        }
-        msg = convertDbMessage(dbMsg)  // Convert sqlc type to domain type
-        return nil
-    }
-    err := s.db.ExecTx(ctx, db.ReadTxOpts(), readOp)
-    return msg, err
+type MessageStore interface {
+    // ... existing methods ...
+
+    // GetMessagesByPriority retrieves messages with a specific priority.
+    GetMessagesByPriority(
+        ctx context.Context, priority string, limit int,
+    ) ([]Message, error)
 }
 ```
 
-**Step 5: Implement in txSqlcStore** (for transaction context)
+**Step 5: Implement in SqlcStore** (`internal/store/sqlc_store.go`)
 ```go
-// internal/store/sqlc_store.go
-func (s *txSqlcStore) GetMessageByID(ctx context.Context, id int64) (Message, error) {
-    dbMsg, err := s.q.GetMessageByID(ctx, id)
+func (s *SqlcStore) GetMessagesByPriority(ctx context.Context,
+    priority string, limit int) ([]Message, error) {
+
+    rows, err := s.db.GetMessagesByPriority(ctx, sqlc.GetMessagesByPriorityParams{
+        Priority: priority,
+        Limit:    int64(limit),
+    })
     if err != nil {
-        return Message{}, err
+        return nil, err
     }
-    return convertDbMessage(dbMsg), nil
+
+    messages := make([]Message, len(rows))
+    for i, row := range rows {
+        messages[i] = MessageFromSqlc(row)
+    }
+    return messages, nil
 }
 ```
 
-### Wrapper Type Pattern
-
-The store uses two implementations:
-
-1. **SqlcStore** - For standalone operations
-   - Wraps queries in transactions automatically
-   - Uses `s.db.ExecTx()` for all operations
-   - Handles transaction retries on serialization errors
-
-2. **txSqlcStore** - For operations within a transaction
-   - Created via `SqlcStore.WithTx(func(Storage) error)`
-   - Calls sqlc directly without wrapping in new transaction
-   - Enables composing multiple operations atomically
-
-**Example of transactional composition:**
+**Step 6: Implement in txSqlcStore** (same file, for transaction support)
 ```go
-err := store.WithTx(ctx, func(ctx context.Context, tx store.Storage) error {
-    // All these run in one transaction
-    msg, err := tx.CreateMessage(ctx, params)
+func (s *txSqlcStore) GetMessagesByPriority(ctx context.Context,
+    priority string, limit int) ([]Message, error) {
+
+    rows, err := s.queries.GetMessagesByPriority(ctx, sqlc.GetMessagesByPriorityParams{
+        Priority: priority,
+        Limit:    int64(limit),
+    })
     if err != nil {
-        return err
+        return nil, err
     }
-    return tx.AddRecipient(ctx, msg.ID, recipientID)
-})
+
+    messages := make([]Message, len(rows))
+    for i, row := range rows {
+        messages[i] = MessageFromSqlc(row)
+    }
+    return messages, nil
+}
 ```
 
-### WithTx Usage Patterns
-
-**Pattern 1: Multi-step creation with rollback on error**
+**Step 7: Implement in MockStore** (`internal/store/mock_store.go`)
 ```go
-func (s *Service) SendMail(ctx context.Context, req SendRequest) error {
-    var messageID int64
+func (m *MockStore) GetMessagesByPriority(
+    ctx context.Context, priority string, limit int,
+) ([]Message, error) {
 
-    err := s.store.WithTx(ctx, func(ctx context.Context, tx store.Storage) error {
-        // Step 1: Create message
-        msg, err := tx.CreateMessage(ctx, CreateMessageParams{
-            Subject:   req.Subject,
-            Body:      req.Body,
-            SenderID:  req.SenderID,
-            CreatedAt: time.Now(),
-        })
-        if err != nil {
-            return err  // Rollback
-        }
-        messageID = msg.ID
+    m.mu.RLock()
+    defer m.mu.RUnlock()
 
-        // Step 2: Add recipients (fails = rollback entire transaction)
-        for _, recipientID := range req.Recipients {
-            if err := tx.CreateMessageRecipient(ctx, msg.ID, recipientID); err != nil {
-                return err  // Rollback - message won't exist
+    var results []Message
+    for _, msg := range m.messages {
+        if msg.Priority == priority {
+            results = append(results, msg)
+            if len(results) >= limit {
+                break
             }
         }
-
-        // Step 3: Update sender's outbox topic offset
-        return tx.IncrementTopicOffset(ctx, req.SenderID)
-    })
-
-    return err
-}
-```
-
-**Pattern 2: Capturing results from transaction**
-```go
-func (s *Service) GetOrCreateAgent(ctx context.Context, name string) (Agent, error) {
-    var agent Agent
-
-    err := s.store.WithTx(ctx, func(ctx context.Context, tx store.Storage) error {
-        // Try to get existing agent
-        existing, err := tx.GetAgentByName(ctx, name)
-        if err == nil {
-            agent = existing
-            return nil
-        }
-
-        // Create new agent if not found
-        newAgent, err := tx.CreateAgent(ctx, CreateAgentParams{
-            Name:      name,
-            CreatedAt: time.Now(),
-        })
-        if err != nil {
-            return err
-        }
-        agent = newAgent
-        return nil
-    })
-
-    return agent, err
-}
-```
-
-**Pattern 3: Nested transactions are NOT supported**
-```go
-// This will fail with error!
-err := store.WithTx(ctx, func(ctx context.Context, tx store.Storage) error {
-    // DON'T DO THIS - nested WithTx will return error
-    return tx.WithTx(ctx, func(ctx context.Context, inner store.Storage) error {
-        // Never reaches here
-        return inner.DoSomething(ctx)
-    })
-})
-// err = "nested transactions not supported: already within a transaction context"
-```
-
-**Pattern 4: Read-only operations don't need WithTx**
-```go
-// For simple reads, use the store directly
-msg, err := store.GetMessage(ctx, messageID)
-
-// SqlcStore wraps single operations in transactions automatically
-// Only use WithTx when you need multiple operations to be atomic
-```
-
-### Domain Types vs sqlc Types
-
-- **sqlc types** (`internal/db/sqlc/`) - Generated from schema, use sql.Null* types
-- **Domain types** (`internal/store/types.go`) - Clean Go types for services
-
-Always convert between them in the store layer:
-```go
-func convertDbMessage(db sqlc.Message) Message {
-    return Message{
-        ID:        db.ID,
-        Subject:   db.Subject,
-        Body:      db.Body.String,  // Handle sql.NullString
-        CreatedAt: time.Unix(db.CreatedAt, 0),
     }
+    return results, nil
 }
+```
+
+### Transaction Pattern (WithTx/ExecTx)
+
+The `WithTx` method runs operations within a transaction with automatic retry:
+
+```go
+// In handlers/services:
+err := store.WithTx(ctx, func(ctx context.Context, txStore Storage) error {
+    // All operations on txStore are within the same transaction
+    msg, err := txStore.CreateMessage(ctx, params)
+    if err != nil {
+        return err // Transaction rolls back
+    }
+
+    err = txStore.CreateMessageRecipient(ctx, msg.ID, recipientID)
+    if err != nil {
+        return err // Transaction rolls back
+    }
+
+    return nil // Transaction commits
+})
+```
+
+**Internal implementation uses `ExecTx`** for retry logic:
+```go
+func (s *SqlcStore) WithTx(ctx context.Context,
+    fn func(ctx context.Context, store Storage) error) error {
+
+    var writeTxOpts StorageTxOptions
+    return s.db.ExecTx(ctx, &writeTxOpts, func(q QueryStore) error {
+        txStore := &txSqlcStore{
+            queries: q,
+            sqlDB:   s.sqlDB,
+        }
+        return fn(ctx, txStore)
+    })
+}
+```
+
+**When to use transactions:**
+- Multiple related writes that must succeed or fail together
+- Read-modify-write patterns
+- Creating parent + child records (message + recipients)
+
+**When NOT needed:**
+- Single reads
+- Single writes that are already atomic
+
+### Type Conversion Reference
+
+**Converting sqlc → domain:**
+```go
+// Use conversion functions from interfaces.go:
+msg := MessageFromSqlc(sqlcMsg)
+agent := AgentFromSqlc(sqlcAgent)
+topic := TopicFromSqlc(sqlcTopic)
+```
+
+**Converting domain → sqlc params:**
+```go
+// Use helper functions:
+ToSqlcNullString(s string) sql.NullString
+ToSqlcNullInt64(t *time.Time) sql.NullInt64
+
+// Example:
+params := sqlc.CreateAgentParams{
+    Name:       params.Name,              // string → string (direct)
+    ProjectKey: ToSqlcNullString(params.ProjectKey), // string → sql.NullString
+    GitBranch:  ToSqlcNullString(params.GitBranch),
+}
+```
+
+**Converting sql.NullInt64 timestamps → *time.Time:**
+```go
+// Use helper (in sqlc_store.go):
+func nullInt64ToTime(n sql.NullInt64) *time.Time {
+    if !n.Valid {
+        return nil
+    }
+    t := time.Unix(n.Int64, 0)
+    return &t
+}
+
+// Usage in row conversion:
+msg.DeadlineAt = nullInt64ToTime(row.DeadlineAt)
+msg.ReadAt = nullInt64ToTime(row.ReadAt)
 ```
 
 ## Git Commit Guidelines
@@ -488,11 +515,6 @@ server.Start()
 
 ## Dependencies
 
-### Local Fork (darepo-client)
-The project uses a local fork via replace directive in go.mod:
-```go
-replace github.com/lightninglabs/darepo-client => /Users/roasbeef/gocode/src/github.com/lightninglabs/darepo-client
-```
 
 ### Key Dependencies
 - `github.com/modelcontextprotocol/go-sdk/mcp` - MCP protocol SDK
@@ -500,118 +522,122 @@ replace github.com/lightninglabs/darepo-client => /Users/roasbeef/gocode/src/git
 - `github.com/lightningnetwork/lnd/fn/v2` - Result type
 - `github.com/mattn/go-sqlite3` - SQLite driver with CGO
 
-## HTMX Frontend Development
+## React Frontend Development
+
+The web UI is a React + TypeScript SPA built with Vite and bun, located in `web/frontend/`.
+
+### Tech Stack
+- **React 18** with TypeScript (strict mode)
+- **Vite** for build tooling
+- **bun** as package manager
+- **TanStack Query** for server state management
+- **Zustand** for client state
+- **Tailwind CSS** for styling
+- **Headless UI** for accessible components
+- **Playwright** for E2E testing
+
+### Project Structure
+```
+web/frontend/
+├── src/
+│   ├── api/           # API client layer (typed fetch)
+│   ├── components/    # React components
+│   │   ├── ui/        # Reusable UI components
+│   │   ├── layout/    # Layout components
+│   │   ├── inbox/     # Inbox feature
+│   │   ├── agents/    # Agents feature
+│   │   └── sessions/  # Sessions feature
+│   ├── hooks/         # Custom React hooks
+│   ├── stores/        # Zustand stores
+│   ├── pages/         # Page components
+│   ├── lib/           # Utility functions
+│   └── types/         # TypeScript types
+├── tests/
+│   ├── unit/          # Vitest unit tests
+│   ├── integration/   # Component tests
+│   └── e2e/           # Playwright E2E tests
+└── dist/              # Build output (embedded in Go binary)
+```
+
+### Development Workflow
+```bash
+# Install dependencies
+make bun-install
+
+# Start dev server (runs on port 5174)
+make bun-dev
+
+# Run Go backend (runs on port 8081)
+make run
+
+# The Vite dev server proxies /api/* and /ws to Go backend
+```
+
+### API Client Patterns
+All API calls go through the typed client in `src/api/`:
+```typescript
+import { api } from '@/api/client';
+
+// Fetch messages with TanStack Query
+const { data, isLoading, error } = useQuery({
+  queryKey: ['messages', filter],
+  queryFn: () => api.messages.list(filter),
+});
+
+// Mutations with optimistic updates
+const mutation = useMutation({
+  mutationFn: api.messages.star,
+  onMutate: async (id) => {
+    // Optimistic update
+  },
+});
+```
+
+### WebSocket Integration
+Real-time updates use WebSocket via `src/api/websocket.ts`:
+```typescript
+const { isConnected, lastMessage } = useWebSocket({
+  onMessage: (event) => {
+    queryClient.invalidateQueries(['messages']);
+  },
+});
+```
+
+### Component Patterns
+- Components use **inline SVG icons** (no external icon library)
+- Use **Headless UI** for modals, dropdowns, tabs
+- Follow **Tailwind CSS** conventions for styling
+- Export **named exports** for components
+
+### Testing
+```bash
+# Run all frontend tests
+make bun-test
+
+# Run E2E tests
+make bun-test-e2e
+
+# Run tests in watch mode
+cd web/frontend && bun run test:watch
+```
+
+### Production Build
+```bash
+# Build frontend and embed in Go binary
+make build-production
+
+# The built files are embedded via //go:embed in web/frontend_embed.go
+```
+
+---
+
+## HTMX Frontend Development (Legacy)
+
+> **Note**: The HTMX frontend is being replaced by React. This section is kept for reference.
 
 ### References
 - **Documentation**: https://htmx.org/docs/
 - **Attribute Reference**: https://htmx.org/reference/
-
-### Core Attributes
-HTMX enables server-driven interactivity with HTML attributes:
-
-```html
-<!-- Request triggers -->
-hx-get="/path"           <!-- GET request -->
-hx-post="/path"          <!-- POST request -->
-hx-put="/path"           <!-- PUT request -->
-hx-delete="/path"        <!-- DELETE request -->
-
-<!-- Target and swap -->
-hx-target="#element-id"  <!-- Where to put response -->
-hx-swap="innerHTML"      <!-- How to swap content (innerHTML, outerHTML, beforeend, afterbegin, etc.) -->
-
-<!-- Triggers -->
-hx-trigger="click"       <!-- Event trigger (click, change, submit, load, etc.) -->
-hx-trigger="keyup changed delay:500ms"  <!-- Debounced input -->
-hx-trigger="load"        <!-- On page load -->
-hx-trigger="every 30s"   <!-- Polling -->
-
-<!-- Other common attributes -->
-hx-boost="true"          <!-- Progressive enhancement for links/forms -->
-hx-indicator="#spinner"  <!-- Loading indicator -->
-hx-confirm="Are you sure?"  <!-- Confirmation dialog -->
-hx-vals='{"key": "value"}'  <!-- Include extra values -->
-```
-
-### Server-Sent Events (SSE)
-For real-time updates, use the SSE extension:
-
-```html
-<!-- Include the extension -->
-<script src="https://unpkg.com/htmx.org@1.9.10/dist/ext/sse.js"></script>
-
-<!-- Connect to SSE endpoint -->
-<div hx-ext="sse" sse-connect="/events">
-    <!-- Update this element when 'message' event received -->
-    <div sse-swap="message"></div>
-</div>
-```
-
-### Template Patterns
-
-**Partials for HTMX responses:**
-```html
-{{define "message-row"}}
-<tr id="msg-{{.ID}}" class="hover:bg-gray-50">
-    <td>{{.Subject}}</td>
-    <td>{{.SenderName}}</td>
-</tr>
-{{end}}
-```
-
-**Full page with HTMX:**
-```html
-{{define "content"}}
-<div id="inbox-list"
-     hx-get="/api/messages"
-     hx-trigger="load"
-     hx-swap="innerHTML">
-    Loading...
-</div>
-{{end}}
-```
-
-### Go Handler Patterns
-HTMX expects HTML fragments, not full pages:
-
-```go
-func (h *Handler) GetMessages(w http.ResponseWriter, r *http.Request) {
-    msgs := h.mailSvc.FetchInbox(...)
-
-    // Check if this is an HTMX request
-    if r.Header.Get("HX-Request") == "true" {
-        // Return partial HTML only
-        h.templates.ExecuteTemplate(w, "message-list", msgs)
-        return
-    }
-
-    // Full page render for non-HTMX requests
-    h.templates.ExecuteTemplate(w, "inbox.html", msgs)
-}
-```
-
-### HTMX Best Practices
-1. **Return HTML, not JSON** - HTMX swaps HTML directly into the DOM
-2. **Use partials** - Keep HTMX responses small and focused
-3. **Leverage hx-boost** - Progressive enhancement for standard links
-4. **Debounce inputs** - Use `delay:Nms` for search/typeahead
-5. **Show loading states** - Use `hx-indicator` for user feedback
-6. **Handle errors** - Return appropriate HTTP status codes; HTMX respects 4xx/5xx
-
-### Project Structure
-```
-web/
-├── templates/
-│   ├── layout.html      # Base layout with HTMX includes
-│   ├── inbox.html       # Inbox page
-│   └── partials/        # HTMX response fragments
-│       ├── message-row.html
-│       └── thread-view.html
-├── static/
-│   ├── css/main.css
-│   └── js/main.js
-└── react/               # React components for complex UI
-```
 
 ## Agent Heartbeat System
 

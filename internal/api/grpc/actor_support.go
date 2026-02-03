@@ -4,95 +4,65 @@ import (
 	"context"
 	"time"
 
-	"github.com/roasbeef/subtrate/internal/actorutil"
 	"github.com/roasbeef/subtrate/internal/mail"
 )
 
-// sendMailActor sends a mail message via the actor system.
+// sendMailActor sends a mail message via the shared mail client.
 func (s *Server) sendMailActor(
 	ctx context.Context, req mail.SendMailRequest,
 ) (mail.SendMailResponse, error) {
-	return actorutil.AskAwaitTyped[
-		mail.MailRequest, mail.MailResponse, mail.SendMailResponse,
-	](ctx, s.mailRef, req)
+	return s.mailClient.SendMail(ctx, req)
 }
 
-// fetchInboxActor fetches inbox messages via the actor system.
+// fetchInboxActor fetches inbox messages via the shared mail client.
 func (s *Server) fetchInboxActor(
 	ctx context.Context, req mail.FetchInboxRequest,
 ) (mail.FetchInboxResponse, error) {
-	return actorutil.AskAwaitTyped[
-		mail.MailRequest, mail.MailResponse, mail.FetchInboxResponse,
-	](ctx, s.mailRef, req)
+	return s.mailClient.FetchInbox(ctx, req)
 }
 
-// readMessageActor reads a message via the actor system and marks it as read.
+// readMessageActor reads a message via the shared mail client and marks it as
+// read.
 func (s *Server) readMessageActor(
 	ctx context.Context, agentID, messageID int64,
 ) (mail.ReadMessageResponse, error) {
-	return actorutil.AskAwaitTyped[
-		mail.MailRequest, mail.MailResponse, mail.ReadMessageResponse,
-	](ctx, s.mailRef, mail.ReadMessageRequest{
-		AgentID:   agentID,
-		MessageID: messageID,
-	})
+	return s.mailClient.ReadMessage(ctx, agentID, messageID)
 }
 
-// updateMessageStateActor updates a message's state via the actor system.
+// updateMessageStateActor updates a message's state via the shared mail client.
 func (s *Server) updateMessageStateActor(
 	ctx context.Context, agentID, messageID int64, newState string,
 	snoozedUntil *time.Time,
 ) (mail.UpdateStateResponse, error) {
-	return actorutil.AskAwaitTyped[
-		mail.MailRequest, mail.MailResponse, mail.UpdateStateResponse,
-	](ctx, s.mailRef, mail.UpdateStateRequest{
-		AgentID:      agentID,
-		MessageID:    messageID,
-		NewState:     newState,
-		SnoozedUntil: snoozedUntil,
-	})
+	return s.mailClient.UpdateMessageState(ctx, agentID, messageID, newState, snoozedUntil)
 }
 
-// ackMessageActor acknowledges a message via the actor system.
+// ackMessageActor acknowledges a message via the shared mail client.
 func (s *Server) ackMessageActor(
 	ctx context.Context, agentID, messageID int64,
 ) (mail.AckMessageResponse, error) {
-	return actorutil.AskAwaitTyped[
-		mail.MailRequest, mail.MailResponse, mail.AckMessageResponse,
-	](ctx, s.mailRef, mail.AckMessageRequest{
-		AgentID:   agentID,
-		MessageID: messageID,
-	})
+	return s.mailClient.AckMessage(ctx, agentID, messageID)
 }
 
-// getAgentStatusActor gets an agent's mail status via the actor system.
+// getAgentStatusActor gets an agent's mail status via the shared mail client.
 func (s *Server) getAgentStatusActor(
 	ctx context.Context, agentID int64,
 ) (mail.GetStatusResponse, error) {
-	return actorutil.AskAwaitTyped[
-		mail.MailRequest, mail.MailResponse, mail.GetStatusResponse,
-	](ctx, s.mailRef, mail.GetStatusRequest{
-		AgentID: agentID,
-	})
+	return s.mailClient.GetAgentStatus(ctx, agentID)
 }
 
-// pollChangesActor polls for new messages via the actor system.
+// pollChangesActor polls for new messages since given offsets via the shared
+// mail client.
 func (s *Server) pollChangesActor(
 	ctx context.Context, agentID int64, sinceOffsets map[int64]int64,
 ) (mail.PollChangesResponse, error) {
-	return actorutil.AskAwaitTyped[
-		mail.MailRequest, mail.MailResponse, mail.PollChangesResponse,
-	](ctx, s.mailRef, mail.PollChangesRequest{
-		AgentID:      agentID,
-		SinceOffsets: sinceOffsets,
-	})
+	return s.mailClient.PollChanges(ctx, agentID, sinceOffsets)
 }
 
-// publishMessageActor publishes a message to a topic via the actor system.
+// publishMessageActor publishes a message to a topic via the shared mail
+// client.
 func (s *Server) publishMessageActor(
 	ctx context.Context, req mail.PublishRequest,
 ) (mail.PublishResponse, error) {
-	return actorutil.AskAwaitTyped[
-		mail.MailRequest, mail.MailResponse, mail.PublishResponse,
-	](ctx, s.mailRef, req)
+	return s.mailClient.Publish(ctx, req)
 }

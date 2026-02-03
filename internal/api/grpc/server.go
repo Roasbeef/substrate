@@ -18,6 +18,7 @@ import (
 	"github.com/roasbeef/subtrate/internal/agent"
 	"github.com/roasbeef/subtrate/internal/db"
 	"github.com/roasbeef/subtrate/internal/mail"
+	"github.com/roasbeef/subtrate/internal/mailclient"
 )
 
 // ServerConfig holds configuration for the gRPC server.
@@ -60,13 +61,14 @@ func DefaultServerConfig() ServerConfig {
 
 // Server is the gRPC server for Subtrate.
 type Server struct {
-	cfg         ServerConfig
-	store       *db.Store
-	mailSvc     *mail.Service
-	mailRef     mail.MailActorRef         // Mail actor reference (required).
-	activityRef activity.ActivityActorRef // Activity actor reference (required).
-	agentReg    *agent.Registry
-	identityMgr *agent.IdentityManager
+	cfg          ServerConfig
+	store        *db.Store
+	mailSvc      *mail.Service              // Direct service for operations not via actor.
+	mailClient   *mailclient.Client         // Shared mail client (required).
+	actClient    *mailclient.ActivityClient // Shared activity client (required).
+	agentReg     *agent.Registry
+	identityMgr  *agent.IdentityManager
+	heartbeatMgr *agent.HeartbeatManager
 
 	// notificationHub is the actor reference for the notification hub.
 	// Used for event-driven message delivery to streaming clients.
@@ -84,6 +86,9 @@ type Server struct {
 
 	UnimplementedMailServer
 	UnimplementedAgentServer
+	UnimplementedSessionServer
+	UnimplementedActivityServer
+	UnimplementedStatsServer
 }
 
 // NewServer creates a new gRPC server instance.
@@ -93,16 +98,18 @@ func NewServer(
 	mailSvc *mail.Service,
 	agentReg *agent.Registry,
 	identityMgr *agent.IdentityManager,
+	heartbeatMgr *agent.HeartbeatManager,
 	notificationHub actor.ActorRef[mail.NotificationRequest, mail.NotificationResponse],
 ) *Server {
 	return &Server{
 		cfg:             cfg,
 		store:           store,
 		mailSvc:         mailSvc,
-		mailRef:         cfg.MailRef,
-		activityRef:     cfg.ActivityRef,
+		mailClient:      mailclient.NewClient(cfg.MailRef),
+		actClient:       mailclient.NewActivityClient(cfg.ActivityRef),
 		agentReg:        agentReg,
 		identityMgr:     identityMgr,
+		heartbeatMgr:    heartbeatMgr,
 		notificationHub: notificationHub,
 		quit:            make(chan struct{}),
 	}
@@ -133,6 +140,9 @@ func (s *Server) Start() error {
 	// Register services.
 	RegisterMailServer(s.grpcServer, s)
 	RegisterAgentServer(s.grpcServer, s)
+	RegisterSessionServer(s.grpcServer, s)
+	RegisterActivityServer(s.grpcServer, s)
+	RegisterStatsServer(s.grpcServer, s)
 
 	// Start serving in a goroutine.
 	s.wg.Add(1)

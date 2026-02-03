@@ -8,6 +8,7 @@ package sqlc
 import (
 	"context"
 	"database/sql"
+	"strings"
 )
 
 const CountArchivedByAgent = `-- name: CountArchivedByAgent :one
@@ -177,7 +178,7 @@ func (q *Queries) DeleteMessagesByTopicOlderThan(ctx context.Context, arg Delete
 }
 
 const GetAllInboxMessages = `-- name: GetAllInboxMessages :many
-SELECT m.id, m.thread_id, m.topic_id, m.log_offset, m.sender_id, m.subject, m.body_md, m.priority, m.deadline_at, m.attachments, m.created_at, m.deleted_by_sender, mr.state, mr.snoozed_until, mr.read_at, mr.acked_at, mr.agent_id as recipient_agent_id, a.name as sender_name
+SELECT m.id, m.thread_id, m.topic_id, m.log_offset, m.sender_id, m.subject, m.body_md, m.priority, m.deadline_at, m.attachments, m.created_at, m.deleted_by_sender, mr.state, mr.snoozed_until, mr.read_at, mr.acked_at, mr.agent_id as recipient_agent_id, a.name as sender_name, a.project_key as sender_project_key, a.git_branch as sender_git_branch
 FROM messages m
 JOIN message_recipients mr ON m.id = mr.message_id
 LEFT JOIN agents a ON m.sender_id = a.id
@@ -205,6 +206,8 @@ type GetAllInboxMessagesRow struct {
 	AckedAt          sql.NullInt64
 	RecipientAgentID int64
 	SenderName       sql.NullString
+	SenderProjectKey sql.NullString
+	SenderGitBranch  sql.NullString
 }
 
 // Global inbox view: all messages across all agents, not archived or trashed.
@@ -236,6 +239,91 @@ func (q *Queries) GetAllInboxMessages(ctx context.Context, limit int64) ([]GetAl
 			&i.AckedAt,
 			&i.RecipientAgentID,
 			&i.SenderName,
+			&i.SenderProjectKey,
+			&i.SenderGitBranch,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const GetAllInboxMessagesPaginated = `-- name: GetAllInboxMessagesPaginated :many
+SELECT m.id, m.thread_id, m.topic_id, m.log_offset, m.sender_id, m.subject, m.body_md, m.priority, m.deadline_at, m.attachments, m.created_at, m.deleted_by_sender, mr.state, mr.snoozed_until, mr.read_at, mr.acked_at, mr.agent_id as recipient_agent_id, a.name as sender_name, a.project_key as sender_project_key, a.git_branch as sender_git_branch
+FROM messages m
+JOIN message_recipients mr ON m.id = mr.message_id
+LEFT JOIN agents a ON m.sender_id = a.id
+WHERE mr.state NOT IN ('archived', 'trash')
+ORDER BY m.created_at DESC
+LIMIT ? OFFSET ?
+`
+
+type GetAllInboxMessagesPaginatedParams struct {
+	Limit  int64
+	Offset int64
+}
+
+type GetAllInboxMessagesPaginatedRow struct {
+	ID               int64
+	ThreadID         string
+	TopicID          int64
+	LogOffset        int64
+	SenderID         int64
+	Subject          string
+	BodyMd           string
+	Priority         string
+	DeadlineAt       sql.NullInt64
+	Attachments      sql.NullString
+	CreatedAt        int64
+	DeletedBySender  int64
+	State            string
+	SnoozedUntil     sql.NullInt64
+	ReadAt           sql.NullInt64
+	AckedAt          sql.NullInt64
+	RecipientAgentID int64
+	SenderName       sql.NullString
+	SenderProjectKey sql.NullString
+	SenderGitBranch  sql.NullString
+}
+
+// Global inbox view with pagination support.
+func (q *Queries) GetAllInboxMessagesPaginated(ctx context.Context, arg GetAllInboxMessagesPaginatedParams) ([]GetAllInboxMessagesPaginatedRow, error) {
+	rows, err := q.db.QueryContext(ctx, GetAllInboxMessagesPaginated, arg.Limit, arg.Offset)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []GetAllInboxMessagesPaginatedRow
+	for rows.Next() {
+		var i GetAllInboxMessagesPaginatedRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.ThreadID,
+			&i.TopicID,
+			&i.LogOffset,
+			&i.SenderID,
+			&i.Subject,
+			&i.BodyMd,
+			&i.Priority,
+			&i.DeadlineAt,
+			&i.Attachments,
+			&i.CreatedAt,
+			&i.DeletedBySender,
+			&i.State,
+			&i.SnoozedUntil,
+			&i.ReadAt,
+			&i.AckedAt,
+			&i.RecipientAgentID,
+			&i.SenderName,
+			&i.SenderProjectKey,
+			&i.SenderGitBranch,
 		); err != nil {
 			return nil, err
 		}
@@ -251,7 +339,7 @@ func (q *Queries) GetAllInboxMessages(ctx context.Context, limit int64) ([]GetAl
 }
 
 const GetAllSentMessages = `-- name: GetAllSentMessages :many
-SELECT m.id, m.thread_id, m.topic_id, m.log_offset, m.sender_id, m.subject, m.body_md, m.priority, m.deadline_at, m.attachments, m.created_at, m.deleted_by_sender, a.name as sender_name
+SELECT m.id, m.thread_id, m.topic_id, m.log_offset, m.sender_id, m.subject, m.body_md, m.priority, m.deadline_at, m.attachments, m.created_at, m.deleted_by_sender, a.name as sender_name, a.project_key as sender_project_key, a.git_branch as sender_git_branch
 FROM messages m
 JOIN agents a ON m.sender_id = a.id
 WHERE m.deleted_by_sender = 0
@@ -260,19 +348,21 @@ LIMIT ?
 `
 
 type GetAllSentMessagesRow struct {
-	ID              int64
-	ThreadID        string
-	TopicID         int64
-	LogOffset       int64
-	SenderID        int64
-	Subject         string
-	BodyMd          string
-	Priority        string
-	DeadlineAt      sql.NullInt64
-	Attachments     sql.NullString
-	CreatedAt       int64
-	DeletedBySender int64
-	SenderName      string
+	ID               int64
+	ThreadID         string
+	TopicID          int64
+	LogOffset        int64
+	SenderID         int64
+	Subject          string
+	BodyMd           string
+	Priority         string
+	DeadlineAt       sql.NullInt64
+	Attachments      sql.NullString
+	CreatedAt        int64
+	DeletedBySender  int64
+	SenderName       string
+	SenderProjectKey sql.NullString
+	SenderGitBranch  sql.NullString
 }
 
 // Global sent view: all sent messages across all agents.
@@ -299,6 +389,8 @@ func (q *Queries) GetAllSentMessages(ctx context.Context, limit int64) ([]GetAll
 			&i.CreatedAt,
 			&i.DeletedBySender,
 			&i.SenderName,
+			&i.SenderProjectKey,
+			&i.SenderGitBranch,
 		); err != nil {
 			return nil, err
 		}
@@ -388,7 +480,7 @@ func (q *Queries) GetArchivedMessages(ctx context.Context, arg GetArchivedMessag
 }
 
 const GetInboxMessages = `-- name: GetInboxMessages :many
-SELECT m.id, m.thread_id, m.topic_id, m.log_offset, m.sender_id, m.subject, m.body_md, m.priority, m.deadline_at, m.attachments, m.created_at, m.deleted_by_sender, mr.state, mr.snoozed_until, mr.read_at, mr.acked_at, a.name as sender_name
+SELECT m.id, m.thread_id, m.topic_id, m.log_offset, m.sender_id, m.subject, m.body_md, m.priority, m.deadline_at, m.attachments, m.created_at, m.deleted_by_sender, mr.state, mr.snoozed_until, mr.read_at, mr.acked_at, a.name as sender_name, a.project_key as sender_project_key, a.git_branch as sender_git_branch
 FROM messages m
 JOIN message_recipients mr ON m.id = mr.message_id
 LEFT JOIN agents a ON m.sender_id = a.id
@@ -404,23 +496,25 @@ type GetInboxMessagesParams struct {
 }
 
 type GetInboxMessagesRow struct {
-	ID              int64
-	ThreadID        string
-	TopicID         int64
-	LogOffset       int64
-	SenderID        int64
-	Subject         string
-	BodyMd          string
-	Priority        string
-	DeadlineAt      sql.NullInt64
-	Attachments     sql.NullString
-	CreatedAt       int64
-	DeletedBySender int64
-	State           string
-	SnoozedUntil    sql.NullInt64
-	ReadAt          sql.NullInt64
-	AckedAt         sql.NullInt64
-	SenderName      sql.NullString
+	ID               int64
+	ThreadID         string
+	TopicID          int64
+	LogOffset        int64
+	SenderID         int64
+	Subject          string
+	BodyMd           string
+	Priority         string
+	DeadlineAt       sql.NullInt64
+	Attachments      sql.NullString
+	CreatedAt        int64
+	DeletedBySender  int64
+	State            string
+	SnoozedUntil     sql.NullInt64
+	ReadAt           sql.NullInt64
+	AckedAt          sql.NullInt64
+	SenderName       sql.NullString
+	SenderProjectKey sql.NullString
+	SenderGitBranch  sql.NullString
 }
 
 func (q *Queries) GetInboxMessages(ctx context.Context, arg GetInboxMessagesParams) ([]GetInboxMessagesRow, error) {
@@ -450,6 +544,8 @@ func (q *Queries) GetInboxMessages(ctx context.Context, arg GetInboxMessagesPara
 			&i.ReadAt,
 			&i.AckedAt,
 			&i.SenderName,
+			&i.SenderProjectKey,
+			&i.SenderGitBranch,
 		); err != nil {
 			return nil, err
 		}
@@ -558,6 +654,66 @@ func (q *Queries) GetMessageRecipients(ctx context.Context, messageID int64) ([]
 	return items, nil
 }
 
+const GetMessageRecipientsWithAgentsBulk = `-- name: GetMessageRecipientsWithAgentsBulk :many
+SELECT mr.message_id, mr.agent_id, mr.state, mr.snoozed_until, mr.read_at, mr.acked_at, a.name as agent_name
+FROM message_recipients mr
+LEFT JOIN agents a ON mr.agent_id = a.id
+WHERE mr.message_id IN (/*SLICE:message_ids*/?)
+`
+
+type GetMessageRecipientsWithAgentsBulkRow struct {
+	MessageID    int64
+	AgentID      int64
+	State        string
+	SnoozedUntil sql.NullInt64
+	ReadAt       sql.NullInt64
+	AckedAt      sql.NullInt64
+	AgentName    sql.NullString
+}
+
+// Fetch recipients for multiple messages at once with agent names.
+// Pass message IDs as a comma-separated string using sqlc.slice.
+func (q *Queries) GetMessageRecipientsWithAgentsBulk(ctx context.Context, messageIds []int64) ([]GetMessageRecipientsWithAgentsBulkRow, error) {
+	query := GetMessageRecipientsWithAgentsBulk
+	var queryParams []interface{}
+	if len(messageIds) > 0 {
+		for _, v := range messageIds {
+			queryParams = append(queryParams, v)
+		}
+		query = strings.Replace(query, "/*SLICE:message_ids*/?", strings.Repeat(",?", len(messageIds))[1:], 1)
+	} else {
+		query = strings.Replace(query, "/*SLICE:message_ids*/?", "NULL", 1)
+	}
+	rows, err := q.db.QueryContext(ctx, query, queryParams...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []GetMessageRecipientsWithAgentsBulkRow
+	for rows.Next() {
+		var i GetMessageRecipientsWithAgentsBulkRow
+		if err := rows.Scan(
+			&i.MessageID,
+			&i.AgentID,
+			&i.State,
+			&i.SnoozedUntil,
+			&i.ReadAt,
+			&i.AckedAt,
+			&i.AgentName,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const GetMessagesByThread = `-- name: GetMessagesByThread :many
 SELECT id, thread_id, topic_id, log_offset, sender_id, subject, body_md, priority, deadline_at, attachments, created_at, deleted_by_sender FROM messages WHERE thread_id = ? ORDER BY created_at ASC
 `
@@ -584,6 +740,72 @@ func (q *Queries) GetMessagesByThread(ctx context.Context, threadID string) ([]M
 			&i.Attachments,
 			&i.CreatedAt,
 			&i.DeletedBySender,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const GetMessagesByThreadWithSender = `-- name: GetMessagesByThreadWithSender :many
+SELECT m.id, m.thread_id, m.topic_id, m.log_offset, m.sender_id, m.subject, m.body_md, m.priority, m.deadline_at, m.attachments, m.created_at, m.deleted_by_sender, a.name as sender_name, a.project_key as sender_project_key, a.git_branch as sender_git_branch
+FROM messages m
+LEFT JOIN agents a ON m.sender_id = a.id
+WHERE m.thread_id = ?
+ORDER BY m.created_at ASC
+`
+
+type GetMessagesByThreadWithSenderRow struct {
+	ID               int64
+	ThreadID         string
+	TopicID          int64
+	LogOffset        int64
+	SenderID         int64
+	Subject          string
+	BodyMd           string
+	Priority         string
+	DeadlineAt       sql.NullInt64
+	Attachments      sql.NullString
+	CreatedAt        int64
+	DeletedBySender  int64
+	SenderName       sql.NullString
+	SenderProjectKey sql.NullString
+	SenderGitBranch  sql.NullString
+}
+
+// Get messages in a thread with sender information (name, project, branch).
+func (q *Queries) GetMessagesByThreadWithSender(ctx context.Context, threadID string) ([]GetMessagesByThreadWithSenderRow, error) {
+	rows, err := q.db.QueryContext(ctx, GetMessagesByThreadWithSender, threadID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []GetMessagesByThreadWithSenderRow
+	for rows.Next() {
+		var i GetMessagesByThreadWithSenderRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.ThreadID,
+			&i.TopicID,
+			&i.LogOffset,
+			&i.SenderID,
+			&i.Subject,
+			&i.BodyMd,
+			&i.Priority,
+			&i.DeadlineAt,
+			&i.Attachments,
+			&i.CreatedAt,
+			&i.DeletedBySender,
+			&i.SenderName,
+			&i.SenderProjectKey,
+			&i.SenderGitBranch,
 		); err != nil {
 			return nil, err
 		}
@@ -688,9 +910,11 @@ func (q *Queries) GetMessagesSinceOffset(ctx context.Context, arg GetMessagesSin
 }
 
 const GetSentMessages = `-- name: GetSentMessages :many
-SELECT id, thread_id, topic_id, log_offset, sender_id, subject, body_md, priority, deadline_at, attachments, created_at, deleted_by_sender FROM messages
-WHERE sender_id = ? AND deleted_by_sender = 0
-ORDER BY created_at DESC
+SELECT m.id, m.thread_id, m.topic_id, m.log_offset, m.sender_id, m.subject, m.body_md, m.priority, m.deadline_at, m.attachments, m.created_at, m.deleted_by_sender, a.name as sender_name, a.project_key as sender_project_key, a.git_branch as sender_git_branch
+FROM messages m
+LEFT JOIN agents a ON m.sender_id = a.id
+WHERE m.sender_id = ? AND m.deleted_by_sender = 0
+ORDER BY m.created_at DESC
 LIMIT ?
 `
 
@@ -699,15 +923,34 @@ type GetSentMessagesParams struct {
 	Limit    int64
 }
 
-func (q *Queries) GetSentMessages(ctx context.Context, arg GetSentMessagesParams) ([]Message, error) {
+type GetSentMessagesRow struct {
+	ID               int64
+	ThreadID         string
+	TopicID          int64
+	LogOffset        int64
+	SenderID         int64
+	Subject          string
+	BodyMd           string
+	Priority         string
+	DeadlineAt       sql.NullInt64
+	Attachments      sql.NullString
+	CreatedAt        int64
+	DeletedBySender  int64
+	SenderName       sql.NullString
+	SenderProjectKey sql.NullString
+	SenderGitBranch  sql.NullString
+}
+
+// Get messages sent by a specific agent with sender details.
+func (q *Queries) GetSentMessages(ctx context.Context, arg GetSentMessagesParams) ([]GetSentMessagesRow, error) {
 	rows, err := q.db.QueryContext(ctx, GetSentMessages, arg.SenderID, arg.Limit)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	var items []Message
+	var items []GetSentMessagesRow
 	for rows.Next() {
-		var i Message
+		var i GetSentMessagesRow
 		if err := rows.Scan(
 			&i.ID,
 			&i.ThreadID,
@@ -721,6 +964,9 @@ func (q *Queries) GetSentMessages(ctx context.Context, arg GetSentMessagesParams
 			&i.Attachments,
 			&i.CreatedAt,
 			&i.DeletedBySender,
+			&i.SenderName,
+			&i.SenderProjectKey,
+			&i.SenderGitBranch,
 		); err != nil {
 			return nil, err
 		}
@@ -1020,7 +1266,7 @@ func (q *Queries) GetTrashMessages(ctx context.Context, arg GetTrashMessagesPara
 }
 
 const GetUnreadMessages = `-- name: GetUnreadMessages :many
-SELECT m.id, m.thread_id, m.topic_id, m.log_offset, m.sender_id, m.subject, m.body_md, m.priority, m.deadline_at, m.attachments, m.created_at, m.deleted_by_sender, mr.state, mr.snoozed_until, mr.read_at, mr.acked_at, a.name as sender_name
+SELECT m.id, m.thread_id, m.topic_id, m.log_offset, m.sender_id, m.subject, m.body_md, m.priority, m.deadline_at, m.attachments, m.created_at, m.deleted_by_sender, mr.state, mr.snoozed_until, mr.read_at, mr.acked_at, a.name as sender_name, a.project_key as sender_project_key, a.git_branch as sender_git_branch
 FROM messages m
 JOIN message_recipients mr ON m.id = mr.message_id
 LEFT JOIN agents a ON m.sender_id = a.id
@@ -1036,23 +1282,25 @@ type GetUnreadMessagesParams struct {
 }
 
 type GetUnreadMessagesRow struct {
-	ID              int64
-	ThreadID        string
-	TopicID         int64
-	LogOffset       int64
-	SenderID        int64
-	Subject         string
-	BodyMd          string
-	Priority        string
-	DeadlineAt      sql.NullInt64
-	Attachments     sql.NullString
-	CreatedAt       int64
-	DeletedBySender int64
-	State           string
-	SnoozedUntil    sql.NullInt64
-	ReadAt          sql.NullInt64
-	AckedAt         sql.NullInt64
-	SenderName      sql.NullString
+	ID               int64
+	ThreadID         string
+	TopicID          int64
+	LogOffset        int64
+	SenderID         int64
+	Subject          string
+	BodyMd           string
+	Priority         string
+	DeadlineAt       sql.NullInt64
+	Attachments      sql.NullString
+	CreatedAt        int64
+	DeletedBySender  int64
+	State            string
+	SnoozedUntil     sql.NullInt64
+	ReadAt           sql.NullInt64
+	AckedAt          sql.NullInt64
+	SenderName       sql.NullString
+	SenderProjectKey sql.NullString
+	SenderGitBranch  sql.NullString
 }
 
 func (q *Queries) GetUnreadMessages(ctx context.Context, arg GetUnreadMessagesParams) ([]GetUnreadMessagesRow, error) {
@@ -1082,6 +1330,8 @@ func (q *Queries) GetUnreadMessages(ctx context.Context, arg GetUnreadMessagesPa
 			&i.ReadAt,
 			&i.AckedAt,
 			&i.SenderName,
+			&i.SenderProjectKey,
+			&i.SenderGitBranch,
 		); err != nil {
 			return nil, err
 		}
@@ -1181,6 +1431,79 @@ type MarkMessageDeletedBySenderParams struct {
 func (q *Queries) MarkMessageDeletedBySender(ctx context.Context, arg MarkMessageDeletedBySenderParams) error {
 	_, err := q.db.ExecContext(ctx, MarkMessageDeletedBySender, arg.ID, arg.SenderID)
 	return err
+}
+
+const SearchMessages = `-- name: SearchMessages :many
+SELECT m.id, m.thread_id, m.topic_id, m.log_offset, m.sender_id, m.subject, m.body_md, m.priority, m.deadline_at, m.attachments, m.created_at, m.deleted_by_sender, a.name as sender_name, a.project_key as sender_project_key, a.git_branch as sender_git_branch
+FROM messages m
+LEFT JOIN agents a ON m.sender_id = a.id
+WHERE m.subject LIKE ? OR m.body_md LIKE ?
+ORDER BY m.created_at DESC
+LIMIT 50
+`
+
+type SearchMessagesParams struct {
+	Subject string
+	BodyMd  string
+}
+
+type SearchMessagesRow struct {
+	ID               int64
+	ThreadID         string
+	TopicID          int64
+	LogOffset        int64
+	SenderID         int64
+	Subject          string
+	BodyMd           string
+	Priority         string
+	DeadlineAt       sql.NullInt64
+	Attachments      sql.NullString
+	CreatedAt        int64
+	DeletedBySender  int64
+	SenderName       sql.NullString
+	SenderProjectKey sql.NullString
+	SenderGitBranch  sql.NullString
+}
+
+// Simple LIKE-based search on subject and body. FTS5 is available but this
+// covers basic cases. The search term should be passed with wildcards.
+func (q *Queries) SearchMessages(ctx context.Context, arg SearchMessagesParams) ([]SearchMessagesRow, error) {
+	rows, err := q.db.QueryContext(ctx, SearchMessages, arg.Subject, arg.BodyMd)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []SearchMessagesRow
+	for rows.Next() {
+		var i SearchMessagesRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.ThreadID,
+			&i.TopicID,
+			&i.LogOffset,
+			&i.SenderID,
+			&i.Subject,
+			&i.BodyMd,
+			&i.Priority,
+			&i.DeadlineAt,
+			&i.Attachments,
+			&i.CreatedAt,
+			&i.DeletedBySender,
+			&i.SenderName,
+			&i.SenderProjectKey,
+			&i.SenderGitBranch,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
 }
 
 const UpdateAllThreadRecipientState = `-- name: UpdateAllThreadRecipientState :execrows
