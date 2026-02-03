@@ -130,7 +130,7 @@ jobs:
           go build -o substrated ./cmd/substrated
 
       - name: Run E2E tests
-        run: bun run test:e2e:prod
+        run: bun run test:e2e
         env:
           CI: true
 

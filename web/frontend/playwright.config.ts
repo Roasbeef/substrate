@@ -84,8 +84,9 @@ export default defineConfig({
     : [
         // Development: Start Go API server + Vite dev server.
         // Note: gRPC must be enabled for grpc-gateway REST API to work.
+        // Use pre-built binary if available (CI), fall back to go run (local dev).
         {
-          command: `cd ../.. && CGO_CFLAGS="-DSQLITE_ENABLE_FTS5" CGO_LDFLAGS="-lm" go run ./cmd/substrated -web-only -web :${API_PORT} -grpc localhost:${GRPC_PORT} -db .test-data/test.db`,
+          command: `cd ../.. && (test -x ./substrated && ./substrated || CGO_CFLAGS="-DSQLITE_ENABLE_FTS5" CGO_LDFLAGS="-lm" go run ./cmd/substrated) -web-only -web :${API_PORT} -grpc localhost:${GRPC_PORT} -db .test-data/test.db`,
           url: `http://localhost:${API_PORT}/api/v1/health`,
           reuseExistingServer: !process.env.CI,
           timeout: 120000,
