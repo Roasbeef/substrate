@@ -73,9 +73,10 @@ export default defineConfig({
   webServer: USE_PRODUCTION
     ? [
         // Production: Start the Go server with embedded frontend.
+        // gRPC must be enabled for grpc-gateway REST API to work.
         {
-          command: `cd ../.. && ./substrated -web-only -web :${PROD_PORT} -grpc "" -db .test-data/test.db`,
-          url: `http://localhost:${PROD_PORT}`,
+          command: `cd ../.. && ./substrated -web-only -web :${PROD_PORT} -grpc localhost:${GRPC_PORT} -db .test-data/test.db`,
+          url: `http://localhost:${PROD_PORT}/api/v1/health`,
           reuseExistingServer: !process.env.CI,
           timeout: 120000,
         },
