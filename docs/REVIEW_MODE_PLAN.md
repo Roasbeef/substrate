@@ -123,7 +123,8 @@ package review
 import (
     "context"
     "github.com/lightningnetwork/lnd/fn/v2"
-    "github.com/Roasbeef/claude-agent-sdk-go/claudeagent"
+    "github.com/roasbeef/subtrate/internal/baselib/actor"
+    claudeagent "github.com/roasbeef/claude-agent-sdk-go"
 )
 
 // ReviewRequest is sent by agents requesting a PR review.
@@ -217,13 +218,16 @@ func (s *Service) SpawnStructuredReview(ctx context.Context, req StructuredRevie
     // Build prompt with diff, context, and expected JSON schema
     prompt := s.buildStructuredPrompt(req)
 
-    // Spawn with -p (print mode) and JSON output
-    resp, err := s.spawner.Spawn(ctx, prompt, agent.SpawnOpts{
-        PrintMode:    true,
-        OutputFormat: "json",
-        WorkDir:      req.WorkDir,
-        Timeout:      5 * time.Minute,
+    // Create a spawner configured for this review's work directory.
+    // Configuration is set at spawner creation time, not per-call.
+    spawner := agent.NewSpawner(agent.SpawnConfig{
+        Model:          "claude-sonnet-4-20250514",
+        WorkDir:        req.WorkDir,
+        PermissionMode: claudeagent.PermissionModeDefault,
     })
+
+    // Spawn with the structured prompt.
+    resp, err := spawner.Spawn(ctx, prompt)
     if err != nil {
         return nil, fmt.Errorf("spawn failed: %w", err)
     }
@@ -262,7 +266,14 @@ type StructuredReviewResult struct {
     LinesAnalyzed int `json:"lines_analyzed"`
 }
 
+// ReviewMessage is a sealed interface for review actor messages.
+// All message types must implement reviewMessageMarker().
+type ReviewMessage interface {
+    reviewMessageMarker()
+}
+
 // Receive implements ActorBehavior for the review service.
+// Follows the same sealed interface pattern as mail.Service.
 func (s *Service) Receive(ctx context.Context, msg ReviewMessage) fn.Result[ReviewResponse] {
     switch m := msg.(type) {
     case ReviewRequest:
@@ -613,7 +624,7 @@ When operating as a specialized reviewer (security, performance, etc.):
 
 ## 3. Database Schema Extensions
 
-**Location**: `internal/db/migrations/000008_reviews.up.sql`
+**Location**: `internal/db/migrations/000003_reviews.up.sql`
 
 ```sql
 -- Review requests table
@@ -1520,11 +1531,13 @@ export function IssueCard({ issue }: IssueCardProps) {
 }
 ```
 
-### 5.8 Diff Viewer Component with @pierre/diffs
+### 5.8 Diff Viewer Component
 
-**Library**: `@pierre/diffs` from https://diffs.com/
+> **Note**: The diff rendering library needs to be selected during implementation.
+> Candidates: `@pierre/diffs`, `react-diff-viewer`, or a custom implementation
+> using `diff2html`. The API shown below is illustrative.
 
-The UI uses the diffs.com React components for professional diff rendering.
+The UI uses a React diff component for professional diff rendering.
 
 **Installation:**
 ```bash
@@ -1886,10 +1899,10 @@ import { ReviewsPage } from '@/pages/ReviewsPage';
 
 ## 6. CLI Commands
 
-**Location**: `cmd/substrate/cmd_review.go`
+**Location**: `cmd/substrate/commands/review.go`
 
 ```go
-package main
+package commands
 
 import (
     "github.com/spf13/cobra"
@@ -2157,7 +2170,7 @@ substrate reviewer stop security-reviewer-1
 **Programmatic (Go SDK):**
 ```go
 // Using the Claude Agent SDK to spawn a reviewer
-import "github.com/Roasbeef/claude-agent-sdk-go/claudeagent"
+import claudeagent "github.com/roasbeef/claude-agent-sdk-go"
 
 cfg := &ReviewerConfig{
     Name:         "security-reviewer",
@@ -2167,22 +2180,19 @@ cfg := &ReviewerConfig{
     WorkDir:      "/tmp/reviewer-security",
 }
 
-// Create spawner with reviewer config
+// Create spawner with reviewer config.
 spawner := agent.NewSpawner(agent.SpawnConfig{
     SystemPrompt:   cfg.SystemPrompt,
     Model:          cfg.Model,
     WorkDir:        cfg.WorkDir,
-    PermissionMode: claudeagent.PermissionModeAcceptEdits,
+    PermissionMode: claudeagent.PermissionModeDefault,
 })
 
-// Start interactive session (long-running)
-session, err := spawner.SpawnInteractive(ctx)
+// Spawn a review session with the reviewer prompt.
+resp, err := spawner.Spawn(ctx, "Subscribe to the 'reviews' topic and wait for review requests.")
 if err != nil {
     return err
 }
-
-// Inject initial prompt to subscribe to reviews
-session.Send("Subscribe to the 'reviews' topic and wait for review requests.")
 ```
 
 ### 9.2 Reviewer Hooks
@@ -2238,12 +2248,13 @@ type ReviewerRegistration struct {
 ### 10.1 JavaScript/TypeScript
 
 ```bash
-# Diff rendering (https://diffs.com)
-bun add @pierre/diffs
+# Diff rendering (TBD: @pierre/diffs, react-diff-viewer, or diff2html)
+# bun add <diff-library>
 
-# Already in project
-# - htmx for interactivity
-# - tailwindcss for styling
+# Already in project:
+# - react, react-dom
+# - @tanstack/react-query
+# - tailwindcss
 ```
 
 ### 10.2 Go
@@ -2251,8 +2262,8 @@ bun add @pierre/diffs
 ```go
 // go.mod additions
 require (
-    github.com/Roasbeef/claude-agent-sdk-go  // Already present
-    // No new Go deps needed for diff rendering (uses bun subprocess)
+    github.com/roasbeef/claude-agent-sdk-go  // Already present
+    // No new Go deps needed
 )
 ```
 
@@ -2312,8 +2323,8 @@ require (
    - Quick actions
 
 3. **Real-time Updates**
-   - SSE for review progress
-   - Live status changes
+   - WebSocket events for review progress (existing Hub infrastructure)
+   - Live status changes via TanStack Query invalidation
 
 ### Phase 4: Multi-Reviewer (Week 4)
 
@@ -2367,8 +2378,8 @@ GET    /api/reviews/{id}/thread        - Get review thread (HTML partial)
 GET    /api/reviews/{id}/issues        - Get all issues for review
 PATCH  /api/reviews/{id}/issues/{iid}  - Update issue status
 
-# SSE endpoints
-GET    /api/reviews/{id}/stream        - Stream review updates
+# Real-time updates via existing WebSocket at /ws (not SSE)
+# Review events: review_updated, review_iteration_added, issue_resolved
 ```
 
 ---
