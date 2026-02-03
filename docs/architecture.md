@@ -7,52 +7,22 @@ mail/messaging, pub/sub, and real-time status tracking.
 
 ```mermaid
 graph TB
-    subgraph "Claude Code Agents"
-        A1[Agent: AzureHaven]
-        A2[Agent: NobleLion]
-        A3[Agent: User]
-    end
+    A1[Agent: AzureHaven] --> Hooks
+    A2[Agent: NobleLion] --> Hooks
+    A3[Agent: User] --> Hooks
 
-    subgraph "Hooks"
-        H1[SessionStart]
-        H2[UserPromptSubmit]
-        H3[Stop - 9.5min poll]
-        H4[SubagentStop]
-        H5[PreCompact]
-    end
+    Hooks[Hook Scripts] --> CLI[substrate CLI]
+    CLI --> GRPC[gRPC :10009]
 
-    subgraph "CLI"
-        CLI[substrate]
-    end
-
-    subgraph "substrated"
-        subgraph "Transport Layer"
-            GRPC[gRPC Server :10009]
-            REST[REST Gateway /api/v1/]
-            WS[WebSocket /ws]
-            WEB[Web UI :8080]
-        end
-
-        subgraph "Actor System"
-            MA[Mail Actor]
-            NH[NotificationHub Actor]
-            AA[Activity Actor]
-            AP[Actor Pool]
-        end
-
-        subgraph "Storage"
-            DB[(SQLite + FTS5)]
-        end
-    end
-
-    A1 & A2 & A3 --> H1 & H2 & H3 & H4 & H5
-    H1 & H2 & H3 & H4 & H5 --> CLI
-    CLI --> GRPC
+    WEB[Web UI :8080] --> REST[REST /api/v1/]
     REST --> GRPC
-    WEB --> REST
-    WEB --> WS
-    GRPC --> MA & NH & AA
-    MA --> DB
+    WEB --> WS[WebSocket /ws]
+
+    GRPC --> MA[Mail Actor]
+    GRPC --> NH[NotificationHub Actor]
+    GRPC --> AA[Activity Actor]
+
+    MA --> DB[(SQLite + FTS5)]
     AA --> DB
     NH --> WS
 ```
@@ -87,23 +57,13 @@ Each actor runs in its own goroutine with a buffered mailbox channel.
 
 ```mermaid
 graph LR
-    subgraph "Actor System"
-        direction TB
-        MA[Mail Actor]
-        NH[NotificationHub]
-        AA[Activity Actor]
-    end
-
-    subgraph "Actor Pool"
-        P1[Worker 1]
-        P2[Worker 2]
-        P3[Worker N]
-    end
-
-    MA -->|Notify| NH
-    MA -->|Log| AA
+    MA[Mail Actor] -->|Notify| NH[NotificationHub]
+    MA -->|Log| AA[Activity Actor]
     NH -->|Deliver| WS[WebSocket Clients]
     NH -->|Deliver| SUB[gRPC Stream Subscribers]
+    Pool[Actor Pool] --> W1[Worker 1]
+    Pool --> W2[Worker 2]
+    Pool --> W3[Worker N]
 ```
 
 ### Mail Actor
