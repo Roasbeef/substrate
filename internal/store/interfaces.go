@@ -244,6 +244,81 @@ type SessionStore interface {
 	) error
 }
 
+// ReviewStore provides review CRUD operations.
+type ReviewStore interface {
+	// CreateReview creates a new review record.
+	CreateReview(
+		ctx context.Context, params CreateReviewParams,
+	) (Review, error)
+
+	// GetReview retrieves a review by its UUID.
+	GetReview(ctx context.Context, reviewID string) (Review, error)
+
+	// ListReviews lists reviews ordered by creation time.
+	ListReviews(
+		ctx context.Context, limit, offset int,
+	) ([]Review, error)
+
+	// ListReviewsByState lists reviews matching the given state.
+	ListReviewsByState(
+		ctx context.Context, state string, limit int,
+	) ([]Review, error)
+
+	// ListReviewsByRequester lists reviews by the requesting agent.
+	ListReviewsByRequester(
+		ctx context.Context, requesterID int64, limit int,
+	) ([]Review, error)
+
+	// ListActiveReviews returns reviews in non-terminal states (for
+	// restart recovery).
+	ListActiveReviews(ctx context.Context) ([]Review, error)
+
+	// UpdateReviewState updates the FSM state of a review.
+	UpdateReviewState(
+		ctx context.Context, reviewID, state string,
+	) error
+
+	// UpdateReviewCompleted marks a review as completed with a terminal
+	// state.
+	UpdateReviewCompleted(
+		ctx context.Context, reviewID, state string,
+	) error
+
+	// CreateReviewIteration records a review iteration result.
+	CreateReviewIteration(
+		ctx context.Context, params CreateReviewIterationParams,
+	) (ReviewIteration, error)
+
+	// GetReviewIterations gets all iterations for a review.
+	GetReviewIterations(
+		ctx context.Context, reviewID string,
+	) ([]ReviewIteration, error)
+
+	// CreateReviewIssue records a specific issue found during review.
+	CreateReviewIssue(
+		ctx context.Context, params CreateReviewIssueParams,
+	) (ReviewIssue, error)
+
+	// GetReviewIssues gets all issues for a review.
+	GetReviewIssues(
+		ctx context.Context, reviewID string,
+	) ([]ReviewIssue, error)
+
+	// GetOpenReviewIssues gets open issues for a review.
+	GetOpenReviewIssues(
+		ctx context.Context, reviewID string,
+	) ([]ReviewIssue, error)
+
+	// UpdateReviewIssueStatus updates an issue's resolution status.
+	UpdateReviewIssueStatus(
+		ctx context.Context, issueID int64, status string,
+		resolvedInIteration *int,
+	) error
+
+	// CountOpenIssues counts open issues for a review.
+	CountOpenIssues(ctx context.Context, reviewID string) (int64, error)
+}
+
 // Storage combines all store interfaces for unified access.
 type Storage interface {
 	MessageStore
@@ -251,6 +326,7 @@ type Storage interface {
 	TopicStore
 	ActivityStore
 	SessionStore
+	ReviewStore
 
 	// WithTx executes a function within a write database transaction.
 	WithTx(ctx context.Context, fn func(ctx context.Context, s Storage) error) error
@@ -505,6 +581,201 @@ func MessageRecipientFromSqlc(r sqlc.MessageRecipient) MessageRecipient {
 	return mr
 }
 
+// Review represents a code review record.
+type Review struct {
+	ID          int64
+	ReviewID    string
+	ThreadID    string
+	RequesterID int64
+	PRNumber    int
+	Branch      string
+	BaseBranch  string
+	CommitSHA   string
+	RepoPath    string
+	RemoteURL   string
+	ReviewType  string
+	Priority    string
+	State       string
+	CreatedAt   time.Time
+	UpdatedAt   time.Time
+	CompletedAt *time.Time
+}
+
+// ReviewIteration represents a single round of review.
+type ReviewIteration struct {
+	ID                int64
+	ReviewID          string
+	IterationNum      int
+	ReviewerID        string
+	ReviewerSessionID string
+	Decision          string
+	Summary           string
+	IssuesJSON        string
+	SuggestionsJSON   string
+	FilesReviewed     int
+	LinesAnalyzed     int
+	DurationMS        int64
+	CostUSD           float64
+	StartedAt         time.Time
+	CompletedAt       *time.Time
+}
+
+// ReviewIssue represents a specific issue found during review.
+type ReviewIssue struct {
+	ID                  int64
+	ReviewID            string
+	IterationNum        int
+	IssueType           string
+	Severity            string
+	FilePath            string
+	LineStart           int
+	LineEnd             int
+	Title               string
+	Description         string
+	CodeSnippet         string
+	Suggestion          string
+	ClaudeMDRef         string
+	Status              string
+	ResolvedAt          *time.Time
+	ResolvedInIteration *int
+	CreatedAt           time.Time
+}
+
+// CreateReviewParams contains parameters for creating a review.
+type CreateReviewParams struct {
+	ReviewID    string
+	ThreadID    string
+	RequesterID int64
+	PRNumber    int
+	Branch      string
+	BaseBranch  string
+	CommitSHA   string
+	RepoPath    string
+	RemoteURL   string
+	ReviewType  string
+	Priority    string
+}
+
+// CreateReviewIterationParams contains parameters for creating a review
+// iteration.
+type CreateReviewIterationParams struct {
+	ReviewID          string
+	IterationNum      int
+	ReviewerID        string
+	ReviewerSessionID string
+	Decision          string
+	Summary           string
+	IssuesJSON        string
+	SuggestionsJSON   string
+	FilesReviewed     int
+	LinesAnalyzed     int
+	DurationMS        int64
+	CostUSD           float64
+	StartedAt         time.Time
+	CompletedAt       *time.Time
+}
+
+// CreateReviewIssueParams contains parameters for creating a review issue.
+type CreateReviewIssueParams struct {
+	ReviewID     string
+	IterationNum int
+	IssueType    string
+	Severity     string
+	FilePath     string
+	LineStart    int
+	LineEnd      int
+	Title        string
+	Description  string
+	CodeSnippet  string
+	Suggestion   string
+	ClaudeMDRef  string
+}
+
+// ReviewFromSqlc converts a sqlc.Review to a store.Review.
+func ReviewFromSqlc(r sqlc.Review) Review {
+	rev := Review{
+		ID:          r.ID,
+		ReviewID:    r.ReviewID,
+		ThreadID:    r.ThreadID,
+		RequesterID: r.RequesterID,
+		Branch:      r.Branch,
+		BaseBranch:  r.BaseBranch,
+		CommitSHA:   r.CommitSha,
+		RepoPath:    r.RepoPath,
+		RemoteURL:   r.RemoteUrl.String,
+		ReviewType:  r.ReviewType,
+		Priority:    r.Priority,
+		State:       r.State,
+		CreatedAt:   time.Unix(r.CreatedAt, 0),
+		UpdatedAt:   time.Unix(r.UpdatedAt, 0),
+	}
+	if r.PrNumber.Valid {
+		rev.PRNumber = int(r.PrNumber.Int64)
+	}
+	if r.CompletedAt.Valid {
+		t := time.Unix(r.CompletedAt.Int64, 0)
+		rev.CompletedAt = &t
+	}
+	return rev
+}
+
+// ReviewIterationFromSqlc converts a sqlc.ReviewIteration to a store model.
+func ReviewIterationFromSqlc(ri sqlc.ReviewIteration) ReviewIteration {
+	iter := ReviewIteration{
+		ID:                ri.ID,
+		ReviewID:          ri.ReviewID,
+		IterationNum:      int(ri.IterationNum),
+		ReviewerID:        ri.ReviewerID,
+		ReviewerSessionID: ri.ReviewerSessionID.String,
+		Decision:          ri.Decision,
+		Summary:           ri.Summary,
+		IssuesJSON:        ri.IssuesJson.String,
+		SuggestionsJSON:   ri.SuggestionsJson.String,
+		FilesReviewed:     int(ri.FilesReviewed),
+		LinesAnalyzed:     int(ri.LinesAnalyzed),
+		DurationMS:        ri.DurationMs,
+		CostUSD:           ri.CostUsd,
+		StartedAt:         time.Unix(ri.StartedAt, 0),
+	}
+	if ri.CompletedAt.Valid {
+		t := time.Unix(ri.CompletedAt.Int64, 0)
+		iter.CompletedAt = &t
+	}
+	return iter
+}
+
+// ReviewIssueFromSqlc converts a sqlc.ReviewIssue to a store model.
+func ReviewIssueFromSqlc(ri sqlc.ReviewIssue) ReviewIssue {
+	issue := ReviewIssue{
+		ID:           ri.ID,
+		ReviewID:     ri.ReviewID,
+		IterationNum: int(ri.IterationNum),
+		IssueType:    ri.IssueType,
+		Severity:     ri.Severity,
+		FilePath:     ri.FilePath,
+		LineStart:    int(ri.LineStart),
+		Title:        ri.Title,
+		Description:  ri.Description,
+		CodeSnippet:  ri.CodeSnippet.String,
+		Suggestion:   ri.Suggestion.String,
+		ClaudeMDRef:  ri.ClaudeMdRef.String,
+		Status:       ri.Status,
+		CreatedAt:    time.Unix(ri.CreatedAt, 0),
+	}
+	if ri.LineEnd.Valid {
+		issue.LineEnd = int(ri.LineEnd.Int64)
+	}
+	if ri.ResolvedAt.Valid {
+		t := time.Unix(ri.ResolvedAt.Int64, 0)
+		issue.ResolvedAt = &t
+	}
+	if ri.ResolvedInIteration.Valid {
+		v := int(ri.ResolvedInIteration.Int64)
+		issue.ResolvedInIteration = &v
+	}
+	return issue
+}
+
 // ToSqlcNullString converts a string to sql.NullString.
 func ToSqlcNullString(s string) sql.NullString {
 	if s == "" {
@@ -519,4 +790,20 @@ func ToSqlcNullInt64(t *time.Time) sql.NullInt64 {
 		return sql.NullInt64{}
 	}
 	return sql.NullInt64{Int64: t.Unix(), Valid: true}
+}
+
+// ToSqlcNullInt64FromInt converts an int pointer to sql.NullInt64.
+func ToSqlcNullInt64FromInt(v *int) sql.NullInt64 {
+	if v == nil {
+		return sql.NullInt64{}
+	}
+	return sql.NullInt64{Int64: int64(*v), Valid: true}
+}
+
+// ToSqlcNullInt64Val converts an int to sql.NullInt64.
+func ToSqlcNullInt64Val(v int) sql.NullInt64 {
+	if v == 0 {
+		return sql.NullInt64{}
+	}
+	return sql.NullInt64{Int64: int64(v), Valid: true}
 }

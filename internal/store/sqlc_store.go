@@ -170,7 +170,58 @@ type QueryStore interface {
 	GetSentMessages(
 		ctx context.Context, arg sqlc.GetSentMessagesParams,
 	) ([]sqlc.GetSentMessagesRow, error)
-	GetAllSentMessages(ctx context.Context, limit int64) ([]sqlc.GetAllSentMessagesRow, error)
+	GetAllSentMessages(
+		ctx context.Context, limit int64,
+	) ([]sqlc.GetAllSentMessagesRow, error)
+
+	// Review operations.
+	CreateReview(
+		ctx context.Context, arg sqlc.CreateReviewParams,
+	) (sqlc.Review, error)
+	GetReview(
+		ctx context.Context, reviewID string,
+	) (sqlc.Review, error)
+	ListReviews(
+		ctx context.Context, arg sqlc.ListReviewsParams,
+	) ([]sqlc.Review, error)
+	ListReviewsByState(
+		ctx context.Context, arg sqlc.ListReviewsByStateParams,
+	) ([]sqlc.Review, error)
+	ListReviewsByRequester(
+		ctx context.Context, arg sqlc.ListReviewsByRequesterParams,
+	) ([]sqlc.Review, error)
+	ListActiveReviews(ctx context.Context) ([]sqlc.Review, error)
+	UpdateReviewState(
+		ctx context.Context, arg sqlc.UpdateReviewStateParams,
+	) error
+	UpdateReviewCompleted(
+		ctx context.Context, arg sqlc.UpdateReviewCompletedParams,
+	) error
+
+	// Review iteration operations.
+	CreateReviewIteration(
+		ctx context.Context, arg sqlc.CreateReviewIterationParams,
+	) (sqlc.ReviewIteration, error)
+	GetReviewIterations(
+		ctx context.Context, reviewID string,
+	) ([]sqlc.ReviewIteration, error)
+
+	// Review issue operations.
+	CreateReviewIssue(
+		ctx context.Context, arg sqlc.CreateReviewIssueParams,
+	) (sqlc.ReviewIssue, error)
+	GetReviewIssues(
+		ctx context.Context, reviewID string,
+	) ([]sqlc.ReviewIssue, error)
+	GetOpenReviewIssues(
+		ctx context.Context, reviewID string,
+	) ([]sqlc.ReviewIssue, error)
+	UpdateReviewIssueStatus(
+		ctx context.Context, arg sqlc.UpdateReviewIssueStatusParams,
+	) error
+	CountOpenIssues(
+		ctx context.Context, reviewID string,
+	) (int64, error)
 }
 
 // BatchedQueryStore is a version of QueryStore that's capable of batched
