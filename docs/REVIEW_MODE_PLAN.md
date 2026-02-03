@@ -209,107 +209,187 @@ var ReviewServiceKey = actor.NewServiceKey[ReviewMessage, ReviewResponse](
 )
 
 // Service handles review orchestration as an actor.
-// It spawns per-review Claude Agent SDK instances and manages FSM state.
+// It subscribes to the "reviews" topic via the notification system,
+// creates DB records, and spawns per-review sub-actors.
 type Service struct {
     store     store.Storage
     mailRef   actor.ActorRef[mail.MailRequest, mail.MailResponse]
+    system    *actor.System
 
     // Registered reviewer configurations (for validation/routing).
+    // Specialized reviewers are just different configs, same architecture.
     reviewers map[string]*ReviewerConfig
 
-    // Active reviews being tracked.
-    activeReviews map[string]*ReviewFSM
+    // Active review sub-actors, keyed by review ID.
+    activeReviews map[string]*reviewSubActor
 }
 
-// SpawnReviewerAgent spawns a per-review Claude Code agent via the Go Agent SDK.
-// The agent reads the review thread for context, performs analysis, and replies
-// with structured feedback including YAML frontmatter for FSM updates.
-func (s *Service) SpawnReviewerAgent(ctx context.Context, req ReviewRequest, cfg *ReviewerConfig) error {
-    // Build the reviewer's system prompt with persona and instructions.
-    systemPrompt := s.buildReviewerSystemPrompt(cfg, req)
+// Receive implements ActorBehavior for the review service.
+// SpawnReviewerAgent is itself an actor message (ReviewRequest).
+func (s *Service) Receive(ctx context.Context, msg ReviewMessage) fn.Result[ReviewResponse] {
+    switch m := msg.(type) {
+    case ReviewRequest:
+        // 1. Create DB records (review, thread).
+        // 2. Spawn a sub-actor for this specific review.
+        // 3. Send the sub-actor a StartReview message.
+        return s.handleReviewRequest(ctx, m)
+    case ReviewIterationRequest:
+        return s.handleIteration(ctx, m)
+    case ReviewApprovalCheck:
+        return s.handleApprovalCheck(ctx, m)
+    default:
+        return fn.Err[ReviewResponse](fmt.Errorf("unknown message type: %T", msg))
+    }
+}
 
-    // Create a Claude Agent SDK client for this review.
+// handleReviewRequest creates DB records and spawns a review sub-actor.
+func (s *Service) handleReviewRequest(ctx context.Context, req ReviewRequest) fn.Result[ReviewResponse] {
+    // 1. Create review record in DB.
+    review, err := s.store.CreateReview(ctx, store.CreateReviewParams{
+        ReviewID:    uuid.New().String(),
+        ThreadID:    req.ThreadID,
+        RequesterID: req.RequesterID,
+        Branch:      req.Branch,
+        BaseBranch:  req.BaseBranch,
+        CommitSHA:   req.CommitSHA,
+        RepoPath:    req.RepoPath,
+        ReviewType:  string(req.ReviewType),
+        Priority:    string(req.Priority),
+    })
+    if err != nil {
+        return fn.Err[ReviewResponse](err)
+    }
+
+    // 2. Spawn a sub-actor for this review.
+    cfg := s.reviewers[string(req.ReviewType)]
+    if cfg == nil {
+        cfg = DefaultReviewerConfig()
+    }
+
+    subActor := newReviewSubActor(s.store, s.mailRef, review.ReviewID, cfg)
+    s.activeReviews[review.ReviewID] = subActor
+
+    // 3. Start the sub-actor (it creates the Claude Agent SDK client).
+    go subActor.Run(ctx, req)
+
+    return fn.Ok(ReviewResponse{
+        ReviewID: review.ReviewID,
+        ThreadID: review.ThreadID,
+    })
+}
+
+// --------------------------------------------------------------------------
+// reviewSubActor: per-review actor managing Claude Agent SDK and FSM
+// --------------------------------------------------------------------------
+
+// reviewSubActor manages a single review's lifecycle.
+// It owns the Claude Agent SDK client/stream, manages the FSM,
+// and monitors the thread for YAML frontmatter updates.
+type reviewSubActor struct {
+    store    store.Storage
+    mailRef  actor.ActorRef[mail.MailRequest, mail.MailResponse]
+    reviewID string
+    cfg      *ReviewerConfig
+    fsm      *ReviewFSM
+
+    client   *claudeagent.Client
+    stream   *claudeagent.Stream
+    cancel   context.CancelFunc
+}
+
+func newReviewSubActor(
+    store store.Storage,
+    mailRef actor.ActorRef[mail.MailRequest, mail.MailResponse],
+    reviewID string, cfg *ReviewerConfig,
+) *reviewSubActor {
+    return &reviewSubActor{
+        store:    store,
+        mailRef:  mailRef,
+        reviewID: reviewID,
+        cfg:      cfg,
+        fsm:      NewReviewFSM(reviewID),
+    }
+}
+
+// Run starts the review sub-actor. It creates the Claude Agent SDK client,
+// opens a bidirectional stream, and manages the review conversation.
+// RepoPath comes from the review request (caller provides their work tree).
+func (r *reviewSubActor) Run(ctx context.Context, req ReviewRequest) {
+    ctx, r.cancel = context.WithCancel(ctx)
+    defer r.cleanup()
+
+    // Build system prompt from reviewer config.
+    systemPrompt := buildReviewerSystemPrompt(r.cfg, req)
+
+    // Create Claude Agent SDK client.
+    // CWD is the sender's repo path (typically a git work tree to avoid
+    // clobbering other reviewers).
     client, err := claudeagent.NewClient(
         claudeagent.WithSystemPrompt(systemPrompt),
-        claudeagent.WithModel(cfg.Model),
+        claudeagent.WithModel(r.cfg.Model),
         claudeagent.WithCwd(req.RepoPath),
         claudeagent.WithPermissionMode(claudeagent.PermissionModeDefault),
         claudeagent.WithMaxTurns(50),
     )
     if err != nil {
-        return fmt.Errorf("create client: %w", err)
+        r.handleError(fmt.Errorf("create client: %w", err))
+        return
     }
+    r.client = client
 
-    // Connect to the Claude Code subprocess.
     if err := client.Connect(ctx); err != nil {
-        client.Close()
-        return fmt.Errorf("connect: %w", err)
+        r.handleError(fmt.Errorf("connect: %w", err))
+        return
     }
 
-    // Open a bidirectional stream for back-and-forth conversation.
     stream, err := client.Stream(ctx)
     if err != nil {
-        client.Close()
-        return fmt.Errorf("open stream: %w", err)
+        r.handleError(fmt.Errorf("open stream: %w", err))
+        return
     }
+    r.stream = stream
 
-    // Initial prompt tells the agent to read the review thread and start.
-    initialPrompt := fmt.Sprintf(
-        "You are reviewing branch %q. Read thread %q via "+
-            "`substrate read` for context, then perform your review. "+
-            "Reply in the same thread with your findings.",
-        req.Branch, req.ThreadID,
-    )
-
-    // Run the reviewer in a goroutine (managed by the service).
-    go s.runReviewerLoop(ctx, stream, client, req.ReviewID, initialPrompt)
-
-    return nil
-}
-
-// runReviewerLoop manages the lifecycle of a reviewer agent stream.
-// It sends the initial prompt, monitors messages for YAML frontmatter
-// to update the FSM, and handles cleanup.
-func (s *Service) runReviewerLoop(
-    ctx context.Context, stream *claudeagent.Stream,
-    client *claudeagent.Client, reviewID string, prompt string,
-) {
-    defer client.Close()
-    defer stream.Close()
+    // Update FSM to under_review.
+    r.fsm.ProcessEvent(ctx, StartReviewEvent{ReviewerID: r.cfg.Name})
+    r.store.UpdateReviewState(ctx, r.reviewID, r.fsm.CurrentState)
 
     // Send initial review prompt.
-    if err := stream.Send(ctx, prompt); err != nil {
-        s.handleReviewerError(reviewID, err)
+    // References the Claude Code review plugin approach:
+    // https://github.com/anthropics/claude-code/blob/main/plugins/code-review/commands/code-review.md
+    initialPrompt := fmt.Sprintf(
+        "You are reviewing branch %q (base: %s). "+
+            "Read the review thread %q via `substrate read` for full context. "+
+            "Perform your review and reply IN THE SAME THREAD with your findings. "+
+            "Include YAML frontmatter with review_id, decision, and issues_count.",
+        req.Branch, req.BaseBranch, req.ThreadID,
+    )
+
+    if err := stream.Send(ctx, initialPrompt); err != nil {
+        r.handleError(err)
         return
     }
 
     // Process messages from the reviewer agent.
     for msg := range stream.Messages() {
-        // Check for YAML frontmatter in assistant messages to update FSM.
-        s.processReviewerMessage(ctx, reviewID, msg)
+        r.processMessage(ctx, msg)
     }
 }
 
-// StructuredReviewRequest contains everything needed for one-shot analysis.
-type StructuredReviewRequest struct {
-    ReviewID     string
-    WorkDir      string            // Where code is checked out
-    Diff         string            // Git diff to review
-    Context      string            // PR description, previous comments
-    FocusAreas   []string          // What to look for
-    PreviousIssues []ReviewIssue   // Issues from prior iteration (for re-review)
+// processMessage handles messages from the Claude Agent SDK stream.
+// Parses YAML frontmatter to update FSM and create DB records.
+func (r *reviewSubActor) processMessage(ctx context.Context, msg claudeagent.Message) {
+    // Extract YAML frontmatter from assistant messages.
+    // Update FSM state, create review_iterations and review_issues records.
+    // ...
 }
 
-// StructuredReviewResult is the JSON response from one-shot analysis.
-type StructuredReviewResult struct {
-    Decision    ReviewDecision `json:"decision"`
-    Summary     string         `json:"summary"`
-    Issues      []ReviewIssue  `json:"issues"`
-    Suggestions []Suggestion   `json:"suggestions,omitempty"`
-
-    // Metadata
-    FilesReviewed int `json:"files_reviewed"`
-    LinesAnalyzed int `json:"lines_analyzed"`
+func (r *reviewSubActor) cleanup() {
+    if r.stream != nil {
+        r.stream.Close()
+    }
+    if r.client != nil {
+        r.client.Close()
+    }
 }
 
 // ReviewMessage is a sealed interface for review actor messages.
@@ -492,7 +572,10 @@ func SpecializedReviewers() map[string]*ReviewerConfig {
 
 ### 1.5 Conversational Review Flow
 
-Reviews are bidirectional conversations in a mail thread, not one-way feedback.
+Reviews are bidirectional conversations in a **single mail thread**. All messages
+(request, review, questions, responses, re-requests, approvals) stay in the same
+thread so both the reviewer sub-actor and the author agent maintain full context.
+The thread ID is created when the review is requested and used throughout.
 
 **Example Thread:**
 ```
@@ -805,42 +888,73 @@ CREATE INDEX idx_review_issues_status ON review_issues(status);
 
 ---
 
-## 4. Multi-Reviewer Topic System
+## 4. Topic Subscription and Multi-Reviewer
 
-**Location**: `internal/review/multi_reviewer.go`
+**Location**: Part of `internal/review/service.go`
 
-For reviews that need multiple specialized perspectives:
+The ReviewerService subscribes to the "reviews" topic using the notification hub
+pattern from `darepo-client`. When a message arrives on the topic, the Service
+parses it, creates DB records, and spawns a sub-actor for the review.
 
 ```go
-// MultiReviewConfig configures a multi-reviewer setup.
+// Service startup: subscribe to the reviews topic for incoming requests.
+// Uses the actor notification system (similar to darepo-client notifier pattern).
+func (s *Service) Start(ctx context.Context) error {
+    // Get or create the reviews topic.
+    topic, err := s.store.GetOrCreateTopic(ctx, "reviews", "broadcast")
+    if err != nil {
+        return fmt.Errorf("get reviews topic: %w", err)
+    }
+
+    // Subscribe to notifications for the reviews topic.
+    // When a new message arrives, the notification hub delivers it to our channel.
+    s.notifHub.Subscribe(ctx, s.agentID, "review-service", s.incomingCh)
+
+    // Start the message processing loop.
+    go s.processIncoming(ctx)
+
+    // On startup, recover any active reviews from DB.
+    return s.recoverActiveReviews(ctx)
+}
+
+// processIncoming handles messages arriving on the reviews topic.
+func (s *Service) processIncoming(ctx context.Context) {
+    for {
+        select {
+        case <-ctx.Done():
+            return
+        case msg := <-s.incomingCh:
+            // Parse the incoming message as a review request.
+            req, err := parseReviewRequest(msg)
+            if err != nil {
+                log.Printf("review: failed to parse request: %v", err)
+                continue
+            }
+
+            // Create DB records and spawn sub-actor.
+            s.handleReviewRequest(ctx, req)
+        }
+    }
+}
+```
+
+### Multi-Reviewer Consensus
+
+For reviews needing multiple perspectives, multiple sub-actors are spawned:
+
+```go
+// MultiReviewConfig configures consensus rules.
 type MultiReviewConfig struct {
-    // Topic where review requests are published
-    TopicName string
+    // Reviewer personas to use (each spawns a sub-actor).
+    Reviewers []string  // ["security", "performance"]
 
-    // Reviewers subscribed to this topic
-    Reviewers []string  // ["security", "performance", "architecture"]
-
-    // Consensus rules
-    RequireAll      bool  // All must approve vs majority
-    MinApprovals    int   // Minimum approvals needed
-    BlockOnCritical bool  // Any critical issue blocks
+    // Consensus rules.
+    RequireAll      bool  // All must approve vs majority.
+    MinApprovals    int   // Minimum approvals needed.
+    BlockOnCritical bool  // Any critical issue blocks.
 }
 
-// PublishReviewRequest publishes a review to the multi-reviewer topic.
-func (s *Service) PublishReviewRequest(ctx context.Context, req ReviewRequest, config MultiReviewConfig) error {
-    // Publish to topic - all subscribed reviewers receive it.
-    // Uses the actual mail.PublishRequest fields (flat struct, no wrapper).
-    _, err := s.mailSvc.Publish(ctx, mail.PublishRequest{
-        SenderID:  req.RequesterID,
-        TopicName: config.TopicName,
-        Subject:   fmt.Sprintf("Review Request: %s", req.Branch),
-        Body:      s.formatReviewRequestBody(req),
-        Priority:  mail.Priority(req.Priority),
-    })
-    return err
-}
-
-// AggregateReviews combines reviews from multiple reviewers.
+// AggregateReviews combines reviews from multiple sub-actors.
 func (s *Service) AggregateReviews(ctx context.Context, reviewID string) (*AggregatedReview, error) {
     iterations, err := s.store.GetReviewIterations(ctx, reviewID)
     if err != nil {
@@ -861,12 +975,17 @@ func (s *Service) AggregateReviews(ctx context.Context, reviewID string) (*Aggre
         agg.AllIssues = append(agg.AllIssues, iter.Issues...)
     }
 
-    // Compute consensus
+    // Compute consensus.
     agg.ConsensusDecision = s.computeConsensus(agg)
 
     return agg, nil
 }
 ```
+
+> **Note**: Specialized reviewers (security, performance, architecture) are not
+> implemented in Phase 1. The architecture supports them via different
+> `ReviewerConfig` instances - they're just specialized sub-actors on the same
+> topic. The interfaces are defined now for future use.
 
 ---
 
@@ -2221,71 +2340,37 @@ Use the structured review format in all responses.
 
 ## 9. Reviewer Agent Management
 
-### 9.1 Starting Reviewer Agents
+### 9.1 Sub-Actor Lifecycle
 
-Reviewer agents are auto-spawned by ReviewerService using the Claude Agent Go SDK.
-Each active review gets a dedicated reviewer agent.
+Reviewer sub-actors are created by the Service's `handleReviewRequest` (Section 1.2).
+Each sub-actor owns its Claude Agent SDK client, manages its FSM, and is tracked
+in `Service.activeReviews`.
 
-**Auto-Spawn (Primary Path):**
-```go
-import claudeagent "github.com/roasbeef/claude-agent-sdk-go"
-
-// ReviewerService auto-spawns when a review request arrives.
-func (s *Service) spawnReviewer(ctx context.Context, req ReviewRequest, cfg *ReviewerConfig) error {
-    // Create client with reviewer persona configuration.
-    client, err := claudeagent.NewClient(
-        claudeagent.WithSystemPrompt(cfg.SystemPrompt),
-        claudeagent.WithModel(cfg.Model),
-        claudeagent.WithCwd(req.RepoPath),
-        claudeagent.WithPermissionMode(claudeagent.PermissionModeDefault),
-        claudeagent.WithMaxTurns(50),
-        claudeagent.WithEnv(map[string]string{
-            "REVIEW_ID":   req.ReviewID,
-            "THREAD_ID":   req.ThreadID,
-            "BRANCH":      req.Branch,
-        }),
-    )
-    if err != nil {
-        return fmt.Errorf("create reviewer client: %w", err)
-    }
-
-    if err := client.Connect(ctx); err != nil {
-        client.Close()
-        return err
-    }
-
-    // Open bidirectional stream for conversational review.
-    stream, err := client.Stream(ctx)
-    if err != nil {
-        client.Close()
-        return err
-    }
-
-    // Run review loop in background goroutine.
-    go s.runReviewerLoop(ctx, stream, client, req.ReviewID, initialPrompt)
-
-    return nil
-}
-```
+**Key lifecycle points:**
+1. **Creation**: `handleReviewRequest` → `newReviewSubActor` → `subActor.Run(ctx, req)`
+2. **Running**: Sub-actor creates Claude SDK client, opens stream, sends prompts
+3. **Monitoring**: Sub-actor parses YAML frontmatter from reviewer messages for FSM
+4. **Completion**: Stream ends → cleanup → remove from activeReviews
+5. **Recovery**: On restart, `recoverActiveReviews` queries DB and re-spawns sub-actors
 
 **CLI Management:**
 ```bash
-# List active reviewers
+# List active reviews (shows sub-actor state)
 substrate reviewer list
 # Output:
-# NAME                          TYPE        STATUS   REVIEW_ID    BRANCH
-# SecurityReviewer-review-abc   security    active   abc123       feature-auth
-# CodeReviewer-review-def       code        active   def456       fix-bug-42
+# REVIEW_ID    REVIEWER                       STATE           BRANCH
+# abc123       CodeReviewer-review-abc123      under_review    feature-auth
+# def456       CodeReviewer-review-def456      changes_req     fix-bug-42
 
-# Stop a reviewer
-substrate reviewer stop SecurityReviewer-review-abc
+# Stop a specific review's sub-actor
+substrate reviewer stop abc123
 ```
 
 **Restart Recovery:**
 ```go
-// On server restart, re-spawn agents for active reviews.
-func (s *Service) RecoverActiveReviews(ctx context.Context) error {
-    // Query for reviews in active states.
+// On server restart, re-spawn sub-actors for active reviews.
+// Called from Service.Start() after topic subscription.
+func (s *Service) recoverActiveReviews(ctx context.Context) error {
     reviews, err := s.store.ListReviewsByState(ctx,
         StateUnderReview, StateChangesRequested, StateReReview,
     )
@@ -2295,10 +2380,15 @@ func (s *Service) RecoverActiveReviews(ctx context.Context) error {
 
     for _, review := range reviews {
         cfg := s.reviewers[review.ReviewType]
-        if err := s.spawnReviewer(ctx, review.ToRequest(), cfg); err != nil {
-            log.Printf("Failed to recover reviewer for %s: %v",
-                review.ReviewID, err)
+        if cfg == nil {
+            cfg = DefaultReviewerConfig()
         }
+
+        subActor := newReviewSubActor(s.store, s.mailRef, review.ReviewID, cfg)
+        s.activeReviews[review.ReviewID] = subActor
+
+        // Sub-actor reads the full thread for context recovery.
+        go subActor.Run(ctx, review.ToRequest())
     }
     return nil
 }
