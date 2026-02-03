@@ -1,6 +1,6 @@
 // AppShell component - the main layout wrapper for the application.
 
-import { type ReactNode, useCallback } from 'react';
+import { type ReactNode, useCallback, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { clsx } from 'clsx';
 import { twMerge } from 'tailwind-merge';
@@ -11,6 +11,9 @@ import { ModalContainer } from './ModalContainer.js';
 import { useNewMessageNotifications } from '@/hooks/useNotifications.js';
 import { useMessageToasts } from '@/hooks/useMessageToasts.js';
 import { useUIStore } from '@/stores/ui.js';
+
+// LocalStorage key for pending thread (backup for when tab is in background).
+const PENDING_THREAD_KEY = 'subtrate_pending_thread';
 
 // Combine clsx and tailwind-merge for class name handling.
 function cn(...inputs: (string | undefined | null | false)[]) {
@@ -65,16 +68,45 @@ export function AppShell({
       // Set pending thread for InboxPage to pick up.
       setPendingThread(threadId);
 
-      // If already on inbox-related pages, navigate with thread ID in URL to force open.
-      // Otherwise, navigate to the thread URL directly.
-      if (location.pathname === '/inbox' || location.pathname === '/') {
-        navigate(`/inbox/thread/${threadId}`);
-      } else {
-        navigate(`/inbox/thread/${threadId}`);
+      // Also save to localStorage as backup (for when tab is in background).
+      try {
+        localStorage.setItem(PENDING_THREAD_KEY, threadId);
+      } catch {
+        // Ignore storage errors.
       }
+
+      // Navigate to the thread URL.
+      navigate(`/inbox/thread/${threadId}`);
     },
-    [setPendingThread, navigate, location.pathname],
+    [setPendingThread, navigate],
   );
+
+  // Check for pending thread on visibility change (when tab becomes visible).
+  // This handles cases where notification clicks happen while tab is in background.
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        // Check localStorage for pending thread.
+        try {
+          const pendingThread = localStorage.getItem(PENDING_THREAD_KEY);
+          if (pendingThread) {
+            // Clear it immediately to prevent re-processing.
+            localStorage.removeItem(PENDING_THREAD_KEY);
+            // Navigate to the thread.
+            setPendingThread(pendingThread);
+            navigate(`/inbox/thread/${pendingThread}`);
+          }
+        } catch {
+          // Ignore storage errors.
+        }
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
+  }, [navigate, setPendingThread]);
 
   // Enable automatic notifications for new messages.
   // Browser notifications (desktop).
