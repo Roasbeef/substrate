@@ -698,7 +698,7 @@ This installs:
 |------|---------|----------|
 | **SessionStart** | Session begins | Heartbeat + check inbox, inject unread messages as context |
 | **UserPromptSubmit** | User sends message | Silent heartbeat + check for new mail |
-| **Stop** | Main agent stopping | **Persistent agent pattern** - long-poll for 55s, always block to keep agent alive |
+| **Stop** | Main agent stopping | **Persistent agent pattern** - long-poll for 9m30s, always block to keep agent alive |
 | **SubagentStop** | Subagent stopping | One-shot check - block if messages, then allow exit |
 | **PreCompact** | Before compaction | Save identity state for restoration after compaction |
 
@@ -707,7 +707,7 @@ This installs:
 The Stop hook implements a "keep alive" pattern that keeps main agents running indefinitely:
 
 1. When the agent tries to stop, the Stop hook runs
-2. It long-polls for 55s (under 60s timeout) checking for new mail
+2. It long-polls for 9m30s (under 10m hook timeout) checking for new mail
 3. If mail arrives, it blocks exit and shows the messages to Claude
 4. If no mail, it **still blocks** to keep the agent alive (heartbeat mode)
 5. User can force exit with **Ctrl+C** (bypasses all hooks)

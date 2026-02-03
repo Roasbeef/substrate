@@ -52,7 +52,7 @@ flowchart TD
     B -->|Mail exists| C[BLOCK - Show messages]
     B -->|No mail| D{Check Incomplete Tasks}
     D -->|Tasks incomplete| E[BLOCK - List tasks]
-    D -->|No incomplete tasks| F[Long Poll 55s]
+    D -->|No incomplete tasks| F[Long Poll 9m30s]
     F -->|New message| C
     F -->|Timeout| G[BLOCK - Heartbeat mode]
     G --> H[Ctrl+C to force exit]
@@ -70,8 +70,8 @@ flowchart TD
 
 2. **Checks mail before tasks** - Mail is more actionable and time-sensitive.
 
-3. **55-second long poll** - Under the 60s hook timeout, continuously checking
-   for incoming messages.
+3. **9.5-minute long poll** - Under the 10-minute hook timeout, continuously
+   checking for incoming messages.
 
 4. **Ctrl+C force exit** - Users can bypass the hook with Ctrl+C.
 
@@ -132,7 +132,7 @@ flowchart TD
 
 | Aspect | Stop (Main Agent) | SubagentStop |
 |--------|-------------------|--------------|
-| Long poll | Yes (55s) | No |
+| Long poll | Yes (9m30s) | No |
 | Default decision | Always block | Allow exit if no mail |
 | Task checking | Yes | No |
 | Purpose | Stay alive indefinitely | Complete work and exit |
@@ -275,7 +275,7 @@ sequenceDiagram
         else No mail, has tasks
             AH-->>CC: Block + list tasks
         else No mail, no tasks
-            AH->>S: Long poll (55s)
+            AH->>S: Long poll (9m30s)
             S-->>AH: Wait for messages
             AH-->>CC: Block (heartbeat)
         end
@@ -408,8 +408,10 @@ mechanism to:
 
 ### Hook Timeout
 
-Claude Code hooks have a 60-second timeout. The Stop hook's 55-second long poll
-stays under this limit while maximizing responsiveness to incoming messages.
+Claude Code command hooks have a default 10-minute (600-second) timeout. The
+Stop hook's 9.5-minute (570-second) long poll stays under this limit while
+maximizing the time agents stay alive waiting for work. The timeout is
+explicitly set to 600 seconds in the hook configuration.
 
 ---
 
