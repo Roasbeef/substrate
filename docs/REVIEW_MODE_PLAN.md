@@ -99,23 +99,26 @@ The review system has three main parts:
 └─────────────────────────────────────────────────────────────────────┘
 ```
 
-### 1.2 ReviewerService (Actor)
+### 1.2 ReviewerService (Actor + Registered Agent)
 
 **Location**: `internal/review/service.go`
 
-The ReviewerService handles orchestration AND can spawn one-shot Claude Code instances
-for structured analysis. It supports two patterns:
+The ReviewerService has a dual role:
 
-**Pattern A: Route to Long-Running Reviewers**
-- Publish review request to topic
-- Reviewer agents (already running) pick it up
-- Conversational back-and-forth in mail thread
+1. **Go Actor** - Registered in the actor system with `ReviewServiceKey`, handles
+   orchestration, FSM tracking, and spawns per-review sub-agents.
+2. **Subtrate Agent** - Registered as a named agent ("Reviewer") that subscribes
+   to the "reviews" topic. Other agents can send review requests to it either
+   via the topic or by mailing "Reviewer" directly.
 
-**Pattern B: Spawn One-Shot Analysis**
-- Spawn Claude Code with `-p` (print mode) + `--output-format json`
-- Pass in diff, context, previous comments
-- Parse structured JSON response
-- Update FSM state, create issues in DB
+**Flow:**
+1. Author agent sends review request → "reviews" topic (or directly to "Reviewer")
+2. ReviewerService receives the request (via topic subscription or direct mail)
+3. Creates review record in DB, initializes FSM
+4. Spawns a dedicated per-review Claude Code agent via the Go Agent SDK
+5. Per-review agent reads the thread, performs analysis, replies with YAML frontmatter
+6. Sub-actor monitors the thread and updates FSM from frontmatter
+7. On restart, recovers active reviews from DB and re-spawns agents
 
 ```go
 package review
