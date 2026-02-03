@@ -204,7 +204,21 @@ interface SearchResultItemProps {
 }
 
 function SearchResultItem({ result, isSelected, onSelect }: SearchResultItemProps) {
-  const Icon = getResultTypeIcon(result.type);
+  // Render icon inline to avoid component creation during render.
+  const renderIcon = () => {
+    switch (result.type) {
+      case 'message':
+        return <MessageIcon />;
+      case 'thread':
+        return <ThreadIcon />;
+      case 'agent':
+        return <AgentIcon />;
+      case 'topic':
+        return <TopicIcon />;
+      default:
+        return <MessageIcon />;
+    }
+  };
 
   return (
     <button
@@ -226,7 +240,7 @@ function SearchResultItem({ result, isSelected, onSelect }: SearchResultItemProp
           result.type === 'topic' ? 'bg-yellow-100 text-yellow-600' : '',
         )}
       >
-        <Icon />
+        {renderIcon()}
       </div>
       <div className="min-w-0 flex-1">
         <div className="flex items-center gap-2">
@@ -267,6 +281,7 @@ export function SearchBar({
 
   // Reset selection when results change.
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- reset selection on results change
     setSelectedIndex(0);
   }, [enrichedResults]);
 

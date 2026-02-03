@@ -70,6 +70,7 @@ export default function InboxPage() {
 
   // Reset filter when route changes.
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- reset filter on route change
     setState((prev) => ({ ...prev, filter: 'all' }));
   }, [routeFilter]);
 
@@ -83,6 +84,7 @@ export default function InboxPage() {
   // Open pending thread if one is set (from notification click).
   useEffect(() => {
     if (pendingThreadId) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- sync with store
       setSelectedThreadId(pendingThreadId);
       clearPendingThread();
     }
@@ -91,6 +93,7 @@ export default function InboxPage() {
   // Open thread from URL params (from search navigation).
   useEffect(() => {
     if (params.threadId) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- sync with URL params
       setSelectedThreadId(params.threadId);
     }
   }, [params.threadId]);

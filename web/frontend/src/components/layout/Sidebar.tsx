@@ -200,7 +200,7 @@ export interface LogoProps {
   collapsed?: boolean;
 }
 
-export function Logo(_props: LogoProps) {
+export function Logo() {
   // Logo is now shown in the header, so sidebar just has spacing.
   return <div className="h-2" />;
 }

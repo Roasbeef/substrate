@@ -1,6 +1,6 @@
 // Hook for browser notification integration.
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useState } from 'react';
 import { useNewMessages, useWebSocketConnection, type NewMessagePayload } from '@/hooks/useWebSocket.js';
 
 // Notification permission state.
@@ -62,19 +62,14 @@ export interface NotificationState {
 
 // Hook to manage browser notifications.
 export function useNotifications(): NotificationState {
-  const [permission, setPermission] = useState<NotificationPermissionState>('default');
-  const [preferences, setPreferences] = useState<NotificationPreferences>(DEFAULT_PREFERENCES);
-
   // Check if notifications are supported.
   const isSupported = typeof Notification !== 'undefined';
 
-  // Initialize permission and preferences on mount.
-  useEffect(() => {
-    if (isSupported) {
-      setPermission(Notification.permission);
-    }
-    setPreferences(loadPreferences());
-  }, [isSupported]);
+  // Use lazy initialization to avoid setState in effect.
+  const [permission, setPermission] = useState<NotificationPermissionState>(() =>
+    isSupported ? Notification.permission : 'default',
+  );
+  const [preferences, setPreferences] = useState<NotificationPreferences>(loadPreferences);
 
   // Request notification permission.
   const requestPermission = useCallback(async (): Promise<NotificationPermissionState> => {
