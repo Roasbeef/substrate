@@ -90,6 +90,26 @@ export default function InboxPage() {
     }
   }, [pendingThreadId, clearPendingThread]);
 
+  // Re-check for pending threads when tab becomes visible.
+  // This handles cases where notification clicks happen while tab is in background.
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        // Get current pending thread from store.
+        const currentPending = useUIStore.getState().pendingThreadId;
+        if (currentPending) {
+          setSelectedThreadId(currentPending);
+          clearPendingThread();
+        }
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
+  }, [clearPendingThread]);
+
   // Open thread from URL params (from search navigation).
   useEffect(() => {
     if (params.threadId) {
