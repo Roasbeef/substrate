@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"log"
 	"net/http"
-	"strings"
 	"time"
 
 	"github.com/grpc-ecosystem/grpc-gateway/runtime"
@@ -95,8 +94,8 @@ func NewServer(cfg *Config, st store.Storage,
 		grpcEndpoint: cfg.GRPCEndpoint,
 	}
 
-	// Register API v1 routes (JSON API for React frontend).
-	s.registerAPIV1Routes()
+	// API v1 routes are now served by grpc-gateway REST proxy.
+	// The manual routes in api_v1.go are deprecated.
 
 	// Register grpc-gateway REST proxy if gRPC endpoint is configured.
 	if cfg.GRPCEndpoint != "" {
@@ -249,16 +248,12 @@ func (s *Server) registerGateway(ctx context.Context) error {
 		return fmt.Errorf("failed to register Stats handler: %w", err)
 	}
 
-	// Mount the gateway at /api/v1/gw/ for direct access (useful for testing).
-	s.mux.HandleFunc("/api/v1/gw/", func(w http.ResponseWriter, r *http.Request) {
-		// Strip the /api/v1/gw prefix to match gateway paths.
-		r.URL.Path = strings.TrimPrefix(r.URL.Path, "/api/v1/gw")
-		if r.URL.Path == "" {
-			r.URL.Path = "/"
-		}
+	// Mount the gateway at /api/v1/ as the primary API endpoint.
+	// The gateway paths in mail.yaml already include /api/v1, so no prefix stripping needed.
+	s.mux.HandleFunc("/api/v1/", func(w http.ResponseWriter, r *http.Request) {
 		s.gatewayMux.ServeHTTP(w, r)
 	})
 
-	log.Printf("grpc-gateway REST proxy registered at /api/v1/gw/ -> %s", s.grpcEndpoint)
+	log.Printf("grpc-gateway REST proxy registered at /api/v1/ -> %s", s.grpcEndpoint)
 	return nil
 }

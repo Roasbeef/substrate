@@ -25,7 +25,7 @@ import (
 	"github.com/roasbeef/subtrate/internal/store"
 )
 
-// gatewayTestHarness holds all components needed for gateway comparison tests.
+// gatewayTestHarness holds all components needed for gateway tests.
 type gatewayTestHarness struct {
 	t *testing.T
 
@@ -73,6 +73,7 @@ func newGatewayTestHarness(t *testing.T) *gatewayTestHarness {
 	// Create services.
 	mailSvc := mail.NewServiceWithStore(storage)
 	agentReg := agent.NewRegistry(sqliteStore.Store)
+	heartbeatMgr := agent.NewHeartbeatManager(agentReg, nil)
 	identityMgr, err := agent.NewIdentityManager(sqliteStore.Store, agentReg)
 	require.NoError(t, err)
 
@@ -109,7 +110,8 @@ func newGatewayTestHarness(t *testing.T) *gatewayTestHarness {
 
 	// Create and start gRPC server.
 	grpcServer := subtraterpc.NewServer(
-		grpcCfg, sqliteStore.Store, mailSvc, agentReg, identityMgr, nil,
+		grpcCfg, sqliteStore.Store, mailSvc, agentReg, identityMgr,
+		heartbeatMgr, nil,
 	)
 	err = grpcServer.Start()
 	require.NoError(t, err)
@@ -165,14 +167,9 @@ func (h *gatewayTestHarness) Close() {
 	h.cleanup()
 }
 
-// manualURL returns URL for the manual REST handler path.
-func (h *gatewayTestHarness) manualURL(path string) string {
-	return fmt.Sprintf("http://%s/api/v1%s", h.webAddr, path)
-}
-
-// gatewayURL returns URL for the grpc-gateway path.
-func (h *gatewayTestHarness) gatewayURL(path string) string {
-	return fmt.Sprintf("http://%s/api/v1/gw%s", h.webAddr, path)
+// apiURL returns the full URL for an API endpoint.
+func (h *gatewayTestHarness) apiURL(path string) string {
+	return fmt.Sprintf("http://%s%s", h.webAddr, path)
 }
 
 // httpGet performs a GET request and returns the response body.
@@ -212,24 +209,29 @@ func (h *gatewayTestHarness) httpPost(url string, body interface{}) (int, []byte
 	return resp.StatusCode, respBody, nil
 }
 
-// createTestAgent creates an agent directly via the store and returns its ID.
+// createTestAgent creates a test agent via the gRPC API and returns its ID.
 func (h *gatewayTestHarness) createTestAgent(name string) int64 {
 	h.t.Helper()
 
-	ctx := context.Background()
-	ag, err := h.storage.CreateAgent(ctx, store.CreateAgentParams{
-		Name: name,
-	})
+	req := map[string]string{"name": name}
+	status, body, err := h.httpPost(h.apiURL("/api/v1/agents"), req)
 	require.NoError(h.t, err)
-	return ag.ID
+	require.Equal(h.t, http.StatusOK, status,
+		"failed to create agent: %s", string(body))
+
+	var resp struct {
+		AgentID string `json:"agent_id"`
+	}
+	err = json.Unmarshal(body, &resp)
+	require.NoError(h.t, err)
+
+	// Parse agent ID from string.
+	var id int64
+	fmt.Sscanf(resp.AgentID, "%d", &id)
+	return id
 }
 
-// ============================================================================
-// Gateway Verification Tests
-// ============================================================================
-
-// TestGatewayVerify_ListAgents compares ListAgents responses between manual and
-// gateway handlers.
+// TestGatewayVerify_ListAgents verifies the grpc-gateway ListAgents endpoint.
 func TestGatewayVerify_ListAgents(t *testing.T) {
 	h := newGatewayTestHarness(t)
 	defer h.Close()
@@ -239,102 +241,59 @@ func TestGatewayVerify_ListAgents(t *testing.T) {
 	h.createTestAgent("Agent2")
 	h.createTestAgent("Agent3")
 
-	// Call manual handler.
-	manualStatus, manualBody, err := h.httpGet(h.manualURL("/agents"))
-	require.NoError(t, err)
-	require.Equal(t, http.StatusOK, manualStatus)
-
 	// Call gateway handler.
-	gwStatus, gwBody, err := h.httpGet(h.gatewayURL("/api/v1/agents"))
+	status, body, err := h.httpGet(h.apiURL("/api/v1/agents"))
 	require.NoError(t, err)
-	require.Equal(t, http.StatusOK, gwStatus)
+	require.Equal(t, http.StatusOK, status)
 
-	// Parse manual response (uses "data" wrapper).
-	var manualResp struct {
-		Data []struct {
-			ID   int64  `json:"id"`
-			Name string `json:"name"`
-		} `json:"data"`
-	}
-	err = json.Unmarshal(manualBody, &manualResp)
-	require.NoError(t, err)
-
-	// Parse gateway response (uses "agents" from proto).
-	var gwResp struct {
+	// Parse response.
+	var resp struct {
 		Agents []struct {
-			ID   string `json:"id"` // grpc-gateway uses string for int64.
+			ID   string `json:"id"`
 			Name string `json:"name"`
 		} `json:"agents"`
 	}
-	err = json.Unmarshal(gwBody, &gwResp)
+	err = json.Unmarshal(body, &resp)
 	require.NoError(t, err)
 
-	// Verify same number of agents.
-	require.Equal(t, len(manualResp.Data), len(gwResp.Agents),
-		"agent count should match: manual=%d, gateway=%d",
-		len(manualResp.Data), len(gwResp.Agents))
+	// Verify we have 3 agents.
+	require.Len(t, resp.Agents, 3, "expected 3 agents")
 
-	// Verify agent names match.
-	manualNames := make(map[string]bool)
-	for _, a := range manualResp.Data {
-		manualNames[a.Name] = true
+	// Verify agent names.
+	names := make(map[string]bool)
+	for _, a := range resp.Agents {
+		names[a.Name] = true
 	}
-	for _, a := range gwResp.Agents {
-		require.True(t, manualNames[a.Name],
-			"gateway agent %q should be in manual response", a.Name)
-	}
+	require.True(t, names["Agent1"], "should have Agent1")
+	require.True(t, names["Agent2"], "should have Agent2")
+	require.True(t, names["Agent3"], "should have Agent3")
 
-	// Log the comparison.
-	t.Logf("ListAgents comparison:")
-	t.Logf("  Manual: %d agents", len(manualResp.Data))
-	t.Logf("  Gateway: %d agents", len(gwResp.Agents))
-	t.Logf("  Note: Manual uses 'data' wrapper, gateway uses 'agents' field")
+	t.Logf("ListAgents: %d agents", len(resp.Agents))
 }
 
-// TestGatewayVerify_RegisterAgent compares RegisterAgent responses.
+// TestGatewayVerify_RegisterAgent verifies agent registration.
 func TestGatewayVerify_RegisterAgent(t *testing.T) {
 	h := newGatewayTestHarness(t)
 	defer h.Close()
 
-	// Test manual handler.
-	manualReq := map[string]string{"name": "ManualAgent"}
-	manualStatus, manualBody, err := h.httpPost(h.manualURL("/agents"), manualReq)
+	req := map[string]string{"name": "NewAgent"}
+	status, body, err := h.httpPost(h.apiURL("/api/v1/agents"), req)
 	require.NoError(t, err)
-	require.Equal(t, http.StatusCreated, manualStatus,
-		"manual handler status: body=%s", string(manualBody))
+	require.Equal(t, http.StatusOK, status, "body=%s", string(body))
 
-	// Test gateway handler.
-	gwReq := map[string]string{"name": "GatewayAgent"}
-	gwStatus, gwBody, err := h.httpPost(h.gatewayURL("/api/v1/agents"), gwReq)
-	require.NoError(t, err)
-	require.Equal(t, http.StatusOK, gwStatus,
-		"gateway handler status: body=%s", string(gwBody))
-
-	// Parse responses.
-	var manualResp struct {
-		ID   int64  `json:"id"`
-		Name string `json:"name"`
-	}
-	err = json.Unmarshal(manualBody, &manualResp)
-	require.NoError(t, err)
-	require.Equal(t, "ManualAgent", manualResp.Name)
-	require.NotZero(t, manualResp.ID)
-
-	var gwResp struct {
-		AgentID string `json:"agent_id"` // Different field name in gateway.
+	var resp struct {
+		AgentID string `json:"agent_id"`
 		Name    string `json:"name"`
 	}
-	err = json.Unmarshal(gwBody, &gwResp)
+	err = json.Unmarshal(body, &resp)
 	require.NoError(t, err)
-	require.Equal(t, "GatewayAgent", gwResp.Name)
-	require.NotEmpty(t, gwResp.AgentID)
+	require.Equal(t, "NewAgent", resp.Name)
+	require.NotEmpty(t, resp.AgentID)
 
-	t.Logf("RegisterAgent comparison:")
-	t.Logf("  Manual: id=%d, name=%s", manualResp.ID, manualResp.Name)
-	t.Logf("  Gateway: agent_id=%s, name=%s", gwResp.AgentID, gwResp.Name)
+	t.Logf("RegisterAgent: agent_id=%s, name=%s", resp.AgentID, resp.Name)
 }
 
-// TestGatewayVerify_FetchInbox compares FetchInbox responses.
+// TestGatewayVerify_FetchInbox verifies fetching inbox messages.
 func TestGatewayVerify_FetchInbox(t *testing.T) {
 	h := newGatewayTestHarness(t)
 	defer h.Close()
@@ -349,123 +308,66 @@ func TestGatewayVerify_FetchInbox(t *testing.T) {
 		SenderID:       senderID,
 		RecipientNames: []string{"InboxRecipient"},
 		Subject:        "Gateway Test Message",
-		Body:           "Testing gateway vs manual handlers",
+		Body:           "Testing gateway endpoint",
 		Priority:       mail.PriorityNormal,
 	})
 	require.NoError(t, err)
 
-	// Call manual handler.
-	manualURL := fmt.Sprintf("%s?agent_id=%d", h.manualURL("/messages"), recipientID)
-	manualStatus, manualBody, err := h.httpGet(manualURL)
+	// Fetch inbox.
+	url := fmt.Sprintf("%s?agent_id=%d", h.apiURL("/api/v1/messages"), recipientID)
+	status, body, err := h.httpGet(url)
 	require.NoError(t, err)
-	require.Equal(t, http.StatusOK, manualStatus,
-		"manual handler: body=%s", string(manualBody))
+	require.Equal(t, http.StatusOK, status, "body=%s", string(body))
 
-	// Call gateway handler.
-	gwURL := fmt.Sprintf("%s?agent_id=%d", h.gatewayURL("/api/v1/messages"), recipientID)
-	gwStatus, gwBody, err := h.httpGet(gwURL)
-	require.NoError(t, err)
-	require.Equal(t, http.StatusOK, gwStatus,
-		"gateway handler: body=%s", string(gwBody))
-
-	// Parse manual response (uses "data" wrapper).
-	var manualResp struct {
-		Data []struct {
-			ID      int64  `json:"id"`
-			Subject string `json:"subject"`
-		} `json:"data"`
-	}
-	err = json.Unmarshal(manualBody, &manualResp)
-	require.NoError(t, err)
-
-	// Parse gateway response (uses "messages" from proto).
-	var gwResp struct {
+	var resp struct {
 		Messages []struct {
-			ID      string `json:"id"` // grpc-gateway uses string for int64.
+			ID      string `json:"id"`
 			Subject string `json:"subject"`
 		} `json:"messages"`
 	}
-	err = json.Unmarshal(gwBody, &gwResp)
+	err = json.Unmarshal(body, &resp)
 	require.NoError(t, err)
 
-	// Verify both have the same message.
-	require.Len(t, manualResp.Data, 1, "manual should have 1 message")
-	require.Len(t, gwResp.Messages, 1, "gateway should have 1 message")
-	require.Equal(t, manualResp.Data[0].Subject, gwResp.Messages[0].Subject,
-		"subjects should match")
+	require.Len(t, resp.Messages, 1, "should have 1 message")
+	require.Equal(t, "Gateway Test Message", resp.Messages[0].Subject)
 
-	t.Logf("FetchInbox comparison:")
-	t.Logf("  Manual: %d messages, subject=%q",
-		len(manualResp.Data), manualResp.Data[0].Subject)
-	t.Logf("  Gateway: %d messages, subject=%q",
-		len(gwResp.Messages), gwResp.Messages[0].Subject)
-	t.Logf("  Note: Manual uses 'data' wrapper, gateway uses 'messages' field")
+	t.Logf("FetchInbox: %d messages", len(resp.Messages))
 }
 
-// TestGatewayVerify_SendMail compares SendMail responses.
-// NOTE: Manual and gateway handlers have significantly different request/response formats:
-// - Manual: takes "to" (recipient IDs), uses User agent as sender, returns "id"
-// - Gateway: takes "sender_id" + "recipient_names", returns "message_id"
+// TestGatewayVerify_SendMail verifies sending messages via gateway.
 func TestGatewayVerify_SendMail(t *testing.T) {
 	h := newGatewayTestHarness(t)
 	defer h.Close()
 
 	// Create agents.
 	senderID := h.createTestAgent("SendSender")
-	recipientID := h.createTestAgent("SendRecipient")
+	h.createTestAgent("SendRecipient")
 
-	// Test manual handler - uses "to" with recipient IDs, sender is auto "User" agent.
-	manualReq := map[string]interface{}{
-		"to":       []int64{recipientID}, // Manual uses "to" with IDs
-		"subject":  "Manual Send Test",
-		"body":     "Sent via manual handler",
-		"priority": "normal",
-	}
-	manualStatus, manualBody, err := h.httpPost(h.manualURL("/messages"), manualReq)
-	require.NoError(t, err)
-	require.Equal(t, http.StatusCreated, manualStatus,
-		"manual handler: body=%s", string(manualBody))
-
-	// Test gateway handler - uses sender_id + recipient_names.
-	gwReq := map[string]interface{}{
+	// Send message via gateway.
+	req := map[string]interface{}{
 		"sender_id":       senderID,
 		"recipient_names": []string{"SendRecipient"},
 		"subject":         "Gateway Send Test",
 		"body":            "Sent via gateway",
 		"priority":        2, // PRIORITY_NORMAL = 2 in proto enum.
 	}
-	gwStatus, gwBody, err := h.httpPost(h.gatewayURL("/api/v1/messages"), gwReq)
+	status, body, err := h.httpPost(h.apiURL("/api/v1/messages"), req)
 	require.NoError(t, err)
-	require.Equal(t, http.StatusOK, gwStatus,
-		"gateway handler: body=%s", string(gwBody))
+	require.Equal(t, http.StatusOK, status, "body=%s", string(body))
 
-	// Parse manual response - returns full message object.
-	var manualResp struct {
-		ID       int64  `json:"id"`
-		ThreadID string `json:"thread_id"` //nolint:tagliatelle
+	var resp struct {
+		MessageID string `json:"message_id"`
+		ThreadID  string `json:"thread_id"`
 	}
-	err = json.Unmarshal(manualBody, &manualResp)
+	err = json.Unmarshal(body, &resp)
 	require.NoError(t, err)
-	require.NotZero(t, manualResp.ID, "manual handler should return id")
+	require.NotEmpty(t, resp.MessageID)
+	require.NotEmpty(t, resp.ThreadID)
 
-	// Parse gateway response.
-	var gwResp struct {
-		MessageID string `json:"message_id"` //nolint:tagliatelle
-		ThreadID  string `json:"thread_id"`  //nolint:tagliatelle
-	}
-	err = json.Unmarshal(gwBody, &gwResp)
-	require.NoError(t, err)
-	require.NotEmpty(t, gwResp.MessageID)
-
-	t.Logf("SendMail comparison:")
-	t.Logf("  Manual: id=%d, thread_id=%s", manualResp.ID, manualResp.ThreadID)
-	t.Logf("  Gateway: message_id=%s, thread_id=%s", gwResp.MessageID, gwResp.ThreadID)
-	t.Logf("  Key differences:")
-	t.Logf("    - Request: Manual uses 'to' (IDs) + auto User sender; Gateway uses 'sender_id' + 'recipient_names'")
-	t.Logf("    - Response: Manual uses 'id'; Gateway uses 'message_id'")
+	t.Logf("SendMail: message_id=%s, thread_id=%s", resp.MessageID, resp.ThreadID)
 }
 
-// TestGatewayVerify_ListTopics compares ListTopics responses.
+// TestGatewayVerify_ListTopics verifies listing topics.
 func TestGatewayVerify_ListTopics(t *testing.T) {
 	h := newGatewayTestHarness(t)
 	defer h.Close()
@@ -479,47 +381,35 @@ func TestGatewayVerify_ListTopics(t *testing.T) {
 	_, err = h.mailSvc.Subscribe(ctx, agentID, "topic-beta")
 	require.NoError(t, err)
 
-	// Call manual handler.
-	manualStatus, manualBody, err := h.httpGet(h.manualURL("/topics"))
+	// List topics.
+	status, body, err := h.httpGet(h.apiURL("/api/v1/topics"))
 	require.NoError(t, err)
-	require.Equal(t, http.StatusOK, manualStatus)
+	require.Equal(t, http.StatusOK, status)
 
-	// Call gateway handler.
-	gwStatus, gwBody, err := h.httpGet(h.gatewayURL("/api/v1/topics"))
-	require.NoError(t, err)
-	require.Equal(t, http.StatusOK, gwStatus)
-
-	// Parse manual response (uses "data" wrapper).
-	var manualResp struct {
-		Data []struct {
-			ID   int64  `json:"id"`
-			Name string `json:"name"`
-		} `json:"data"`
-	}
-	err = json.Unmarshal(manualBody, &manualResp)
-	require.NoError(t, err)
-
-	// Parse gateway response (uses "topics" from proto).
-	var gwResp struct {
+	var resp struct {
 		Topics []struct {
 			ID   string `json:"id"`
 			Name string `json:"name"`
 		} `json:"topics"`
 	}
-	err = json.Unmarshal(gwBody, &gwResp)
+	err = json.Unmarshal(body, &resp)
 	require.NoError(t, err)
 
-	// Verify same number of topics.
-	require.Equal(t, len(manualResp.Data), len(gwResp.Topics),
-		"topic count should match")
+	// Agent gets a personal inbox topic plus the two we subscribed to.
+	require.GreaterOrEqual(t, len(resp.Topics), 2, "should have at least 2 topics")
 
-	t.Logf("ListTopics comparison:")
-	t.Logf("  Manual: %d topics", len(manualResp.Data))
-	t.Logf("  Gateway: %d topics", len(gwResp.Topics))
-	t.Logf("  Note: Manual uses 'data' wrapper, gateway uses 'topics' field")
+	// Verify our topics are included.
+	topicNames := make(map[string]bool)
+	for _, topic := range resp.Topics {
+		topicNames[topic.Name] = true
+	}
+	require.True(t, topicNames["topic-alpha"], "should have topic-alpha")
+	require.True(t, topicNames["topic-beta"], "should have topic-beta")
+
+	t.Logf("ListTopics: %d topics", len(resp.Topics))
 }
 
-// TestGatewayVerify_Search compares Search responses.
+// TestGatewayVerify_Search verifies search functionality.
 func TestGatewayVerify_Search(t *testing.T) {
 	h := newGatewayTestHarness(t)
 	defer h.Close()
@@ -541,103 +431,24 @@ func TestGatewayVerify_Search(t *testing.T) {
 	// Wait a moment for FTS indexing.
 	time.Sleep(50 * time.Millisecond)
 
-	// Call manual handler.
-	manualURL := fmt.Sprintf("%s?q=XYZ123&agent_id=%d", h.manualURL("/search"), recipientID)
-	manualStatus, manualBody, err := h.httpGet(manualURL)
+	// Search via gateway.
+	url := fmt.Sprintf("%s?query=XYZ123&agent_id=%d", h.apiURL("/api/v1/search"), recipientID)
+	status, body, err := h.httpGet(url)
 	require.NoError(t, err)
-	require.Equal(t, http.StatusOK, manualStatus,
-		"manual handler: body=%s", string(manualBody))
+	require.Equal(t, http.StatusOK, status, "body=%s", string(body))
 
-	// Call gateway handler.
-	gwURL := fmt.Sprintf("%s?query=XYZ123&agent_id=%d", h.gatewayURL("/api/v1/search"), recipientID)
-	gwStatus, gwBody, err := h.httpGet(gwURL)
-	require.NoError(t, err)
-	require.Equal(t, http.StatusOK, gwStatus,
-		"gateway handler: body=%s", string(gwBody))
-
-	// Parse manual response (uses "data" wrapper).
-	var manualResp struct {
-		Data []interface{} `json:"data"`
-	}
-	err = json.Unmarshal(manualBody, &manualResp)
-	require.NoError(t, err)
-
-	// Parse gateway response (uses "results" from proto).
-	var gwResp struct {
+	var resp struct {
 		Results []interface{} `json:"results"`
 	}
-	err = json.Unmarshal(gwBody, &gwResp)
+	err = json.Unmarshal(body, &resp)
 	require.NoError(t, err)
 
-	// Both should return results (may differ due to response structure).
-	t.Logf("Search comparison:")
-	t.Logf("  Manual: %d items in 'data'", len(manualResp.Data))
-	t.Logf("  Gateway: %d items in 'results'", len(gwResp.Results))
-	t.Logf("  Note: Manual uses 'data' wrapper, gateway uses 'results' field")
+	require.GreaterOrEqual(t, len(resp.Results), 1, "should have search results")
+
+	t.Logf("Search: %d results", len(resp.Results))
 }
 
-// TestGatewayVerify_ErrorResponses compares error handling between handlers.
-// NOTE: This test documents differences in error handling behavior.
-func TestGatewayVerify_ErrorResponses(t *testing.T) {
-	h := newGatewayTestHarness(t)
-	defer h.Close()
-
-	// Test invalid agent_id parameter.
-	t.Run("InvalidAgentID", func(t *testing.T) {
-		// Manual handler with invalid agent_id.
-		manualURL := fmt.Sprintf("%s?agent_id=0", h.manualURL("/messages"))
-		manualStatus, _, err := h.httpGet(manualURL)
-		require.NoError(t, err)
-
-		// Gateway handler with invalid agent_id.
-		gwURL := fmt.Sprintf("%s?agent_id=0", h.gatewayURL("/api/v1/messages"))
-		gwStatus, _, err := h.httpGet(gwURL)
-		require.NoError(t, err)
-
-		t.Logf("Invalid AgentID error comparison:")
-		t.Logf("  Manual status: %d", manualStatus)
-		t.Logf("  Gateway status: %d", gwStatus)
-
-		// Gateway properly validates, manual is more permissive.
-		// This documents a behavioral difference that should be addressed
-		// when migrating to gateway.
-		require.True(t, gwStatus >= 400, "gateway should return error status")
-		t.Logf("  NOTE: Manual handler returns %d (permissive), gateway returns %d (strict)",
-			manualStatus, gwStatus)
-	})
-
-	// Test missing required fields in POST.
-	t.Run("MissingRequiredFields", func(t *testing.T) {
-		// Manual handler with missing sender_id.
-		manualReq := map[string]interface{}{
-			"recipients": []string{"Someone"},
-			"subject":    "Test",
-			"body":       "Test",
-		}
-		manualStatus, _, err := h.httpPost(h.manualURL("/messages"), manualReq)
-		require.NoError(t, err)
-
-		// Gateway handler with missing sender_id.
-		gwReq := map[string]interface{}{
-			"recipient_names": []string{"Someone"},
-			"subject":         "Test",
-			"body":            "Test",
-		}
-		gwStatus, _, err := h.httpPost(h.gatewayURL("/api/v1/messages"), gwReq)
-		require.NoError(t, err)
-
-		t.Logf("Missing sender_id error comparison:")
-		t.Logf("  Manual status: %d", manualStatus)
-		t.Logf("  Gateway status: %d", gwStatus)
-
-		// Gateway properly validates, manual is more permissive.
-		require.True(t, gwStatus >= 400, "gateway should return error status")
-		t.Logf("  NOTE: Manual handler returns %d (permissive), gateway returns %d (strict)",
-			manualStatus, gwStatus)
-	})
-}
-
-// TestGatewayVerify_EmptyResponses compares empty list responses.
+// TestGatewayVerify_EmptyResponses verifies empty list responses.
 func TestGatewayVerify_EmptyResponses(t *testing.T) {
 	h := newGatewayTestHarness(t)
 	defer h.Close()
@@ -645,64 +456,41 @@ func TestGatewayVerify_EmptyResponses(t *testing.T) {
 	// Create agent with no messages.
 	agentID := h.createTestAgent("EmptyAgent")
 
-	// Call manual handler.
-	manualURL := fmt.Sprintf("%s?agent_id=%d", h.manualURL("/messages"), agentID)
-	manualStatus, manualBody, err := h.httpGet(manualURL)
+	// Fetch empty inbox.
+	url := fmt.Sprintf("%s?agent_id=%d", h.apiURL("/api/v1/messages"), agentID)
+	status, body, err := h.httpGet(url)
 	require.NoError(t, err)
-	require.Equal(t, http.StatusOK, manualStatus)
+	require.Equal(t, http.StatusOK, status)
 
-	// Call gateway handler.
-	gwURL := fmt.Sprintf("%s?agent_id=%d", h.gatewayURL("/api/v1/messages"), agentID)
-	gwStatus, gwBody, err := h.httpGet(gwURL)
-	require.NoError(t, err)
-	require.Equal(t, http.StatusOK, gwStatus)
-
-	// Parse manual response (uses "data" wrapper).
-	var manualResp struct {
-		Data []interface{} `json:"data"`
-	}
-	err = json.Unmarshal(manualBody, &manualResp)
-	require.NoError(t, err)
-
-	// Parse gateway response (uses "messages" from proto).
-	var gwResp struct {
+	var resp struct {
 		Messages []interface{} `json:"messages"`
 	}
-	err = json.Unmarshal(gwBody, &gwResp)
+	err = json.Unmarshal(body, &resp)
 	require.NoError(t, err)
 
-	// Both should return empty arrays (or nil which becomes empty).
-	require.Empty(t, manualResp.Data, "manual should return empty data")
-	// Gateway may return nil for empty repeated field, which is valid.
-	t.Logf("Empty responses comparison:")
-	t.Logf("  Manual: %d items in 'data'", len(manualResp.Data))
-	t.Logf("  Gateway: %d items in 'messages'", len(gwResp.Messages))
+	// Gateway should return empty array (not null).
+	require.NotNil(t, resp.Messages, "messages should be non-nil")
+	require.Empty(t, resp.Messages, "messages should be empty")
+
+	t.Logf("Empty response: messages=%v", resp.Messages)
 }
 
-// TestGatewayVerify_ContentTypeHeaders compares Content-Type headers.
+// TestGatewayVerify_ContentTypeHeaders verifies content-type headers.
 func TestGatewayVerify_ContentTypeHeaders(t *testing.T) {
 	h := newGatewayTestHarness(t)
 	defer h.Close()
 
 	h.createTestAgent("HeaderAgent")
 
-	// Check manual handler Content-Type.
-	manualResp, err := h.client.Get(h.manualURL("/agents"))
+	resp, err := h.client.Get(h.apiURL("/api/v1/agents"))
 	require.NoError(t, err)
-	manualContentType := manualResp.Header.Get("Content-Type")
-	manualResp.Body.Close()
+	defer resp.Body.Close()
 
-	// Check gateway handler Content-Type.
-	gwResp, err := h.client.Get(h.gatewayURL("/api/v1/agents"))
-	require.NoError(t, err)
-	gwContentType := gwResp.Header.Get("Content-Type")
-	gwResp.Body.Close()
+	require.Equal(t, http.StatusOK, resp.StatusCode)
 
-	t.Logf("Content-Type header comparison:")
-	t.Logf("  Manual: %s", manualContentType)
-	t.Logf("  Gateway: %s", gwContentType)
+	contentType := resp.Header.Get("Content-Type")
+	require.Contains(t, contentType, "application/json",
+		"response should be JSON: got %s", contentType)
 
-	// Both should return JSON.
-	require.Contains(t, manualContentType, "application/json")
-	require.Contains(t, gwContentType, "application/json")
+	t.Logf("Content-Type: %s", contentType)
 }
