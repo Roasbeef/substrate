@@ -7,7 +7,16 @@ import { server } from './mocks/server.js';
 
 // Start MSW server before all tests.
 beforeAll(() => {
-  server.listen({ onUnhandledRequest: 'error' });
+  server.listen({
+    onUnhandledRequest: (req, print) => {
+      // Allow WebSocket requests to pass through (MSW doesn't support them).
+      if (req.url.includes('ws://') || req.url.includes('wss://')) {
+        return;
+      }
+      // Error on all other unhandled requests.
+      print.error();
+    },
+  });
 });
 
 // Reset handlers after each test to prevent test pollution.

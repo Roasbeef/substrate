@@ -148,7 +148,12 @@ export const handlers = [
     return HttpResponse.json(response);
   }),
 
-  // Agents status.
+  // Agents status (grpc-gateway uses hyphen path).
+  http.get(`${API_BASE}/agents-status`, () => {
+    return HttpResponse.json(mockAgentsStatus);
+  }),
+
+  // Legacy agents status endpoint (with slash).
   http.get(`${API_BASE}/agents/status`, () => {
     return HttpResponse.json(mockAgentsStatus);
   }),
