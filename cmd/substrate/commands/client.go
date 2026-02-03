@@ -30,9 +30,10 @@ const (
 // a gRPC connection to substrated or direct database access.
 type Client struct {
 	// When using gRPC mode.
-	conn        *grpc.ClientConn
-	mailClient  subtraterpc.MailClient
-	agentClient subtraterpc.AgentClient
+	conn         *grpc.ClientConn
+	mailClient   subtraterpc.MailClient
+	agentClient  subtraterpc.AgentClient
+	reviewClient subtraterpc.ReviewServiceClient
 
 	// When using direct DB mode.
 	store       *db.Store
@@ -120,11 +121,12 @@ func tryGRPCConnection(addr string) (*Client, error) {
 	}
 
 	return &Client{
-		conn:        conn,
-		mailClient:  subtraterpc.NewMailClient(conn),
-		agentClient: agentClient,
-		mode:        ModeGRPC,
-		grpcAddr:    addr,
+		conn:         conn,
+		mailClient:   subtraterpc.NewMailClient(conn),
+		agentClient:  agentClient,
+		reviewClient: subtraterpc.NewReviewServiceClient(conn),
+		mode:         ModeGRPC,
+		grpcAddr:     addr,
 	}, nil
 }
 
@@ -986,4 +988,111 @@ func convertProtoToState(s subtraterpc.MessageState) string {
 	default:
 		return "unread"
 	}
+}
+
+// =============================================================================
+// Review client methods (gRPC only - requires daemon)
+// =============================================================================
+
+// requireGRPC returns an error if the client is not in gRPC mode. Review
+// operations require the daemon because they need the actor system.
+func (c *Client) requireGRPC() error {
+	if c.mode != ModeGRPC {
+		return fmt.Errorf(
+			"review commands require the substrated daemon; " +
+				"start it with: make run",
+		)
+	}
+	return nil
+}
+
+// CreateReview requests a new code review via the review service.
+func (c *Client) CreateReview(
+	ctx context.Context, req *subtraterpc.CreateReviewRequest,
+) (*subtraterpc.CreateReviewResponse, error) {
+
+	if err := c.requireGRPC(); err != nil {
+		return nil, err
+	}
+
+	return c.reviewClient.CreateReview(ctx, req)
+}
+
+// GetReview retrieves details for a specific review.
+func (c *Client) GetReview(
+	ctx context.Context, reviewID string,
+) (*subtraterpc.ReviewDetailResponse, error) {
+
+	if err := c.requireGRPC(); err != nil {
+		return nil, err
+	}
+
+	return c.reviewClient.GetReview(
+		ctx, &subtraterpc.GetReviewProtoRequest{
+			ReviewId: reviewID,
+		},
+	)
+}
+
+// ListReviews lists reviews with optional filters.
+func (c *Client) ListReviews(
+	ctx context.Context, req *subtraterpc.ListReviewsProtoRequest,
+) (*subtraterpc.ListReviewsProtoResponse, error) {
+
+	if err := c.requireGRPC(); err != nil {
+		return nil, err
+	}
+
+	return c.reviewClient.ListReviews(ctx, req)
+}
+
+// CancelReview cancels an active review.
+func (c *Client) CancelReview(
+	ctx context.Context, reviewID, reason string,
+) (*subtraterpc.CancelReviewProtoResponse, error) {
+
+	if err := c.requireGRPC(); err != nil {
+		return nil, err
+	}
+
+	return c.reviewClient.CancelReview(
+		ctx, &subtraterpc.CancelReviewProtoRequest{
+			ReviewId: reviewID,
+			Reason:   reason,
+		},
+	)
+}
+
+// ListReviewIssues lists issues for a specific review.
+func (c *Client) ListReviewIssues(
+	ctx context.Context, reviewID string,
+) (*subtraterpc.ListReviewIssuesResponse, error) {
+
+	if err := c.requireGRPC(); err != nil {
+		return nil, err
+	}
+
+	return c.reviewClient.ListReviewIssues(
+		ctx, &subtraterpc.ListReviewIssuesRequest{
+			ReviewId: reviewID,
+		},
+	)
+}
+
+// UpdateIssueStatus updates the status of a review issue.
+func (c *Client) UpdateIssueStatus(
+	ctx context.Context, reviewID string, issueID int64, status string,
+) (*subtraterpc.UpdateIssueStatusResponse, error) {
+
+	if err := c.requireGRPC(); err != nil {
+		return nil, err
+	}
+
+	return c.reviewClient.UpdateIssueStatus(
+		ctx, &subtraterpc.UpdateIssueStatusRequest{
+			ReviewId: reviewID,
+			IssueId:  issueID,
+			Status:   status,
+		},
+	)
 }
