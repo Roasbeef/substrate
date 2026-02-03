@@ -103,12 +103,13 @@ func (h *Hub) Run() {
 			agentID := client.AgentID()
 			h.mu.Lock()
 			h.allClients[client] = struct{}{}
-			if agentID > 0 {
-				if h.clients[agentID] == nil {
-					h.clients[agentID] = make(map[*WSClient]struct{})
-				}
-				h.clients[agentID][client] = struct{}{}
+			// Track all clients including agentID=0 (global inbox viewers).
+			// This enables the notification bridge to subscribe to agent 0
+			// notifications for real-time updates in the default inbox view.
+			if h.clients[agentID] == nil {
+				h.clients[agentID] = make(map[*WSClient]struct{})
 			}
+			h.clients[agentID][client] = struct{}{}
 			h.mu.Unlock()
 			log.Printf("WebSocket: Client registered (agent_id=%d, total=%d)",
 				agentID, len(h.allClients))
@@ -118,11 +119,10 @@ func (h *Hub) Run() {
 			h.mu.Lock()
 			if _, ok := h.allClients[client]; ok {
 				delete(h.allClients, client)
-				if agentID > 0 {
-					delete(h.clients[agentID], client)
-					if len(h.clients[agentID]) == 0 {
-						delete(h.clients, agentID)
-					}
+				// Remove from agent-specific map (including agentID=0).
+				delete(h.clients[agentID], client)
+				if len(h.clients[agentID]) == 0 {
+					delete(h.clients, agentID)
 				}
 				client.Close()
 			}
