@@ -131,6 +131,42 @@ function ChevronDownIcon({ className }: { className?: string }) {
   );
 }
 
+function ExpandIcon({ className }: { className?: string }) {
+  return (
+    <svg
+      className={cn('h-4 w-4', className)}
+      fill="none"
+      viewBox="0 0 24 24"
+      stroke="currentColor"
+    >
+      <path
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        strokeWidth={2}
+        d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4"
+      />
+    </svg>
+  );
+}
+
+function CollapseIcon({ className }: { className?: string }) {
+  return (
+    <svg
+      className={cn('h-4 w-4', className)}
+      fill="none"
+      viewBox="0 0 24 24"
+      stroke="currentColor"
+    >
+      <path
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        strokeWidth={2}
+        d="M9 9V4.5M9 9H4.5M9 9L3.75 3.75M9 15v4.5M9 15H4.5M9 15l-5.25 5.25M15 9h4.5M15 9V4.5M15 9l5.25-5.25M15 15h4.5M15 15v4.5m0-4.5l5.25 5.25"
+      />
+    </svg>
+  );
+}
+
 // Toolbar action button.
 interface ToolbarButtonProps {
   onClick: () => void;
@@ -224,6 +260,7 @@ export function ThreadView({
   // State for reply input.
   const [replyText, setReplyText] = useState('');
   const [isReplying, setIsReplying] = useState(false);
+  const [isExpanded, setIsExpanded] = useState(false);
 
   // State for focused message index.
   const [focusedIndex, setFocusedIndex] = useState<number | null>(null);
@@ -459,16 +496,51 @@ export function ThreadView({
 
       {/* Reply box. */}
       {thread && onReply ? (
-        <div className="border-t border-gray-200 p-4">
+        <div
+          className={cn(
+            'border-t border-gray-200 p-4',
+            isExpanded && 'flex-1 flex flex-col min-h-[300px]',
+          )}
+        >
+          <div className="flex items-center justify-between mb-2">
+            <span className="text-sm text-gray-500">
+              Press Ctrl+Enter to send
+            </span>
+            <button
+              type="button"
+              onClick={() => setIsExpanded(!isExpanded)}
+              className={cn(
+                'flex items-center gap-1 rounded px-2 py-1 text-xs',
+                'text-gray-500 hover:bg-gray-100 hover:text-gray-700',
+                'transition-colors',
+              )}
+              title={isExpanded ? 'Collapse' : 'Expand'}
+            >
+              {isExpanded ? (
+                <>
+                  <CollapseIcon />
+                  <span>Collapse</span>
+                </>
+              ) : (
+                <>
+                  <ExpandIcon />
+                  <span>Expand</span>
+                </>
+              )}
+            </button>
+          </div>
           <Textarea
             value={replyText}
             onChange={(e) => setReplyText(e.target.value)}
             onKeyDown={handleReplyKeyDown}
-            placeholder="Write a reply... (Ctrl+Enter to send)"
-            rows={3}
-            className="w-full resize-none"
+            placeholder="Write a reply..."
+            rows={isExpanded ? 12 : 6}
+            className={cn(
+              'w-full',
+              isExpanded && 'flex-1 min-h-[200px]',
+            )}
           />
-          <div className="mt-2 flex justify-end">
+          <div className="mt-3 flex justify-end">
             <Button
               onClick={() => void handleReply()}
               disabled={!replyText.trim() || isReplying || isActionLoading}

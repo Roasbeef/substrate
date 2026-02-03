@@ -181,7 +181,7 @@ function EnvelopeIcon({ className }: { className?: string }) {
   );
 }
 
-// Blue header search bar.
+// Blue header search bar - centered and wider.
 function BlueHeaderSearchBar() {
   const toggleSearch = useUIStore((state) => state.toggleSearch);
 
@@ -194,7 +194,7 @@ function BlueHeaderSearchBar() {
         'text-sm text-white/90 placeholder-white/60',
         'hover:bg-blue-400/80 transition-colors',
         'focus:outline-none focus:ring-2 focus:ring-white/50',
-        'min-w-[240px] md:min-w-[360px]',
+        'w-full max-w-xl',
       )}
     >
       <SearchIcon className="text-white/70" />
@@ -225,12 +225,12 @@ export function Header({ className, leftContent, rightContent }: HeaderProps) {
   return (
     <header
       className={cn(
-        'flex h-14 items-center justify-between bg-blue-600 px-4 shadow-sm',
+        'flex h-14 items-center bg-blue-600 px-4 shadow-sm',
         className,
       )}
     >
-      {/* Left section - branding and search. */}
-      <div className="flex items-center gap-4">
+      {/* Left section - branding. */}
+      <div className="flex items-center gap-4 flex-shrink-0">
         <button
           type="button"
           onClick={toggleSidebar}
@@ -245,21 +245,21 @@ export function Header({ className, leftContent, rightContent }: HeaderProps) {
           <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-white/10">
             <EnvelopeIcon className="text-white" />
           </div>
-          <span className="text-xl font-semibold tracking-tight text-white">
+          <span className="hidden text-xl font-semibold tracking-tight text-white sm:inline">
             Substrate
           </span>
         </Link>
 
         {leftContent}
+      </div>
 
-        {/* Search bar - visible on larger screens. */}
-        <div className="ml-4 hidden md:block">
-          <BlueHeaderSearchBar />
-        </div>
+      {/* Center section - search bar (takes remaining space). */}
+      <div className="flex-1 flex justify-center px-4 hidden md:flex">
+        <BlueHeaderSearchBar />
       </div>
 
       {/* Right section - actions and custom content. */}
-      <div className="flex items-center gap-1">
+      <div className="flex items-center gap-1 flex-shrink-0">
         {/* Mobile search button. */}
         <div className="md:hidden">
           <button

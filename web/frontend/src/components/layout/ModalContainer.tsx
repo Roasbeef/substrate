@@ -3,6 +3,7 @@
 import { useUIStore } from '@/stores/ui.js';
 import { NewAgentModal } from '@/components/agents/NewAgentModal.js';
 import { ComposeModal } from '@/components/inbox/ComposeModal.js';
+import { SearchBar } from '@/components/layout/SearchBar.js';
 import { useCreateAgent } from '@/hooks/useAgents.js';
 import { useSendMessage } from '@/hooks/useMessages.js';
 import { autocompleteRecipients } from '@/api/search.js';
@@ -64,9 +65,15 @@ export function ModalContainer() {
   };
 
   // Render the active modal based on type.
-  switch (activeModal) {
-    case 'compose':
-      return (
+  // Note: SearchBar is always rendered since it manages its own visibility via
+  // the searchOpen state.
+  return (
+    <>
+      {/* Global search modal - always rendered, visibility controlled by searchOpen state. */}
+      <SearchBar />
+
+      {/* Other modals based on activeModal state. */}
+      {activeModal === 'compose' ? (
         <ComposeModal
           isOpen
           onClose={closeModal}
@@ -74,9 +81,8 @@ export function ModalContainer() {
           onSearchRecipients={handleSearchRecipients}
           isSending={sendMessage.isPending}
         />
-      );
-    case 'newAgent':
-      return (
+      ) : null}
+      {activeModal === 'newAgent' ? (
         <NewAgentModal
           isOpen
           onClose={closeModal}
@@ -84,8 +90,7 @@ export function ModalContainer() {
           isSubmitting={createAgent.isPending}
           {...(createAgent.error?.message != null && { submitError: createAgent.error.message })}
         />
-      );
-    default:
-      return null;
-  }
+      ) : null}
+    </>
+  );
 }

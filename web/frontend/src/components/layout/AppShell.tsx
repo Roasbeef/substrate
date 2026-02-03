@@ -1,6 +1,7 @@
 // AppShell component - the main layout wrapper for the application.
 
-import { type ReactNode } from 'react';
+import { type ReactNode, useCallback } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { clsx } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 import { Header } from './Header.js';
@@ -9,6 +10,7 @@ import { NotificationPrompt } from './NotificationPrompt.js';
 import { ModalContainer } from './ModalContainer.js';
 import { useNewMessageNotifications } from '@/hooks/useNotifications.js';
 import { useMessageToasts } from '@/hooks/useMessageToasts.js';
+import { useUIStore } from '@/stores/ui.js';
 
 // Combine clsx and tailwind-merge for class name handling.
 function cn(...inputs: (string | undefined | null | false)[]) {
@@ -53,9 +55,21 @@ export function AppShell({
   hideHeader = false,
   mainClassName,
 }: AppShellProps) {
+  const navigate = useNavigate();
+  const setPendingThread = useUIStore((state) => state.setPendingThread);
+
+  // Handle notification thread click - navigate to inbox and open thread.
+  const handleThreadClick = useCallback(
+    (threadId: string) => {
+      setPendingThread(threadId);
+      navigate('/');
+    },
+    [setPendingThread, navigate],
+  );
+
   // Enable automatic notifications for new messages.
   // Browser notifications (desktop).
-  useNewMessageNotifications();
+  useNewMessageNotifications({ onThreadClick: handleThreadClick });
   // In-app toast notifications.
   useMessageToasts();
 

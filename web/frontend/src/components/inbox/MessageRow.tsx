@@ -246,6 +246,16 @@ export function MessageRow({
           : undefined
       }
     >
+      {/* Unread indicator dot. */}
+      <div className="w-2 flex-shrink-0">
+        {isUnread ? (
+          <span
+            className="inline-block h-2 w-2 rounded-full bg-blue-500"
+            aria-label="Unread message"
+          />
+        ) : null}
+      </div>
+
       {/* Checkbox. */}
       {showCheckbox ? (
         <div className="flex-shrink-0">
