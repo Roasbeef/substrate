@@ -59,6 +59,14 @@ func main() {
 
 	// Create agent registry, heartbeat manager, and identity manager.
 	agentReg := agent.NewRegistry(dbStore)
+
+	// Ensure the default "User" agent exists for the web UI inbox.
+	if _, err := agentReg.EnsureDefaultAgent(
+		context.Background(), web.UserAgentName,
+	); err != nil {
+		log.Fatalf("Failed to ensure User agent: %v", err)
+	}
+
 	heartbeatMgr := agent.NewHeartbeatManager(agentReg, nil)
 	identityMgr, err := agent.NewIdentityManager(dbStore, agentReg)
 	if err != nil {

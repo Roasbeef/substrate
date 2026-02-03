@@ -77,6 +77,26 @@ func (r *Registry) RegisterAgent(ctx context.Context, name string,
 	return &agent, nil
 }
 
+// EnsureDefaultAgent ensures that an agent with the given name exists,
+// creating it if necessary. This is used to guarantee that system agents
+// (like "User") are present in the database on startup.
+func (r *Registry) EnsureDefaultAgent(ctx context.Context,
+	name string,
+) (*sqlc.Agent, error) {
+
+	agent, err := r.store.Queries().GetAgentByName(ctx, name)
+	if err == nil {
+		return &agent, nil
+	}
+
+	if err != sql.ErrNoRows {
+		return nil, fmt.Errorf("failed to check for agent: %w", err)
+	}
+
+	// Agent doesn't exist, create it.
+	return r.RegisterAgent(ctx, name, "", "")
+}
+
 // GetAgent retrieves an agent by ID.
 func (r *Registry) GetAgent(ctx context.Context,
 	id int64,
