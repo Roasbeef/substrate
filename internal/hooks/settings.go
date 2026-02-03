@@ -26,6 +26,7 @@ type HookEntry struct {
 type HookCommand struct {
 	Type    string `json:"type"`
 	Command string `json:"command"`
+	Timeout int    `json:"timeout,omitempty"`
 }
 
 // substrateHookID is used to identify Subtrate hooks in settings.json.
@@ -52,6 +53,7 @@ var HookDefinitions = map[string]HookEntry{
 		Hooks: []HookCommand{{
 			Type:    "command",
 			Command: "~/.claude/hooks/substrate/stop.sh",
+			Timeout: 600,
 		}},
 	},
 	"SubagentStop": {
@@ -121,6 +123,7 @@ func LoadSettings(claudeDir string) (*ClaudeSettings, error) {
 						entry.Hooks = append(entry.Hooks, HookCommand{
 							Type:    getStringField(hookMap, "type"),
 							Command: getStringField(hookMap, "command"),
+							Timeout: getIntField(hookMap, "timeout"),
 						})
 					}
 				}
@@ -154,10 +157,14 @@ func SaveSettings(claudeDir string, settings *ClaudeSettings) error {
 
 			hooksArr := make([]any, 0, len(entry.Hooks))
 			for _, hook := range entry.Hooks {
-				hooksArr = append(hooksArr, map[string]any{
+				hookMap := map[string]any{
 					"type":    hook.Type,
 					"command": hook.Command,
-				})
+				}
+				if hook.Timeout > 0 {
+					hookMap["timeout"] = hook.Timeout
+				}
+				hooksArr = append(hooksArr, hookMap)
 			}
 			entryMap["hooks"] = hooksArr
 
@@ -255,4 +262,13 @@ func getStringField(m map[string]any, key string) string {
 		return v
 	}
 	return ""
+}
+
+// getIntField safely gets an int field from a map. JSON numbers
+// unmarshal as float64, so we handle that conversion.
+func getIntField(m map[string]any, key string) int {
+	if v, ok := m[key].(float64); ok {
+		return int(v)
+	}
+	return 0
 }

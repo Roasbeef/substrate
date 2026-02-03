@@ -10,7 +10,7 @@
 # Key behaviors:
 # - Checks mail before tasks (mail is more actionable)
 # - Sends status updates to User with deduplication
-# - Long-polls for 55s (under 60s hook timeout)
+# - Long-polls for 9m30s (under 10m hook timeout)
 # - Always outputs {"decision": "block"} to stay alive
 # - User can force exit with Ctrl+C (bypasses hooks)
 #
@@ -283,7 +283,7 @@ mkdir -p "$(dirname "$debug_log")"
 echo "=== Stop Hook Step 4: $(date) ===" >> "$debug_log"
 echo "session_args: [$session_args]" >> "$debug_log"
 
-poll_output=$(substrate poll $session_args --wait=55s --format hook --always-block 2>&1)
+poll_output=$(substrate poll $session_args --wait=570s --format hook --always-block 2>&1)
 poll_exit=$?
 echo "poll_exit: $poll_exit, output: $poll_output" >> "$debug_log"
 
