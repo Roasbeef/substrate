@@ -169,6 +169,9 @@ type FetchInboxRequest struct {
 	// StateFilter filters messages by state (e.g., "unread", "starred").
 	// If nil, no state filtering is applied.
 	StateFilter *string
+
+	// SentOnly retrieves messages sent by the agent instead of received.
+	SentOnly bool
 }
 
 // MessageType implements actor.Message.
@@ -176,20 +179,22 @@ func (FetchInboxRequest) MessageType() string { return "FetchInboxRequest" }
 
 // InboxMessage represents a message in the inbox with its state.
 type InboxMessage struct {
-	ID           int64
-	ThreadID     string
-	TopicID      int64
-	SenderID     int64
-	SenderName   string
-	Subject      string
-	Body         string
-	Priority     Priority
-	Deadline     *time.Time
-	State        string
-	SnoozedUntil *time.Time
-	ReadAt       *time.Time
-	AckedAt      *time.Time
-	CreatedAt    time.Time
+	ID               int64
+	ThreadID         string
+	TopicID          int64
+	SenderID         int64
+	SenderName       string
+	SenderProjectKey string
+	SenderGitBranch  string
+	Subject          string
+	Body             string
+	Priority         Priority
+	Deadline         *time.Time
+	State            string
+	SnoozedUntil     *time.Time
+	ReadAt           *time.Time
+	AckedAt          *time.Time
+	CreatedAt        time.Time
 }
 
 // FetchInboxResponse is the response to a FetchInboxRequest.

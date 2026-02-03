@@ -262,6 +262,14 @@ func (s *Service) handleSendMail(ctx context.Context,
 				Message: notifMsg,
 			})
 		}
+
+		// Also notify agent_id=0 for global inbox viewers (web UI without
+		// a specific agent selected). This ensures real-time updates work
+		// for the default inbox view.
+		s.notifHub.Tell(ctx, NotifyAgentMsg{
+			AgentID: 0,
+			Message: notifMsg,
+		})
 	}
 
 	return response
@@ -276,6 +284,57 @@ func (s *Service) handleFetchInbox(ctx context.Context,
 	limit := req.Limit
 	if limit <= 0 {
 		limit = 50
+	}
+
+	// Handle sent messages view.
+	if req.SentOnly {
+		// If AgentID is provided, get sent messages for that agent.
+		// Otherwise, get all sent messages globally.
+		if req.AgentID != 0 {
+			msgs, err := s.store.GetSentMessages(ctx, req.AgentID, limit)
+			if err != nil {
+				response.Error = fmt.Errorf("failed to fetch sent: %w", err)
+				return response
+			}
+
+			// Get agent info for sender details.
+			agent, err := s.store.GetAgent(ctx, req.AgentID)
+			if err != nil {
+				response.Error = fmt.Errorf("failed to get agent: %w", err)
+				return response
+			}
+
+			for _, m := range msgs {
+				response.Messages = append(response.Messages, InboxMessage{
+					ID:               m.ID,
+					ThreadID:         m.ThreadID,
+					TopicID:          m.TopicID,
+					SenderID:         m.SenderID,
+					SenderName:       agent.Name,
+					SenderProjectKey: agent.ProjectKey,
+					SenderGitBranch:  agent.GitBranch,
+					Subject:          m.Subject,
+					Body:             m.Body,
+					Priority:         Priority(m.Priority),
+					CreatedAt:        m.CreatedAt,
+					Deadline:         m.DeadlineAt,
+					State:            "read", // Sent messages are always "read".
+				})
+			}
+		} else {
+			msgs, err := s.store.GetAllSentMessages(ctx, limit)
+			if err != nil {
+				response.Error = fmt.Errorf("failed to fetch all sent: %w", err)
+				return response
+			}
+
+			for _, m := range msgs {
+				response.Messages = append(
+					response.Messages, storeInboxToMail(m),
+				)
+			}
+		}
+		return response
 	}
 
 	if req.UnreadOnly {
@@ -531,20 +590,22 @@ func (s *Service) handlePollChanges(ctx context.Context,
 // storeInboxToMail converts a store.InboxMessage to mail.InboxMessage.
 func storeInboxToMail(m store.InboxMessage) InboxMessage {
 	return InboxMessage{
-		ID:           m.ID,
-		ThreadID:     m.ThreadID,
-		TopicID:      m.TopicID,
-		SenderID:     m.SenderID,
-		SenderName:   m.SenderName,
-		Subject:      m.Subject,
-		Body:         m.Body,
-		Priority:     Priority(m.Priority),
-		State:        m.State,
-		CreatedAt:    m.CreatedAt,
-		Deadline:     m.DeadlineAt,
-		SnoozedUntil: m.SnoozedUntil,
-		ReadAt:       m.ReadAt,
-		AckedAt:      m.AckedAt,
+		ID:               m.ID,
+		ThreadID:         m.ThreadID,
+		TopicID:          m.TopicID,
+		SenderID:         m.SenderID,
+		SenderName:       m.SenderName,
+		SenderProjectKey: m.SenderProjectKey,
+		SenderGitBranch:  m.SenderGitBranch,
+		Subject:          m.Subject,
+		Body:             m.Body,
+		Priority:         Priority(m.Priority),
+		State:            m.State,
+		CreatedAt:        m.CreatedAt,
+		Deadline:         m.DeadlineAt,
+		SnoozedUntil:     m.SnoozedUntil,
+		ReadAt:           m.ReadAt,
+		AckedAt:          m.AckedAt,
 	}
 }
 
@@ -560,6 +621,29 @@ func storeMessageToMail(m store.Message) InboxMessage {
 		Priority:  Priority(m.Priority),
 		CreatedAt: m.CreatedAt,
 		Deadline:  m.DeadlineAt,
+	}
+}
+
+// storeInboxMessageToMail converts a store.InboxMessage to mail.InboxMessage.
+// This variant includes sender information (name, project, branch).
+func storeInboxMessageToMail(m store.InboxMessage) InboxMessage {
+	return InboxMessage{
+		ID:               m.ID,
+		ThreadID:         m.ThreadID,
+		TopicID:          m.TopicID,
+		SenderID:         m.SenderID,
+		SenderName:       m.SenderName,
+		SenderProjectKey: m.SenderProjectKey,
+		SenderGitBranch:  m.SenderGitBranch,
+		Subject:          m.Subject,
+		Body:             m.Body,
+		Priority:         Priority(m.Priority),
+		CreatedAt:        m.CreatedAt,
+		Deadline:         m.DeadlineAt,
+		State:            m.State,
+		SnoozedUntil:     m.SnoozedUntil,
+		ReadAt:           m.ReadAt,
+		AckedAt:          m.AckedAt,
 	}
 }
 
@@ -659,15 +743,15 @@ func (s *Service) ReadMessage(ctx context.Context, agentID, messageID int64) (*I
 
 // ReadThread reads all messages in a thread synchronously.
 func (s *Service) ReadThread(ctx context.Context, agentID int64, threadID string) ([]InboxMessage, error) {
-	// Get messages by thread ID.
-	rows, err := s.store.GetMessagesByThread(ctx, threadID)
+	// Get messages by thread ID with sender information.
+	rows, err := s.store.GetMessagesByThreadWithSender(ctx, threadID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get thread messages: %w", err)
 	}
 
-	var messages []InboxMessage
+	messages := make([]InboxMessage, 0, len(rows))
 	for _, r := range rows {
-		messages = append(messages, storeMessageToMail(r))
+		messages = append(messages, storeInboxMessageToMail(r))
 	}
 
 	return messages, nil
@@ -753,10 +837,11 @@ func (s *Service) Unsubscribe(ctx context.Context, agentID int64, topicName stri
 
 // TopicInfo represents basic topic information.
 type TopicInfo struct {
-	ID        int64
-	Name      string
-	TopicType string
-	CreatedAt time.Time
+	ID           int64
+	Name         string
+	TopicType    string
+	CreatedAt    time.Time
+	MessageCount int64
 }
 
 // ListTopics lists topics, optionally filtered by agent subscription.
@@ -783,10 +868,11 @@ func (s *Service) ListTopics(ctx context.Context, req ListTopicsRequest) ([]Topi
 		}
 		for _, r := range rows {
 			topics = append(topics, TopicInfo{
-				ID:        r.ID,
-				Name:      r.Name,
-				TopicType: r.TopicType,
-				CreatedAt: r.CreatedAt,
+				ID:           r.ID,
+				Name:         r.Name,
+				TopicType:    r.TopicType,
+				CreatedAt:    r.CreatedAt,
+				MessageCount: r.MessageCount,
 			})
 		}
 	}
@@ -815,6 +901,21 @@ func (s *Service) Search(ctx context.Context, req SearchRequest) ([]InboxMessage
 		limit = 50
 	}
 
+	if req.AgentID == 0 {
+		// Global search across all messages.
+		rows, err := s.store.SearchMessages(ctx, req.Query, limit)
+		if err != nil {
+			return nil, fmt.Errorf("search failed: %w", err)
+		}
+
+		var messages []InboxMessage
+		for _, r := range rows {
+			messages = append(messages, storeInboxToMail(r))
+		}
+		return messages, nil
+	}
+
+	// Agent-specific search.
 	rows, err := s.store.SearchMessagesForAgent(
 		ctx, req.Query, req.AgentID, limit,
 	)

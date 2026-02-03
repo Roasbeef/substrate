@@ -881,3 +881,166 @@ func TestService_UpdateState_Trash(t *testing.T) {
 	require.NoError(t, trashResp.Error)
 	require.True(t, trashResp.Success)
 }
+
+// TestService_FetchInbox_SenderContext verifies that sender context
+// (project_key and git_branch) is properly returned in inbox messages.
+func TestService_FetchInbox_SenderContext(t *testing.T) {
+	t.Parallel()
+
+	storage, cleanup := testDB(t)
+	defer cleanup()
+
+	svc := NewServiceWithStore(storage)
+	ctx := context.Background()
+
+	// Create sender with project context.
+	sender, err := storage.CreateAgent(ctx, store.CreateAgentParams{
+		Name:       "ContextSender",
+		ProjectKey: "/Users/dev/myproject",
+		GitBranch:  "feature/context-test",
+	})
+	require.NoError(t, err)
+
+	// Create recipient without project context.
+	recipient := createTestAgent(t, storage, "ContextRecipient")
+
+	// Send a message.
+	req := SendMailRequest{
+		SenderID:       sender.ID,
+		RecipientNames: []string{recipient.Name},
+		Subject:        "Context Test",
+		Body:           "Testing sender context propagation",
+		Priority:       PriorityNormal,
+	}
+
+	result := svc.Receive(ctx, req)
+	val, err := result.Unpack()
+	require.NoError(t, err)
+	resp := val.(SendMailResponse)
+	require.NoError(t, resp.Error)
+
+	// Fetch inbox and verify sender context is present.
+	fetchReq := FetchInboxRequest{
+		AgentID: recipient.ID,
+		Limit:   10,
+	}
+
+	result = svc.Receive(ctx, fetchReq)
+	val, err = result.Unpack()
+	require.NoError(t, err)
+
+	fetchResp := val.(FetchInboxResponse)
+	require.NoError(t, fetchResp.Error)
+	require.Len(t, fetchResp.Messages, 1)
+
+	msg := fetchResp.Messages[0]
+	require.Equal(t, "ContextSender", msg.SenderName)
+	require.Equal(t, "/Users/dev/myproject", msg.SenderProjectKey)
+	require.Equal(t, "feature/context-test", msg.SenderGitBranch)
+}
+
+// TestService_ReadThread_SenderContext verifies that sender context
+// is properly returned when reading a thread.
+func TestService_ReadThread_SenderContext(t *testing.T) {
+	t.Parallel()
+
+	storage, cleanup := testDB(t)
+	defer cleanup()
+
+	svc := NewServiceWithStore(storage)
+	ctx := context.Background()
+
+	// Create sender with project context.
+	sender, err := storage.CreateAgent(ctx, store.CreateAgentParams{
+		Name:       "ThreadSender",
+		ProjectKey: "/Users/dev/threadproject",
+		GitBranch:  "develop",
+	})
+	require.NoError(t, err)
+
+	// Create recipient.
+	recipient := createTestAgent(t, storage, "ThreadRecipient")
+
+	// Send a message.
+	req := SendMailRequest{
+		SenderID:       sender.ID,
+		RecipientNames: []string{recipient.Name},
+		Subject:        "Thread View Test",
+		Body:           "Testing thread sender context",
+		Priority:       PriorityNormal,
+	}
+
+	result := svc.Receive(ctx, req)
+	val, err := result.Unpack()
+	require.NoError(t, err)
+	resp := val.(SendMailResponse)
+	require.NoError(t, resp.Error)
+
+	// Read the thread and verify sender context.
+	messages, err := svc.ReadThread(ctx, recipient.ID, resp.ThreadID)
+	require.NoError(t, err)
+	require.Len(t, messages, 1)
+
+	msg := messages[0]
+	require.Equal(t, "ThreadSender", msg.SenderName)
+	require.Equal(t, "/Users/dev/threadproject", msg.SenderProjectKey)
+	require.Equal(t, "develop", msg.SenderGitBranch)
+}
+
+// TestService_FetchSentMessages_SenderContext verifies that sender context
+// is properly returned when fetching sent messages.
+func TestService_FetchSentMessages_SenderContext(t *testing.T) {
+	t.Parallel()
+
+	storage, cleanup := testDB(t)
+	defer cleanup()
+
+	svc := NewServiceWithStore(storage)
+	ctx := context.Background()
+
+	// Create sender with project context.
+	sender, err := storage.CreateAgent(ctx, store.CreateAgentParams{
+		Name:       "SentSender",
+		ProjectKey: "/Users/dev/sentproject",
+		GitBranch:  "feature/sent-test",
+	})
+	require.NoError(t, err)
+
+	// Create recipient.
+	recipient := createTestAgent(t, storage, "SentRecipient")
+
+	// Send a message.
+	req := SendMailRequest{
+		SenderID:       sender.ID,
+		RecipientNames: []string{recipient.Name},
+		Subject:        "Sent Messages Test",
+		Body:           "Testing sent messages sender context",
+		Priority:       PriorityNormal,
+	}
+
+	result := svc.Receive(ctx, req)
+	val, err := result.Unpack()
+	require.NoError(t, err)
+	resp := val.(SendMailResponse)
+	require.NoError(t, resp.Error)
+
+	// Fetch sent messages and verify sender context.
+	fetchReq := FetchInboxRequest{
+		AgentID:  sender.ID,
+		SentOnly: true,
+		Limit:    10,
+	}
+
+	result = svc.Receive(ctx, fetchReq)
+	val, err = result.Unpack()
+	require.NoError(t, err)
+
+	fetchResp := val.(FetchInboxResponse)
+	require.NoError(t, fetchResp.Error)
+	require.Len(t, fetchResp.Messages, 1)
+
+	msg := fetchResp.Messages[0]
+	require.Equal(t, "SentSender", msg.SenderName)
+	require.Equal(t, "/Users/dev/sentproject", msg.SenderProjectKey)
+	require.Equal(t, "feature/sent-test", msg.SenderGitBranch)
+}
