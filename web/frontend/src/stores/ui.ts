@@ -59,6 +59,9 @@ interface UIState {
   searchQuery: string;
   searchOpen: boolean;
 
+  // Pending thread to open (set by notification clicks).
+  pendingThreadId: string | null;
+
   // Actions for modals.
   openModal: (type: ModalType, data?: ModalData) => void;
   closeModal: () => void;
@@ -79,6 +82,10 @@ interface UIState {
   setSearchQuery: (query: string) => void;
   toggleSearch: () => void;
   closeSearch: () => void;
+
+  // Actions for pending thread.
+  setPendingThread: (threadId: string) => void;
+  clearPendingThread: () => void;
 }
 
 // Generate unique ID for toasts.
@@ -98,6 +105,7 @@ export const useUIStore = create<UIState>()(
       globalLoading: false,
       searchQuery: '',
       searchOpen: false,
+      pendingThreadId: null,
 
       // Modal actions.
       openModal: (type, data) =>
@@ -162,6 +170,13 @@ export const useUIStore = create<UIState>()(
 
       closeSearch: () =>
         set({ searchOpen: false, searchQuery: '' }, undefined, 'closeSearch'),
+
+      // Pending thread actions.
+      setPendingThread: (threadId) =>
+        set({ pendingThreadId: threadId }, undefined, 'setPendingThread'),
+
+      clearPendingThread: () =>
+        set({ pendingThreadId: null }, undefined, 'clearPendingThread'),
     }),
     { name: 'ui-store' },
   ),

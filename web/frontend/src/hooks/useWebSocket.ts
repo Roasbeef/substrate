@@ -180,6 +180,7 @@ export interface ActivityPayload {
 // New message payload type.
 export interface NewMessagePayload {
   id: number;
+  thread_id: string;
   sender_id: number;
   sender_name: string;
   subject: string;

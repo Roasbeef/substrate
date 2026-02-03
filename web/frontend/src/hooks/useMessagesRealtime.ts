@@ -51,6 +51,7 @@ export function useMessagesRealtime(): RealtimeMessageState {
       // The message is created with minimal data; a refetch will get full details.
       const newMessage: MessageWithRecipients = {
         id: payload.id,
+        thread_id: payload.thread_id,
         sender_id: payload.sender_id,
         sender_name: payload.sender_name,
         subject: payload.subject,

@@ -90,9 +90,14 @@ export interface SearchResultWithRoute extends SearchResult {
 export function enrichSearchResult(result: SearchResult): SearchResultWithRoute {
   switch (result.type) {
     case 'message':
-      return { ...result, route: `/inbox/thread/${result.id}` };
+      // For messages, use thread_id if available, otherwise fall back to id.
+      // The thread view route is /thread/:threadId (not /inbox/thread/).
+      if (result.thread_id) {
+        return { ...result, route: `/thread/${result.thread_id}` };
+      }
+      return { ...result, route: `/thread/${result.id}` };
     case 'thread':
-      return { ...result, route: `/inbox/thread/${result.id}` };
+      return { ...result, route: `/thread/${result.id}` };
     case 'agent':
       return { ...result, route: `/agents/${result.id}` };
     case 'topic':

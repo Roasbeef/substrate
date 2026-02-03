@@ -45,6 +45,11 @@ function savePreferences(prefs: NotificationPreferences): void {
   }
 }
 
+// Extended notification options with click handler.
+export interface ExtendedNotificationOptions extends NotificationOptions {
+  onClick?: () => void;
+}
+
 // Interface for notification state.
 export interface NotificationState {
   permission: NotificationPermissionState;
@@ -52,7 +57,7 @@ export interface NotificationState {
   preferences: NotificationPreferences;
   requestPermission: () => Promise<NotificationPermissionState>;
   updatePreferences: (updates: Partial<NotificationPreferences>) => void;
-  showNotification: (title: string, options?: NotificationOptions) => void;
+  showNotification: (title: string, options?: ExtendedNotificationOptions) => void;
 }
 
 // Hook to manage browser notifications.
@@ -97,7 +102,7 @@ export function useNotifications(): NotificationState {
 
   // Show a notification.
   const showNotification = useCallback(
-    (title: string, options?: NotificationOptions) => {
+    (title: string, options?: ExtendedNotificationOptions) => {
       if (!isSupported) {
         console.warn('Notifications not supported in this browser');
         return;
@@ -112,11 +117,21 @@ export function useNotifications(): NotificationState {
       }
 
       try {
+        // Extract onClick before passing to Notification constructor.
+        const { onClick, ...notificationOptions } = options ?? {};
+
         // Create notification without icon if it might be missing.
         const notification = new Notification(title, {
-          ...options,
+          ...notificationOptions,
         });
         console.log('Notification created:', title);
+
+        // Handle click to navigate to thread and focus window.
+        notification.onclick = () => {
+          window.focus();
+          notification.close();
+          onClick?.();
+        };
 
         // Auto-close after 5 seconds.
         setTimeout(() => notification.close(), 5000);
@@ -137,8 +152,16 @@ export function useNotifications(): NotificationState {
   };
 }
 
+// Options for the new message notifications hook.
+export interface NewMessageNotificationsOptions {
+  onThreadClick?: (threadId: string) => void;
+}
+
 // Hook to automatically show notifications for new messages.
-export function useNewMessageNotifications(): void {
+export function useNewMessageNotifications(
+  options: NewMessageNotificationsOptions = {},
+): void {
+  const { onThreadClick } = options;
   const { permission, isSupported, preferences, showNotification } = useNotifications();
   const { state } = useWebSocketConnection();
 
@@ -156,13 +179,19 @@ export function useNewMessageNotifications(): void {
         return;
       }
 
-      // Show the notification.
+      // Show the notification with click handler.
       showNotification(`New message from ${payload.sender_name}`, {
         body: payload.subject,
         tag: `message-${payload.id}`,
+        onClick: () => {
+          // Navigate to the thread when notification is clicked.
+          if (onThreadClick && payload.thread_id) {
+            onThreadClick(payload.thread_id);
+          }
+        },
       });
     },
-    [isSupported, permission, preferences, state, showNotification],
+    [isSupported, permission, preferences, state, showNotification, onThreadClick],
   );
 
   // Subscribe to new messages.
