@@ -3,6 +3,7 @@ package e2e_test
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"io"
 	"net"
 	"net/http"
@@ -14,6 +15,7 @@ import (
 
 	"github.com/roasbeef/subtrate/internal/activity"
 	"github.com/roasbeef/subtrate/internal/agent"
+	subtraterpc "github.com/roasbeef/subtrate/internal/api/grpc"
 	"github.com/roasbeef/subtrate/internal/baselib/actor"
 	"github.com/roasbeef/subtrate/internal/db"
 	"github.com/roasbeef/subtrate/internal/db/sqlc"
@@ -30,6 +32,7 @@ type httpTestEnv struct {
 	// Server components.
 	store       *db.Store
 	server      *web.Server
+	grpcServer  *subtraterpc.Server
 	addr        string
 	actorSystem *actor.ActorSystem
 
@@ -96,14 +99,42 @@ func newHTTPTestEnv(t *testing.T) *httpTestEnv {
 		activitySvc,
 	)
 
-	// Create agent registry.
+	// Create agent registry and heartbeat manager.
 	registry := agent.NewRegistry(dbStore)
+	heartbeatMgr := agent.NewHeartbeatManager(registry, nil)
 
-	// Create web server.
+	// Create identity manager.
+	identityMgr, err := agent.NewIdentityManager(dbStore, registry)
+	require.NoError(t, err)
+
+	// Create gRPC server config with a random port.
+	grpcCfg := subtraterpc.ServerConfig{
+		ListenAddr:                   "localhost:0", // Random port.
+		ServerPingTime:               5 * time.Minute,
+		ServerPingTimeout:            1 * time.Minute,
+		ClientPingMinWait:            5 * time.Second,
+		ClientAllowPingWithoutStream: true,
+		MailRef:                      mailRef,
+		ActivityRef:                  activityRef,
+	}
+
+	// Create and start gRPC server.
+	grpcServer := subtraterpc.NewServer(
+		grpcCfg, dbStore, mailSvc, registry, identityMgr,
+		heartbeatMgr, nil,
+	)
+	err = grpcServer.Start()
+	require.NoError(t, err)
+
+	// Get the actual gRPC address from the server's listener.
+	grpcAddr := grpcServer.Addr()
+
+	// Create web server with gateway enabled.
 	cfg := web.DefaultConfig()
 	cfg.Addr = addr
 	cfg.MailRef = mailRef
 	cfg.ActivityRef = activityRef
+	cfg.GRPCEndpoint = grpcAddr
 
 	server, err := web.NewServer(cfg, storage, registry)
 	require.NoError(t, err)
@@ -119,10 +150,16 @@ func newHTTPTestEnv(t *testing.T) *httpTestEnv {
 	// Wait for server to be ready.
 	waitForServer(t, addr)
 
+	// Create the default "User" agent that the system uses for global inbox.
+	ctx := context.Background()
+	_, err = registry.RegisterAgent(ctx, "User", "", "")
+	require.NoError(t, err)
+
 	env := &httpTestEnv{
 		t:           t,
 		store:       dbStore,
 		server:      server,
+		grpcServer:  grpcServer,
 		addr:        addr,
 		actorSystem: actorSystem,
 		mailSvc:     mailSvc,
@@ -133,6 +170,7 @@ func newHTTPTestEnv(t *testing.T) *httpTestEnv {
 
 	env.cleanups = append(env.cleanups, func() {
 		server.Shutdown(context.Background())
+		grpcServer.Stop()
 		actorSystem.Shutdown(context.Background())
 		dbStore.Close()
 		os.RemoveAll(tmpDir)
@@ -298,8 +336,10 @@ func TestHTTP_APIV1Messages(t *testing.T) {
 	env.sendMessage("Sender", "Receiver", "Test Subject", "Test body", mail.PriorityNormal)
 	env.sendMessage("Sender", "Receiver", "Urgent Task", "Do this now!", mail.PriorityUrgent)
 
-	// Get inbox messages via API v1.
-	resp := env.get("/api/v1/messages")
+	// Get inbox messages via API v1 for the Receiver agent.
+	// Without agent_id, it defaults to User's inbox which is empty.
+	receiver := env.agents["Receiver"]
+	resp := env.get(fmt.Sprintf("/api/v1/messages?agent_id=%d", receiver.ID))
 	require.Equal(t, http.StatusOK, resp.StatusCode)
 
 	body := readBody(t, resp)
@@ -363,7 +403,9 @@ func TestHTTP_APIV1AgentStatus(t *testing.T) {
 	env.createAgent("StatusTestSender")
 	env.createAgent("StatusTestReceiver")
 
-	resp := env.get("/api/v1/agents/status")
+	// Note: The gateway route is /api/v1/agents-status (with hyphen, not slash)
+	// to avoid route conflict with /api/v1/agents/{id}.
+	resp := env.get("/api/v1/agents-status")
 	require.Equal(t, http.StatusOK, resp.StatusCode)
 
 	body := readBody(t, resp)
@@ -418,15 +460,24 @@ func TestHTTP_APIV1MessagesInThread(t *testing.T) {
 	require.NoError(t, err)
 
 	// Fetch messages via API v1 - messages in same thread share thread_id.
-	resp := env.get("/api/v1/messages")
+	// Query for ThreadReceiver's inbox to see the messages they received.
+	threadReceiverAgent := env.agents["ThreadReceiver"]
+	resp := env.get(fmt.Sprintf("/api/v1/messages?agent_id=%d", threadReceiverAgent.ID))
 	require.Equal(t, http.StatusOK, resp.StatusCode)
 
 	body := readBody(t, resp)
 
-	// Should contain both messages and their thread ID.
+	// Should contain the first message and thread ID.
 	require.Contains(t, body, "First message in thread")
-	require.Contains(t, body, "Reply message")
 	require.Contains(t, body, threadID)
+
+	// Also check ThreadSender's inbox for the reply.
+	threadSenderAgent := env.agents["ThreadSender"]
+	resp2 := env.get(fmt.Sprintf("/api/v1/messages?agent_id=%d", threadSenderAgent.ID))
+	require.Equal(t, http.StatusOK, resp2.StatusCode)
+
+	body2 := readBody(t, resp2)
+	require.Contains(t, body2, "Reply message")
 
 	t.Logf("API v1 messages with thread response: %s", body[:min(400, len(body))])
 }
@@ -437,18 +488,26 @@ func TestHTTP_APIV1Heartbeat(t *testing.T) {
 	defer env.cleanup()
 
 	// Create an agent.
-	env.createAgent("HeartbeatAgent")
+	agent := env.createAgent("HeartbeatAgent")
 
-	// Send heartbeat via API v1. Heartbeat returns 204 No Content.
-	data := map[string]string{"agent_name": "HeartbeatAgent"}
-	resp := env.postJSON("/api/v1/agents/heartbeat", data)
-	require.Equal(t, http.StatusNoContent, resp.StatusCode)
-
-	// Check agent status via API v1.
-	resp = env.get("/api/v1/agents/status")
+	// Send heartbeat via API v1 using the gateway endpoint.
+	// The gRPC Heartbeat expects agent_id (int64), not agent_name.
+	data := map[string]any{
+		"agent_id":   agent.ID,
+		"session_id": "test-session",
+	}
+	resp := env.postJSON("/api/v1/heartbeat", data)
 	require.Equal(t, http.StatusOK, resp.StatusCode)
 
+	// Verify the heartbeat response.
 	body := readBody(t, resp)
+	require.Contains(t, body, "success")
+
+	// Check agent status via API v1 (using agents-status with hyphen).
+	resp = env.get("/api/v1/agents-status")
+	require.Equal(t, http.StatusOK, resp.StatusCode)
+
+	body = readBody(t, resp)
 	require.Contains(t, body, "HeartbeatAgent")
 
 	t.Logf("Agents status response: %s", body[:min(200, len(body))])
@@ -471,8 +530,9 @@ func TestHTTP_E2EFlow(t *testing.T) {
 
 	t.Log("Step 2: Sent 2 messages from WebUser to WebWorker")
 
-	// Step 3: Verify API v1 messages endpoint returns messages.
-	resp := env.get("/api/v1/messages")
+	// Step 3: Verify API v1 messages endpoint returns messages for WebWorker.
+	webWorkerAgent := env.agents["WebWorker"]
+	resp := env.get(fmt.Sprintf("/api/v1/messages?agent_id=%d", webWorkerAgent.ID))
 	require.Equal(t, http.StatusOK, resp.StatusCode)
 
 	body := readBody(t, resp)
@@ -494,11 +554,14 @@ func TestHTTP_E2EFlow(t *testing.T) {
 
 	t.Log("Step 4: Created and verified topics via API v1")
 
-	// Step 5: Test heartbeat flow via API v1. Heartbeat returns 204 No Content.
-	resp = env.postJSON("/api/v1/agents/heartbeat", map[string]string{"agent_name": "WebWorker"})
-	require.Equal(t, http.StatusNoContent, resp.StatusCode)
+	// Step 5: Test heartbeat flow via API v1.
+	resp = env.postJSON("/api/v1/heartbeat", map[string]any{
+		"agent_id":   webWorkerAgent.ID,
+		"session_id": "test-session",
+	})
+	require.Equal(t, http.StatusOK, resp.StatusCode)
 
-	resp = env.get("/api/v1/agents/status")
+	resp = env.get("/api/v1/agents-status")
 	require.Equal(t, http.StatusOK, resp.StatusCode)
 
 	body = readBody(t, resp)
