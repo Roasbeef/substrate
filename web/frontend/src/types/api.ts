@@ -168,6 +168,9 @@ export interface SearchResult {
   title: string;
   snippet: string;
   created_at: string;
+  // Additional fields for message results to enable navigation.
+  thread_id?: string;
+  sender_name?: string;
 }
 
 // Autocomplete types.

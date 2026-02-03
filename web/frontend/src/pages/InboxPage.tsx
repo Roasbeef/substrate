@@ -1,7 +1,7 @@
 // InboxPage component - main inbox view with messages, filters, and actions.
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { useLocation } from 'react-router-dom';
+import { useLocation, useParams } from 'react-router-dom';
 import {
   InboxStats,
   CategoryTabs,
@@ -22,6 +22,7 @@ import {
   useDeleteMessage,
 } from '@/hooks/useMessages.js';
 import { useAuthStore } from '@/stores/auth.js';
+import { useUIStore } from '@/stores/ui.js';
 import {
   useThread,
   useReplyToThread,
@@ -54,6 +55,7 @@ function getRouteFilter(pathname: string): RouteFilter {
 export default function InboxPage() {
   // Get current location for route-based filtering.
   const location = useLocation();
+  const params = useParams<{ threadId?: string }>();
   const routeFilter = getRouteFilter(location.pathname);
 
   // Get current agent from auth store for filtering.
@@ -73,6 +75,25 @@ export default function InboxPage() {
 
   // Thread view state.
   const [selectedThreadId, setSelectedThreadId] = useState<string | null>(null);
+
+  // Check for pending thread from notification click.
+  const pendingThreadId = useUIStore((state) => state.pendingThreadId);
+  const clearPendingThread = useUIStore((state) => state.clearPendingThread);
+
+  // Open pending thread if one is set (from notification click).
+  useEffect(() => {
+    if (pendingThreadId) {
+      setSelectedThreadId(pendingThreadId);
+      clearPendingThread();
+    }
+  }, [pendingThreadId, clearPendingThread]);
+
+  // Open thread from URL params (from search navigation).
+  useEffect(() => {
+    if (params.threadId) {
+      setSelectedThreadId(params.threadId);
+    }
+  }, [params.threadId]);
 
   // Build query options from route and state.
   const queryOptions = useMemo(() => {
