@@ -99,8 +99,11 @@ func newTestHarness(t *testing.T) *testHarness {
 		ActivityRef:                  activityRef,
 	}
 
+	// Create heartbeat manager.
+	heartbeatMgr := agent.NewHeartbeatManager(agentReg, nil)
+
 	// Create and start server.
-	server := NewServer(cfg, sqliteStore.Store, mailSvc, agentReg, identityMgr, nil)
+	server := NewServer(cfg, sqliteStore.Store, mailSvc, agentReg, identityMgr, heartbeatMgr, nil)
 	err = server.Start()
 	require.NoError(t, err)
 
@@ -117,6 +120,11 @@ func newTestHarness(t *testing.T) *testHarness {
 	// Create service clients.
 	mailClient := NewMailClient(conn)
 	agentClient := NewAgentClient(conn)
+
+	// Create the default "User" agent that the system uses for global inbox.
+	ctx := context.Background()
+	_, err = agentClient.RegisterAgent(ctx, &RegisterAgentRequest{Name: "User"})
+	require.NoError(t, err)
 
 	h := &testHarness{
 		t:           t,
@@ -263,16 +271,17 @@ func TestAgentService_ListAgents(t *testing.T) {
 	_, err = h.agentClient.RegisterAgent(ctx, &RegisterAgentRequest{Name: "Agent3"})
 	require.NoError(t, err)
 
-	// List all agents.
+	// List all agents (includes the default "User" agent created by harness).
 	resp, err := h.agentClient.ListAgents(ctx, &ListAgentsRequest{})
 	require.NoError(t, err)
-	require.Len(t, resp.Agents, 3)
+	require.Len(t, resp.Agents, 4) // User + Agent1 + Agent2 + Agent3
 
 	// Verify agent names.
 	names := make(map[string]bool)
 	for _, a := range resp.Agents {
 		names[a.Name] = true
 	}
+	require.True(t, names["User"])
 	require.True(t, names["Agent1"])
 	require.True(t, names["Agent2"])
 	require.True(t, names["Agent3"])
@@ -347,16 +356,17 @@ func TestAgentService_RegisterAgent_Duplicate(t *testing.T) {
 	require.Contains(t, err.Error(), "UNIQUE constraint failed")
 }
 
-func TestAgentService_ListAgents_Empty(t *testing.T) {
+func TestAgentService_ListAgents_OnlyDefaultUser(t *testing.T) {
 	h := newTestHarness(t)
 	defer h.Close()
 
 	ctx := context.Background()
 
-	// List agents when none exist.
+	// List agents - only the default "User" agent exists.
 	resp, err := h.agentClient.ListAgents(ctx, &ListAgentsRequest{})
 	require.NoError(t, err)
-	require.Empty(t, resp.Agents)
+	require.Len(t, resp.Agents, 1)
+	require.Equal(t, "User", resp.Agents[0].Name)
 }
 
 func TestAgentService_EnsureIdentity_DifferentSessions(t *testing.T) {
@@ -928,18 +938,19 @@ func TestMailService_FetchInbox_MultipleSenders(t *testing.T) {
 	require.True(t, senders["MultiSender3"])
 }
 
-func TestMailService_FetchInbox_InvalidAgent(t *testing.T) {
+func TestMailService_FetchInbox_DefaultUserAgent(t *testing.T) {
 	h := newTestHarness(t)
 	defer h.Close()
 
 	ctx := context.Background()
 
-	// Fetch with invalid agent ID.
-	_, err := h.mailClient.FetchInbox(ctx, &FetchInboxRequest{
+	// Fetch with agent_id=0 uses the default "User" agent.
+	resp, err := h.mailClient.FetchInbox(ctx, &FetchInboxRequest{
 		AgentId: 0,
 	})
-	require.Error(t, err)
-	require.Contains(t, err.Error(), "agent_id is required")
+	require.NoError(t, err)
+	require.NotNil(t, resp)
+	require.Empty(t, resp.Messages) // User's inbox should be empty.
 }
 
 func TestMailService_ReadThread(t *testing.T) {
