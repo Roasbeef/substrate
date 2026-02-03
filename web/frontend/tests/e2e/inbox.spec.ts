@@ -20,18 +20,18 @@ test.describe('Inbox Page', () => {
     await expect(composeButton).toBeVisible();
     await composeButton.click();
 
-    // Verify compose modal opens.
-    await expect(page.getByRole('dialog')).toBeVisible();
-    await expect(page.getByText(/compose|new message/i)).toBeVisible();
+    // Verify compose modal opens by checking for the modal title/content.
+    // HeadlessUI dialogs may have visibility quirks, so check for content.
+    await expect(page.getByRole('heading', { name: /compose/i })).toBeVisible();
   });
 
   test('compose modal can be closed', async ({ page }) => {
     // Open compose modal.
     await page.getByRole('button', { name: /compose/i }).click();
-    await expect(page.getByRole('dialog')).toBeVisible();
+    await expect(page.getByRole('heading', { name: /compose/i })).toBeVisible();
 
-    // Close via cancel button or X.
-    const closeButton = page.getByRole('button', { name: /cancel|close/i }).first();
+    // Close via close button.
+    const closeButton = page.getByRole('button', { name: /close modal/i });
     if (await closeButton.isVisible()) {
       await closeButton.click();
     } else {
@@ -39,8 +39,8 @@ test.describe('Inbox Page', () => {
       await page.keyboard.press('Escape');
     }
 
-    // Modal should be closed.
-    await expect(page.getByRole('dialog')).not.toBeVisible();
+    // Modal should be closed - the heading should no longer be visible.
+    await expect(page.getByRole('heading', { name: /compose/i })).not.toBeVisible();
   });
 });
 

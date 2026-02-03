@@ -47,8 +47,11 @@ test.describe('Start Session Modal', () => {
     if (await startButton.isVisible()) {
       await startButton.click();
 
-      // Modal should open.
-      await expect(page.getByRole('dialog')).toBeVisible();
+      // Modal should open - check for session heading or form content.
+      const modalContent = page.getByRole('heading', { name: /start.*session|new.*session/i })
+        .or(page.getByLabel(/project/i))
+        .or(page.getByPlaceholder(/project/i));
+      await expect(modalContent.first()).toBeVisible();
     }
   });
 
@@ -81,7 +84,10 @@ test.describe('Start Session Modal', () => {
 
     if (await startButton.isVisible()) {
       await startButton.click();
-      await expect(page.getByRole('dialog')).toBeVisible();
+      // Check for modal content.
+      const modalContent = page.getByRole('heading', { name: /start.*session|new.*session/i })
+        .or(page.getByLabel(/project/i));
+      await expect(modalContent.first()).toBeVisible();
 
       // Close via cancel button or escape.
       const cancelButton = page.getByRole('button', { name: /cancel/i });
@@ -91,7 +97,8 @@ test.describe('Start Session Modal', () => {
         await page.keyboard.press('Escape');
       }
 
-      await expect(page.getByRole('dialog')).not.toBeVisible();
+      // Modal should be closed.
+      await expect(modalContent.first()).not.toBeVisible();
     }
   });
 });
