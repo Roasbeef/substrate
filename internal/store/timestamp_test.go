@@ -109,3 +109,69 @@ func TestCreateMessage_TimestampOrder(t *testing.T) {
 	require.GreaterOrEqual(t, msg2.CreatedAt.Unix(), msg1.CreatedAt.Unix(),
 		"second message should have timestamp >= first message")
 }
+
+// TestGetMessagesByThreadWithSender verifies that GetMessagesByThreadWithSender
+// returns messages with sender information (name, project, branch).
+func TestGetMessagesByThreadWithSender(t *testing.T) {
+	t.Parallel()
+
+	store := NewMockStore()
+	ctx := context.Background()
+
+	// Create sender with project and branch info.
+	sender, err := store.CreateAgent(ctx, CreateAgentParams{
+		Name:       "TestAgent",
+		ProjectKey: "substrate",
+		GitBranch:  "feature/thread-fix",
+	})
+	require.NoError(t, err)
+
+	// Create topic.
+	topic, err := store.GetOrCreateTopic(ctx, "sender-test", "inbox")
+	require.NoError(t, err)
+
+	// Create messages in the same thread.
+	threadID := "thread-with-sender-info"
+
+	offset1, _ := store.NextLogOffset(ctx, topic.ID)
+	msg1, err := store.CreateMessage(ctx, CreateMessageParams{
+		ThreadID:  threadID,
+		TopicID:   topic.ID,
+		LogOffset: offset1,
+		SenderID:  sender.ID,
+		Subject:   "First Message",
+		Body:      "Message body",
+		Priority:  "normal",
+	})
+	require.NoError(t, err)
+
+	offset2, _ := store.NextLogOffset(ctx, topic.ID)
+	msg2, err := store.CreateMessage(ctx, CreateMessageParams{
+		ThreadID:  threadID,
+		TopicID:   topic.ID,
+		LogOffset: offset2,
+		SenderID:  sender.ID,
+		Subject:   "Second Message",
+		Body:      "Another message body",
+		Priority:  "normal",
+	})
+	require.NoError(t, err)
+
+	// Fetch messages with sender info.
+	msgs, err := store.GetMessagesByThreadWithSender(ctx, threadID)
+	require.NoError(t, err)
+	require.Len(t, msgs, 2, "should return 2 messages in thread")
+
+	// Verify both messages have sender information populated.
+	for i, m := range msgs {
+		require.NotZero(t, m.ID, "message %d should have ID", i)
+		require.Equal(t, threadID, m.ThreadID, "message %d should have correct thread ID", i)
+		require.Equal(t, sender.Name, m.SenderName, "message %d should have sender name", i)
+		require.Equal(t, sender.ProjectKey, m.SenderProjectKey, "message %d should have sender project key", i)
+		require.Equal(t, sender.GitBranch, m.SenderGitBranch, "message %d should have sender git branch", i)
+	}
+
+	// Verify specific message IDs are correct.
+	require.Equal(t, msg1.ID, msgs[0].ID, "first message ID should match")
+	require.Equal(t, msg2.ID, msgs[1].ID, "second message ID should match")
+}

@@ -19,6 +19,12 @@ type MessageStore interface {
 	// GetMessagesByThread retrieves all messages in a thread.
 	GetMessagesByThread(ctx context.Context, threadID string) ([]Message, error)
 
+	// GetMessagesByThreadWithSender retrieves all messages in a thread with
+	// sender information (name, project, branch).
+	GetMessagesByThreadWithSender(
+		ctx context.Context, threadID string,
+	) ([]InboxMessage, error)
+
 	// GetInboxMessages retrieves inbox messages for an agent.
 	GetInboxMessages(
 		ctx context.Context, agentID int64, limit int,
@@ -103,6 +109,14 @@ type MessageStore interface {
 
 	// GetMessagesByTopic retrieves all messages for a topic.
 	GetMessagesByTopic(ctx context.Context, topicID int64) ([]Message, error)
+
+	// GetSentMessages retrieves messages sent by a specific agent.
+	GetSentMessages(
+		ctx context.Context, senderID int64, limit int,
+	) ([]Message, error)
+
+	// GetAllSentMessages retrieves all sent messages across all agents.
+	GetAllSentMessages(ctx context.Context, limit int) ([]InboxMessage, error)
 }
 
 // AgentStore handles agent persistence operations.
@@ -313,6 +327,7 @@ type Topic struct {
 	TopicType        string
 	RetentionSeconds int64
 	CreatedAt        time.Time
+	MessageCount     int64
 }
 
 // Activity represents an activity event.
@@ -428,6 +443,19 @@ func TopicFromSqlc(t sqlc.Topic) Topic {
 		TopicType:        t.TopicType,
 		RetentionSeconds: t.RetentionSeconds.Int64,
 		CreatedAt:        time.Unix(t.CreatedAt, 0),
+	}
+}
+
+// TopicWithCountFromSqlc converts a sqlc.ListTopicsWithMessageCountRow to a
+// store.Topic.
+func TopicWithCountFromSqlc(t sqlc.ListTopicsWithMessageCountRow) Topic {
+	return Topic{
+		ID:               t.ID,
+		Name:             t.Name,
+		TopicType:        t.TopicType,
+		RetentionSeconds: t.RetentionSeconds.Int64,
+		CreatedAt:        time.Unix(t.CreatedAt, 0),
+		MessageCount:     t.MessageCount,
 	}
 }
 

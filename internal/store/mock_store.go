@@ -168,6 +168,35 @@ func (m *MockStore) GetMessagesByThread(
 	return result, nil
 }
 
+// GetMessagesByThreadWithSender retrieves all messages in a thread with sender
+// information (name, project, branch).
+func (m *MockStore) GetMessagesByThreadWithSender(
+	ctx context.Context, threadID string,
+) ([]InboxMessage, error) {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+
+	var result []InboxMessage
+	for _, msg := range m.messages {
+		if msg.ThreadID == threadID {
+			// Look up sender info.
+			var senderName, senderProjectKey, senderGitBranch string
+			if agent, ok := m.agents[msg.SenderID]; ok {
+				senderName = agent.Name
+				senderProjectKey = agent.ProjectKey
+				senderGitBranch = agent.GitBranch
+			}
+			result = append(result, InboxMessage{
+				Message:          msg,
+				SenderName:       senderName,
+				SenderProjectKey: senderProjectKey,
+				SenderGitBranch:  senderGitBranch,
+			})
+		}
+	}
+	return result, nil
+}
+
 func (m *MockStore) GetInboxMessages(
 	ctx context.Context, agentID int64, limit int,
 ) ([]InboxMessage, error) {
@@ -616,6 +645,57 @@ func (m *MockStore) GetMessagesByTopic(
 	for _, msg := range m.messages {
 		if msg.TopicID == topicID {
 			results = append(results, msg)
+		}
+	}
+	return results, nil
+}
+
+// GetSentMessages retrieves messages sent by a specific agent.
+func (m *MockStore) GetSentMessages(
+	ctx context.Context, senderID int64, limit int,
+) ([]Message, error) {
+
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+
+	var results []Message
+	for _, msg := range m.messages {
+		if msg.SenderID == senderID {
+			results = append(results, msg)
+			if len(results) >= limit {
+				break
+			}
+		}
+	}
+	return results, nil
+}
+
+// GetAllSentMessages retrieves all sent messages across all agents.
+func (m *MockStore) GetAllSentMessages(
+	ctx context.Context, limit int,
+) ([]InboxMessage, error) {
+
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+
+	var results []InboxMessage
+	for _, msg := range m.messages {
+		var senderName, senderProjectKey, senderGitBranch string
+		if sender, ok := m.agents[msg.SenderID]; ok {
+			senderName = sender.Name
+			senderProjectKey = sender.ProjectKey
+			senderGitBranch = sender.GitBranch
+		}
+
+		results = append(results, InboxMessage{
+			Message:          msg,
+			SenderName:       senderName,
+			SenderProjectKey: senderProjectKey,
+			SenderGitBranch:  senderGitBranch,
+		})
+
+		if len(results) >= limit {
+			break
 		}
 	}
 	return results, nil

@@ -31,6 +31,9 @@ type QueryStore interface {
 	GetMessagesByThread(
 		ctx context.Context, threadID string,
 	) ([]sqlc.Message, error)
+	GetMessagesByThreadWithSender(
+		ctx context.Context, threadID string,
+	) ([]sqlc.GetMessagesByThreadWithSenderRow, error)
 	GetInboxMessages(
 		ctx context.Context, arg sqlc.GetInboxMessagesParams,
 	) ([]sqlc.GetInboxMessagesRow, error)
@@ -114,6 +117,9 @@ type QueryStore interface {
 		ctx context.Context, arg sqlc.GetOrCreateTopicParams,
 	) (sqlc.Topic, error)
 	ListTopics(ctx context.Context) ([]sqlc.Topic, error)
+	ListTopicsWithMessageCount(
+		ctx context.Context,
+	) ([]sqlc.ListTopicsWithMessageCountRow, error)
 	ListTopicsByType(
 		ctx context.Context, topicType string,
 	) ([]sqlc.Topic, error)
@@ -159,6 +165,12 @@ type QueryStore interface {
 	UpdateSessionIdentityLastActive(
 		ctx context.Context, arg sqlc.UpdateSessionIdentityLastActiveParams,
 	) error
+
+	// Sent message operations.
+	GetSentMessages(
+		ctx context.Context, arg sqlc.GetSentMessagesParams,
+	) ([]sqlc.GetSentMessagesRow, error)
+	GetAllSentMessages(ctx context.Context, limit int64) ([]sqlc.GetAllSentMessagesRow, error)
 }
 
 // BatchedQueryStore is a version of QueryStore that's capable of batched
@@ -341,6 +353,40 @@ func (s *SqlcStore) GetMessagesByThread(ctx context.Context,
 	messages := make([]Message, len(rows))
 	for i, row := range rows {
 		messages[i] = MessageFromSqlc(row)
+	}
+	return messages, nil
+}
+
+// GetMessagesByThreadWithSender retrieves all messages in a thread with sender
+// information (name, project, branch).
+func (s *SqlcStore) GetMessagesByThreadWithSender(ctx context.Context,
+	threadID string,
+) ([]InboxMessage, error) {
+	rows, err := s.db.GetMessagesByThreadWithSender(ctx, threadID)
+	if err != nil {
+		return nil, err
+	}
+	messages := make([]InboxMessage, len(rows))
+	for i, row := range rows {
+		messages[i] = InboxMessage{
+			Message: Message{
+				ID:              row.ID,
+				ThreadID:        row.ThreadID,
+				TopicID:         row.TopicID,
+				LogOffset:       row.LogOffset,
+				SenderID:        row.SenderID,
+				Subject:         row.Subject,
+				Body:            row.BodyMd,
+				Priority:        row.Priority,
+				DeadlineAt:      nullInt64ToTime(row.DeadlineAt),
+				Attachments:     row.Attachments.String,
+				CreatedAt:       time.Unix(row.CreatedAt, 0),
+				DeletedBySender: row.DeletedBySender != 0,
+			},
+			SenderName:       row.SenderName.String,
+			SenderProjectKey: row.SenderProjectKey.String,
+			SenderGitBranch:  row.SenderGitBranch.String,
+		}
 	}
 	return messages, nil
 }
@@ -693,7 +739,9 @@ func (s *SqlcStore) SearchMessages(ctx context.Context, query string,
 				Priority:  row.Priority,
 				CreatedAt: time.Unix(row.CreatedAt, 0),
 			},
-			SenderName: row.SenderName.String,
+			SenderName:       row.SenderName.String,
+			SenderProjectKey: row.SenderProjectKey.String,
+			SenderGitBranch:  row.SenderGitBranch.String,
 		})
 	}
 	return messages, nil
@@ -711,6 +759,75 @@ func (s *SqlcStore) GetMessagesByTopic(ctx context.Context,
 	messages := make([]Message, 0, len(rows))
 	for _, row := range rows {
 		messages = append(messages, MessageFromSqlc(row))
+	}
+	return messages, nil
+}
+
+// GetSentMessages retrieves messages sent by a specific agent.
+func (s *SqlcStore) GetSentMessages(ctx context.Context, senderID int64,
+	limit int) ([]Message, error) {
+
+	rows, err := s.db.GetSentMessages(ctx, sqlc.GetSentMessagesParams{
+		SenderID: senderID,
+		Limit:    int64(limit),
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	messages := make([]Message, 0, len(rows))
+	for _, row := range rows {
+		msg := Message{
+			ID:              row.ID,
+			ThreadID:        row.ThreadID,
+			TopicID:         row.TopicID,
+			LogOffset:       row.LogOffset,
+			SenderID:        row.SenderID,
+			Subject:         row.Subject,
+			Body:            row.BodyMd,
+			Priority:        row.Priority,
+			CreatedAt:       time.Unix(row.CreatedAt, 0),
+			DeletedBySender: row.DeletedBySender == 1,
+		}
+		if row.DeadlineAt.Valid {
+			t := time.Unix(row.DeadlineAt.Int64, 0)
+			msg.DeadlineAt = &t
+		}
+		if row.Attachments.Valid {
+			msg.Attachments = row.Attachments.String
+		}
+		messages = append(messages, msg)
+	}
+	return messages, nil
+}
+
+// GetAllSentMessages retrieves all sent messages across all agents.
+func (s *SqlcStore) GetAllSentMessages(ctx context.Context,
+	limit int) ([]InboxMessage, error) {
+
+	rows, err := s.db.GetAllSentMessages(ctx, int64(limit))
+	if err != nil {
+		return nil, err
+	}
+
+	messages := make([]InboxMessage, 0, len(rows))
+	for _, row := range rows {
+		messages = append(messages, InboxMessage{
+			Message: Message{
+				ID:        row.ID,
+				ThreadID:  row.ThreadID,
+				TopicID:   row.TopicID,
+				LogOffset: row.LogOffset,
+				SenderID:  row.SenderID,
+				Subject:   row.Subject,
+				Body:      row.BodyMd,
+				Priority:  row.Priority,
+				CreatedAt: time.Unix(row.CreatedAt, 0),
+			},
+			SenderName:       row.SenderName,
+			SenderProjectKey: row.SenderProjectKey.String,
+			SenderGitBranch:  row.SenderGitBranch.String,
+		})
 	}
 	return messages, nil
 }
@@ -904,15 +1021,15 @@ func (s *SqlcStore) GetOrCreateTopic(ctx context.Context, name,
 	return TopicFromSqlc(topic), nil
 }
 
-// ListTopics lists all topics.
+// ListTopics lists all topics with their message counts.
 func (s *SqlcStore) ListTopics(ctx context.Context) ([]Topic, error) {
-	rows, err := s.db.ListTopics(ctx)
+	rows, err := s.db.ListTopicsWithMessageCount(ctx)
 	if err != nil {
 		return nil, err
 	}
 	topics := make([]Topic, len(rows))
 	for i, row := range rows {
-		topics[i] = TopicFromSqlc(row)
+		topics[i] = TopicWithCountFromSqlc(row)
 	}
 	return topics, nil
 }
@@ -1166,6 +1283,40 @@ func (s *txSqlcStore) GetMessagesByThread(ctx context.Context,
 	messages := make([]Message, len(rows))
 	for i, row := range rows {
 		messages[i] = MessageFromSqlc(row)
+	}
+	return messages, nil
+}
+
+// GetMessagesByThreadWithSender retrieves all messages in a thread with sender
+// information (name, project, branch).
+func (s *txSqlcStore) GetMessagesByThreadWithSender(ctx context.Context,
+	threadID string,
+) ([]InboxMessage, error) {
+	rows, err := s.queries.GetMessagesByThreadWithSender(ctx, threadID)
+	if err != nil {
+		return nil, err
+	}
+	messages := make([]InboxMessage, len(rows))
+	for i, row := range rows {
+		messages[i] = InboxMessage{
+			Message: Message{
+				ID:              row.ID,
+				ThreadID:        row.ThreadID,
+				TopicID:         row.TopicID,
+				LogOffset:       row.LogOffset,
+				SenderID:        row.SenderID,
+				Subject:         row.Subject,
+				Body:            row.BodyMd,
+				Priority:        row.Priority,
+				DeadlineAt:      nullInt64ToTime(row.DeadlineAt),
+				Attachments:     row.Attachments.String,
+				CreatedAt:       time.Unix(row.CreatedAt, 0),
+				DeletedBySender: row.DeletedBySender != 0,
+			},
+			SenderName:       row.SenderName.String,
+			SenderProjectKey: row.SenderProjectKey.String,
+			SenderGitBranch:  row.SenderGitBranch.String,
+		}
 	}
 	return messages, nil
 }
@@ -1565,15 +1716,15 @@ func (s *txSqlcStore) GetOrCreateTopic(ctx context.Context, name,
 	return TopicFromSqlc(topic), nil
 }
 
-// ListTopics lists all topics.
+// ListTopics lists all topics with their message counts.
 func (s *txSqlcStore) ListTopics(ctx context.Context) ([]Topic, error) {
-	rows, err := s.queries.ListTopics(ctx)
+	rows, err := s.queries.ListTopicsWithMessageCount(ctx)
 	if err != nil {
 		return nil, err
 	}
 	topics := make([]Topic, len(rows))
 	for i, row := range rows {
-		topics[i] = TopicFromSqlc(row)
+		topics[i] = TopicWithCountFromSqlc(row)
 	}
 	return topics, nil
 }
@@ -1911,6 +2062,75 @@ func (s *txSqlcStore) GetMessagesByTopic(ctx context.Context,
 	messages := make([]Message, 0, len(rows))
 	for _, row := range rows {
 		messages = append(messages, MessageFromSqlc(row))
+	}
+	return messages, nil
+}
+
+// GetSentMessages retrieves messages sent by a specific agent.
+func (s *txSqlcStore) GetSentMessages(ctx context.Context, senderID int64,
+	limit int) ([]Message, error) {
+
+	rows, err := s.queries.GetSentMessages(ctx, sqlc.GetSentMessagesParams{
+		SenderID: senderID,
+		Limit:    int64(limit),
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	messages := make([]Message, 0, len(rows))
+	for _, row := range rows {
+		msg := Message{
+			ID:              row.ID,
+			ThreadID:        row.ThreadID,
+			TopicID:         row.TopicID,
+			LogOffset:       row.LogOffset,
+			SenderID:        row.SenderID,
+			Subject:         row.Subject,
+			Body:            row.BodyMd,
+			Priority:        row.Priority,
+			CreatedAt:       time.Unix(row.CreatedAt, 0),
+			DeletedBySender: row.DeletedBySender == 1,
+		}
+		if row.DeadlineAt.Valid {
+			t := time.Unix(row.DeadlineAt.Int64, 0)
+			msg.DeadlineAt = &t
+		}
+		if row.Attachments.Valid {
+			msg.Attachments = row.Attachments.String
+		}
+		messages = append(messages, msg)
+	}
+	return messages, nil
+}
+
+// GetAllSentMessages retrieves all sent messages across all agents.
+func (s *txSqlcStore) GetAllSentMessages(ctx context.Context,
+	limit int) ([]InboxMessage, error) {
+
+	rows, err := s.queries.GetAllSentMessages(ctx, int64(limit))
+	if err != nil {
+		return nil, err
+	}
+
+	messages := make([]InboxMessage, 0, len(rows))
+	for _, row := range rows {
+		messages = append(messages, InboxMessage{
+			Message: Message{
+				ID:        row.ID,
+				ThreadID:  row.ThreadID,
+				TopicID:   row.TopicID,
+				LogOffset: row.LogOffset,
+				SenderID:  row.SenderID,
+				Subject:   row.Subject,
+				Body:      row.BodyMd,
+				Priority:  row.Priority,
+				CreatedAt: time.Unix(row.CreatedAt, 0),
+			},
+			SenderName:       row.SenderName,
+			SenderProjectKey: row.SenderProjectKey.String,
+			SenderGitBranch:  row.SenderGitBranch.String,
+		})
 	}
 	return messages, nil
 }
