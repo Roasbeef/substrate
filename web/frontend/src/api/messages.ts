@@ -1,7 +1,7 @@
 // API functions for message-related operations.
 // Uses grpc-gateway REST API directly.
 
-import { get, post } from './client.js';
+import { get, post, patch } from './client.js';
 import type {
   APIResponse,
   Message,
@@ -23,6 +23,19 @@ function normalizePriority(priority: string | undefined): MessageWithRecipients[
     return normalized;
   }
   return 'normal';
+}
+
+// Helper to normalize message state enum from proto format.
+function normalizeState(state: string | undefined): MessageState {
+  if (!state) return 'unread';
+  const normalized = state.toLowerCase().replace('state_', '');
+  if (normalized === 'unread' || normalized === 'read' || normalized === 'acknowledged') {
+    return normalized;
+  }
+  // Starred, snoozed, archived, trash all count as "read" for the
+  // unread indicator since the user has interacted with the message.
+  if (normalized === 'unspecified') return 'unread';
+  return 'read';
 }
 
 // Gateway response format.
@@ -50,6 +63,13 @@ interface GatewayMessagesResponse {
 // Convert gateway response to internal format.
 function parseMessagesResponse(response: GatewayMessagesResponse): APIResponse<MessageWithRecipients[]> {
   const messages = (response.messages ?? []).map((msg): MessageWithRecipients => {
+    // Map state fields from the flat gateway response into a synthetic
+    // recipient entry. The backend proto InboxMessage carries state,
+    // read_at, etc. directly on the message rather than in a separate
+    // recipients array.
+    const normalizedState = normalizeState(msg.state);
+    const stateNorm = (msg.state ?? '').toLowerCase().replace('state_', '');
+
     const result: MessageWithRecipients = {
       id: toNumber(msg.id),
       sender_id: toNumber(msg.sender_id),
@@ -58,7 +78,17 @@ function parseMessagesResponse(response: GatewayMessagesResponse): APIResponse<M
       body: msg.body ?? '',
       priority: normalizePriority(msg.priority),
       created_at: msg.created_at ?? new Date().toISOString(),
-      recipients: [],
+      recipients: [{
+        message_id: toNumber(msg.id),
+        agent_id: 0,
+        agent_name: '',
+        state: normalizedState,
+        is_starred: stateNorm === 'starred',
+        is_archived: stateNorm === 'archived',
+        snoozed_until: msg.snoozed_until,
+        read_at: msg.read_at,
+        acknowledged_at: msg.acknowledged_at,
+      }],
     };
     if (msg.thread_id !== undefined) {
       result.thread_id = msg.thread_id;
@@ -138,32 +168,37 @@ export function sendMessage(data: SendMessageRequest): Promise<Message> {
   return post<Message>('/messages', data);
 }
 
-// Star/unstar a message.
+// Star/unstar a message via UpdateState (PATCH /messages/{id}).
 export function toggleMessageStar(
   id: number,
   starred: boolean,
 ): Promise<void> {
-  return post<void>(`/messages/${id}/star`, { starred });
+  // Starring sets STATE_STARRED; unstarring reverts to STATE_READ.
+  const new_state = starred ? 'STATE_STARRED' : 'STATE_READ';
+  return patch<void>(`/messages/${id}`, { new_state });
 }
 
-// Archive a message.
+// Archive a message via UpdateState (PATCH /messages/{id}).
 export function archiveMessage(id: number): Promise<void> {
-  return post<void>(`/messages/${id}/archive`, {});
+  return patch<void>(`/messages/${id}`, { new_state: 'STATE_ARCHIVED' });
 }
 
-// Unarchive a message.
+// Unarchive a message via UpdateState (PATCH /messages/{id}).
 export function unarchiveMessage(id: number): Promise<void> {
-  return post<void>(`/messages/${id}/unarchive`, {});
+  return patch<void>(`/messages/${id}`, { new_state: 'STATE_READ' });
 }
 
-// Snooze a message.
+// Snooze a message via UpdateState (PATCH /messages/{id}).
 export function snoozeMessage(id: number, until: string): Promise<void> {
-  return post<void>(`/messages/${id}/snooze`, { until });
+  return patch<void>(`/messages/${id}`, {
+    new_state: 'STATE_SNOOZED',
+    snoozed_until: until,
+  });
 }
 
-// Mark a message as read.
+// Mark a message as read via UpdateState (PATCH /messages/{id}).
 export function markMessageRead(id: number): Promise<void> {
-  return post<void>(`/messages/${id}/read`, {});
+  return patch<void>(`/messages/${id}`, { new_state: 'STATE_READ' });
 }
 
 // Mark a message as acknowledged.
