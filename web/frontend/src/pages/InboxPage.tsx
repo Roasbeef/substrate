@@ -98,6 +98,9 @@ export default function InboxPage() {
     }
   }, [params.threadId]);
 
+  // Extract agent ID for stable dependency.
+  const currentAgentId = currentAgent?.id;
+
   // Build query options from route and state.
   const queryOptions = useMemo(() => {
     const options: Record<string, string | boolean | number | undefined> = {};
@@ -122,12 +125,12 @@ export default function InboxPage() {
     }
 
     // Apply agent filter if an agent is selected.
-    if (currentAgent?.id !== undefined) {
-      options.agentId = currentAgent.id;
+    if (currentAgentId !== undefined) {
+      options.agentId = currentAgentId;
     }
 
     return options;
-  }, [state.category, state.filter, routeFilter, currentAgent?.id]);
+  }, [state.category, state.filter, routeFilter, currentAgentId]);
 
   // Fetch messages.
   const {
@@ -137,8 +140,11 @@ export default function InboxPage() {
     refetch,
   } = useMessages(queryOptions);
 
-  // Extract messages array from response.
-  const allMessages = messagesResponse?.data ?? [];
+  // Extract messages array from response with stable reference.
+  const allMessages = useMemo(
+    () => messagesResponse?.data ?? [],
+    [messagesResponse?.data],
+  );
 
   // Get unique senders for filter dropdown.
   const uniqueSenders = useMemo(() => {

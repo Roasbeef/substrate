@@ -200,6 +200,7 @@ export interface LogoProps {
   collapsed?: boolean;
 }
 
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 export function Logo(_props: LogoProps = {}) {
   // Logo is now shown in the header, so sidebar just has spacing.
   return <div className="h-2" />;
