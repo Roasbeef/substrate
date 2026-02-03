@@ -85,7 +85,7 @@ func (c *WSClient) Send(msg *WSMessage) {
 	case c.send <- msg:
 	default:
 		// Buffer full, drop message.
-		log.Printf("WebSocket: Send buffer full for agent %d, dropping message", c.AgentID())
+		log.Printf("WebSocket: Send buffer full for agent %d, dropping message", c.agentID)
 	}
 }
 

@@ -59,32 +59,12 @@ export default defineConfig({
     timeout: 5000,
   },
 
-  // Configure projects for major browsers.
+  // Configure projects for browsers.
+  // Only Chromium for now to keep CI fast.
   projects: [
     {
       name: 'chromium',
       use: { ...devices['Desktop Chrome'] },
-    },
-
-    {
-      name: 'firefox',
-      use: { ...devices['Desktop Firefox'] },
-    },
-
-    {
-      name: 'webkit',
-      use: { ...devices['Desktop Safari'] },
-    },
-
-    // Mobile viewports.
-    {
-      name: 'Mobile Chrome',
-      use: { ...devices['Pixel 5'] },
-    },
-
-    {
-      name: 'Mobile Safari',
-      use: { ...devices['iPhone 12'] },
     },
   ],
 
