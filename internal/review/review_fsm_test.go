@@ -1,0 +1,449 @@
+package review
+
+import (
+	"context"
+	"testing"
+)
+
+// newTestFSM creates a ReviewFSM for testing with standard test values.
+func newTestFSM() *ReviewFSM {
+	return NewReviewFSM(
+		"test-review-123", "thread-456", "/tmp/repo", 1,
+	)
+}
+
+// TestFSM_HappyPath tests the full lifecycle: new → pending → under_review → approved.
+func TestFSM_HappyPath(t *testing.T) {
+	ctx := context.Background()
+	fsm := newTestFSM()
+
+	// Initial state should be new.
+	if fsm.CurrentState() != "new" {
+		t.Fatalf("expected state 'new', got %q", fsm.CurrentState())
+	}
+	if fsm.IsTerminal() {
+		t.Fatal("new state should not be terminal")
+	}
+
+	// Submit for review: new → pending_review.
+	outbox, err := fsm.ProcessEvent(ctx, SubmitForReviewEvent{
+		RequesterID: 1,
+	})
+	if err != nil {
+		t.Fatalf("SubmitForReview failed: %v", err)
+	}
+	if fsm.CurrentState() != "pending_review" {
+		t.Fatalf("expected 'pending_review', got %q", fsm.CurrentState())
+	}
+
+	// Verify outbox events.
+	assertHasOutboxEvent[PersistReviewState](t, outbox)
+	assertHasOutboxEvent[NotifyReviewStateChange](t, outbox)
+	assertHasOutboxEvent[SpawnReviewerAgent](t, outbox)
+	assertHasOutboxEvent[RecordActivity](t, outbox)
+
+	// Start review: pending_review → under_review.
+	outbox, err = fsm.ProcessEvent(ctx, StartReviewEvent{
+		ReviewerID: "CodeReviewer",
+	})
+	if err != nil {
+		t.Fatalf("StartReview failed: %v", err)
+	}
+	if fsm.CurrentState() != "under_review" {
+		t.Fatalf("expected 'under_review', got %q", fsm.CurrentState())
+	}
+
+	// Approve: under_review → approved.
+	outbox, err = fsm.ProcessEvent(ctx, ApproveEvent{
+		ReviewerID: "CodeReviewer",
+	})
+	if err != nil {
+		t.Fatalf("Approve failed: %v", err)
+	}
+	if fsm.CurrentState() != "approved" {
+		t.Fatalf("expected 'approved', got %q", fsm.CurrentState())
+	}
+	if !fsm.IsTerminal() {
+		t.Fatal("approved state should be terminal")
+	}
+
+	// Verify we got activity event for approval.
+	assertHasOutboxEvent[RecordActivity](t, outbox)
+}
+
+// TestFSM_ChangesRequested tests the iteration cycle: review → changes_requested → re_review → approved.
+func TestFSM_ChangesRequested(t *testing.T) {
+	ctx := context.Background()
+	fsm := newTestFSM()
+
+	// Get to under_review state.
+	_, _ = fsm.ProcessEvent(ctx, SubmitForReviewEvent{RequesterID: 1})
+	_, _ = fsm.ProcessEvent(ctx, StartReviewEvent{ReviewerID: "SecurityReviewer"})
+
+	if fsm.CurrentState() != "under_review" {
+		t.Fatalf("expected 'under_review', got %q", fsm.CurrentState())
+	}
+
+	// Request changes: under_review → changes_requested.
+	issues := []ReviewIssueSummary{
+		{Title: "SQL injection", Severity: "critical"},
+		{Title: "Missing auth check", Severity: "high"},
+	}
+	outbox, err := fsm.ProcessEvent(ctx, RequestChangesEvent{
+		ReviewerID: "SecurityReviewer",
+		Issues:     issues,
+	})
+	if err != nil {
+		t.Fatalf("RequestChanges failed: %v", err)
+	}
+	if fsm.CurrentState() != "changes_requested" {
+		t.Fatalf(
+			"expected 'changes_requested', got %q",
+			fsm.CurrentState(),
+		)
+	}
+	assertHasOutboxEvent[CreateReviewIssues](t, outbox)
+
+	// Resubmit: changes_requested → re_review.
+	outbox, err = fsm.ProcessEvent(ctx, ResubmitEvent{
+		NewCommitSHA: "abc123",
+	})
+	if err != nil {
+		t.Fatalf("Resubmit failed: %v", err)
+	}
+	if fsm.CurrentState() != "re_review" {
+		t.Fatalf("expected 're_review', got %q", fsm.CurrentState())
+	}
+	assertHasOutboxEvent[SpawnReviewerAgent](t, outbox)
+
+	// Re-review starts: re_review → under_review.
+	_, err = fsm.ProcessEvent(ctx, StartReviewEvent{
+		ReviewerID: "SecurityReviewer",
+	})
+	if err != nil {
+		t.Fatalf("StartReview (re-review) failed: %v", err)
+	}
+	if fsm.CurrentState() != "under_review" {
+		t.Fatalf("expected 'under_review', got %q", fsm.CurrentState())
+	}
+
+	// Approve after fixes: under_review → approved.
+	_, err = fsm.ProcessEvent(ctx, ApproveEvent{
+		ReviewerID: "SecurityReviewer",
+	})
+	if err != nil {
+		t.Fatalf("Approve (after fix) failed: %v", err)
+	}
+	if fsm.CurrentState() != "approved" {
+		t.Fatalf("expected 'approved', got %q", fsm.CurrentState())
+	}
+	if !fsm.IsTerminal() {
+		t.Fatal("approved should be terminal")
+	}
+}
+
+// TestFSM_Rejection tests the rejection path: under_review → rejected.
+func TestFSM_Rejection(t *testing.T) {
+	ctx := context.Background()
+	fsm := newTestFSM()
+
+	_, _ = fsm.ProcessEvent(ctx, SubmitForReviewEvent{RequesterID: 1})
+	_, _ = fsm.ProcessEvent(ctx, StartReviewEvent{ReviewerID: "Reviewer"})
+
+	// Reject: under_review → rejected.
+	outbox, err := fsm.ProcessEvent(ctx, RejectEvent{
+		ReviewerID: "Reviewer",
+		Reason:     "fundamental design flaw",
+	})
+	if err != nil {
+		t.Fatalf("Reject failed: %v", err)
+	}
+	if fsm.CurrentState() != "rejected" {
+		t.Fatalf("expected 'rejected', got %q", fsm.CurrentState())
+	}
+	if !fsm.IsTerminal() {
+		t.Fatal("rejected should be terminal")
+	}
+	assertHasOutboxEvent[RecordActivity](t, outbox)
+}
+
+// TestFSM_CancelFromAnyState tests cancellation from every non-terminal state.
+func TestFSM_CancelFromAnyState(t *testing.T) {
+	ctx := context.Background()
+
+	states := []struct {
+		name  string
+		setup func(*ReviewFSM)
+	}{
+		{
+			name:  "new",
+			setup: func(f *ReviewFSM) {},
+		},
+		{
+			name: "pending_review",
+			setup: func(f *ReviewFSM) {
+				f.ProcessEvent(ctx, SubmitForReviewEvent{
+					RequesterID: 1,
+				})
+			},
+		},
+		{
+			name: "under_review",
+			setup: func(f *ReviewFSM) {
+				f.ProcessEvent(ctx, SubmitForReviewEvent{
+					RequesterID: 1,
+				})
+				f.ProcessEvent(ctx, StartReviewEvent{
+					ReviewerID: "R",
+				})
+			},
+		},
+		{
+			name: "changes_requested",
+			setup: func(f *ReviewFSM) {
+				f.ProcessEvent(ctx, SubmitForReviewEvent{
+					RequesterID: 1,
+				})
+				f.ProcessEvent(ctx, StartReviewEvent{
+					ReviewerID: "R",
+				})
+				f.ProcessEvent(ctx, RequestChangesEvent{
+					ReviewerID: "R",
+				})
+			},
+		},
+		{
+			name: "re_review",
+			setup: func(f *ReviewFSM) {
+				f.ProcessEvent(ctx, SubmitForReviewEvent{
+					RequesterID: 1,
+				})
+				f.ProcessEvent(ctx, StartReviewEvent{
+					ReviewerID: "R",
+				})
+				f.ProcessEvent(ctx, RequestChangesEvent{
+					ReviewerID: "R",
+				})
+				f.ProcessEvent(ctx, ResubmitEvent{
+					NewCommitSHA: "abc",
+				})
+			},
+		},
+	}
+
+	for _, tc := range states {
+		t.Run(tc.name, func(t *testing.T) {
+			fsm := newTestFSM()
+			tc.setup(fsm)
+
+			if fsm.CurrentState() != tc.name {
+				t.Fatalf(
+					"setup failed: expected %q, got %q",
+					tc.name, fsm.CurrentState(),
+				)
+			}
+
+			outbox, err := fsm.ProcessEvent(ctx, CancelEvent{
+				Reason: "no longer needed",
+			})
+			if err != nil {
+				t.Fatalf("Cancel from %s failed: %v", tc.name, err)
+			}
+			if fsm.CurrentState() != "cancelled" {
+				t.Fatalf(
+					"expected 'cancelled', got %q",
+					fsm.CurrentState(),
+				)
+			}
+			if !fsm.IsTerminal() {
+				t.Fatal("cancelled should be terminal")
+			}
+			assertHasOutboxEvent[PersistReviewState](t, outbox)
+		})
+	}
+}
+
+// TestFSM_TerminalStatesRejectEvents tests that terminal states reject all events.
+func TestFSM_TerminalStatesRejectEvents(t *testing.T) {
+	ctx := context.Background()
+
+	terminalStates := []struct {
+		name  string
+		state ReviewState
+	}{
+		{"approved", &StateApproved{ReviewerID: "R"}},
+		{"rejected", &StateRejected{ReviewerID: "R", Reason: "bad"}},
+		{"cancelled", &StateCancelled{}},
+	}
+
+	events := []ReviewEvent{
+		SubmitForReviewEvent{RequesterID: 1},
+		StartReviewEvent{ReviewerID: "R"},
+		RequestChangesEvent{ReviewerID: "R"},
+		ResubmitEvent{NewCommitSHA: "abc"},
+		ApproveEvent{ReviewerID: "R"},
+		RejectEvent{ReviewerID: "R"},
+		CancelEvent{Reason: "test"},
+	}
+
+	for _, ts := range terminalStates {
+		for _, evt := range events {
+			t.Run(ts.name, func(t *testing.T) {
+				_, err := ts.state.ProcessEvent(
+					ctx, evt, &ReviewEnvironment{
+						ReviewID: "test",
+					},
+				)
+				if err == nil {
+					t.Fatalf(
+						"expected error for %T in terminal "+
+							"state %s",
+						evt, ts.name,
+					)
+				}
+			})
+		}
+	}
+}
+
+// TestFSM_InvalidTransitions tests that invalid events produce errors.
+func TestFSM_InvalidTransitions(t *testing.T) {
+	ctx := context.Background()
+
+	cases := []struct {
+		name  string
+		state ReviewState
+		event ReviewEvent
+	}{
+		{
+			name:  "approve in new",
+			state: &StateNew{},
+			event: ApproveEvent{ReviewerID: "R"},
+		},
+		{
+			name:  "request_changes in new",
+			state: &StateNew{},
+			event: RequestChangesEvent{ReviewerID: "R"},
+		},
+		{
+			name:  "resubmit in pending",
+			state: &StatePendingReview{},
+			event: ResubmitEvent{NewCommitSHA: "abc"},
+		},
+		{
+			name:  "approve in pending",
+			state: &StatePendingReview{},
+			event: ApproveEvent{ReviewerID: "R"},
+		},
+		{
+			name:  "resubmit in under_review",
+			state: &StateUnderReview{},
+			event: ResubmitEvent{NewCommitSHA: "abc"},
+		},
+		{
+			name:  "approve in changes_requested",
+			state: &StateChangesRequested{},
+			event: ApproveEvent{ReviewerID: "R"},
+		},
+		{
+			name:  "approve in re_review",
+			state: &StateReReview{},
+			event: ApproveEvent{ReviewerID: "R"},
+		},
+	}
+
+	env := &ReviewEnvironment{ReviewID: "test"}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			_, err := tc.state.ProcessEvent(ctx, tc.event, env)
+			if err == nil {
+				t.Fatalf(
+					"expected error for %T in state %s",
+					tc.event, tc.state.String(),
+				)
+			}
+		})
+	}
+}
+
+// TestFSM_FromDB tests creating an FSM from a persisted state string.
+func TestFSM_FromDB(t *testing.T) {
+	states := []string{
+		"new", "pending_review", "under_review",
+		"changes_requested", "re_review",
+		"approved", "rejected", "cancelled",
+	}
+
+	for _, s := range states {
+		t.Run(s, func(t *testing.T) {
+			fsm := NewReviewFSMFromDB(
+				"review-1", "thread-1", "/repo", 1, s,
+			)
+			if fsm.CurrentState() != s {
+				t.Fatalf(
+					"expected state %q, got %q",
+					s, fsm.CurrentState(),
+				)
+			}
+		})
+	}
+}
+
+// TestFSM_OutboxPersistStateContent verifies outbox event field values.
+func TestFSM_OutboxPersistStateContent(t *testing.T) {
+	ctx := context.Background()
+	fsm := NewReviewFSM("r-42", "t-99", "/tmp/code", 7)
+
+	outbox, err := fsm.ProcessEvent(ctx, SubmitForReviewEvent{
+		RequesterID: 7,
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	// Check PersistReviewState has correct fields.
+	for _, evt := range outbox {
+		if persist, ok := evt.(PersistReviewState); ok {
+			if persist.ReviewID != "r-42" {
+				t.Fatalf(
+					"expected ReviewID 'r-42', got %q",
+					persist.ReviewID,
+				)
+			}
+			if persist.NewState != "pending_review" {
+				t.Fatalf(
+					"expected NewState 'pending_review', got %q",
+					persist.NewState,
+				)
+			}
+			return
+		}
+	}
+	t.Fatal("PersistReviewState not found in outbox")
+}
+
+// TestStateFromString_Unknown tests that an unknown state falls back to New.
+func TestStateFromString_Unknown(t *testing.T) {
+	state := StateFromString("totally_unknown")
+	if state.String() != "new" {
+		t.Fatalf(
+			"expected fallback to 'new', got %q", state.String(),
+		)
+	}
+}
+
+// assertHasOutboxEvent checks that at least one outbox event matches the
+// given type.
+func assertHasOutboxEvent[T ReviewOutboxEvent](
+	t *testing.T, events []ReviewOutboxEvent,
+) {
+
+	t.Helper()
+	for _, evt := range events {
+		if _, ok := evt.(T); ok {
+			return
+		}
+	}
+	t.Fatalf("expected outbox event of type %T not found", *new(T))
+}
