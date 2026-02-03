@@ -61,13 +61,13 @@ func DefaultServerConfig() ServerConfig {
 
 // Server is the gRPC server for Subtrate.
 type Server struct {
-	cfg         ServerConfig
-	store       *db.Store
-	mailSvc     *mail.Service              // Direct service for operations not via actor.
-	mailClient  *mailclient.Client         // Shared mail client (required).
-	actClient   *mailclient.ActivityClient // Shared activity client (required).
-	agentReg    *agent.Registry
-	identityMgr *agent.IdentityManager
+	cfg          ServerConfig
+	store        *db.Store
+	mailSvc      *mail.Service              // Direct service for operations not via actor.
+	mailClient   *mailclient.Client         // Shared mail client (required).
+	actClient    *mailclient.ActivityClient // Shared activity client (required).
+	agentReg     *agent.Registry
+	identityMgr  *agent.IdentityManager
 	heartbeatMgr *agent.HeartbeatManager
 
 	// notificationHub is the actor reference for the notification hub.

@@ -37,7 +37,6 @@ type Server struct {
 	srv          *http.Server
 	addr         string
 	grpcEndpoint string // gRPC endpoint for gateway proxy.
-	userAgentID  int64  // Cached ID for the User agent.
 }
 
 // Config holds configuration for the web server.
@@ -157,39 +156,6 @@ func (s *Server) Shutdown(ctx context.Context) error {
 		return s.srv.Shutdown(ctx)
 	}
 	return nil
-}
-
-// ensureUserAgent ensures the User agent exists and caches its ID.
-func (s *Server) ensureUserAgent(ctx context.Context) error {
-	// Try to get existing User agent.
-	ag, err := s.store.GetAgentByName(ctx, UserAgentName)
-	if err == nil {
-		s.userAgentID = ag.ID
-		return nil
-	}
-
-	// Create the User agent.
-	ag, err = s.store.CreateAgent(ctx, store.CreateAgentParams{
-		Name: UserAgentName,
-	})
-	if err != nil {
-		return fmt.Errorf("failed to create User agent: %w", err)
-	}
-
-	s.userAgentID = ag.ID
-	log.Printf("Created User agent with ID %d", s.userAgentID)
-	return nil
-}
-
-// getUserAgentID returns the cached User agent ID, initializing if needed.
-func (s *Server) getUserAgentID(ctx context.Context) int64 {
-	if s.userAgentID == 0 {
-		if err := s.ensureUserAgent(ctx); err != nil {
-			log.Printf("Warning: failed to ensure User agent: %v", err)
-			return 0
-		}
-	}
-	return s.userAgentID
 }
 
 // registerGateway sets up the grpc-gateway REST proxy to forward requests to the

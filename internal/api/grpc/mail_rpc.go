@@ -1051,12 +1051,8 @@ func (s *Server) GetAgentsStatus(
 			LastActiveAt:          timestamppb.New(aws.LastActive),
 			SecondsSinceHeartbeat: int64(time.Since(aws.LastActive).Seconds()),
 		}
-		// Add session ID if the agent has an active session.
-		if aws.ActiveSessionID != "" {
-			// Session IDs are strings in the identity system, but the proto
-			// uses int64. For now we'll leave it as 0 since session_id in
-			// proto is for database session IDs, not Claude session strings.
-		}
+		// Note: Session IDs are strings in the identity system, but the proto
+		// uses int64. Proto session_id is 0 since we use Claude session strings.
 	}
 
 	return &GetAgentsStatusResponse{

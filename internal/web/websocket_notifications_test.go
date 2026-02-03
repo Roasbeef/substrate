@@ -13,8 +13,8 @@ import (
 
 // mockNotificationHubRef implements NotificationHubRef for testing.
 type mockNotificationHubRef struct {
-	mu            sync.Mutex
-	subscriptions map[int64]map[string]chan<- mail.InboxMessage
+	mu               sync.Mutex
+	subscriptions    map[int64]map[string]chan<- mail.InboxMessage
 	subscribeCalls   int
 	unsubscribeCalls int
 }
@@ -51,20 +51,6 @@ func (m *mockNotificationHubRef) Unsubscribe(
 		}
 	}
 	return nil
-}
-
-func (m *mockNotificationHubRef) notify(agentID int64, msg mail.InboxMessage) {
-	m.mu.Lock()
-	subs := m.subscriptions[agentID]
-	m.mu.Unlock()
-
-	for _, ch := range subs {
-		select {
-		case ch <- msg:
-		default:
-			// Channel full, skip.
-		}
-	}
 }
 
 func (m *mockNotificationHubRef) subscriberCount(agentID int64) int {

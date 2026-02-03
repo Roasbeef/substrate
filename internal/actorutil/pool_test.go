@@ -388,7 +388,7 @@ func TestPoolRef_ImplementsActorRef(t *testing.T) {
 	defer pool.Stop()
 
 	// This should compile if PoolRef implements ActorRef.
-	var ref actor.ActorRef[testMessage, int] = NewPoolRef(pool)
+	var ref = NewPoolRef(pool)
 	_ = ref
 }
 

@@ -15,13 +15,13 @@ import (
 
 // WebSocket message types for real-time updates.
 const (
-	WSMsgTypeUnreadCount  = "unread_count"
-	WSMsgTypeNewMessage   = "new_message"
-	WSMsgTypeAgentUpdate  = "agent_update"
-	WSMsgTypeActivity     = "activity"
-	WSMsgTypePong         = "pong"
-	WSMsgTypeConnected    = "connected"
-	WSMsgTypeError        = "error"
+	WSMsgTypeUnreadCount = "unread_count"
+	WSMsgTypeNewMessage  = "new_message"
+	WSMsgTypeAgentUpdate = "agent_update"
+	WSMsgTypeActivity    = "activity"
+	WSMsgTypePong        = "pong"
+	WSMsgTypeConnected   = "connected"
+	WSMsgTypeError       = "error"
 )
 
 // WSMessage represents a WebSocket message sent to clients.
