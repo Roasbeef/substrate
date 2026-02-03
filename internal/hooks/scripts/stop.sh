@@ -129,7 +129,9 @@ fi
     echo "Session ID: ${session_id:-'(empty)'}" >> "$debug_log"
     echo "Session args: ${session_args:-'(empty)'}" >> "$debug_log"
 
-    # Deduplication: check if we sent a status in the last 5 minutes
+    # Deduplication: check if we sent a status in the last 30 minutes.
+    # Heartbeats already handle liveness for the UI, so status updates
+    # are purely work-summary messages and don't need to be frequent.
     status_flag="$HOME/.subtrate/status_sent_${session_id:-default}"
     now=$(date +%s)
 
@@ -137,9 +139,9 @@ fi
         last_sent=$(cat "$status_flag" 2>/dev/null || echo "0")
         elapsed=$((now - last_sent))
         echo "Dedup check: flag exists, last_sent=$last_sent, elapsed=${elapsed}s" >> "$debug_log"
-        # Skip if sent within last 5 minutes (300 seconds)
-        if [ "$elapsed" -lt 300 ]; then
-            echo "SKIPPED: Within 5-minute dedup window" >> "$debug_log"
+        # Skip if sent within last 30 minutes (1800 seconds).
+        if [ "$elapsed" -lt 1800 ]; then
+            echo "SKIPPED: Within 30-minute dedup window" >> "$debug_log"
             exit 0
         fi
     else
