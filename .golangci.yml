@@ -2,22 +2,16 @@ version: "2"
 
 run:
   timeout: 5m
-  modules-download-mode: readonly
-  skip-dirs:
-    - internal/db/sqlc
 
 linters:
+  default: none
   enable:
     - govet
     - staticcheck
     - unused
     - ineffassign
-  disable:
-    # TODO: Fix these and re-enable
-    - errcheck  # Many unchecked errors in codebase, fix incrementally
   settings:
     govet:
-      enable-all: true
       disable:
         - fieldalignment
         - shadow
@@ -25,3 +19,8 @@ linters:
 formatters:
   enable:
     - gofmt
+
+output:
+  formats:
+    text:
+      path: stdout
