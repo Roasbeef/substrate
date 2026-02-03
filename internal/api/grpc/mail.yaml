@@ -160,3 +160,29 @@ http:
 
     - selector: subtraterpc.Stats.HealthCheck
       get: "/api/v1/health"
+
+    # ReviewService - Review Operations
+    - selector: subtraterpc.ReviewService.CreateReview
+      post: "/api/v1/reviews"
+      body: "*"
+
+    - selector: subtraterpc.ReviewService.ListReviews
+      get: "/api/v1/reviews"
+
+    - selector: subtraterpc.ReviewService.GetReview
+      get: "/api/v1/reviews/{review_id}"
+
+    - selector: subtraterpc.ReviewService.ResubmitReview
+      post: "/api/v1/reviews/{review_id}/resubmit"
+      body: "*"
+
+    - selector: subtraterpc.ReviewService.CancelReview
+      delete: "/api/v1/reviews/{review_id}"
+
+    # ReviewService - Issue Operations
+    - selector: subtraterpc.ReviewService.ListReviewIssues
+      get: "/api/v1/reviews/{review_id}/issues"
+
+    - selector: subtraterpc.ReviewService.UpdateIssueStatus
+      patch: "/api/v1/reviews/{review_id}/issues/{issue_id}"
+      body: "*"

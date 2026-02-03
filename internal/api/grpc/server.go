@@ -19,6 +19,7 @@ import (
 	"github.com/roasbeef/subtrate/internal/db"
 	"github.com/roasbeef/subtrate/internal/mail"
 	"github.com/roasbeef/subtrate/internal/mailclient"
+	"github.com/roasbeef/subtrate/internal/review"
 )
 
 // ServerConfig holds configuration for the gRPC server.
@@ -46,6 +47,9 @@ type ServerConfig struct {
 
 	// ActivityRef is the actor reference for activity operations (required).
 	ActivityRef activity.ActivityActorRef
+
+	// ReviewRef is the actor reference for review operations (optional).
+	ReviewRef review.ReviewActorRef
 }
 
 // DefaultServerConfig returns a ServerConfig with sensible defaults.
@@ -74,6 +78,9 @@ type Server struct {
 	// Used for event-driven message delivery to streaming clients.
 	notificationHub actor.ActorRef[mail.NotificationRequest, mail.NotificationResponse]
 
+	// reviewRef is the actor reference for the review service.
+	reviewRef review.ReviewActorRef
+
 	grpcServer *grpc.Server
 	listener   net.Listener
 
@@ -89,6 +96,7 @@ type Server struct {
 	UnimplementedSessionServer
 	UnimplementedActivityServer
 	UnimplementedStatsServer
+	UnimplementedReviewServiceServer
 }
 
 // NewServer creates a new gRPC server instance.
@@ -111,6 +119,7 @@ func NewServer(
 		identityMgr:     identityMgr,
 		heartbeatMgr:    heartbeatMgr,
 		notificationHub: notificationHub,
+		reviewRef:       cfg.ReviewRef,
 		quit:            make(chan struct{}),
 	}
 }
@@ -143,6 +152,7 @@ func (s *Server) Start() error {
 	RegisterSessionServer(s.grpcServer, s)
 	RegisterActivityServer(s.grpcServer, s)
 	RegisterStatsServer(s.grpcServer, s)
+	RegisterReviewServiceServer(s.grpcServer, s)
 
 	// Start serving in a goroutine.
 	s.wg.Add(1)

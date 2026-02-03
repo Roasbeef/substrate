@@ -137,6 +137,30 @@ service Stats {
     rpc HealthCheck (HealthCheckRequest) returns (HealthCheckResponse);
 }
 
+// ReviewService handles code review operations.
+service ReviewService {
+    // CreateReview creates a new review request.
+    rpc CreateReview (CreateReviewRequest) returns (CreateReviewResponse);
+
+    // ListReviews lists reviews with optional filters.
+    rpc ListReviews (ListReviewsProtoRequest) returns (ListReviewsProtoResponse);
+
+    // GetReview gets a single review with its iterations.
+    rpc GetReview (GetReviewProtoRequest) returns (ReviewDetailResponse);
+
+    // ResubmitReview re-requests review after author changes.
+    rpc ResubmitReview (ResubmitReviewRequest) returns (CreateReviewResponse);
+
+    // CancelReview cancels an active review.
+    rpc CancelReview (CancelReviewProtoRequest) returns (CancelReviewProtoResponse);
+
+    // ListReviewIssues lists issues for a review.
+    rpc ListReviewIssues (ListReviewIssuesRequest) returns (ListReviewIssuesResponse);
+
+    // UpdateIssueStatus updates the status of a review issue.
+    rpc UpdateIssueStatus (UpdateIssueStatusRequest) returns (UpdateIssueStatusResponse);
+}
+
 // Priority represents message priority levels.
 enum Priority {
     PRIORITY_UNSPECIFIED = 0;
@@ -738,4 +762,130 @@ message HealthCheckRequest {}
 message HealthCheckResponse {
     string status = 1;  // "ok" or "error"
     google.protobuf.Timestamp time = 2;
+}
+
+// =============================================================================
+// ReviewService Messages
+// =============================================================================
+
+// CreateReviewRequest is the request for CreateReview.
+message CreateReviewRequest {
+    string branch = 1;
+    string base_branch = 2;
+    string commit_sha = 3;
+    string repo_path = 4;
+    int32 pr_number = 5;
+    string review_type = 6;       // full, incremental, security, performance
+    string priority = 7;          // urgent, normal, low
+    repeated string reviewers = 8;
+    string description = 9;
+    int64 requester_id = 10;
+    string remote_url = 11;
+}
+
+// CreateReviewResponse is the response for CreateReview and ResubmitReview.
+message CreateReviewResponse {
+    string review_id = 1;
+    string thread_id = 2;
+    string state = 3;
+    string error = 4;
+}
+
+// ListReviewsProtoRequest is the request for ListReviews.
+message ListReviewsProtoRequest {
+    string state = 1;             // Optional state filter
+    int64 requester_id = 2;       // Optional requester filter
+    int32 limit = 3;
+    int32 offset = 4;
+}
+
+// ListReviewsProtoResponse is the response for ListReviews.
+message ListReviewsProtoResponse {
+    repeated ReviewSummaryProto reviews = 1;
+}
+
+// ReviewSummaryProto represents a review summary in proto format.
+message ReviewSummaryProto {
+    string review_id = 1;
+    string thread_id = 2;
+    int64 requester_id = 3;
+    string branch = 4;
+    string state = 5;
+    string review_type = 6;
+    int64 created_at = 7;
+}
+
+// GetReviewProtoRequest is the request for GetReview.
+message GetReviewProtoRequest {
+    string review_id = 1;
+}
+
+// ReviewDetailResponse is the response for GetReview.
+message ReviewDetailResponse {
+    string review_id = 1;
+    string thread_id = 2;
+    string state = 3;
+    string branch = 4;
+    string base_branch = 5;
+    string review_type = 6;
+    int32 iterations = 7;
+    int64 open_issues = 8;
+    string error = 9;
+}
+
+// ResubmitReviewRequest is the request for ResubmitReview.
+message ResubmitReviewRequest {
+    string review_id = 1;
+    string commit_sha = 2;
+}
+
+// CancelReviewProtoRequest is the request for CancelReview.
+message CancelReviewProtoRequest {
+    string review_id = 1;
+    string reason = 2;
+}
+
+// CancelReviewProtoResponse is the response for CancelReview.
+message CancelReviewProtoResponse {
+    string error = 1;
+}
+
+// ListReviewIssuesRequest is the request for ListReviewIssues.
+message ListReviewIssuesRequest {
+    string review_id = 1;
+}
+
+// ListReviewIssuesResponse is the response for ListReviewIssues.
+message ListReviewIssuesResponse {
+    repeated ReviewIssueProto issues = 1;
+}
+
+// ReviewIssueProto represents a review issue in proto format.
+message ReviewIssueProto {
+    int64 id = 1;
+    string review_id = 2;
+    int32 iteration_num = 3;
+    string issue_type = 4;
+    string severity = 5;
+    string file_path = 6;
+    int32 line_start = 7;
+    int32 line_end = 8;
+    string title = 9;
+    string description = 10;
+    string code_snippet = 11;
+    string suggestion = 12;
+    string claude_md_ref = 13;
+    string status = 14;
+}
+
+// UpdateIssueStatusRequest is the request for UpdateIssueStatus.
+message UpdateIssueStatusRequest {
+    string review_id = 1;
+    int64 issue_id = 2;
+    string status = 3;            // open, fixed, wont_fix, duplicate
+}
+
+// UpdateIssueStatusResponse is the response for UpdateIssueStatus.
+message UpdateIssueStatusResponse {
+    string error = 1;
 }

@@ -123,7 +123,7 @@ func main() {
 	reviewSvc := review.NewService(review.ServiceConfig{
 		Store: storage,
 	})
-	_ = actor.RegisterWithSystem(
+	reviewRef := actor.RegisterWithSystem(
 		actorSystem,
 		"review-service",
 		review.ReviewServiceKey,
@@ -169,6 +169,7 @@ func main() {
 		grpcCfg.ListenAddr = *grpcAddr
 		grpcCfg.MailRef = mailRef
 		grpcCfg.ActivityRef = activityRef
+		grpcCfg.ReviewRef = reviewRef
 
 		// Pass the notification hub actor for gRPC streaming RPCs.
 		grpcServer = subtraterpc.NewServer(

@@ -214,6 +214,16 @@ func (s *Server) registerGateway(ctx context.Context) error {
 		return fmt.Errorf("failed to register Stats handler: %w", err)
 	}
 
+	// Register ReviewService handler.
+	err = subtraterpc.RegisterReviewServiceHandlerFromEndpoint(
+		ctx, s.gatewayMux, s.grpcEndpoint, opts,
+	)
+	if err != nil {
+		return fmt.Errorf(
+			"failed to register ReviewService handler: %w", err,
+		)
+	}
+
 	// Mount the gateway at /api/v1/ as the primary API endpoint.
 	// The gateway paths in mail.yaml already include /api/v1, so no prefix stripping needed.
 	s.mux.HandleFunc("/api/v1/", func(w http.ResponseWriter, r *http.Request) {
