@@ -116,7 +116,7 @@ ci: ci-go ci-frontend
 	@echo "All CI checks passed."
 
 .PHONY: install
-install:
+install: bun-install bun-build
 	go install ./cmd/substrate
 	go install ./cmd/substrated
 
