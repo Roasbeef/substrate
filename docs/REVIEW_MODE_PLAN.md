@@ -635,64 +635,267 @@ The thread ID is created when the review is requested and used throughout.
 - Re-review after changes
 - Approve when satisfied
 
-### 1.6 Review State Machine
+### 1.6 Review State Machine (Actor + FSM Pattern)
 
-**Location**: `internal/review/fsm.go`
+**Location**: `internal/review/` - follows the exact pattern from `internal/mail/thread_*.go`
 
+The review FSM uses the same `ProcessEvent → Transition → OutboxEvents` pattern
+as the existing ThreadFSM. The sub-actor processes outbox events for side effects
+(DB writes, notifications, agent spawning).
+
+**`internal/review/review_states.go`** - State interface and transitions:
 ```go
-// ReviewState represents the current state of a review.
-type ReviewState string
+// ReviewState is the sealed interface for all review states. Each state handles
+// incoming events and returns state transitions with optional outbox events
+// for side effects.
+type ReviewState interface {
+    // ProcessEvent handles an incoming event and returns the next state
+    // along with any outbox events to emit.
+    ProcessEvent(ctx context.Context, event ReviewEvent,
+        env *ReviewEnvironment) (*ReviewTransition, error)
 
-const (
-    StateNew              ReviewState = "new"
-    StatePendingReview    ReviewState = "pending_review"
-    StateUnderReview      ReviewState = "under_review"
-    StateChangesRequested ReviewState = "changes_requested"
-    StateReReview         ReviewState = "re_review"
-    StateApproved         ReviewState = "approved"
-    StateRejected         ReviewState = "rejected"
-    StateCancelled        ReviewState = "cancelled"
+    // IsTerminal returns true if this is a terminal state.
+    IsTerminal() bool
+
+    // String returns a human-readable name for the state.
+    String() string
+
+    // isReviewState seals the interface.
+    isReviewState()
+}
+
+// ReviewTransition represents the result of processing an event.
+type ReviewTransition struct {
+    NextState    ReviewState
+    OutboxEvents []ReviewOutboxEvent
+}
+
+// ReviewEnvironment provides context for state transitions.
+type ReviewEnvironment struct {
+    ReviewID   string
+    ThreadID   string
+    RepoPath   string
+}
+
+// Concrete states (each implements ReviewState).
+var (
+    _ ReviewState = (*StateNew)(nil)
+    _ ReviewState = (*StatePendingReview)(nil)
+    _ ReviewState = (*StateUnderReview)(nil)
+    _ ReviewState = (*StateChangesRequested)(nil)
+    _ ReviewState = (*StateReReview)(nil)
+    _ ReviewState = (*StateApproved)(nil)
+    _ ReviewState = (*StateRejected)(nil)
+    _ ReviewState = (*StateCancelled)(nil)
 )
 
-// ReviewEvent triggers state transitions.
+// Example state: StateNew handles SubmitForReviewEvent.
+type StateNew struct{}
+
+func (s *StateNew) ProcessEvent(ctx context.Context, event ReviewEvent,
+    env *ReviewEnvironment) (*ReviewTransition, error) {
+
+    switch e := event.(type) {
+    case SubmitForReviewEvent:
+        return &ReviewTransition{
+            NextState: &StatePendingReview{},
+            OutboxEvents: []ReviewOutboxEvent{
+                PersistReviewState{
+                    ReviewID: env.ReviewID,
+                    NewState: "pending_review",
+                },
+                NotifyReviewStateChange{
+                    ReviewID: env.ReviewID,
+                    OldState: "new",
+                    NewState: "pending_review",
+                },
+                SpawnReviewerAgent{
+                    ReviewID:  env.ReviewID,
+                    ThreadID:  env.ThreadID,
+                    RepoPath:  env.RepoPath,
+                    Requester: e.RequesterID,
+                },
+            },
+        }, nil
+    case CancelEvent:
+        return &ReviewTransition{
+            NextState: &StateCancelled{},
+            OutboxEvents: []ReviewOutboxEvent{
+                PersistReviewState{ReviewID: env.ReviewID, NewState: "cancelled"},
+            },
+        }, nil
+    default:
+        return nil, fmt.Errorf("unexpected event %T in state New", event)
+    }
+}
+
+func (s *StateNew) IsTerminal() bool  { return false }
+func (s *StateNew) String() string    { return "new" }
+func (s *StateNew) isReviewState()    {}
+```
+
+**`internal/review/review_events.go`** - Incoming events (sealed):
+```go
+// ReviewEvent is the sealed interface for events that drive the review FSM.
 type ReviewEvent interface {
-    reviewEventMarker()
+    isReviewEvent()
 }
 
-type (
-    SubmitForReviewEvent   struct{ RequesterID int64 }
-    StartReviewEvent       struct{ ReviewerID string }
-    RequestChangesEvent    struct{ Issues []ReviewIssue }
-    ResubmitEvent          struct{ NewCommitSHA string }
-    ApproveEvent           struct{ ReviewerID string }
-    RejectEvent            struct{ Reason string }
-    CancelEvent            struct{ Reason string }
-)
+func (SubmitForReviewEvent) isReviewEvent() {}
+func (StartReviewEvent) isReviewEvent()     {}
+func (RequestChangesEvent) isReviewEvent()  {}
+func (ResubmitEvent) isReviewEvent()        {}
+func (ApproveEvent) isReviewEvent()         {}
+func (RejectEvent) isReviewEvent()          {}
+func (CancelEvent) isReviewEvent()          {}
 
-// ReviewFSM manages review state transitions.
+type SubmitForReviewEvent struct{ RequesterID int64 }
+type StartReviewEvent     struct{ ReviewerID string }
+type RequestChangesEvent  struct{ Issues []ReviewIssue }
+type ResubmitEvent        struct{ NewCommitSHA string }
+type ApproveEvent         struct{ ReviewerID string }
+type RejectEvent          struct{ Reason string }
+type CancelEvent          struct{ Reason string }
+```
+
+**`internal/review/review_outbox.go`** - Outbox events (side effects):
+```go
+// ReviewOutboxEvent is the sealed interface for events emitted by the review
+// FSM to external actors. These events trigger side effects like database
+// persistence, notifications, and agent spawning.
+type ReviewOutboxEvent interface {
+    isReviewOutboxEvent()
+}
+
+func (PersistReviewState) isReviewOutboxEvent()      {}
+func (NotifyReviewStateChange) isReviewOutboxEvent()  {}
+func (SpawnReviewerAgent) isReviewOutboxEvent()       {}
+func (CreateReviewIteration) isReviewOutboxEvent()    {}
+func (CreateReviewIssues) isReviewOutboxEvent()       {}
+func (RecordActivity) isReviewOutboxEvent()           {}
+
+// PersistReviewState requests database persistence of the review state.
+type PersistReviewState struct {
+    ReviewID string
+    NewState string
+}
+
+// NotifyReviewStateChange notifies subscribers of a review state change
+// for real-time UI updates via WebSocket.
+type NotifyReviewStateChange struct {
+    ReviewID string
+    OldState string
+    NewState string
+}
+
+// SpawnReviewerAgent requests the sub-actor to create a Claude Agent SDK
+// instance for performing the review.
+type SpawnReviewerAgent struct {
+    ReviewID  string
+    ThreadID  string
+    RepoPath  string
+    Requester int64
+}
+
+// CreateReviewIteration requests persistence of a review iteration result.
+type CreateReviewIteration struct {
+    ReviewID     string
+    IterationNum int
+    ReviewerID   string
+    Decision     ReviewDecision
+    Summary      string
+    Issues       []ReviewIssue
+}
+
+// CreateReviewIssues requests persistence of individual review issues.
+type CreateReviewIssues struct {
+    ReviewID string
+    Issues   []ReviewIssue
+}
+
+// RecordActivity requests an activity entry for the review event.
+type RecordActivity struct {
+    AgentID      int64
+    ActivityType string
+    Description  string
+    ReviewID     string
+}
+```
+
+**`internal/review/review_fsm.go`** - FSM coordinator:
+```go
+// ReviewFSM manages review state transitions using the ProcessEvent pattern.
+// Mirrors the ThreadFSM pattern from internal/mail/thread_fsm.go.
 type ReviewFSM struct {
-    ReviewID    string
-    ThreadID    string
-    CurrentState ReviewState
-
-    // History for debugging/UI
-    Transitions []StateTransition
-
-    // Multi-reviewer tracking
-    ReviewerStates map[string]ReviewerState
+    state ReviewState
+    env   *ReviewEnvironment
 }
 
-// ReviewerState tracks per-reviewer status in multi-reviewer mode.
-type ReviewerState struct {
-    ReviewerID  string
-    Decision    ReviewDecision
-    ReviewedAt  time.Time
-    Issues      []ReviewIssue
+// NewReviewFSM creates a new review FSM starting in the New state.
+func NewReviewFSM(reviewID, threadID, repoPath string) *ReviewFSM {
+    return &ReviewFSM{
+        state: &StateNew{},
+        env: &ReviewEnvironment{
+            ReviewID: reviewID,
+            ThreadID: threadID,
+            RepoPath: repoPath,
+        },
+    }
 }
 
-// ProcessEvent handles a review event and returns the new state.
-func (fsm *ReviewFSM) ProcessEvent(ctx context.Context, event ReviewEvent) (ReviewState, error) {
-    // State transition logic...
+// ProcessEvent processes an event and returns the outbox events that should
+// be dispatched to external actors.
+func (f *ReviewFSM) ProcessEvent(ctx context.Context,
+    event ReviewEvent,
+) ([]ReviewOutboxEvent, error) {
+
+    transition, err := f.state.ProcessEvent(ctx, event, f.env)
+    if err != nil {
+        return nil, fmt.Errorf("process event %T: %w", event, err)
+    }
+
+    // Update state.
+    f.state = transition.NextState
+
+    return transition.OutboxEvents, nil
+}
+
+// CurrentState returns a string representation of the current state.
+func (f *ReviewFSM) CurrentState() string {
+    return f.state.String()
+}
+
+// IsTerminal returns true if the review has reached a terminal state.
+func (f *ReviewFSM) IsTerminal() bool {
+    return f.state.IsTerminal()
+}
+```
+
+**Sub-actor outbox processing** (in `reviewSubActor`):
+```go
+// processOutbox dispatches outbox events from the FSM to external systems.
+// This is called by the sub-actor after each FSM transition.
+func (r *reviewSubActor) processOutbox(ctx context.Context, events []ReviewOutboxEvent) {
+    for _, event := range events {
+        switch e := event.(type) {
+        case PersistReviewState:
+            r.store.UpdateReviewState(ctx, e.ReviewID, e.NewState)
+        case NotifyReviewStateChange:
+            // Send via notification hub for WebSocket broadcast.
+            r.notifyStateChange(ctx, e)
+        case SpawnReviewerAgent:
+            // Create Claude Agent SDK client and start review stream.
+            r.spawnAgent(ctx, e)
+        case CreateReviewIteration:
+            r.store.CreateReviewIteration(ctx, store.CreateReviewIterationParams{...})
+        case CreateReviewIssues:
+            for _, issue := range e.Issues {
+                r.store.CreateReviewIssue(ctx, store.CreateReviewIssueParams{...})
+            }
+        case RecordActivity:
+            r.store.CreateActivity(ctx, store.CreateActivityParams{...})
+        }
+    }
 }
 ```
 
