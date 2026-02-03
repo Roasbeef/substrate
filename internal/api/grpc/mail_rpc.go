@@ -196,8 +196,19 @@ func (s *Server) ReadThread(ctx context.Context, req *ReadThreadRequest) (*ReadT
 
 // UpdateState changes the state of a message.
 func (s *Server) UpdateState(ctx context.Context, req *UpdateStateRequest) (*UpdateStateResponse, error) {
-	if req.AgentId == 0 {
-		return nil, status.Error(codes.InvalidArgument, "agent_id is required")
+	agentID := req.AgentId
+	if agentID == 0 {
+		// Use the default "User" agent for web UI state changes.
+		userAgent, err := s.store.Queries().GetAgentByName(
+			ctx, "User",
+		)
+		if err != nil {
+			return nil, status.Error(
+				codes.Internal,
+				"failed to get User agent",
+			)
+		}
+		agentID = userAgent.ID
 	}
 	if req.MessageId == 0 {
 		return nil, status.Error(codes.InvalidArgument, "message_id is required")
@@ -218,7 +229,7 @@ func (s *Server) UpdateState(ctx context.Context, req *UpdateStateRequest) (*Upd
 
 	// Update state via the shared mail client (actor system).
 	resp, err := s.updateMessageStateActor(
-		ctx, req.AgentId, req.MessageId, newState, snoozedUntil,
+		ctx, agentID, req.MessageId, newState, snoozedUntil,
 	)
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "failed to update state: %v", err)

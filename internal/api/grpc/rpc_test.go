@@ -1313,20 +1313,32 @@ func TestMailService_UpdateState_NonExistentMessage(t *testing.T) {
 	require.True(t, resp.Success)
 }
 
-func TestMailService_UpdateState_InvalidAgentId(t *testing.T) {
+func TestMailService_UpdateState_DefaultUserAgent(t *testing.T) {
 	h := newTestHarness(t)
 	defer h.Close()
 
 	ctx := context.Background()
 
-	// Update state with invalid agent ID.
-	_, err := h.mailClient.UpdateState(ctx, &UpdateStateRequest{
-		MessageId: 1,
+	// Create sender and send a message to User (agent_id=0 defaults to
+	// "User" which is created by the init migration).
+	senderID := h.createTestAgent("Sender")
+
+	// Send a message to User via recipient name.
+	sendResp, err := h.mailClient.SendMail(ctx, &SendMailRequest{
+		SenderId:       senderID,
+		RecipientNames: []string{"User"},
+		Subject:        "Test message",
+		Body:           "Hello User",
+	})
+	require.NoError(t, err)
+
+	// Update state with agent_id=0 should default to User agent.
+	_, err = h.mailClient.UpdateState(ctx, &UpdateStateRequest{
+		MessageId: sendResp.MessageId,
 		AgentId:   0,
 		NewState:  MessageState_STATE_ARCHIVED,
 	})
-	require.Error(t, err)
-	require.Contains(t, err.Error(), "agent_id is required")
+	require.NoError(t, err)
 }
 
 func TestMailService_PollChanges(t *testing.T) {

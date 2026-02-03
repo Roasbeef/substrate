@@ -133,14 +133,14 @@ All status messages should follow this format for consistency:
 **Actions:**
 1. Quick mail check - block if mail exists
 2. Check incomplete tasks - block if any
-3. Send status update to User (with 5-minute deduplication)
+3. Send status update to User (with 30-minute deduplication)
 4. Long poll (55s) - keep agent alive
 5. Always blocks to maintain persistent agent pattern
 
 **Status Update (Step 3):**
 - Generates summary using `claude -p` with haiku model
 - Sends "[Status] AgentName - Standing By" to User
-- Uses timestamp-based deduplication (5-minute cooldown)
+- Uses timestamp-based deduplication (30-minute cooldown)
 - Runs in background to not delay the hook
 
 **Output:** JSON `{"decision": "block", "reason": "..."}`
@@ -186,12 +186,12 @@ To prevent message spam, the Stop hook uses timestamp-based deduplication:
 
 **How it works:**
 1. Before sending a status update, check flag file `~/.subtrate/status_sent_<session_id>`
-2. If file exists and was written < 5 minutes ago, skip sending
+2. If file exists and was written < 30 minutes ago, skip sending
 3. After successful send, update the flag file with current timestamp
 
 **Flag file location:** `~/.subtrate/status_sent_<session_id>`
 
-**Cooldown period:** 5 minutes (300 seconds)
+**Cooldown period:** 30 minutes (1800 seconds)
 
 This approach is simpler than querying for unacked messages and works offline.
 

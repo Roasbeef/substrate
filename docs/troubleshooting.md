@@ -98,7 +98,7 @@ cat ~/.subtrate/stop_hook_trace.log
 
 ### Status updates not sending
 
-Check deduplication. Status updates are deduplicated within a 5-minute
+Check deduplication. Status updates are deduplicated within a 30-minute
 window:
 
 ```bash
