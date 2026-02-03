@@ -5,6 +5,7 @@ import { get, post, patch } from './client.js';
 import type {
   APIResponse,
   Message,
+  MessageState,
   MessageWithRecipients,
   SendMessageRequest,
 } from '@/types/api.js';
@@ -85,9 +86,9 @@ function parseMessagesResponse(response: GatewayMessagesResponse): APIResponse<M
         state: normalizedState,
         is_starred: stateNorm === 'starred',
         is_archived: stateNorm === 'archived',
-        snoozed_until: msg.snoozed_until,
-        read_at: msg.read_at,
-        acknowledged_at: msg.acknowledged_at,
+        ...(msg.snoozed_until ? { snoozed_until: msg.snoozed_until } : {}),
+        ...(msg.read_at ? { read_at: msg.read_at } : {}),
+        ...(msg.acknowledged_at ? { acknowledged_at: msg.acknowledged_at } : {}),
       }],
     };
     if (msg.thread_id !== undefined) {

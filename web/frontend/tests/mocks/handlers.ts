@@ -163,11 +163,22 @@ export const handlers = [
     return HttpResponse.json({ data: mockDashboardStats });
   }),
 
-  // Messages.
+  // Messages (gateway format with flat state fields).
   http.get(`${API_BASE}/messages`, () => {
     return HttpResponse.json({
-      data: mockMessages,
-      meta: { total: mockMessages.length, page: 1, page_size: 20 },
+      messages: mockMessages.map((m) => ({
+        id: String(m.id),
+        sender_id: String(m.sender_id),
+        sender_name: m.sender_name,
+        sender_project_key: m.sender_project_key,
+        sender_git_branch: m.sender_git_branch,
+        subject: m.subject,
+        body: m.body,
+        priority: `PRIORITY_${m.priority.toUpperCase()}`,
+        state: m.recipients[0]?.state === 'unread' ? 'STATE_UNREAD' : 'STATE_READ',
+        created_at: m.created_at,
+        thread_id: m.thread_id,
+      })),
     });
   }),
 
@@ -193,27 +204,13 @@ export const handlers = [
     return HttpResponse.json(newMessage, { status: 201 });
   }),
 
-  http.post(`${API_BASE}/messages/:id/star`, () => {
-    return new HttpResponse(null, { status: 204 });
+  // UpdateState via PATCH (star, archive, read, snooze, etc.).
+  http.patch(`${API_BASE}/messages/:id`, () => {
+    return HttpResponse.json({ success: true });
   }),
 
-  http.post(`${API_BASE}/messages/:id/archive`, () => {
-    return new HttpResponse(null, { status: 204 });
-  }),
-
-  http.post(`${API_BASE}/messages/:id/unarchive`, () => {
-    return new HttpResponse(null, { status: 204 });
-  }),
-
-  http.post(`${API_BASE}/messages/:id/snooze`, () => {
-    return new HttpResponse(null, { status: 204 });
-  }),
-
+  // Ack still uses its own POST endpoint.
   http.post(`${API_BASE}/messages/:id/ack`, () => {
-    return new HttpResponse(null, { status: 204 });
-  }),
-
-  http.post(`${API_BASE}/messages/:id/read`, () => {
     return new HttpResponse(null, { status: 204 });
   }),
 

@@ -426,9 +426,9 @@ describe('useMessageMutations', () => {
 
 describe('error handling', () => {
   it('handles star toggle error', async () => {
-    // Make the request fail.
+    // Make the PATCH request fail for star toggle.
     server.use(
-      http.post('/api/v1/messages/:id/star', () => {
+      http.patch('/api/v1/messages/:id', () => {
         return HttpResponse.json(
           { error: { code: 'server_error', message: 'Failed' } },
           { status: 500 },
@@ -452,7 +452,7 @@ describe('error handling', () => {
 
   it('handles archive error', async () => {
     server.use(
-      http.post('/api/v1/messages/:id/archive', () => {
+      http.patch('/api/v1/messages/:id', () => {
         return HttpResponse.json(
           { error: { code: 'server_error', message: 'Failed' } },
           { status: 500 },
