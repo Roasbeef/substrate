@@ -199,49 +199,92 @@ type ReviewIssue struct {
     ClaudeMDRef string        // CLAUDE.md rule citation (if applicable)
 }
 
-// Service handles review orchestration and can spawn structured analysis.
+// ReviewServiceKey is the service key for the review service actor.
+// Used to get an ActorRef from the actor system.
+var ReviewServiceKey = actor.NewServiceKey[ReviewMessage, ReviewResponse](
+    "review-service",
+)
+
+// Service handles review orchestration as an actor.
+// It spawns per-review Claude Agent SDK instances and manages FSM state.
 type Service struct {
     store     store.Storage
-    mailSvc   *mail.Service
-    spawner   *agent.Spawner  // For one-shot structured analysis
+    mailRef   actor.ActorRef[mail.MailRequest, mail.MailResponse]
 
-    // Registered reviewer configurations (for validation/routing)
+    // Registered reviewer configurations (for validation/routing).
     reviewers map[string]*ReviewerConfig
 
-    // Active reviews being tracked
+    // Active reviews being tracked.
     activeReviews map[string]*ReviewFSM
 }
 
-// SpawnStructuredReview runs a one-shot Claude Code analysis with JSON output.
-// This is used for automated review passes that need structured data.
-func (s *Service) SpawnStructuredReview(ctx context.Context, req StructuredReviewRequest) (*StructuredReviewResult, error) {
-    // Build prompt with diff, context, and expected JSON schema
-    prompt := s.buildStructuredPrompt(req)
+// SpawnReviewerAgent spawns a per-review Claude Code agent via the Go Agent SDK.
+// The agent reads the review thread for context, performs analysis, and replies
+// with structured feedback including YAML frontmatter for FSM updates.
+func (s *Service) SpawnReviewerAgent(ctx context.Context, req ReviewRequest, cfg *ReviewerConfig) error {
+    // Build the reviewer's system prompt with persona and instructions.
+    systemPrompt := s.buildReviewerSystemPrompt(cfg, req)
 
-    // Create a spawner configured for this review's work directory.
-    // Configuration is set at spawner creation time, not per-call.
-    spawner := agent.NewSpawner(agent.SpawnConfig{
-        Model:          "claude-sonnet-4-20250514",
-        WorkDir:        req.WorkDir,
-        PermissionMode: claudeagent.PermissionModeDefault,
-    })
-
-    // Spawn with the structured prompt.
-    resp, err := spawner.Spawn(ctx, prompt)
+    // Create a Claude Agent SDK client for this review.
+    client, err := claudeagent.NewClient(
+        claudeagent.WithSystemPrompt(systemPrompt),
+        claudeagent.WithModel(cfg.Model),
+        claudeagent.WithCwd(req.RepoPath),
+        claudeagent.WithPermissionMode(claudeagent.PermissionModeDefault),
+        claudeagent.WithMaxTurns(50),
+    )
     if err != nil {
-        return nil, fmt.Errorf("spawn failed: %w", err)
+        return fmt.Errorf("create client: %w", err)
     }
 
-    // Parse structured JSON response
-    var result StructuredReviewResult
-    if err := json.Unmarshal([]byte(resp.Result), &result); err != nil {
-        return nil, fmt.Errorf("parse response: %w", err)
+    // Connect to the Claude Code subprocess.
+    if err := client.Connect(ctx); err != nil {
+        client.Close()
+        return fmt.Errorf("connect: %w", err)
     }
 
-    // Update FSM based on decision
-    s.processReviewResult(ctx, req.ReviewID, &result)
+    // Open a bidirectional stream for back-and-forth conversation.
+    stream, err := client.Stream(ctx)
+    if err != nil {
+        client.Close()
+        return fmt.Errorf("open stream: %w", err)
+    }
 
-    return &result, nil
+    // Initial prompt tells the agent to read the review thread and start.
+    initialPrompt := fmt.Sprintf(
+        "You are reviewing branch %q. Read thread %q via "+
+            "`substrate read` for context, then perform your review. "+
+            "Reply in the same thread with your findings.",
+        req.Branch, req.ThreadID,
+    )
+
+    // Run the reviewer in a goroutine (managed by the service).
+    go s.runReviewerLoop(ctx, stream, client, req.ReviewID, initialPrompt)
+
+    return nil
+}
+
+// runReviewerLoop manages the lifecycle of a reviewer agent stream.
+// It sends the initial prompt, monitors messages for YAML frontmatter
+// to update the FSM, and handles cleanup.
+func (s *Service) runReviewerLoop(
+    ctx context.Context, stream *claudeagent.Stream,
+    client *claudeagent.Client, reviewID string, prompt string,
+) {
+    defer client.Close()
+    defer stream.Close()
+
+    // Send initial review prompt.
+    if err := stream.Send(ctx, prompt); err != nil {
+        s.handleReviewerError(reviewID, err)
+        return
+    }
+
+    // Process messages from the reviewer agent.
+    for msg := range stream.Messages() {
+        // Check for YAML frontmatter in assistant messages to update FSM.
+        s.processReviewerMessage(ctx, reviewID, msg)
+    }
 }
 
 // StructuredReviewRequest contains everything needed for one-shot analysis.
@@ -288,24 +331,59 @@ func (s *Service) Receive(ctx context.Context, msg ReviewMessage) fn.Result[Revi
 }
 ```
 
-### 1.3 Reviewer Agents (Claude Code Instances)
+### 1.3 Reviewer Agents (Claude Agent SDK)
 
-**Key Insight**: Reviewer agents are NOT spawned subprocesses - they are full Claude Code
-agents running independently with a specialized reviewer persona.
+**Key Insight**: Reviewer agents are auto-spawned by ReviewerService using the Claude
+Agent Go SDK (`github.com/roasbeef/claude-agent-sdk-go`). Each active review gets a
+dedicated reviewer agent that lives for the duration of that review.
 
-**Setup**: Each reviewer agent is started with:
-```bash
-# Start a reviewer agent (runs independently)
-claude --profile reviewer-security \
-       --system-prompt "$(cat ~/.substrate/reviewers/security/prompt.md)" \
-       --subscribe reviews-topic
+**Spawning via Claude Agent SDK:**
+```go
+import claudeagent "github.com/roasbeef/claude-agent-sdk-go"
+
+// Create a client for the reviewer agent.
+client, err := claudeagent.NewClient(
+    claudeagent.WithSystemPrompt(reviewerPrompt),
+    claudeagent.WithModel("claude-sonnet-4-20250514"),
+    claudeagent.WithCwd(workDir),
+    claudeagent.WithPermissionMode(claudeagent.PermissionModeDefault),
+    claudeagent.WithMaxTurns(50),
+)
+if err != nil {
+    return err
+}
+defer client.Close()
+
+// Connect and open a bidirectional stream for back-and-forth.
+if err := client.Connect(ctx); err != nil {
+    return err
+}
+
+stream, err := client.Stream(ctx)
+if err != nil {
+    return err
+}
+defer stream.Close()
+
+// Send initial review prompt (tells agent to check the thread).
+if err := stream.Send(ctx, initialPrompt); err != nil {
+    return err
+}
+
+// Process messages from the reviewer agent.
+for msg := range stream.Messages() {
+    // Handle review responses, FSM updates, etc.
+}
 ```
 
-**Or via Substrate CLI:**
-```bash
-# Register and start a reviewer agent
-substrate reviewer start --type security --subscribe reviews
+**Lifecycle:**
+1. **Auto-spawned** by ReviewerService when a review request arrives
+2. **Per-review identity** - Each spawned reviewer gets a unique agent name (e.g., "SecurityReviewer-review-abc123")
+3. **Thread-based context** - Agent reads the full review thread for context recovery
+4. **Restart recovery** - On server restart, query DB for active reviews and re-spawn agents
 
+**Or via Substrate CLI (for manual management):**
+```bash
 # List active reviewers
 substrate reviewer list
 
@@ -318,7 +396,7 @@ substrate reviewer stop security-reviewer-1
 2. **Run commands** - `make test`, `make lint`, `go build`, etc.
 3. **Git operations** - `gh pr checkout`, `git diff`, `git log`
 4. **Mail integration** - Receive requests, send reviews via Substrate mail
-5. **Conversational** - Respond to author questions, participate in discussion
+5. **Conversational** - Respond to author questions, participate in discussion via stream
 
 **Checkout Flow:**
 ```bash
@@ -627,11 +705,14 @@ When operating as a specialized reviewer (security, performance, etc.):
 **Location**: `internal/db/migrations/000003_reviews.up.sql`
 
 ```sql
--- Review requests table
+-- Add metadata column to messages table (general-purpose tagging).
+ALTER TABLE messages ADD COLUMN metadata TEXT;
+
+-- Review requests table (structured review data linked via thread_id).
 CREATE TABLE reviews (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     review_id TEXT NOT NULL UNIQUE,           -- UUID
-    thread_id TEXT NOT NULL,                  -- Links to message thread
+    thread_id TEXT NOT NULL,                  -- Links to message thread (no FK, grouping field)
     requester_id INTEGER NOT NULL REFERENCES agents(id),
 
     -- PR Information
@@ -651,9 +732,7 @@ CREATE TABLE reviews (
     -- Timestamps
     created_at INTEGER NOT NULL,
     updated_at INTEGER NOT NULL,
-    completed_at INTEGER,
-
-    FOREIGN KEY (thread_id) REFERENCES messages(thread_id)
+    completed_at INTEGER
 );
 
 -- Review iterations (each round of review)
@@ -746,18 +825,16 @@ type MultiReviewConfig struct {
 
 // PublishReviewRequest publishes a review to the multi-reviewer topic.
 func (s *Service) PublishReviewRequest(ctx context.Context, req ReviewRequest, config MultiReviewConfig) error {
-    // Publish to topic - all subscribed reviewers receive it
-    return s.mailSvc.Publish(ctx, mail.PublishRequest{
+    // Publish to topic - all subscribed reviewers receive it.
+    // Uses the actual mail.PublishRequest fields (flat struct, no wrapper).
+    _, err := s.mailSvc.Publish(ctx, mail.PublishRequest{
+        SenderID:  req.RequesterID,
         TopicName: config.TopicName,
-        Message: mail.TopicMessage{
-            Subject: fmt.Sprintf("Review Request: %s", req.Branch),
-            Body:    s.formatReviewRequestBody(req),
-            Metadata: map[string]string{
-                "review_id":   req.ReviewID,
-                "review_type": "multi",
-            },
-        },
+        Subject:   fmt.Sprintf("Review Request: %s", req.Branch),
+        Body:      s.formatReviewRequestBody(req),
+        Priority:  mail.Priority(req.Priority),
     })
+    return err
 }
 
 // AggregateReviews combines reviews from multiple reviewers.
@@ -1236,8 +1313,8 @@ export function ReviewThread({ reviewId }: ReviewThreadProps) {
   }
 
   const handleResubmit = async () => {
-    // Get current commit SHA from git
-    const commitSha = await getCurrentCommitSha();
+    // Get current commit SHA via backend API (frontend can't call git directly).
+    const { commitSha } = await reviewsApi.getCurrentCommitSha(review.repoPath);
     resubmit.mutate({ reviewId, commitSha });
   };
 
@@ -1531,24 +1608,26 @@ export function IssueCard({ issue }: IssueCardProps) {
 }
 ```
 
-### 5.8 Diff Viewer Component
+### 5.8 Diff Viewer Component (Deferred)
 
-> **Note**: The diff rendering library needs to be selected during implementation.
-> Candidates: `@pierre/diffs`, `react-diff-viewer`, or a custom implementation
-> using `diff2html`. The API shown below is illustrative.
+> **Status**: Deferred to a later phase. Focus on the underlying system first.
+> The diff rendering library needs to be selected during implementation.
+> Candidates: `react-diff-viewer-continued`, `diff2html`, or a custom implementation.
+> The API shown below is illustrative and will be finalized when this phase begins.
 
-The UI uses a React diff component for professional diff rendering.
+The UI will use a React diff component for professional diff rendering.
 
-**Installation:**
+**Installation (when implemented):**
 ```bash
-cd web/frontend && bun add @pierre/diffs
+cd web/frontend && bun add <diff-library-tbd>
 ```
 
 **Location**: `web/frontend/src/components/reviews/DiffViewer.tsx`
 
 ```tsx
 import { useState, useEffect } from 'react';
-import { MultiFileDiff, FileDiff, PatchDiff, registerCustomTheme } from '@pierre/diffs/react';
+// NOTE: Diff library TBD. Example imports are illustrative.
+// import { MultiFileDiff, FileDiff, PatchDiff, registerCustomTheme } from '<diff-library>';
 import { useQuery } from '@tanstack/react-query';
 import { reviewsApi } from '@/api/reviews';
 import { IssueCard } from './IssueCard';
@@ -1689,7 +1768,8 @@ function IssueAnnotations({ issues }: IssueAnnotationsProps) {
 ```tsx
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { PatchDiff, parsePatchFiles } from '@pierre/diffs/react';
+// NOTE: Diff library TBD. Example imports are illustrative.
+// import { PatchDiff, parsePatchFiles } from '<diff-library>';
 import { reviewsApi } from '@/api/reviews';
 import { DiffViewer } from './DiffViewer';
 import type { Review } from '@/types/reviews';
@@ -2140,105 +2220,122 @@ Use the structured review format in all responses.
 
 ### 9.1 Starting Reviewer Agents
 
-Reviewer agents can be started via CLI or programmatically via the Go SDK:
+Reviewer agents are auto-spawned by ReviewerService using the Claude Agent Go SDK.
+Each active review gets a dedicated reviewer agent.
 
-**CLI Approach:**
+**Auto-Spawn (Primary Path):**
+```go
+import claudeagent "github.com/roasbeef/claude-agent-sdk-go"
+
+// ReviewerService auto-spawns when a review request arrives.
+func (s *Service) spawnReviewer(ctx context.Context, req ReviewRequest, cfg *ReviewerConfig) error {
+    // Create client with reviewer persona configuration.
+    client, err := claudeagent.NewClient(
+        claudeagent.WithSystemPrompt(cfg.SystemPrompt),
+        claudeagent.WithModel(cfg.Model),
+        claudeagent.WithCwd(req.RepoPath),
+        claudeagent.WithPermissionMode(claudeagent.PermissionModeDefault),
+        claudeagent.WithMaxTurns(50),
+        claudeagent.WithEnv(map[string]string{
+            "REVIEW_ID":   req.ReviewID,
+            "THREAD_ID":   req.ThreadID,
+            "BRANCH":      req.Branch,
+        }),
+    )
+    if err != nil {
+        return fmt.Errorf("create reviewer client: %w", err)
+    }
+
+    if err := client.Connect(ctx); err != nil {
+        client.Close()
+        return err
+    }
+
+    // Open bidirectional stream for conversational review.
+    stream, err := client.Stream(ctx)
+    if err != nil {
+        client.Close()
+        return err
+    }
+
+    // Run review loop in background goroutine.
+    go s.runReviewerLoop(ctx, stream, client, req.ReviewID, initialPrompt)
+
+    return nil
+}
+```
+
+**CLI Management:**
 ```bash
-# Start a security reviewer (long-running, subscribes to reviews topic)
-substrate reviewer start \
-    --type security \
-    --subscribe reviews \
-    --workdir /tmp/reviewer-security
-
-# Start with custom model
-substrate reviewer start \
-    --type performance \
-    --model claude-sonnet-4-20250514 \
-    --subscribe reviews
-
 # List active reviewers
 substrate reviewer list
 # Output:
-# NAME                  TYPE        STATUS   REVIEWS  LAST_ACTIVE
-# security-reviewer-1   security    active   12       2m ago
-# perf-reviewer-1       performance idle     8        15m ago
+# NAME                          TYPE        STATUS   REVIEW_ID    BRANCH
+# SecurityReviewer-review-abc   security    active   abc123       feature-auth
+# CodeReviewer-review-def       code        active   def456       fix-bug-42
 
 # Stop a reviewer
-substrate reviewer stop security-reviewer-1
+substrate reviewer stop SecurityReviewer-review-abc
 ```
 
-**Programmatic (Go SDK):**
+**Restart Recovery:**
 ```go
-// Using the Claude Agent SDK to spawn a reviewer
-import claudeagent "github.com/roasbeef/claude-agent-sdk-go"
+// On server restart, re-spawn agents for active reviews.
+func (s *Service) RecoverActiveReviews(ctx context.Context) error {
+    // Query for reviews in active states.
+    reviews, err := s.store.ListReviewsByState(ctx,
+        StateUnderReview, StateChangesRequested, StateReReview,
+    )
+    if err != nil {
+        return err
+    }
 
-cfg := &ReviewerConfig{
-    Name:         "security-reviewer",
-    Type:         "security",
-    SystemPrompt: securityReviewerPrompt,
-    Model:        "claude-opus-4-5-20251101",
-    WorkDir:      "/tmp/reviewer-security",
+    for _, review := range reviews {
+        cfg := s.reviewers[review.ReviewType]
+        if err := s.spawnReviewer(ctx, review.ToRequest(), cfg); err != nil {
+            log.Printf("Failed to recover reviewer for %s: %v",
+                review.ReviewID, err)
+        }
+    }
+    return nil
 }
+```
 
-// Create spawner with reviewer config.
-spawner := agent.NewSpawner(agent.SpawnConfig{
-    SystemPrompt:   cfg.SystemPrompt,
-    Model:          cfg.Model,
-    WorkDir:        cfg.WorkDir,
-    PermissionMode: claudeagent.PermissionModeDefault,
+### 9.2 Reviewer Agent Hooks
+
+Reviewer agents use hooks configured via the Claude Agent SDK:
+
+```go
+// Hooks are passed via WithHooks option when creating the client.
+claudeagent.WithHooks(map[claudeagent.HookType][]claudeagent.HookConfig{
+    claudeagent.HookTypeSessionStart: {{
+        Command: "substrate review context --review-id $REVIEW_ID --format context",
+    }},
 })
-
-// Spawn a review session with the reviewer prompt.
-resp, err := spawner.Spawn(ctx, "Subscribe to the 'reviews' topic and wait for review requests.")
-if err != nil {
-    return err
-}
 ```
 
-### 9.2 Reviewer Hooks
-
-Each reviewer agent has specialized hooks:
-
-**SessionStart Hook:**
-```bash
-#!/bin/bash
-# Check for pending reviews assigned to this reviewer
-substrate review list --filter pending --assignee $REVIEWER_NAME --format context
-```
-
-**Stop Hook (Persistent Reviewer Pattern):**
-```bash
-#!/bin/bash
-# Long-poll for new reviews - keep reviewer alive
-result=$(substrate poll --topics reviews --wait 55s --format hook)
-
-if [ "$(echo "$result" | jq -r '.has_messages')" = "true" ]; then
-    echo "$result"
-    exit 1  # Block - new reviews to process
-fi
-
-# Still block to keep reviewer alive (heartbeat mode)
-echo '{"decision": "block", "reason": "Reviewer standing by for reviews"}'
-exit 0
-```
+The reviewer agent uses Substrate's mail system (via installed hooks) for heartbeats
+and message delivery. No separate reviewer-specific hooks are needed since the agent
+communicates through normal mail threads.
 
 ### 9.3 Reviewer Registration
 
-Reviewers register with Substrate on startup:
+Reviewer agents are tracked in the review_iterations table. When spawned:
 
 ```go
-// When reviewer agent starts, register with the system
-type ReviewerRegistration struct {
-    Name       string   // "security-reviewer-1"
-    Type       string   // "security", "performance", "architecture"
-    Topics     []string // ["reviews", "security-reviews"]
-    Capabilities []string // ["checkout", "test", "lint"]
-    Model      string
-    StartedAt  time.Time
+// ReviewerService tracks spawned reviewers for lifecycle management.
+type ActiveReviewer struct {
+    ReviewID    string
+    ReviewerName string          // "SecurityReviewer-review-abc123"
+    AgentID     int64            // Registered agent in Substrate
+    Stream      *claudeagent.Stream
+    Client      *claudeagent.Client
+    StartedAt   time.Time
+    Cancel      context.CancelFunc
 }
 
-// Stored in DB for tracking
-// Heartbeats keep registration alive
+// Stored in memory (activeReviews map) and referenced via DB.
+// On restart, DB state is used to re-spawn agents.
 ```
 
 ---
@@ -2277,161 +2374,461 @@ require (
 
 ## 11. Implementation Phases
 
-### Phase 1: Foundation (Week 1)
+### Phase 1: Foundation
 
 1. **Database Schema**
-   - Create migration for reviews tables
-   - Add sqlc queries
-   - Implement store methods
+   - Create migration 000003_reviews (reviews, review_iterations, review_issues tables)
+   - Add metadata column to messages table
+   - Add sqlc queries for review CRUD
+   - Implement ReviewStore in SqlcStore, MockStore, txSqlcStore
 
-2. **Review Service Core**
-   - Basic ReviewRequest/Response types
-   - Service struct with spawner integration
-   - Single-reviewer workflow
+2. **Review Service Actor**
+   - ReviewServiceKey and actor registration
+   - ReviewMessage sealed interface (ReviewRequest, ReviewIterationRequest, ReviewApprovalCheck)
+   - Basic FSM (ReviewState, ReviewEvent, ProcessEvent)
+   - Wire into actor system in main.go
 
-3. **CLI Commands**
-   - `substrate review request`
+3. **gRPC Proto + API**
+   - Add ReviewService to mail.proto
+   - `make proto` to generate code
+   - Register with gateway mux in server.go
+   - Implement RPC handlers
+
+4. **CLI Commands**
+   - `substrate review request` (sends to reviews topic)
    - `substrate review status`
    - `substrate review list`
 
-### Phase 2: Reviewer Agent (Week 2)
+### Phase 2: Reviewer Agent Integration
 
-1. **System Prompt**
-   - Port and enhance Claude Code review prompt
-   - Add Substrate-specific context
+1. **Claude Agent SDK Integration**
+   - Per-review agent spawning via `claudeagent.NewClient` + `Stream`
+   - System prompt construction with reviewer persona
+   - Bidirectional stream management (runReviewerLoop)
+   - Agent lifecycle tracking (ActiveReviewer map)
 
-2. **Spawner Integration**
-   - Configure spawner for review sessions
-   - Handle streaming responses
-   - Parse structured review output
+2. **YAML Frontmatter Protocol**
+   - Thread watcher for parsing reviewer messages
+   - FSM state updates from frontmatter
+   - review_iterations and review_issues record creation
 
-3. **Review State Machine**
-   - Implement FSM
-   - State persistence
-   - Transition handling
+3. **Activity Integration**
+   - Activity entries for review events
+   - ActivityStore calls from ReviewerService
 
-### Phase 3: Web UI (Week 3)
+4. **Restart Recovery**
+   - Query DB for active reviews on startup
+   - Re-spawn reviewer agents with thread context
 
-1. **Review Thread Template**
-   - Specialized review thread view
-   - Issue cards with severity
-   - Decision badges
+### Phase 3: Web UI
+
+1. **Review Thread Component**
+   - ReviewThread, ReviewMessage, ReviewHeader components
+   - Issue cards with severity badges
+   - Decision badges (approve/request_changes)
 
 2. **Reviews List Page**
-   - Filter and sort
-   - Status indicators
-   - Quick actions
+   - ReviewsPage with filters (state, requester)
+   - Review state badges
+   - Link to thread view
 
 3. **Real-time Updates**
-   - WebSocket events for review progress (existing Hub infrastructure)
-   - Live status changes via TanStack Query invalidation
+   - WebSocket events (review_updated, review_iteration_added, issue_resolved)
+   - TanStack Query hooks (useReviews, useReviewIssues, useReviewsRealtime)
+   - Notification pipeline via existing NotificationHub
 
-### Phase 4: Multi-Reviewer (Week 4)
+### Phase 4: Multi-Reviewer + Polish
 
-1. **Topic-Based Distribution**
-   - Review request topic
-   - Reviewer subscriptions
-   - Consensus aggregation
+1. **Multi-Reviewer Support**
+   - Multiple reviewer personas per review
+   - Consensus aggregation logic
+   - Per-reviewer status tracking in UI
 
-2. **Specialized Reviewers**
-   - Security reviewer config
-   - Performance reviewer config
-   - Architecture reviewer config
-
-3. **Consensus Logic**
-   - Approval requirements
-   - Critical issue blocking
-   - Final decision computation
-
-### Phase 5: Integration & Polish (Week 5)
-
-1. **Hook Integration**
-   - Reviewer agent hooks
-   - Author notification hooks
-   - Session tracking
-
-2. **CLAUDE.md Documentation**
-   - Project-level docs
-   - Reviewer agent docs
-   - User guide
+2. **Diff Viewer (deferred from earlier)**
+   - Select and integrate diff rendering library
+   - Inline issue annotations on diff
+   - Multi-file diff page
 
 3. **Testing**
-   - Unit tests for review service
-   - Integration tests for full flow
-   - Multi-reviewer scenarios
+   - Unit tests for ReviewerService actor
+   - Integration tests for full review flow
+   - MockStore implementation for reviews
+   - E2E tests for web UI review pages
 
 ---
 
-## 12. API Endpoints
+## 12. API Endpoints (gRPC-Gateway)
+
+All review endpoints follow the existing gRPC-gateway pattern: proto definition →
+`make proto` → register handler with gateway mux in server.go.
 
 ```
-POST   /api/reviews                    - Create review request
-GET    /api/reviews                    - List reviews (with filters)
-GET    /api/reviews/{id}               - Get review details
-POST   /api/reviews/{id}/resubmit      - Re-request review after changes
-DELETE /api/reviews/{id}               - Cancel review
+POST   /api/v1/reviews                    - Create review request
+GET    /api/v1/reviews                    - List reviews (with filters)
+GET    /api/v1/reviews/{review_id}        - Get review details with iterations
+POST   /api/v1/reviews/{review_id}/resubmit - Re-request review after changes
+DELETE /api/v1/reviews/{review_id}        - Cancel review
 
-GET    /api/reviews/{id}/iterations    - Get all review iterations
-POST   /api/reviews/{id}/respond       - Submit review response (for reviewers)
-
-GET    /api/reviews/{id}/thread        - Get review thread (HTML partial)
-GET    /api/reviews/{id}/issues        - Get all issues for review
-PATCH  /api/reviews/{id}/issues/{iid}  - Update issue status
+GET    /api/v1/reviews/{review_id}/issues - Get all issues for review
+PATCH  /api/v1/reviews/{review_id}/issues/{issue_id} - Update issue status
 
 # Real-time updates via existing WebSocket at /ws (not SSE)
 # Review events: review_updated, review_iteration_added, issue_resolved
 ```
 
----
+### 12.1 Proto Definition
 
-## 13. Message Types
+**Location**: `internal/api/grpc/mail.proto` (extend existing file)
 
-Extend the mail system with review-specific message metadata:
+```protobuf
+// ReviewService handles code review operations.
+service ReviewService {
+    // CreateReview creates a new review request.
+    rpc CreateReview(CreateReviewRequest) returns (ReviewResponse) {
+        option (google.api.http) = {
+            post: "/api/v1/reviews"
+            body: "*"
+        };
+    }
 
-```go
-// MessageType constants for reviews
-const (
-    MessageTypeReviewRequest  = "review_request"
-    MessageTypeReviewResponse = "review_response"
-    MessageTypeReviewApproval = "review_approval"
-)
+    // ListReviews lists reviews with optional filters.
+    rpc ListReviews(ListReviewsRequest) returns (ListReviewsResponse) {
+        option (google.api.http) = {
+            get: "/api/v1/reviews"
+        };
+    }
 
-// Review metadata stored in message.Metadata JSON field
-type ReviewMetadata struct {
-    ReviewID     string         `json:"review_id"`
-    ReviewType   string         `json:"review_type"`
-    Decision     ReviewDecision `json:"decision,omitempty"`
-    IssueCount   int            `json:"issue_count,omitempty"`
-    ReviewerName string         `json:"reviewer_name,omitempty"`
+    // GetReview gets a single review with its iterations.
+    rpc GetReview(GetReviewRequest) returns (ReviewDetailResponse) {
+        option (google.api.http) = {
+            get: "/api/v1/reviews/{review_id}"
+        };
+    }
+
+    // ResubmitReview re-requests review after changes.
+    rpc ResubmitReview(ResubmitReviewRequest) returns (ReviewResponse) {
+        option (google.api.http) = {
+            post: "/api/v1/reviews/{review_id}/resubmit"
+            body: "*"
+        };
+    }
+
+    // CancelReview cancels an active review.
+    rpc CancelReview(CancelReviewRequest) returns (CancelReviewResponse) {
+        option (google.api.http) = {
+            delete: "/api/v1/reviews/{review_id}"
+        };
+    }
+
+    // ListReviewIssues lists issues for a review.
+    rpc ListReviewIssues(ListReviewIssuesRequest) returns (ListReviewIssuesResponse) {
+        option (google.api.http) = {
+            get: "/api/v1/reviews/{review_id}/issues"
+        };
+    }
+
+    // UpdateIssueStatus updates the status of a review issue.
+    rpc UpdateIssueStatus(UpdateIssueStatusRequest) returns (ReviewIssueResponse) {
+        option (google.api.http) = {
+            patch: "/api/v1/reviews/{review_id}/issues/{issue_id}"
+            body: "*"
+        };
+    }
+}
+
+message CreateReviewRequest {
+    string branch = 1;
+    string base_branch = 2;
+    string commit_sha = 3;
+    string repo_path = 4;
+    int32 pr_number = 5;
+    string review_type = 6;   // full, incremental, security, performance
+    string priority = 7;      // urgent, normal, low
+    repeated string reviewers = 8;
+    string description = 9;
+    int64 requester_id = 10;
+}
+
+message ReviewResponse {
+    string review_id = 1;
+    string thread_id = 2;
+    string state = 3;
+}
+
+message ListReviewsRequest {
+    string filter = 1;        // State filter or "all"
+    int64 requester_id = 2;
+    int32 limit = 3;
+    int32 offset = 4;
+}
+
+message ListReviewsResponse {
+    repeated ReviewSummary reviews = 1;
+}
+
+message ReviewSummary {
+    string review_id = 1;
+    string thread_id = 2;
+    int64 requester_id = 3;
+    string requester_name = 4;
+    string branch = 5;
+    string state = 6;
+    string review_type = 7;
+    int64 created_at = 8;
+    int64 updated_at = 9;
+}
+
+message GetReviewRequest {
+    string review_id = 1;
+}
+
+message ReviewDetailResponse {
+    ReviewSummary review = 1;
+    repeated ReviewIterationProto iterations = 2;
+}
+
+message ReviewIterationProto {
+    int32 iteration_num = 1;
+    string reviewer_id = 2;
+    string decision = 3;
+    string summary = 4;
+    int32 issue_count = 5;
+    int64 started_at = 6;
+    int64 completed_at = 7;
+}
+
+message ResubmitReviewRequest {
+    string review_id = 1;
+    string commit_sha = 2;
+}
+
+message CancelReviewRequest {
+    string review_id = 1;
+}
+
+message CancelReviewResponse {}
+
+message ListReviewIssuesRequest {
+    string review_id = 1;
+}
+
+message ListReviewIssuesResponse {
+    repeated ReviewIssueProto issues = 1;
+}
+
+message ReviewIssueProto {
+    int64 id = 1;
+    string review_id = 2;
+    int32 iteration_num = 3;
+    string issue_type = 4;
+    string severity = 5;
+    string file_path = 6;
+    int32 line_start = 7;
+    int32 line_end = 8;
+    string title = 9;
+    string description = 10;
+    string code_snippet = 11;
+    string suggestion = 12;
+    string claude_md_ref = 13;
+    string status = 14;
+}
+
+message UpdateIssueStatusRequest {
+    string review_id = 1;
+    int64 issue_id = 2;
+    string status = 3;       // open, fixed, wont_fix, duplicate
+}
+
+message ReviewIssueResponse {
+    ReviewIssueProto issue = 1;
 }
 ```
 
 ---
 
-## 14. Design Decisions
+## 13. Store Interface for Reviews
+
+**Location**: `internal/store/interfaces.go` (extend existing)
+
+Following the existing 3-tier pattern: domain interface → SqlcStore → MockStore → txSqlcStore.
+
+```go
+// ReviewStore provides review CRUD operations.
+type ReviewStore interface {
+    // CreateReview creates a new review record.
+    CreateReview(ctx context.Context, params CreateReviewParams) (Review, error)
+
+    // GetReview retrieves a review by its UUID.
+    GetReview(ctx context.Context, reviewID string) (Review, error)
+
+    // ListReviews lists reviews with optional state filter.
+    ListReviews(ctx context.Context, filter string, limit, offset int) ([]Review, error)
+
+    // ListReviewsByState lists reviews matching any of the given states.
+    ListReviewsByState(ctx context.Context, states ...ReviewState) ([]Review, error)
+
+    // ListReviewsByRequester lists reviews by the requesting agent.
+    ListReviewsByRequester(ctx context.Context, requesterID int64, limit int) ([]Review, error)
+
+    // UpdateReviewState updates the FSM state of a review.
+    UpdateReviewState(ctx context.Context, reviewID string, state ReviewState) error
+
+    // CreateReviewIteration records a review iteration result.
+    CreateReviewIteration(ctx context.Context, params CreateReviewIterationParams) error
+
+    // GetReviewIterations gets all iterations for a review.
+    GetReviewIterations(ctx context.Context, reviewID string) ([]ReviewIteration, error)
+
+    // CreateReviewIssue records a specific issue found during review.
+    CreateReviewIssue(ctx context.Context, params CreateReviewIssueParams) error
+
+    // GetReviewIssues gets all issues for a review.
+    GetReviewIssues(ctx context.Context, reviewID string) ([]ReviewIssue, error)
+
+    // UpdateReviewIssueStatus updates an issue's resolution status.
+    UpdateReviewIssueStatus(ctx context.Context, issueID int64, status string) error
+}
+```
+
+The Storage interface will embed ReviewStore alongside the existing sub-interfaces.
+
+---
+
+## 14. YAML Frontmatter Protocol
+
+Reviewer agents include structured YAML frontmatter in their messages so the
+ReviewerService can update the FSM state automatically by monitoring the thread.
+
+**Format:**
+```
+---
+review_id: abc-123
+decision: request_changes
+issues_count: 2
+iteration: 1
+reviewer: SecurityReviewer
+---
+
+Found 2 issues in your PR:
+...actual review body...
+```
+
+The ReviewerService has a thread watcher that:
+1. Subscribes to notifications for review threads
+2. Parses YAML frontmatter from new messages
+3. Extracts decision, issue count, and reviewer identity
+4. Updates the FSM state in the reviews table
+5. Creates review_iterations and review_issues records
+
+This keeps the review conversation as normal mail messages while enabling
+structured state tracking.
+
+---
+
+## 15. Activity Integration
+
+Review events create activity entries using the existing ActivityStore:
+
+```go
+// Activity types for reviews.
+const (
+    ActivityReviewRequested  = "review_requested"
+    ActivityReviewStarted    = "review_started"
+    ActivityReviewCompleted  = "review_completed"
+    ActivityReviewApproved   = "review_approved"
+    ActivityReviewRejected   = "review_rejected"
+    ActivityIssueResolved    = "issue_resolved"
+)
+
+// Example: when a review is requested.
+s.activityStore.CreateActivity(ctx, store.CreateActivityParams{
+    AgentID:      req.RequesterID,
+    ActivityType: ActivityReviewRequested,
+    Description:  fmt.Sprintf("Requested review for branch %s", req.Branch),
+    Metadata:     fmt.Sprintf(`{"review_id":"%s","branch":"%s"}`, reviewID, req.Branch),
+})
+```
+
+These appear in the activity feed on the AgentsDashboard and in the
+WebSocket `activity` event stream.
+
+---
+
+## 16. WebSocket Event Pipeline
+
+Review events flow through the existing notification infrastructure:
+
+```
+ReviewerService (FSM state change)
+         │
+         ▼
+NotificationHub actor (existing, reused)
+    - ReviewerService sends Tell() with review events
+    - Hub forwards to subscribed WebSocket clients
+         │
+         ▼
+HubNotificationBridge (existing)
+    - Converts to WSMessage with review-specific types
+         │
+         ▼
+WebSocket Hub → React Frontend
+    - review_updated: Query invalidation for review lists
+    - review_iteration_added: Refresh review detail
+    - issue_resolved: Update issue tracker
+```
+
+New WSMessage types added to `internal/web/websocket.go`:
+```go
+const (
+    WSMsgTypeReviewUpdated       = "review_updated"
+    WSMsgTypeReviewIterationAdded = "review_iteration_added"
+    WSMsgTypeIssueResolved       = "issue_resolved"
+)
+```
+
+---
+
+## 17. Design Decisions
 
 These decisions have been made based on discussion:
 
 1. **Mail-based messaging**: Review requests and responses are normal mail messages
-   - `substrate review request` is a wrapper around `substrate send`
+   - `substrate review request` is a wrapper around mail send to the reviews topic
    - Reviews appear in inbox alongside other mail
    - Thread management handled by existing mail system
+   - Back-and-forth discussion happens in the same thread
 
-2. **Reviewer agents are Claude Code agents**: Not spawned subprocesses
-   - Full Claude Code instances with reviewer persona
-   - Can checkout code, run tests, browse files
-   - Participate in conversation with author
-   - Subscribe to reviews topic for incoming requests
+2. **Reviewer agents are auto-spawned Claude Code instances**: Per-review lifecycle
+   - Auto-spawned by ReviewerService via Claude Agent Go SDK
+   - Each active review gets a dedicated agent with unique identity
+   - Agents use bidirectional `Stream` for conversational review
+   - On restart, active reviews are re-spawned from DB state
 
-3. **ReviewerService for orchestration**: Server-side tracking only
-   - Creates review records in DB
-   - Manages FSM state transitions
-   - Aggregates multi-reviewer results
-   - Does NOT do actual reviewing
+3. **ReviewerService is an actor**: Orchestration and lifecycle management
+   - Creates review records in DB, manages FSM state
+   - Spawns and manages reviewer agent lifecycles
+   - Monitors threads via YAML frontmatter for FSM updates
+   - Aggregates multi-reviewer results and computes consensus
+
+4. **Topic-based routing**: Author sends to reviews topic, system picks up
+   - Author agent sends review request to the "reviews" topic
+   - ReviewerService subscribes to the topic and handles requests
+   - Spawns dedicated reviewer agent per review
+   - Reviewer carries out conversation in the thread
+
+5. **gRPC-gateway for API**: Consistent with existing codebase
+   - Proto definitions in mail.proto (extended)
+   - REST endpoints auto-generated via grpc-gateway
+   - Registered in server.go alongside existing services
+
+6. **Store follows 3-tier pattern**: ReviewStore interface
+   - Domain interface in interfaces.go
+   - SqlcStore, txSqlcStore, and MockStore implementations
+   - sqlc queries generated from migration SQL
 
 ---
 
-## 15. Resolved Design Questions
+## 18. Resolved Design Questions
 
 These questions were discussed and resolved:
 
@@ -2451,14 +2848,29 @@ These questions were discussed and resolved:
    - Individual reviewer agents track their own usage.
    - No centralized cost aggregation needed initially.
 
-5. **Reviewer Discovery**: Both topic subscription and direct mail supported.
-   - Reviewers subscribe to the `reviews` topic for fan-out.
-   - Direct mail to specific reviewer also works.
-   - Both paths are first-class.
+5. **Reviewer Discovery**: Topic-based with auto-spawn.
+   - Author sends to "reviews" topic.
+   - ReviewerService picks up and spawns dedicated reviewer.
+   - Direct mail to specific reviewer also supported.
+
+6. **Reviewer Identity**: Per-review agents.
+   - Each review gets a uniquely named agent (e.g., "SecurityReviewer-review-abc123").
+   - Provides traceability in activity feed and message history.
+   - Cleaned up when review completes.
+
+7. **Metadata Storage**: Reviews table + messages metadata column.
+   - Structured review data in reviews/review_iterations/review_issues tables.
+   - General-purpose metadata TEXT column added to messages table.
+   - YAML frontmatter in reviewer messages for FSM state updates.
+
+8. **Notification Pipeline**: Reuse existing NotificationHub.
+   - ReviewerService sends events through existing NotificationHub actor.
+   - HubNotificationBridge forwards to WebSocket clients.
+   - New WS message types for review-specific events.
 
 ---
 
-## 16. Success Metrics
+## 19. Success Metrics
 
 - **Review Turnaround**: Time from request to first response
 - **Iteration Count**: Average iterations before approval
