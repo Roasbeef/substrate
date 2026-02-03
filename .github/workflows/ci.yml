@@ -45,6 +45,7 @@ jobs:
         run: |
           export CGO_ENABLED=1
           export CGO_CFLAGS="-DSQLITE_ENABLE_FTS5"
+          export CGO_LDFLAGS="-lm"
           go test -v -race -coverprofile=coverage.out ./...
 
       - name: Upload coverage
@@ -124,6 +125,7 @@ jobs:
           cd ../..
           export CGO_ENABLED=1
           export CGO_CFLAGS="-DSQLITE_ENABLE_FTS5"
+          export CGO_LDFLAGS="-lm"
           go build -o substrated ./cmd/substrated
 
       - name: Run E2E tests
@@ -168,6 +170,7 @@ jobs:
         run: |
           export CGO_ENABLED=1
           export CGO_CFLAGS="-DSQLITE_ENABLE_FTS5"
+          export CGO_LDFLAGS="-lm"
           go build -o substrate ./cmd/substrate
           go build -o substrated ./cmd/substrated
 
