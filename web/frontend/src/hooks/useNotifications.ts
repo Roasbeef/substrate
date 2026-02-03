@@ -122,10 +122,23 @@ export function useNotifications(): NotificationState {
         console.log('Notification created:', title);
 
         // Handle click to navigate to thread and focus window.
-        notification.onclick = () => {
-          window.focus();
+        notification.onclick = (event) => {
+          // Prevent default to allow custom handling.
+          event.preventDefault();
+
+          // Close the notification first.
           notification.close();
-          onClick?.();
+
+          // Focus the window - this brings the browser to the foreground.
+          // Note: window.focus() may be restricted by browser security
+          // policies, but we try our best.
+          window.focus();
+
+          // Use requestAnimationFrame to ensure we're in a new event loop
+          // tick after the focus call, then trigger the click callback.
+          requestAnimationFrame(() => {
+            onClick?.();
+          });
         };
 
         // Auto-close after 5 seconds.
