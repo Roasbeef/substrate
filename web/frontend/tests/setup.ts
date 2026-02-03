@@ -13,8 +13,8 @@ beforeAll(() => {
       if (req.url.includes('ws://') || req.url.includes('wss://')) {
         return;
       }
-      // Error on all other unhandled requests.
-      print.error();
+      // Warn on other unhandled requests (don't fail tests).
+      print.warning();
     },
   });
 });

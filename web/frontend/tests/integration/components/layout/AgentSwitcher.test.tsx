@@ -151,13 +151,15 @@ describe('AgentSwitcher', () => {
     expect(container.firstChild).toHaveClass('custom-switcher');
   });
 
-  it('shows empty state when no agents', async () => {
+  it('shows Global option even when no agents', async () => {
     const user = userEvent.setup();
     render(<AgentSwitcher agents={[]} onSelectAgent={vi.fn()} />);
 
     await user.click(screen.getByRole('button'));
 
-    expect(screen.getByText('No agents available')).toBeInTheDocument();
+    // Global option is always available even with empty agents list.
+    expect(screen.getByText('Global')).toBeInTheDocument();
+    expect(screen.getByText('All agents')).toBeInTheDocument();
   });
 });
 
