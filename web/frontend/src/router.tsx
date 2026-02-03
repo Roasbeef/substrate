@@ -148,9 +148,14 @@ export const router = createBrowserRouter([
         element: <InboxPage />,
         errorElement: <RouteErrorBoundary />,
       },
-      // Thread view.
+      // Thread view (direct and nested under inbox).
       {
         path: 'thread/:threadId',
+        element: <InboxPage />,
+        errorElement: <RouteErrorBoundary />,
+      },
+      {
+        path: 'inbox/thread/:threadId',
         element: <InboxPage />,
         errorElement: <RouteErrorBoundary />,
       },
