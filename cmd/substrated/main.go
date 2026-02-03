@@ -57,8 +57,9 @@ func main() {
 	dbStore := sqliteStore.Store
 	storage := store.FromDB(dbStore.DB())
 
-	// Create agent registry and identity manager.
+	// Create agent registry, heartbeat manager, and identity manager.
 	agentReg := agent.NewRegistry(dbStore)
+	heartbeatMgr := agent.NewHeartbeatManager(agentReg, nil)
 	identityMgr, err := agent.NewIdentityManager(dbStore, agentReg)
 	if err != nil {
 		log.Fatalf("Failed to create identity manager: %v", err)
@@ -137,7 +138,7 @@ func main() {
 		// Pass the notification hub actor for gRPC streaming RPCs.
 		grpcServer = subtraterpc.NewServer(
 			grpcCfg, dbStore, mailSvc, agentReg, identityMgr,
-			notificationHub,
+			heartbeatMgr, notificationHub,
 		)
 		if err := grpcServer.Start(); err != nil {
 			log.Fatalf("Failed to start gRPC server: %v", err)
