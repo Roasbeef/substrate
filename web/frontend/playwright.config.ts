@@ -86,7 +86,7 @@ export default defineConfig({
         // Note: gRPC must be enabled for grpc-gateway REST API to work.
         // Use pre-built binary if available (CI), fall back to go run (local dev).
         {
-          command: `cd ../.. && (test -x ./substrated && ./substrated || CGO_CFLAGS="-DSQLITE_ENABLE_FTS5" CGO_LDFLAGS="-lm" go run ./cmd/substrated) -web-only -web :${API_PORT} -grpc localhost:${GRPC_PORT} -db .test-data/test.db`,
+          command: `cd ../.. && if test -x ./substrated; then exec ./substrated -web-only -web :${API_PORT} -grpc localhost:${GRPC_PORT} -db .test-data/test.db; else CGO_CFLAGS="-DSQLITE_ENABLE_FTS5" CGO_LDFLAGS="-lm" exec go run ./cmd/substrated -web-only -web :${API_PORT} -grpc localhost:${GRPC_PORT} -db .test-data/test.db; fi`,
           url: `http://localhost:${API_PORT}/api/v1/health`,
           reuseExistingServer: !process.env.CI,
           timeout: 120000,
