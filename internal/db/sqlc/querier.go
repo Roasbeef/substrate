@@ -53,11 +53,14 @@ type Querier interface {
 	// Pass message IDs as a comma-separated string using sqlc.slice.
 	GetMessageRecipientsWithAgentsBulk(ctx context.Context, messageIds []int64) ([]GetMessageRecipientsWithAgentsBulkRow, error)
 	GetMessagesByThread(ctx context.Context, threadID string) ([]Message, error)
+	// Get messages in a thread with sender information (name, project, branch).
+	GetMessagesByThreadWithSender(ctx context.Context, threadID string) ([]GetMessagesByThreadWithSenderRow, error)
 	GetMessagesByTopic(ctx context.Context, topicID int64) ([]Message, error)
 	GetMessagesSinceOffset(ctx context.Context, arg GetMessagesSinceOffsetParams) ([]Message, error)
 	GetOrCreateAgentInboxTopic(ctx context.Context, arg GetOrCreateAgentInboxTopicParams) (Topic, error)
 	GetOrCreateTopic(ctx context.Context, arg GetOrCreateTopicParams) (Topic, error)
-	GetSentMessages(ctx context.Context, arg GetSentMessagesParams) ([]Message, error)
+	// Get messages sent by a specific agent with sender details.
+	GetSentMessages(ctx context.Context, arg GetSentMessagesParams) ([]GetSentMessagesRow, error)
 	GetSessionIdentity(ctx context.Context, sessionID string) (SessionIdentity, error)
 	GetSessionIdentityByProject(ctx context.Context, projectKey sql.NullString) (SessionIdentity, error)
 	GetSnoozedMessages(ctx context.Context, arg GetSnoozedMessagesParams) ([]GetSnoozedMessagesRow, error)
@@ -84,6 +87,7 @@ type Querier interface {
 	ListSubscriptionsByTopic(ctx context.Context, topicID int64) ([]Agent, error)
 	ListTopics(ctx context.Context) ([]Topic, error)
 	ListTopicsByType(ctx context.Context, topicType string) ([]Topic, error)
+	ListTopicsWithMessageCount(ctx context.Context) ([]ListTopicsWithMessageCountRow, error)
 	MarkMessageDeletedBySender(ctx context.Context, arg MarkMessageDeletedBySenderParams) error
 	// Simple LIKE-based search on subject and body. FTS5 is available but this
 	// covers basic cases. The search term should be passed with wildcards.

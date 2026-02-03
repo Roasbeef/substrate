@@ -754,6 +754,72 @@ func (q *Queries) GetMessagesByThread(ctx context.Context, threadID string) ([]M
 	return items, nil
 }
 
+const GetMessagesByThreadWithSender = `-- name: GetMessagesByThreadWithSender :many
+SELECT m.id, m.thread_id, m.topic_id, m.log_offset, m.sender_id, m.subject, m.body_md, m.priority, m.deadline_at, m.attachments, m.created_at, m.deleted_by_sender, a.name as sender_name, a.project_key as sender_project_key, a.git_branch as sender_git_branch
+FROM messages m
+LEFT JOIN agents a ON m.sender_id = a.id
+WHERE m.thread_id = ?
+ORDER BY m.created_at ASC
+`
+
+type GetMessagesByThreadWithSenderRow struct {
+	ID               int64
+	ThreadID         string
+	TopicID          int64
+	LogOffset        int64
+	SenderID         int64
+	Subject          string
+	BodyMd           string
+	Priority         string
+	DeadlineAt       sql.NullInt64
+	Attachments      sql.NullString
+	CreatedAt        int64
+	DeletedBySender  int64
+	SenderName       sql.NullString
+	SenderProjectKey sql.NullString
+	SenderGitBranch  sql.NullString
+}
+
+// Get messages in a thread with sender information (name, project, branch).
+func (q *Queries) GetMessagesByThreadWithSender(ctx context.Context, threadID string) ([]GetMessagesByThreadWithSenderRow, error) {
+	rows, err := q.db.QueryContext(ctx, GetMessagesByThreadWithSender, threadID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []GetMessagesByThreadWithSenderRow
+	for rows.Next() {
+		var i GetMessagesByThreadWithSenderRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.ThreadID,
+			&i.TopicID,
+			&i.LogOffset,
+			&i.SenderID,
+			&i.Subject,
+			&i.BodyMd,
+			&i.Priority,
+			&i.DeadlineAt,
+			&i.Attachments,
+			&i.CreatedAt,
+			&i.DeletedBySender,
+			&i.SenderName,
+			&i.SenderProjectKey,
+			&i.SenderGitBranch,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const GetMessagesByTopic = `-- name: GetMessagesByTopic :many
 SELECT id, thread_id, topic_id, log_offset, sender_id, subject, body_md, priority, deadline_at, attachments, created_at, deleted_by_sender FROM messages WHERE topic_id = ? ORDER BY log_offset ASC
 `
@@ -844,9 +910,11 @@ func (q *Queries) GetMessagesSinceOffset(ctx context.Context, arg GetMessagesSin
 }
 
 const GetSentMessages = `-- name: GetSentMessages :many
-SELECT id, thread_id, topic_id, log_offset, sender_id, subject, body_md, priority, deadline_at, attachments, created_at, deleted_by_sender FROM messages
-WHERE sender_id = ? AND deleted_by_sender = 0
-ORDER BY created_at DESC
+SELECT m.id, m.thread_id, m.topic_id, m.log_offset, m.sender_id, m.subject, m.body_md, m.priority, m.deadline_at, m.attachments, m.created_at, m.deleted_by_sender, a.name as sender_name, a.project_key as sender_project_key, a.git_branch as sender_git_branch
+FROM messages m
+LEFT JOIN agents a ON m.sender_id = a.id
+WHERE m.sender_id = ? AND m.deleted_by_sender = 0
+ORDER BY m.created_at DESC
 LIMIT ?
 `
 
@@ -855,15 +923,34 @@ type GetSentMessagesParams struct {
 	Limit    int64
 }
 
-func (q *Queries) GetSentMessages(ctx context.Context, arg GetSentMessagesParams) ([]Message, error) {
+type GetSentMessagesRow struct {
+	ID               int64
+	ThreadID         string
+	TopicID          int64
+	LogOffset        int64
+	SenderID         int64
+	Subject          string
+	BodyMd           string
+	Priority         string
+	DeadlineAt       sql.NullInt64
+	Attachments      sql.NullString
+	CreatedAt        int64
+	DeletedBySender  int64
+	SenderName       sql.NullString
+	SenderProjectKey sql.NullString
+	SenderGitBranch  sql.NullString
+}
+
+// Get messages sent by a specific agent with sender details.
+func (q *Queries) GetSentMessages(ctx context.Context, arg GetSentMessagesParams) ([]GetSentMessagesRow, error) {
 	rows, err := q.db.QueryContext(ctx, GetSentMessages, arg.SenderID, arg.Limit)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	var items []Message
+	var items []GetSentMessagesRow
 	for rows.Next() {
-		var i Message
+		var i GetSentMessagesRow
 		if err := rows.Scan(
 			&i.ID,
 			&i.ThreadID,
@@ -877,6 +964,9 @@ func (q *Queries) GetSentMessages(ctx context.Context, arg GetSentMessagesParams
 			&i.Attachments,
 			&i.CreatedAt,
 			&i.DeletedBySender,
+			&i.SenderName,
+			&i.SenderProjectKey,
+			&i.SenderGitBranch,
 		); err != nil {
 			return nil, err
 		}

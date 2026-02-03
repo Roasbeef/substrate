@@ -11,6 +11,14 @@ SELECT * FROM messages WHERE id = ?;
 -- name: GetMessagesByThread :many
 SELECT * FROM messages WHERE thread_id = ? ORDER BY created_at ASC;
 
+-- name: GetMessagesByThreadWithSender :many
+-- Get messages in a thread with sender information (name, project, branch).
+SELECT m.*, a.name as sender_name, a.project_key as sender_project_key, a.git_branch as sender_git_branch
+FROM messages m
+LEFT JOIN agents a ON m.sender_id = a.id
+WHERE m.thread_id = ?
+ORDER BY m.created_at ASC;
+
 -- name: GetMessagesByTopic :many
 SELECT * FROM messages WHERE topic_id = ? ORDER BY log_offset ASC;
 
@@ -170,9 +178,12 @@ JOIN messages m ON mr.message_id = m.id
 WHERE mr.agent_id = ? AND mr.state = 'unread' AND m.priority = 'urgent';
 
 -- name: GetSentMessages :many
-SELECT * FROM messages
-WHERE sender_id = ? AND deleted_by_sender = 0
-ORDER BY created_at DESC
+-- Get messages sent by a specific agent with sender details.
+SELECT m.*, a.name as sender_name, a.project_key as sender_project_key, a.git_branch as sender_git_branch
+FROM messages m
+LEFT JOIN agents a ON m.sender_id = a.id
+WHERE m.sender_id = ? AND m.deleted_by_sender = 0
+ORDER BY m.created_at DESC
 LIMIT ?;
 
 -- name: GetAllSentMessages :many
