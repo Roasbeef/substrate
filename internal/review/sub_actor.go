@@ -689,11 +689,13 @@ func (r *reviewSubActor) buildSystemPrompt() string {
 
 	sb.WriteString("Use the substrate CLI to send messages. ")
 	sb.WriteString("Always pass `--agent " + agentName + "` ")
-	sb.WriteString("to identify yourself:\n")
+	sb.WriteString("to identify yourself, and `--thread " +
+		r.threadID + "` to reply in the review thread:\n")
 	sb.WriteString("```bash\n")
 	sb.WriteString(
 		"substrate send --agent " + agentName +
 			" --to <requester-agent>" +
+			" --thread " + r.threadID +
 			" --subject \"Review: <decision>\"" +
 			" --body \"<your review summary>\"\n",
 	)
