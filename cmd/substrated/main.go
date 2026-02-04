@@ -3,18 +3,22 @@ package main
 import (
 	"context"
 	"flag"
+	"io"
 	"log"
 	"log/slog"
 	"net/http"
 	"os"
 	"os/signal"
 	"syscall"
+	"time"
 
+	"github.com/btcsuite/btclog/v2"
 	sdkmcp "github.com/modelcontextprotocol/go-sdk/mcp"
 	"github.com/roasbeef/subtrate/internal/activity"
 	"github.com/roasbeef/subtrate/internal/agent"
 	subtraterpc "github.com/roasbeef/subtrate/internal/api/grpc"
 	"github.com/roasbeef/subtrate/internal/baselib/actor"
+	"github.com/roasbeef/subtrate/internal/build"
 	"github.com/roasbeef/subtrate/internal/db"
 	"github.com/roasbeef/subtrate/internal/mail"
 	"github.com/roasbeef/subtrate/internal/mcp"
@@ -25,21 +29,60 @@ import (
 
 func main() {
 	var (
-		dbPath   = flag.String("db", "~/.subtrate/subtrate.db", "Path to SQLite database")
-		webAddr  = flag.String("web", ":8080", "Web server address (empty to disable)")
-		grpcAddr = flag.String("grpc", "localhost:10009", "gRPC server address (empty to disable)")
-		webOnly  = flag.Bool("web-only", false, "Run web + gRPC servers only (no MCP stdio)")
+		dbPath         = flag.String("db", "~/.subtrate/subtrate.db", "Path to SQLite database")
+		webAddr        = flag.String("web", ":8080", "Web server address (empty to disable)")
+		grpcAddr       = flag.String("grpc", "localhost:10009", "gRPC server address (empty to disable)")
+		webOnly        = flag.Bool("web-only", false, "Run web + gRPC servers only (no MCP stdio)")
+		logDir         = flag.String("log-dir", "~/.subtrate/logs", "Directory for log files (empty to disable file logging)")
+		maxLogFiles    = flag.Int("max-log-files", build.DefaultMaxLogFiles, "Maximum number of rotated log files to keep")
+		maxLogFileSize = flag.Int("max-log-file-size", build.DefaultMaxLogFileSize, "Maximum log file size in MB before rotation")
 	)
 	flag.Parse()
 
-	// Expand home directory.
-	dbPathExpanded := os.ExpandEnv(*dbPath)
-	if dbPathExpanded == *dbPath && (*dbPath)[0] == '~' {
-		home, err := os.UserHomeDir()
-		if err != nil {
-			log.Fatalf("Failed to get home directory: %v", err)
+	// Expand home directory in paths.
+	expandHome := func(path string) string {
+		expanded := os.ExpandEnv(path)
+		if expanded == path && len(path) > 0 && path[0] == '~' {
+			home, err := os.UserHomeDir()
+			if err != nil {
+				log.Fatalf(
+					"Failed to get home directory: %v",
+					err,
+				)
+			}
+			expanded = home + path[1:]
 		}
-		dbPathExpanded = home + (*dbPath)[1:]
+		return expanded
+	}
+
+	dbPathExpanded := expandHome(*dbPath)
+	logDirExpanded := expandHome(*logDir)
+
+	// Initialize the rotating log file writer if a log directory is
+	// configured. This creates ~/.subtrate/logs/substrated.log with
+	// automatic rotation and gzip compression of old files.
+	var logRotator *build.RotatingLogWriter
+	if logDirExpanded != "" {
+		logRotator = build.NewRotatingLogWriter()
+		err := logRotator.InitLogRotator(
+			&build.LogRotatorConfig{
+				LogDir:         logDirExpanded,
+				MaxLogFiles:    *maxLogFiles,
+				MaxLogFileSize: *maxLogFileSize,
+			},
+		)
+		if err != nil {
+			log.Fatalf(
+				"Failed to init log rotator: %v", err,
+			)
+		}
+		defer logRotator.Close()
+
+		// Redirect the standard log package to write to both
+		// stderr and the log file.
+		multiWriter := io.MultiWriter(os.Stderr, logRotator)
+		log.SetOutput(multiWriter)
+		log.SetFlags(log.LstdFlags)
 	}
 
 	// Create a logger for the database.
@@ -73,6 +116,38 @@ func main() {
 	if err != nil {
 		log.Fatalf("Failed to create identity manager: %v", err)
 	}
+
+	// Create btclog handlers for structured subsystem logging. When file
+	// logging is enabled, logs go to both the console and the rotating
+	// log file (matching lnd's dual-stream pattern).
+	var btclogHandlers []btclog.Handler
+	consoleHandler := btclog.NewDefaultHandler(os.Stderr)
+	btclogHandlers = append(btclogHandlers, consoleHandler)
+
+	if logRotator != nil {
+		fileHandler := btclog.NewDefaultHandler(logRotator)
+		btclogHandlers = append(btclogHandlers, fileHandler)
+
+		log.Printf(
+			"Log file rotation enabled: dir=%s, max_files=%d, "+
+				"max_size=%dMB",
+			logDirExpanded, *maxLogFiles, *maxLogFileSize,
+		)
+	}
+
+	// Combine handlers into a single btclog.Handler via HandlerSet.
+	// This fans out each log record to all handlers (console + file).
+	combinedHandler := build.NewHandlerSet(btclogHandlers...)
+
+	// Wire up the actor system's btclog logger so lifecycle events
+	// (registration, shutdown, stop) are visible in daemon logs.
+	actorLogger := btclog.NewSLogger(combinedHandler)
+	actor.UseLogger(actorLogger)
+
+	// Wire up the review subsystem logger so reviewer lifecycle events
+	// (spawn, stop, result parsing) are visible in daemon logs.
+	reviewLogger := actorLogger.WithPrefix(review.Subsystem)
+	review.UseLogger(reviewLogger)
 
 	// Create the actor system.
 	actorSystem := actor.NewActorSystem()
@@ -119,15 +194,18 @@ func main() {
 
 	// Create and register the review service actor. This handles code
 	// review orchestration, FSM state management, and reviewer agent
-	// coordination.
+	// coordination. The actor system reference enables reviewer sub-actors
+	// to be registered as proper actors for graceful shutdown.
 	reviewSvc := review.NewService(review.ServiceConfig{
-		Store: storage,
+		Store:       storage,
+		ActorSystem: actorSystem,
 	})
 	reviewRef := actor.RegisterWithSystem(
 		actorSystem,
 		"review-service",
 		review.ReviewServiceKey,
 		reviewSvc,
+		actor.WithCleanupTimeout(30*time.Second),
 	)
 
 	// Recover any active reviews from the database (restart recovery).
