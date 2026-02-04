@@ -1010,7 +1010,6 @@ func (c *Client) requireGRPC() error {
 func (c *Client) CreateReview(
 	ctx context.Context, req *subtraterpc.CreateReviewRequest,
 ) (*subtraterpc.CreateReviewResponse, error) {
-
 	if err := c.requireGRPC(); err != nil {
 		return nil, err
 	}
@@ -1022,7 +1021,6 @@ func (c *Client) CreateReview(
 func (c *Client) GetReview(
 	ctx context.Context, reviewID string,
 ) (*subtraterpc.ReviewDetailResponse, error) {
-
 	if err := c.requireGRPC(); err != nil {
 		return nil, err
 	}
@@ -1038,7 +1036,6 @@ func (c *Client) GetReview(
 func (c *Client) ListReviews(
 	ctx context.Context, req *subtraterpc.ListReviewsProtoRequest,
 ) (*subtraterpc.ListReviewsProtoResponse, error) {
-
 	if err := c.requireGRPC(); err != nil {
 		return nil, err
 	}
@@ -1050,7 +1047,6 @@ func (c *Client) ListReviews(
 func (c *Client) CancelReview(
 	ctx context.Context, reviewID, reason string,
 ) (*subtraterpc.CancelReviewProtoResponse, error) {
-
 	if err := c.requireGRPC(); err != nil {
 		return nil, err
 	}
@@ -1067,7 +1063,6 @@ func (c *Client) CancelReview(
 func (c *Client) ListReviewIssues(
 	ctx context.Context, reviewID string,
 ) (*subtraterpc.ListReviewIssuesResponse, error) {
-
 	if err := c.requireGRPC(); err != nil {
 		return nil, err
 	}
@@ -1083,7 +1078,6 @@ func (c *Client) ListReviewIssues(
 func (c *Client) UpdateIssueStatus(
 	ctx context.Context, reviewID string, issueID int64, status string,
 ) (*subtraterpc.UpdateIssueStatusResponse, error) {
-
 	if err := c.requireGRPC(); err != nil {
 		return nil, err
 	}

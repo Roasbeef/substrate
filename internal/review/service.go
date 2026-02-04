@@ -3,6 +3,7 @@ package review
 import (
 	"context"
 	"fmt"
+	"log"
 	"sync"
 
 	"github.com/google/uuid"
@@ -23,16 +24,23 @@ var _ actor.ActorBehavior[ReviewRequest, ReviewResponse] = (*Service)(nil)
 type ServiceConfig struct {
 	// Store is the storage backend for persisting reviews.
 	Store store.Storage
+
+	// SpawnConfig overrides the default reviewer spawn configuration.
+	// If nil, defaults are used.
+	SpawnConfig *SpawnConfig
 }
 
 // Service handles review orchestration as an actor. It creates DB records,
-// manages the review FSM, and tracks active reviews. The Claude Agent SDK
-// integration (sub-actor spawning) is handled separately in Task #8.
+// manages the review FSM, spawns reviewer sub-actors via the Claude Agent
+// SDK, and tracks active reviews.
 type Service struct {
 	store store.Storage
 
 	// Registered reviewer configurations keyed by review type.
 	reviewers map[string]*ReviewerConfig
+
+	// subActorMgr manages spawned reviewer sub-actors.
+	subActorMgr *SubActorManager
 
 	// Active review FSMs, keyed by review ID. Protected by mu.
 	mu            sync.RWMutex
@@ -52,6 +60,7 @@ func NewService(cfg ServiceConfig) *Service {
 	return &Service{
 		store:         cfg.Store,
 		reviewers:     reviewers,
+		subActorMgr:   NewSubActorManager(cfg.Store, cfg.SpawnConfig),
 		activeReviews: make(map[string]*ReviewFSM),
 	}
 }
@@ -145,13 +154,14 @@ func (s *Service) handleCreateReview(ctx context.Context,
 		return CreateReviewResp{Error: err}
 	}
 
-	// Process outbox events (persist state, etc.).
-	s.processOutbox(ctx, outbox)
-
-	// Track the active review.
+	// Track the active review before processing outbox so that
+	// SpawnReviewerAgent can find the FSM.
 	s.mu.Lock()
 	s.activeReviews[reviewID] = fsm
 	s.mu.Unlock()
+
+	// Process outbox events (persist state, spawn reviewer, etc.).
+	s.processOutbox(ctx, outbox)
 
 	return CreateReviewResp{
 		ReviewID: review.ReviewID,
@@ -377,19 +387,18 @@ func (s *Service) processOutbox(ctx context.Context,
 
 		case NotifyReviewStateChange:
 			// TODO(review): Send via notification hub for
-			// WebSocket broadcast (Task #9).
+			// WebSocket broadcast.
 
 		case SpawnReviewerAgent:
-			// TODO(review): Spawn Claude Agent SDK client via
-			// sub-actor (Task #8).
+			s.spawnReviewer(ctx, e)
 
 		case CreateReviewIteration:
-			// TODO(review): Create iteration record from parsed
-			// YAML frontmatter (Task #8).
+			// Iteration records are persisted by the sub-actor
+			// directly in persistResults().
 
 		case CreateReviewIssues:
-			// TODO(review): Create issue records from parsed
-			// YAML frontmatter (Task #8).
+			// Issue records are persisted by the sub-actor
+			// directly in persistResults().
 
 		case RecordActivity:
 			_ = s.store.CreateActivity(
@@ -405,6 +414,152 @@ func (s *Service) processOutbox(ctx context.Context,
 			)
 		}
 	}
+}
+
+// spawnReviewer launches a reviewer sub-actor for the given review. The
+// sub-actor runs as a goroutine, spawns a Claude Agent SDK client, and calls
+// handleSubActorResult when the review completes.
+func (s *Service) spawnReviewer(ctx context.Context,
+	e SpawnReviewerAgent,
+) {
+	// Look up the reviewer config based on the review type.
+	s.mu.RLock()
+	fsm, ok := s.activeReviews[e.ReviewID]
+	s.mu.RUnlock()
+
+	if !ok {
+		log.Printf(
+			"review service: no active FSM for %s, "+
+				"skipping spawn",
+			e.ReviewID,
+		)
+		return
+	}
+
+	// Determine reviewer config from the review type stored in the DB.
+	review, err := s.store.GetReview(ctx, e.ReviewID)
+	if err != nil {
+		log.Printf(
+			"review service: get review %s for spawn: %v",
+			e.ReviewID, err,
+		)
+		return
+	}
+
+	config, ok := s.reviewers[review.ReviewType]
+	if !ok {
+		config = s.reviewers["full"]
+	}
+
+	// Transition FSM to under_review.
+	outbox, err := fsm.ProcessEvent(ctx, StartReviewEvent{
+		ReviewerID: config.Name,
+	})
+	if err != nil {
+		log.Printf(
+			"review service: start review event for %s: %v",
+			e.ReviewID, err,
+		)
+		return
+	}
+	s.processOutbox(ctx, outbox)
+
+	// Spawn the sub-actor.
+	s.subActorMgr.SpawnReviewer(
+		ctx, e.ReviewID, e.ThreadID, e.RepoPath,
+		e.Requester, config, s.handleSubActorResult,
+	)
+}
+
+// handleSubActorResult processes the outcome of a reviewer sub-actor run. It
+// feeds the appropriate event into the review FSM based on the reviewer's
+// decision.
+func (s *Service) handleSubActorResult(ctx context.Context,
+	result *SubActorResult,
+) {
+	if result.Error != nil {
+		log.Printf(
+			"review sub-actor error for %s: %v",
+			result.ReviewID, result.Error,
+		)
+		// On error, we don't transition the FSM - the review stays
+		// in under_review and can be retried or cancelled.
+		return
+	}
+
+	s.mu.RLock()
+	fsm, ok := s.activeReviews[result.ReviewID]
+	s.mu.RUnlock()
+
+	if !ok {
+		log.Printf(
+			"review service: no active FSM for %s after "+
+				"sub-actor completion",
+			result.ReviewID,
+		)
+		return
+	}
+
+	var event ReviewEvent
+	switch result.Result.Decision {
+	case "approve":
+		event = ApproveEvent{
+			ReviewerID: "reviewer-agent",
+		}
+
+	case "request_changes":
+		issues := make(
+			[]ReviewIssueSummary, len(result.Result.Issues),
+		)
+		for i, issue := range result.Result.Issues {
+			issues[i] = ReviewIssueSummary{
+				Title:    issue.Title,
+				Severity: issue.Severity,
+			}
+		}
+		event = RequestChangesEvent{
+			ReviewerID: "reviewer-agent",
+			Issues:     issues,
+		}
+
+	case "reject":
+		event = RejectEvent{
+			ReviewerID: "reviewer-agent",
+			Reason:     result.Result.Summary,
+		}
+
+	default:
+		log.Printf(
+			"review sub-actor: unknown decision %q for %s",
+			result.Result.Decision, result.ReviewID,
+		)
+		return
+	}
+
+	outbox, err := fsm.ProcessEvent(ctx, event)
+	if err != nil {
+		log.Printf(
+			"review service: process sub-actor result for "+
+				"%s: %v",
+			result.ReviewID, err,
+		)
+		return
+	}
+
+	s.processOutbox(ctx, outbox)
+
+	// If the review reached a terminal state, remove from active.
+	if fsm.IsTerminal() {
+		s.mu.Lock()
+		delete(s.activeReviews, result.ReviewID)
+		s.mu.Unlock()
+	}
+}
+
+// StopSubActors stops all active reviewer sub-actors. Called during graceful
+// shutdown.
+func (s *Service) StopSubActors() {
+	s.subActorMgr.StopAll()
 }
 
 // RecoverActiveReviews loads active reviews from the database and restores

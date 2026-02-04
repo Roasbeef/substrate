@@ -127,7 +127,10 @@ func TestService_CreateReview(t *testing.T) {
 	require.NoError(t, resp.Error)
 	require.NotEmpty(t, resp.ReviewID)
 	require.NotEmpty(t, resp.ThreadID)
-	require.Equal(t, "pending_review", resp.State)
+
+	// After create, the SpawnReviewerAgent outbox event fires
+	// spawnReviewer(), which transitions pending_review → under_review.
+	require.Equal(t, "under_review", resp.State)
 }
 
 // TestService_CreateReview_Defaults tests that review type and priority
@@ -204,7 +207,8 @@ func TestService_GetReview(t *testing.T) {
 	require.NoError(t, getResp.Error)
 	require.Equal(t, createResp.ReviewID, getResp.ReviewID)
 	require.Equal(t, createResp.ThreadID, getResp.ThreadID)
-	require.Equal(t, "pending_review", getResp.State)
+	// After creation, spawnReviewer auto-transitions to under_review.
+	require.Equal(t, "under_review", getResp.State)
 	require.Equal(t, "feature/websocket", getResp.Branch)
 	require.Equal(t, "develop", getResp.BaseBranch)
 	require.Equal(t, "security", getResp.ReviewType)
@@ -285,7 +289,7 @@ func TestService_ListReviewsByState(t *testing.T) {
 	ctx := context.Background()
 	requester := createTestAgent(t, storage, "StateFilter")
 
-	// Create a review (it will be in pending_review state).
+	// Create a review (spawnReviewer auto-transitions to under_review).
 	result := svc.Receive(ctx, CreateReviewMsg{
 		RequesterID: requester.ID,
 		Branch:      "feature/state-test",
@@ -296,9 +300,9 @@ func TestService_ListReviewsByState(t *testing.T) {
 	require.NoError(t, err)
 	require.NoError(t, val.(CreateReviewResp).Error)
 
-	// List by pending_review state.
+	// List by under_review state (auto-transitioned from pending_review).
 	listResult := svc.Receive(ctx, ListReviewsMsg{
-		State: "pending_review",
+		State: "under_review",
 		Limit: 10,
 	})
 	listVal, err := listResult.Unpack()
@@ -307,7 +311,7 @@ func TestService_ListReviewsByState(t *testing.T) {
 	listResp := listVal.(ListReviewsResp)
 	require.NoError(t, listResp.Error)
 	require.Len(t, listResp.Reviews, 1)
-	require.Equal(t, "pending_review", listResp.Reviews[0].State)
+	require.Equal(t, "under_review", listResp.Reviews[0].State)
 
 	// List by a state with no reviews.
 	emptyResult := svc.Receive(ctx, ListReviewsMsg{
@@ -404,18 +408,13 @@ func TestService_Resubmit(t *testing.T) {
 	createResp := createVal.(CreateReviewResp)
 	require.NoError(t, createResp.Error)
 
-	// The review is now in pending_review. Advance the FSM to
-	// changes_requested state by directly manipulating the active FSM.
+	// The review auto-transitions to under_review via spawnReviewer.
+	// Advance the FSM to changes_requested state.
 	svc.mu.RLock()
 	fsm := svc.activeReviews[createResp.ReviewID]
 	svc.mu.RUnlock()
 	require.NotNil(t, fsm)
-
-	// pending_review → under_review.
-	_, err = fsm.ProcessEvent(ctx, StartReviewEvent{
-		ReviewerID: "TestReviewer",
-	})
-	require.NoError(t, err)
+	require.Equal(t, "under_review", fsm.CurrentState())
 
 	// under_review → changes_requested.
 	_, err = fsm.ProcessEvent(ctx, RequestChangesEvent{
@@ -438,7 +437,10 @@ func TestService_Resubmit(t *testing.T) {
 	resubResp := resubVal.(ResubmitResp)
 	require.NoError(t, resubResp.Error)
 	require.Equal(t, createResp.ReviewID, resubResp.ReviewID)
-	require.Equal(t, "re_review", resubResp.NewState)
+
+	// After resubmit, the SpawnReviewerAgent outbox event triggers
+	// spawnReviewer(), which auto-transitions re_review → under_review.
+	require.Equal(t, "under_review", resubResp.NewState)
 }
 
 // TestService_Resubmit_RecoverFromDB tests that resubmit can recover an FSM
@@ -464,15 +466,13 @@ func TestService_Resubmit_RecoverFromDB(t *testing.T) {
 	createResp := createVal.(CreateReviewResp)
 	require.NoError(t, createResp.Error)
 
-	// Advance to changes_requested through the FSM.
+	// FSM auto-transitions to under_review. Advance to changes_requested.
 	svc.mu.RLock()
 	fsm := svc.activeReviews[createResp.ReviewID]
 	svc.mu.RUnlock()
+	require.NotNil(t, fsm)
+	require.Equal(t, "under_review", fsm.CurrentState())
 
-	_, err = fsm.ProcessEvent(ctx, StartReviewEvent{
-		ReviewerID: "R",
-	})
-	require.NoError(t, err)
 	_, err = fsm.ProcessEvent(ctx, RequestChangesEvent{
 		ReviewerID: "R",
 	})
@@ -499,7 +499,10 @@ func TestService_Resubmit_RecoverFromDB(t *testing.T) {
 
 	resubResp := resubVal.(ResubmitResp)
 	require.NoError(t, resubResp.Error)
-	require.Equal(t, "re_review", resubResp.NewState)
+
+	// After resubmit + spawnReviewer, the FSM transitions through
+	// re_review → under_review automatically.
+	require.Equal(t, "under_review", resubResp.NewState)
 
 	// Verify the FSM was restored into active reviews.
 	svc.mu.RLock()

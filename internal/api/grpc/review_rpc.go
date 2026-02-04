@@ -13,7 +13,6 @@ import (
 func (s *Server) CreateReview(
 	ctx context.Context, req *CreateReviewRequest,
 ) (*CreateReviewResponse, error) {
-
 	if req.Branch == "" {
 		return nil, status.Error(
 			codes.InvalidArgument, "branch is required",
@@ -77,7 +76,6 @@ func (s *Server) CreateReview(
 func (s *Server) ListReviews(
 	ctx context.Context, req *ListReviewsProtoRequest,
 ) (*ListReviewsProtoResponse, error) {
-
 	resp, err := s.askReview(ctx, review.ListReviewsMsg{
 		State:       req.State,
 		RequesterID: req.RequesterId,
@@ -122,7 +120,6 @@ func (s *Server) ListReviews(
 func (s *Server) GetReview(
 	ctx context.Context, req *GetReviewProtoRequest,
 ) (*ReviewDetailResponse, error) {
-
 	if req.ReviewId == "" {
 		return nil, status.Error(
 			codes.InvalidArgument, "review_id is required",
@@ -166,7 +163,6 @@ func (s *Server) GetReview(
 func (s *Server) ResubmitReview(
 	ctx context.Context, req *ResubmitReviewRequest,
 ) (*CreateReviewResponse, error) {
-
 	if req.ReviewId == "" {
 		return nil, status.Error(
 			codes.InvalidArgument, "review_id is required",
@@ -210,7 +206,6 @@ func (s *Server) ResubmitReview(
 func (s *Server) CancelReview(
 	ctx context.Context, req *CancelReviewProtoRequest,
 ) (*CancelReviewProtoResponse, error) {
-
 	if req.ReviewId == "" {
 		return nil, status.Error(
 			codes.InvalidArgument, "review_id is required",
@@ -246,7 +241,6 @@ func (s *Server) CancelReview(
 func (s *Server) ListReviewIssues(
 	ctx context.Context, req *ListReviewIssuesRequest,
 ) (*ListReviewIssuesResponse, error) {
-
 	if req.ReviewId == "" {
 		return nil, status.Error(
 			codes.InvalidArgument, "review_id is required",
@@ -297,7 +291,6 @@ func (s *Server) ListReviewIssues(
 func (s *Server) UpdateIssueStatus(
 	ctx context.Context, req *UpdateIssueStatusRequest,
 ) (*UpdateIssueStatusResponse, error) {
-
 	if req.ReviewId == "" {
 		return nil, status.Error(
 			codes.InvalidArgument, "review_id is required",
@@ -344,7 +337,6 @@ func (s *Server) UpdateIssueStatus(
 func (s *Server) askReview(
 	ctx context.Context, msg review.ReviewRequest,
 ) (review.ReviewResponse, error) {
-
 	askCtx, cancel := context.WithTimeout(ctx, 30*time.Second)
 	defer cancel()
 
