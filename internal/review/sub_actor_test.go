@@ -1099,6 +1099,58 @@ func TestReviewerPermissionPolicy_SubstrateAllowed(t *testing.T) {
 	}
 }
 
+// TestReviewerPermissionPolicy_WriteTmpAllowed tests that the Write tool
+// is allowed for /tmp/ paths (for review body files) but denied elsewhere.
+func TestReviewerPermissionPolicy_WriteTmpAllowed(t *testing.T) {
+	// Write to /tmp/ should be allowed.
+	result := reviewerPermissionPolicy(
+		context.Background(),
+		claudeagent.ToolPermissionRequest{
+			ToolName:  "Write",
+			Arguments: []byte(`{"file_path":"/tmp/review-abc123.md"}`),
+		},
+	)
+	require.True(t, result.IsAllow(),
+		"Write to /tmp/ should be allowed for review body files",
+	)
+
+	// Write to project directory should be denied.
+	result = reviewerPermissionPolicy(
+		context.Background(),
+		claudeagent.ToolPermissionRequest{
+			ToolName:  "Write",
+			Arguments: []byte(`{"file_path":"/home/user/project/evil.go"}`),
+		},
+	)
+	require.False(t, result.IsAllow(),
+		"Write to project directory should be denied",
+	)
+
+	// Write with path traversal should be denied.
+	result = reviewerPermissionPolicy(
+		context.Background(),
+		claudeagent.ToolPermissionRequest{
+			ToolName:  "Write",
+			Arguments: []byte(`{"file_path":"/tmp/../etc/passwd"}`),
+		},
+	)
+	require.False(t, result.IsAllow(),
+		"Write with path traversal out of /tmp/ should be denied",
+	)
+
+	// Edit tool should still be denied.
+	result = reviewerPermissionPolicy(
+		context.Background(),
+		claudeagent.ToolPermissionRequest{
+			ToolName:  "Edit",
+			Arguments: []byte(`{"file_path":"/tmp/foo.go"}`),
+		},
+	)
+	require.False(t, result.IsAllow(),
+		"Edit tool should be denied even for /tmp/ paths",
+	)
+}
+
 // TestReviewerAgentName verifies the agent name generation.
 func TestReviewerAgentName(t *testing.T) {
 	actor := &reviewSubActor{
@@ -1243,6 +1295,8 @@ func TestBuildSystemPrompt_SubstrateSection(t *testing.T) {
 	prompt := actor.buildSystemPrompt()
 	require.Contains(t, prompt, "Substrate Messaging")
 	require.Contains(t, prompt, "substrate send")
+	require.Contains(t, prompt, "--body-file")
+	require.Contains(t, prompt, "/tmp/review-")
 	require.Contains(t, prompt, actor.reviewerAgentName())
 }
 

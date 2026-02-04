@@ -711,26 +711,49 @@ func (r *reviewSubActor) buildSystemPrompt() string {
 
 	agentName := r.reviewerAgentName()
 
-	sb.WriteString("Use the substrate CLI to send messages. ")
-	sb.WriteString("Always pass `--agent " + agentName + "` ")
-	sb.WriteString("to identify yourself, and `--thread " +
-		r.threadID + "` to reply in the review thread:\n")
+	// Explain the two-step send process: write body to temp file,
+	// then send with --body-file. This avoids shell quoting issues
+	// that break multi-line markdown passed via --body.
+	sb.WriteString("### How to Send Your Review\n\n")
+	sb.WriteString(
+		"Use a two-step process to send rich review content:\n\n",
+	)
+	sb.WriteString(
+		"1. **Write** your full review to a temp file " +
+			"using the Write tool:\n",
+	)
+	shortID := r.reviewID
+	if len(shortID) > 8 {
+		shortID = shortID[:8]
+	}
+	bodyFile := "/tmp/review-" + shortID + ".md"
+
+	sb.WriteString("   - Path: `" + bodyFile + "`\n")
+	sb.WriteString(
+		"   - Use full markdown with headers, code blocks, " +
+			"etc.\n\n",
+	)
+	sb.WriteString(
+		"2. **Send** the review using `substrate send` " +
+			"with `--body-file`:\n",
+	)
 	sb.WriteString("```bash\n")
 	sb.WriteString(
-		"substrate send --agent " + agentName +
+		"substrate send" +
+			" --agent " + agentName +
 			" --to <requester-agent>" +
 			" --thread " + r.threadID +
 			" --subject \"Review: <decision>\"" +
-			" --body \"$REVIEW_BODY\"\n",
+			" --body-file " + bodyFile + "\n",
 	)
 	sb.WriteString("```\n\n")
 
 	// Instruct the agent on what to include in the mail body.
 	sb.WriteString("### Mail Body Format\n")
 	sb.WriteString(
-		"The `--body` must contain a **full, rich review** " +
-			"in markdown format (similar to a GitHub PR " +
-			"review). Include ALL of the following:\n\n",
+		"The review file must contain a **full, rich " +
+			"review** in markdown format (similar to a " +
+			"GitHub PR review). Include ALL of:\n\n",
 	)
 	sb.WriteString(
 		"1. **Decision** (approve/request_changes/reject) " +
@@ -762,39 +785,8 @@ func (r *reviewSubActor) buildSystemPrompt() string {
 	)
 	sb.WriteString(
 		"Use markdown headers, code blocks, and formatting " +
-			"for readability. The body supports full markdown " +
-			"so use ``` for code snippets.\n\n",
+			"for readability.\n\n",
 	)
-	sb.WriteString(
-		"**TIP**: Build the body string in a variable " +
-			"before calling substrate send, since the body " +
-			"can be long. Use a heredoc or variable:\n",
-	)
-	sb.WriteString("```bash\n")
-	sb.WriteString(
-		"REVIEW_BODY=$(cat <<'REVIEW_EOF'\n" +
-			"# Code Review: <decision>\n\n" +
-			"## Summary\n" +
-			"<overview paragraph>\n\n" +
-			"## Issues\n\n" +
-			"### 1. [critical] <title> (`file.go:42`)\n" +
-			"<description>\n" +
-			"```go\n" +
-			"// problematic code\n" +
-			"```\n" +
-			"**Suggestion**:\n" +
-			"```go\n" +
-			"// fixed code\n" +
-			"```\n\n" +
-			"## What Looks Good\n" +
-			"- <positive observations>\n\n" +
-			"## Stats\n" +
-			"- Files reviewed: N\n" +
-			"- Lines analyzed: ~N\n" +
-			"REVIEW_EOF\n" +
-			")\n",
-	)
-	sb.WriteString("```\n\n")
 
 	sb.WriteString(
 		"If you receive messages (injected by the stop hook), " +
@@ -1339,13 +1331,17 @@ var readOnlyTools = map[string]bool{
 // writeTools is the set of tools that can modify the filesystem or spawn
 // subprocesses. These are always denied for reviewer agents.
 var writeTools = map[string]bool{
-	"Write":        true,
 	"Edit":         true,
 	"MultiEdit":    true,
 	"NotebookEdit": true,
 	"Task":         true,
 	"TodoWrite":    true,
 }
+
+// tmpWritePrefix is the only path prefix where the Write tool is
+// allowed for reviewer agents. This lets the reviewer write review
+// body content to a temp file for use with `substrate send --body-file`.
+const tmpWritePrefix = "/tmp/"
 
 // bashDangerousPrefixes lists command prefixes that indicate destructive
 // Bash operations. Commands starting with any of these are denied.
@@ -1364,10 +1360,17 @@ var bashDangerousPrefixes = []string{
 // reviewerPermissionPolicy is the CanUseTool callback for reviewer agents.
 // It enforces a read-only policy: read tools are allowed, write tools are
 // denied, and Bash commands are filtered to prevent filesystem mutations.
+// The Write tool is allowed only for /tmp/ paths so the reviewer can write
+// review body content to a temp file for substrate send --body-file.
 func reviewerPermissionPolicy(
 	_ context.Context, req claudeagent.ToolPermissionRequest,
 ) claudeagent.PermissionResult {
 	toolName := req.ToolName
+
+	// Allow Write tool only to /tmp/ paths for review body files.
+	if toolName == "Write" {
+		return checkWritePath(req.Arguments)
+	}
 
 	// Deny known write tools immediately.
 	if writeTools[toolName] {
@@ -1396,6 +1399,37 @@ func reviewerPermissionPolicy(
 				"review mode", toolName,
 		),
 	}
+}
+
+// writeArgs is the JSON structure of Write tool arguments.
+type writeArgs struct {
+	FilePath string `json:"file_path"`
+}
+
+// checkWritePath allows the Write tool only when the target path is
+// under /tmp/. This lets the reviewer write review body markdown to a
+// temp file without granting general filesystem write access.
+func checkWritePath(
+	arguments json.RawMessage,
+) claudeagent.PermissionResult {
+	var args writeArgs
+	if err := json.Unmarshal(arguments, &args); err != nil {
+		return claudeagent.PermissionDeny{
+			Reason: "failed to parse Write arguments",
+		}
+	}
+
+	path := filepath.Clean(args.FilePath)
+	if !strings.HasPrefix(path, tmpWritePrefix) {
+		return claudeagent.PermissionDeny{
+			Reason: fmt.Sprintf(
+				"Write to %q denied: reviewer can only "+
+					"write to %s", path, tmpWritePrefix,
+			),
+		}
+	}
+
+	return claudeagent.PermissionAllow{}
 }
 
 // bashArgs is the JSON structure of Bash tool arguments from Claude Code.
