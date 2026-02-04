@@ -13,16 +13,6 @@ import (
 func (s *Server) CreateReview(
 	ctx context.Context, req *CreateReviewRequest,
 ) (*CreateReviewResponse, error) {
-	if req.Branch == "" {
-		return nil, status.Error(
-			codes.InvalidArgument, "branch is required",
-		)
-	}
-	if req.CommitSha == "" {
-		return nil, status.Error(
-			codes.InvalidArgument, "commit_sha is required",
-		)
-	}
 	if req.RepoPath == "" {
 		return nil, status.Error(
 			codes.InvalidArgument, "repo_path is required",
@@ -34,12 +24,51 @@ func (s *Server) CreateReview(
 		)
 	}
 
+	// Extract target information from the oneof or deprecated fields.
+	var (
+		branch     string
+		baseBranch string
+		commitSHA  string
+		prNumber   int
+	)
+
+	switch t := req.Target.(type) {
+	case *CreateReviewRequest_BranchTarget:
+		branch = t.BranchTarget.Branch
+		baseBranch = t.BranchTarget.BaseBranch
+	case *CreateReviewRequest_CommitTarget:
+		commitSHA = t.CommitTarget.Sha
+		branch = t.CommitTarget.Branch
+	case *CreateReviewRequest_CommitRangeTarget:
+		// For commit ranges, use end_sha as the commit to review.
+		commitSHA = t.CommitRangeTarget.EndSha
+		branch = t.CommitRangeTarget.Branch
+	case *CreateReviewRequest_PrTarget:
+		prNumber = int(t.PrTarget.Number)
+		branch = t.PrTarget.Branch
+		baseBranch = t.PrTarget.BaseBranch
+	default:
+		// Fall back to deprecated fields for backward compatibility.
+		branch = req.Branch      //nolint:staticcheck
+		baseBranch = req.BaseBranch //nolint:staticcheck
+		commitSHA = req.CommitSha   //nolint:staticcheck
+		prNumber = int(req.PrNumber) //nolint:staticcheck
+	}
+
+	// Validate that we have enough information.
+	if branch == "" && commitSHA == "" {
+		return nil, status.Error(
+			codes.InvalidArgument,
+			"target is required (branch, commit, or PR)",
+		)
+	}
+
 	resp, err := s.askReview(ctx, review.CreateReviewMsg{
 		RequesterID: req.RequesterId,
-		PRNumber:    int(req.PrNumber),
-		Branch:      req.Branch,
-		BaseBranch:  req.BaseBranch,
-		CommitSHA:   req.CommitSha,
+		PRNumber:    prNumber,
+		Branch:      branch,
+		BaseBranch:  baseBranch,
+		CommitSHA:   commitSHA,
 		RepoPath:    req.RepoPath,
 		RemoteURL:   req.RemoteUrl,
 		ReviewType:  req.ReviewType,

@@ -966,6 +966,13 @@ func TestServiceWithSubActorManager(t *testing.T) {
 	require.NotNil(t, svc2.subActorMgr)
 }
 
+// testWritePrefixes is the allowed write prefixes used in permission
+// tests.
+var testWritePrefixes = []string{
+	"/tmp/substrate_reviews/",
+	"/private/tmp/substrate_reviews/",
+}
+
 // TestReviewerPermissionPolicy_ReadOnlyTools tests that read-only tools are
 // allowed by the permission policy.
 func TestReviewerPermissionPolicy_ReadOnlyTools(t *testing.T) {
@@ -977,11 +984,11 @@ func TestReviewerPermissionPolicy_ReadOnlyTools(t *testing.T) {
 	for _, tool := range allowedTools {
 		t.Run(tool, func(t *testing.T) {
 			result := reviewerPermissionPolicy(
-				context.Background(),
 				claudeagent.ToolPermissionRequest{
 					ToolName:  tool,
 					Arguments: []byte(`{}`),
 				},
+				testWritePrefixes,
 			)
 			require.True(t, result.IsAllow(),
 				"tool %q should be allowed", tool,
@@ -990,28 +997,43 @@ func TestReviewerPermissionPolicy_ReadOnlyTools(t *testing.T) {
 	}
 }
 
-// TestReviewerPermissionPolicy_WriteToolsDenied tests that write tools are
-// denied by the permission policy.
+// TestReviewerPermissionPolicy_WriteToolsDenied tests that write tools
+// (other than Write to .reviews/) are denied by the permission policy.
 func TestReviewerPermissionPolicy_WriteToolsDenied(t *testing.T) {
+	// Write with empty args should be denied (no valid path).
 	deniedTools := []string{
-		"Write", "Edit", "MultiEdit",
+		"Edit", "MultiEdit",
 		"NotebookEdit", "Task", "TodoWrite",
 	}
 
 	for _, tool := range deniedTools {
 		t.Run(tool, func(t *testing.T) {
 			result := reviewerPermissionPolicy(
-				context.Background(),
 				claudeagent.ToolPermissionRequest{
 					ToolName:  tool,
 					Arguments: []byte(`{}`),
 				},
+				testWritePrefixes,
 			)
 			require.False(t, result.IsAllow(),
 				"tool %q should be denied", tool,
 			)
 		})
 	}
+
+	// Write with empty/invalid path should be denied.
+	t.Run("Write with empty args", func(t *testing.T) {
+		result := reviewerPermissionPolicy(
+			claudeagent.ToolPermissionRequest{
+				ToolName:  "Write",
+				Arguments: []byte(`{}`),
+			},
+			testWritePrefixes,
+		)
+		require.False(t, result.IsAllow(),
+			"Write with empty path should be denied",
+		)
+	})
 }
 
 // TestReviewerPermissionPolicy_BashReadOnly tests that safe Bash commands
@@ -1035,17 +1057,29 @@ func TestReviewerPermissionPolicy_BashReadOnly(t *testing.T) {
 		{"git checkout", `{"command":"git checkout main"}`, false},
 		{"make", `{"command":"make build"}`, false},
 		{"redirect", `{"command":"echo bad > file.txt"}`, false},
+		{"redirect denied", `{"command":"echo review > /tmp/claude/review.md"}`, false},
+		{"redirect to project denied", `{"command":"echo review > review.md"}`, false},
 		{"stderr redirect ok", `{"command":"git diff 2>&1"}`, true},
+		{"chained rm via semicolon", `{"command":"git log; rm -rf /"}`, false},
+		{"chained rm via &&", `{"command":"git log && rm file"}`, false},
+		{"chained rm via ||", `{"command":"git log || rm file"}`, false},
+		{"chained rm via pipe", `{"command":"echo x | rm file"}`, false},
+		{"subshell $() denied", `{"command":"echo $(rm file)"}`, false},
+		{"backtick subshell denied", "{ \"command\": \"echo `rm file`\"}", false},
+		{"process substitution denied", `{"command":"cat <(rm file)"}`, false},
+		{"chained git push via semicolon", `{"command":"echo hi; git push origin main"}`, false},
+		{"chained make via &&", `{"command":"git diff && make build"}`, false},
+		{"multiple safe chained", `{"command":"git diff 2>&1"}`, true},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			result := reviewerPermissionPolicy(
-				context.Background(),
 				claudeagent.ToolPermissionRequest{
 					ToolName:  "Bash",
 					Arguments: []byte(tt.command),
 				},
+				testWritePrefixes,
 			)
 			if tt.allowed {
 				require.True(t, result.IsAllow(),
@@ -1064,11 +1098,11 @@ func TestReviewerPermissionPolicy_BashReadOnly(t *testing.T) {
 // are denied for safety.
 func TestReviewerPermissionPolicy_UnknownToolDenied(t *testing.T) {
 	result := reviewerPermissionPolicy(
-		context.Background(),
 		claudeagent.ToolPermissionRequest{
 			ToolName:  "SomeNewTool",
 			Arguments: []byte(`{}`),
 		},
+		testWritePrefixes,
 	)
 	require.False(t, result.IsAllow())
 }
@@ -1086,11 +1120,11 @@ func TestReviewerPermissionPolicy_SubstrateAllowed(t *testing.T) {
 	for _, cmd := range substrateCmds {
 		t.Run(cmd, func(t *testing.T) {
 			result := reviewerPermissionPolicy(
-				context.Background(),
 				claudeagent.ToolPermissionRequest{
 					ToolName:  "Bash",
 					Arguments: []byte(cmd),
 				},
+				testWritePrefixes,
 			)
 			require.True(t, result.IsAllow(),
 				"substrate command should be allowed",
@@ -1099,67 +1133,110 @@ func TestReviewerPermissionPolicy_SubstrateAllowed(t *testing.T) {
 	}
 }
 
-// TestReviewerPermissionPolicy_WriteTmpAllowed tests that the Write tool
-// is allowed for /tmp/ paths (for review body files) but denied elsewhere.
-func TestReviewerPermissionPolicy_WriteTmpAllowed(t *testing.T) {
-	// Write to /tmp/ should be allowed.
+// TestReviewerPermissionPolicy_WriteReviewsAllowed tests that the Write
+// tool is allowed for /tmp/substrate_reviews/ paths but denied elsewhere.
+func TestReviewerPermissionPolicy_WriteReviewsAllowed(t *testing.T) {
+	// Write to /tmp/substrate_reviews/ should be allowed.
 	result := reviewerPermissionPolicy(
-		context.Background(),
 		claudeagent.ToolPermissionRequest{
 			ToolName:  "Write",
-			Arguments: []byte(`{"file_path":"/tmp/review-abc123.md"}`),
+			Arguments: []byte(`{"file_path":"/tmp/substrate_reviews/review-abc123.md"}`),
 		},
+		testWritePrefixes,
 	)
 	require.True(t, result.IsAllow(),
-		"Write to /tmp/ should be allowed for review body files",
+		"Write to /tmp/substrate_reviews/ should be allowed",
 	)
 
-	// Write to project directory should be denied.
+	// Write to /private/tmp/substrate_reviews/ should also be
+	// allowed (macOS symlink resolution).
 	result = reviewerPermissionPolicy(
-		context.Background(),
 		claudeagent.ToolPermissionRequest{
 			ToolName:  "Write",
-			Arguments: []byte(`{"file_path":"/home/user/project/evil.go"}`),
+			Arguments: []byte(`{"file_path":"/private/tmp/substrate_reviews/review-abc123.md"}`),
 		},
+		testWritePrefixes,
+	)
+	require.True(t, result.IsAllow(),
+		"Write to /private/tmp/substrate_reviews/ should be allowed",
+	)
+
+	// Write to project root should be denied.
+	result = reviewerPermissionPolicy(
+		claudeagent.ToolPermissionRequest{
+			ToolName:  "Write",
+			Arguments: []byte(`{"file_path":"/test/repo/evil.go"}`),
+		},
+		testWritePrefixes,
 	)
 	require.False(t, result.IsAllow(),
-		"Write to project directory should be denied",
+		"Write to project root should be denied",
 	)
 
 	// Write with path traversal should be denied.
 	result = reviewerPermissionPolicy(
-		context.Background(),
 		claudeagent.ToolPermissionRequest{
 			ToolName:  "Write",
-			Arguments: []byte(`{"file_path":"/tmp/../etc/passwd"}`),
+			Arguments: []byte(`{"file_path":"/tmp/substrate_reviews/../evil.go"}`),
 		},
+		testWritePrefixes,
 	)
 	require.False(t, result.IsAllow(),
-		"Write with path traversal out of /tmp/ should be denied",
+		"Write with path traversal should be denied",
 	)
 
-	// Edit tool should still be denied.
+	// Write to /tmp/claude/ should be denied (wrong subdir).
 	result = reviewerPermissionPolicy(
-		context.Background(),
 		claudeagent.ToolPermissionRequest{
-			ToolName:  "Edit",
-			Arguments: []byte(`{"file_path":"/tmp/foo.go"}`),
+			ToolName:  "Write",
+			Arguments: []byte(`{"file_path":"/tmp/claude/review.md"}`),
 		},
+		testWritePrefixes,
 	)
 	require.False(t, result.IsAllow(),
-		"Edit tool should be denied even for /tmp/ paths",
+		"Write to /tmp/claude/ should be denied",
+	)
+
+	// Edit tool should still be denied even for review paths.
+	result = reviewerPermissionPolicy(
+		claudeagent.ToolPermissionRequest{
+			ToolName:  "Edit",
+			Arguments: []byte(`{"file_path":"/tmp/substrate_reviews/foo.md"}`),
+		},
+		testWritePrefixes,
+	)
+	require.False(t, result.IsAllow(),
+		"Edit tool should be denied even for review paths",
 	)
 }
 
-// TestReviewerAgentName verifies the agent name generation.
+// TestReviewerAgentName verifies branch-based agent naming.
 func TestReviewerAgentName(t *testing.T) {
+	// Simple branch name.
 	actor := &reviewSubActor{
-		reviewID: "abcdef12-3456-7890-abcd-ef1234567890",
-		config:   &ReviewerConfig{Name: "full"},
+		branch: "feature-x",
+		config: &ReviewerConfig{Name: "CodeReviewer"},
 	}
 
 	name := actor.reviewerAgentName()
-	require.Equal(t, "reviewer-full-abcdef12", name)
+	require.Equal(t, "reviewer-feature-x", name)
+
+	// Branch with slashes should be sanitized.
+	actor2 := &reviewSubActor{
+		branch: "feature/auth/login",
+		config: &ReviewerConfig{Name: "SecurityReviewer"},
+	}
+	require.Equal(t,
+		"reviewer-feature-auth-login",
+		actor2.reviewerAgentName(),
+	)
+
+	// Empty branch should default to "unknown".
+	actor3 := &reviewSubActor{
+		branch: "",
+		config: &ReviewerConfig{Name: "CodeReviewer"},
+	}
+	require.Equal(t, "reviewer-unknown", actor3.reviewerAgentName())
 }
 
 // TestBuildSubstrateHooks verifies the hook map is constructed correctly.
@@ -1240,18 +1317,18 @@ func TestHookStop_NoAgentID(t *testing.T) {
 func TestHookStop_NoMessages(t *testing.T) {
 	mockStore := store.NewMockStore()
 
-	// Create an agent in the store.
+	// Create an agent in the store with branch-based naming.
 	agent, err := mockStore.CreateAgent(
 		context.Background(),
-		store.CreateAgentParams{Name: "reviewer-full-hookstop"},
+		store.CreateAgentParams{Name: "reviewer-hookstop-branch"},
 	)
 	require.NoError(t, err)
 
 	actor := &reviewSubActor{
-		reviewID: "hookstop-test",
-		config:   DefaultReviewerConfig(),
-		store:    mockStore,
-		agentID:  agent.ID,
+		branch:  "hookstop-branch",
+		config:  DefaultReviewerConfig(),
+		store:   mockStore,
+		agentID: agent.ID,
 	}
 
 	// Use a cancelled context to exit the poll loop immediately.
@@ -1288,6 +1365,7 @@ func TestFormatMailAsPrompt(t *testing.T) {
 func TestBuildSystemPrompt_SubstrateSection(t *testing.T) {
 	actor := &reviewSubActor{
 		reviewID: "test-substrate-prompt",
+		branch:   "feature-test",
 		config:   DefaultReviewerConfig(),
 		store:    store.NewMockStore(),
 	}
@@ -1296,7 +1374,8 @@ func TestBuildSystemPrompt_SubstrateSection(t *testing.T) {
 	require.Contains(t, prompt, "Substrate Messaging")
 	require.Contains(t, prompt, "substrate send")
 	require.Contains(t, prompt, "--body-file")
-	require.Contains(t, prompt, "/tmp/review-")
+	require.Contains(t, prompt, "/tmp/substrate_reviews/review-")
+	require.Contains(t, prompt, "Write tool")
 	require.Contains(t, prompt, actor.reviewerAgentName())
 }
 

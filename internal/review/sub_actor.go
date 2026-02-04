@@ -390,23 +390,49 @@ func (r *reviewSubActor) Run(parentCtx context.Context) {
 			// The UserMessage following a tool_use contains
 			// the Bash output, which is critical for debugging
 			// substrate CLI failures.
-			var preview string
-			if len(m.Message.Content) > 0 {
-				preview = truncateStr(
-					m.Message.Content[0].Text, 500,
-				)
-			}
 			var parentToolID string
 			if m.ParentToolUseID != nil {
 				parentToolID = *m.ParentToolUseID
 			}
+
+			// Log each content block with its type so we
+			// can see what the CLI actually returned (the
+			// Text field may be empty for non-text types).
+			for i, cb := range m.Message.Content {
+				log.InfoS(ctx,
+					"Reviewer tool result block",
+					"review_id", r.reviewID,
+					"msg_num", msgCount,
+					"block_idx", i,
+					"block_type", cb.Type,
+					"text_len", len(cb.Text),
+					"text_preview",
+					truncateStr(cb.Text, 500),
+				)
+			}
+
+			// Also log the raw ToolUseResult field which
+			// may contain the tool output when the content
+			// blocks are empty.
+			if m.ToolUseResult != nil {
+				raw, _ := json.Marshal(m.ToolUseResult)
+				log.InfoS(ctx,
+					"Reviewer tool use result",
+					"review_id", r.reviewID,
+					"msg_num", msgCount,
+					"parent_tool_use_id",
+					parentToolID,
+					"raw_result",
+					truncateStr(string(raw), 1000),
+				)
+			}
+
 			log.InfoS(ctx, "Reviewer tool result",
 				"review_id", r.reviewID,
 				"msg_num", msgCount,
 				"parent_tool_use_id", parentToolID,
 				"content_blocks",
 				len(m.Message.Content),
-				"preview", preview,
 			)
 
 		default:
@@ -540,10 +566,16 @@ func (r *reviewSubActor) buildClientOptions() ([]claudeagent.Option, string) {
 	opts := []claudeagent.Option{
 		claudeagent.WithModel(r.config.Model),
 		// Route all permission decisions through our read-only
-		// policy callback. This replaces the blanket
-		// --dangerously-skip-permissions with a fine-grained
-		// policy that allows read operations and denies writes.
-		claudeagent.WithCanUseTool(reviewerPermissionPolicy),
+		// policy callback. This provides fine-grained control
+		// over which tools are allowed (reads yes, writes only
+		// to /tmp/claude/, dangerous bash commands denied).
+		claudeagent.WithCanUseTool(
+			makeReviewerPermissionPolicy(r.repoPath),
+		),
+		// NOTE: We intentionally do NOT use
+		// WithAllowDangerouslySkipPermissions here. Our
+		// CanUseTool callback provides fine-grained control
+		// over which operations are allowed.
 		// Don't save sessions — reviewers are one-shot tasks.
 		claudeagent.WithNoSessionPersistence(),
 		// Don't load user/project filesystem settings (which
@@ -696,52 +728,59 @@ func (r *reviewSubActor) buildSystemPrompt() string {
 		r.reviewerAgentName() + "\n\n",
 	)
 
-	// Look up requester name if possible.
+	// Look up requester name so we can template it into the
+	// substrate send command (avoids the agent guessing).
+	requesterName := "User"
 	if r.requester > 0 {
 		requester, err := r.store.GetAgent(
 			context.Background(), r.requester,
 		)
 		if err == nil {
-			sb.WriteString(fmt.Sprintf(
-				"**Requester agent**: %s\n\n",
-				requester.Name,
-			))
+			requesterName = requester.Name
 		}
 	}
 
+	sb.WriteString(fmt.Sprintf(
+		"**Requester agent**: %s\n\n", requesterName,
+	))
+
 	agentName := r.reviewerAgentName()
 
-	// Explain the two-step send process: write body to temp file,
-	// then send with --body-file. This avoids shell quoting issues
-	// that break multi-line markdown passed via --body.
+	// Explain the two-step send process: write body to a file in
+	// /tmp/substrate_reviews/, then send with --body-file. This
+	// avoids shell quoting issues with multi-line markdown.
 	sb.WriteString("### How to Send Your Review\n\n")
 	sb.WriteString(
 		"Use a two-step process to send rich review content:\n\n",
 	)
-	sb.WriteString(
-		"1. **Write** your full review to a temp file " +
-			"using the Write tool:\n",
-	)
+
 	shortID := r.reviewID
 	if len(shortID) > 8 {
 		shortID = shortID[:8]
 	}
-	bodyFile := "/tmp/review-" + shortID + ".md"
+	bodyFile := "/tmp/substrate_reviews/review-" + shortID + ".md"
 
-	sb.WriteString("   - Path: `" + bodyFile + "`\n")
 	sb.WriteString(
-		"   - Use full markdown with headers, code blocks, " +
+		"1. First, create the reviews directory: " +
+			"`mkdir -p /tmp/substrate_reviews`\n\n",
+	)
+
+	sb.WriteString(
+		"2. **Write** your full review to `" + bodyFile +
+			"` using the Write tool. " +
+			"Use full markdown with headers, code blocks, " +
 			"etc.\n\n",
 	)
+
 	sb.WriteString(
-		"2. **Send** the review using `substrate send` " +
+		"3. **Send** the review using `substrate send` " +
 			"with `--body-file`:\n",
 	)
 	sb.WriteString("```bash\n")
 	sb.WriteString(
 		"substrate send" +
 			" --agent " + agentName +
-			" --to <requester-agent>" +
+			" --to " + requesterName +
 			" --thread " + r.threadID +
 			" --subject \"Review: <decision>\"" +
 			" --body-file " + bodyFile + "\n",
@@ -884,15 +923,23 @@ func (r *reviewSubActor) buildDiffCommand() string {
 }
 
 // reviewerAgentName returns the substrate agent name for this reviewer.
-// The name includes the reviewer config name and a short review ID suffix
-// for uniqueness across concurrent reviews.
+// Each reviewer instance gets a unique name based on the reviewer config
+// name and a short review ID suffix. Review aggregation happens via the
+// CodeReviewer topic, not the agent name.
 func (r *reviewSubActor) reviewerAgentName() string {
-	shortID := r.reviewID
-	if len(shortID) > 8 {
-		shortID = shortID[:8]
+	// Use branch name for agent identity so reviewers are grouped by
+	// what they're reviewing rather than by review ID. This allows
+	// the UI to aggregate all reviewer-* agents under "CodeReviewer".
+	branch := r.branch
+	if branch == "" {
+		branch = "unknown"
 	}
 
-	return fmt.Sprintf("reviewer-%s-%s", r.config.Name, shortID)
+	// Sanitize branch name: replace slashes with dashes for valid
+	// agent naming.
+	branch = strings.ReplaceAll(branch, "/", "-")
+
+	return "reviewer-" + branch
 }
 
 // buildSubstrateHooks constructs the SDK hook callbacks for substrate
@@ -1338,11 +1385,6 @@ var writeTools = map[string]bool{
 	"TodoWrite":    true,
 }
 
-// tmpWritePrefix is the only path prefix where the Write tool is
-// allowed for reviewer agents. This lets the reviewer write review
-// body content to a temp file for use with `substrate send --body-file`.
-const tmpWritePrefix = "/tmp/"
-
 // bashDangerousPrefixes lists command prefixes that indicate destructive
 // Bash operations. Commands starting with any of these are denied.
 var bashDangerousPrefixes = []string{
@@ -1357,48 +1399,105 @@ var bashDangerousPrefixes = []string{
 	"make ",
 }
 
-// reviewerPermissionPolicy is the CanUseTool callback for reviewer agents.
-// It enforces a read-only policy: read tools are allowed, write tools are
-// denied, and Bash commands are filtered to prevent filesystem mutations.
-// The Write tool is allowed only for /tmp/ paths so the reviewer can write
-// review body content to a temp file for substrate send --body-file.
+// reviewWriteDir is the directory where reviewers are allowed to write
+// review body files. Using /tmp avoids cluttering the project directory.
+const reviewWriteDir = "/tmp/substrate_reviews"
+
+// makeReviewerPermissionPolicy creates a CanUseTool callback for
+// reviewer agents. It enforces a read-only policy: read tools are
+// allowed, write tools are denied, and Bash commands are filtered to
+// prevent filesystem mutations. The Write tool is allowed only for
+// /tmp/substrate_reviews/ paths so the reviewer can write review body
+// content for substrate send --body-file.
+func makeReviewerPermissionPolicy(
+	_ string,
+) claudeagent.CanUseToolFunc {
+
+	// Resolve the canonical write prefix, handling macOS /tmp →
+	// /private/tmp symlink. We accept both the symlink and the
+	// resolved path so writes work regardless of whether
+	// filepath.Clean resolves the symlink or not.
+	canonicalDir := reviewWriteDir
+	if resolved, err := filepath.EvalSymlinks(
+		reviewWriteDir,
+	); err == nil {
+		canonicalDir = resolved
+	}
+
+	prefixes := []string{
+		reviewWriteDir + string(filepath.Separator),
+		canonicalDir + string(filepath.Separator),
+	}
+
+	return func(
+		_ context.Context, req claudeagent.ToolPermissionRequest,
+	) claudeagent.PermissionResult {
+		return reviewerPermissionPolicy(req, prefixes)
+	}
+}
+
+// reviewerPermissionPolicy is the core permission logic for reviewer
+// agents. The allowedWritePrefixes parameter lists the absolute path
+// prefixes where the Write tool is allowed (e.g.,
+// ["/tmp/substrate_reviews/", "/private/tmp/substrate_reviews/"]).
 func reviewerPermissionPolicy(
-	_ context.Context, req claudeagent.ToolPermissionRequest,
+	req claudeagent.ToolPermissionRequest,
+	allowedWritePrefixes []string,
 ) claudeagent.PermissionResult {
 	toolName := req.ToolName
 
-	// Allow Write tool only to /tmp/ paths for review body files.
-	if toolName == "Write" {
-		return checkWritePath(req.Arguments)
-	}
+	// Log every permission request for diagnostics.
+	argPreview := truncateStr(string(req.Arguments), 200)
+	log.Infof("Reviewer permission check: tool=%s args=%s",
+		toolName, argPreview,
+	)
 
-	// Deny known write tools immediately.
-	if writeTools[toolName] {
-		return claudeagent.PermissionDeny{
+	var result claudeagent.PermissionResult
+
+	// Allow Write tool only to .reviews/ paths for review body
+	// files. The CLI sandbox allows writes to the CWD (project
+	// dir), so writing to {repoPath}/.reviews/ works through
+	// both our callback and the CLI sandbox.
+	if toolName == "Write" {
+		result = checkWritePath(req.Arguments, allowedWritePrefixes)
+	} else if writeTools[toolName] {
+		// Deny known write tools immediately.
+		result = claudeagent.PermissionDeny{
 			Reason: fmt.Sprintf(
 				"tool %q is not allowed in read-only "+
 					"review mode", toolName,
 			),
 		}
+	} else if toolName == "Bash" {
+		// For Bash, inspect the command to block destructive
+		// operations.
+		result = checkBashCommand(req.Arguments)
+	} else if readOnlyTools[toolName] {
+		// Allow known read-only tools.
+		result = claudeagent.PermissionAllow{}
+	} else {
+		// Default: deny unknown tools for safety.
+		result = claudeagent.PermissionDeny{
+			Reason: fmt.Sprintf(
+				"unknown tool %q is not allowed in "+
+					"read-only review mode", toolName,
+			),
+		}
 	}
 
-	// For Bash, inspect the command to block destructive operations.
-	if toolName == "Bash" {
-		return checkBashCommand(req.Arguments)
+	// Log the decision.
+	if result.IsAllow() {
+		log.Infof("Reviewer permission ALLOW: tool=%s",
+			toolName,
+		)
+	} else {
+		deny, _ := result.(claudeagent.PermissionDeny)
+		log.Infof("Reviewer permission DENY: tool=%s reason=%s",
+			toolName, deny.Reason,
+		)
 	}
 
-	// Allow known read-only tools.
-	if readOnlyTools[toolName] {
-		return claudeagent.PermissionAllow{}
-	}
-
-	// Default: deny unknown tools for safety.
-	return claudeagent.PermissionDeny{
-		Reason: fmt.Sprintf(
-			"unknown tool %q is not allowed in read-only "+
-				"review mode", toolName,
-		),
-	}
+	return result
 }
 
 // writeArgs is the JSON structure of Write tool arguments.
@@ -1407,24 +1506,52 @@ type writeArgs struct {
 }
 
 // checkWritePath allows the Write tool only when the target path is
-// under /tmp/. This lets the reviewer write review body markdown to a
-// temp file without granting general filesystem write access.
+// under one of the allowed prefixes. This lets the reviewer write
+// review body markdown to /tmp/substrate_reviews/ without granting
+// general filesystem write access.
 func checkWritePath(
-	arguments json.RawMessage,
+	arguments json.RawMessage, allowedPrefixes []string,
 ) claudeagent.PermissionResult {
 	var args writeArgs
 	if err := json.Unmarshal(arguments, &args); err != nil {
+		log.Infof("Reviewer Write permission: failed to "+
+			"parse args: %v (raw: %s)", err,
+			truncateStr(string(arguments), 200),
+		)
+
 		return claudeagent.PermissionDeny{
 			Reason: "failed to parse Write arguments",
 		}
 	}
 
 	path := filepath.Clean(args.FilePath)
-	if !strings.HasPrefix(path, tmpWritePrefix) {
+
+	// Check if the path is under any allowed prefix. Multiple
+	// prefixes handle macOS /tmp → /private/tmp symlink resolution.
+	allowed := false
+	for _, prefix := range allowedPrefixes {
+		if strings.HasPrefix(path, prefix) {
+			allowed = true
+			break
+		}
+	}
+
+	log.Infof("Reviewer Write permission check: "+
+		"raw_path=%q cleaned_path=%q prefixes=%v allowed=%v",
+		args.FilePath, path, allowedPrefixes, allowed,
+	)
+
+	if !allowed {
+		log.Infof("Reviewer Write DENIED: path=%q does not "+
+			"match any allowed prefix",
+			path,
+		)
+
 		return claudeagent.PermissionDeny{
 			Reason: fmt.Sprintf(
 				"Write to %q denied: reviewer can only "+
-					"write to %s", path, tmpWritePrefix,
+					"write to %s/",
+				path, reviewWriteDir,
 			),
 		}
 	}
@@ -1437,8 +1564,25 @@ type bashArgs struct {
 	Command string `json:"command"`
 }
 
+// bashChainOperators are shell metacharacters that allow chaining
+// multiple commands. We split on these to check each sub-command
+// independently, preventing bypass via "safe; dangerous".
+var bashChainOperators = []string{
+	"&&", "||", ";", "|", "\n",
+}
+
+// bashSubshellPatterns match shell constructs that can embed
+// arbitrary commands: $(...), `...`, and process substitution.
+var bashSubshellPatterns = []string{
+	"$(", "`",
+	"<(", ">(",
+}
+
 // checkBashCommand inspects the Bash command and denies destructive
-// operations while allowing read-only commands like git diff, git log, etc.
+// operations while allowing read-only commands like git diff, git log,
+// etc. It splits chained commands on shell operators (;, &&, ||, |) and
+// checks each sub-command independently. It also rejects subshell
+// constructs like $() and backticks that could embed dangerous commands.
 func checkBashCommand(
 	arguments json.RawMessage,
 ) claudeagent.PermissionResult {
@@ -1451,28 +1595,90 @@ func checkBashCommand(
 
 	cmd := strings.TrimSpace(args.Command)
 
-	// Check against dangerous command prefixes.
-	for _, prefix := range bashDangerousPrefixes {
-		if strings.HasPrefix(cmd, prefix) {
+	// Reject subshell constructs that can embed arbitrary commands.
+	// These bypass prefix-based filtering because the dangerous
+	// command is nested inside an otherwise safe-looking command.
+	for _, pattern := range bashSubshellPatterns {
+		if strings.Contains(cmd, pattern) {
 			return claudeagent.PermissionDeny{
 				Reason: fmt.Sprintf(
-					"bash command %q is not allowed "+
-						"in read-only review mode",
-					truncateStr(cmd, 80),
+					"subshell construct %q is not "+
+						"allowed in read-only "+
+						"review mode",
+					pattern,
 				),
 			}
 		}
 	}
 
-	// Also deny piped writes and redirects that create/overwrite files.
-	if strings.Contains(cmd, ">") && !strings.Contains(cmd, "2>&1") {
+	// Split on chain operators and check each sub-command. This
+	// prevents bypass via "git log; rm -rf /" where only the first
+	// token is checked.
+	subCmds := splitOnChainOperators(cmd)
+	for _, sub := range subCmds {
+		sub = strings.TrimSpace(sub)
+		if sub == "" {
+			continue
+		}
+
+		// Check against dangerous command prefixes.
+		for _, prefix := range bashDangerousPrefixes {
+			if strings.HasPrefix(sub, prefix) {
+				return claudeagent.PermissionDeny{
+					Reason: fmt.Sprintf(
+						"bash command %q is not "+
+							"allowed in read-only"+
+							" review mode",
+						truncateStr(sub, 80),
+					),
+				}
+			}
+		}
+	}
+
+	// Deny output redirects that create/overwrite files. The
+	// reviewer should use the Write tool for file creation (writing
+	// to .reviews/), not Bash redirects. Allow stderr redirects
+	// (2>&1) since those are diagnostic.
+	if strings.Contains(cmd, ">") && !isOnlyStderrRedirect(cmd) {
+		log.Infof("Reviewer Bash redirect DENIED: cmd=%s",
+			truncateStr(cmd, 200),
+		)
+
 		return claudeagent.PermissionDeny{
 			Reason: "output redirection is not allowed " +
-				"in read-only review mode",
+				"in read-only review mode; use the " +
+				"Write tool to write files",
 		}
 	}
 
 	return claudeagent.PermissionAllow{}
+}
+
+// splitOnChainOperators splits a command string on shell chain
+// operators (;, &&, ||, |, newline) to extract individual sub-commands.
+// This is a best-effort split for security filtering — it does not
+// handle quoted strings or escape sequences.
+func splitOnChainOperators(cmd string) []string {
+	// Replace multi-char operators with a sentinel, then split on
+	// the sentinel and single-char operators.
+	const sentinel = "\x00"
+
+	result := cmd
+	for _, op := range bashChainOperators {
+		result = strings.ReplaceAll(result, op, sentinel)
+	}
+
+	return strings.Split(result, sentinel)
+}
+
+// isOnlyStderrRedirect returns true when the command's only redirect
+// is 2>&1, which is a safe diagnostic pattern.
+func isOnlyStderrRedirect(cmd string) bool {
+	// Remove all occurrences of 2>&1 and check if any > remains.
+	stripped := strings.ReplaceAll(cmd, "2>&1", "")
+
+	return !strings.Contains(stripped, ">")
 }
 
 // extractYAMLBlock finds the last ```yaml ... ``` block in the text.

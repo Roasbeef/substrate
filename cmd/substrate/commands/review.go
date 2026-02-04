@@ -158,7 +158,11 @@ func runReviewRequest(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("resolve identity: %w", err)
 	}
 
-	// Auto-detect git context if flags not set.
+	// Determine which flags were explicitly provided.
+	commitExplicit := cmd.Flags().Changed("commit")
+	prExplicit := cmd.Flags().Changed("pr")
+
+	// Always auto-detect branch for naming/display purposes.
 	if reviewBranch == "" {
 		reviewBranch = getGitBranch()
 	}
@@ -172,6 +176,7 @@ func runReviewRequest(cmd *cobra.Command, args []string) error {
 		reviewRemoteURL = gitRemoteURL()
 	}
 
+	// Validate required fields.
 	if reviewBranch == "" {
 		return fmt.Errorf(
 			"could not detect branch; use --branch flag",
@@ -183,17 +188,43 @@ func runReviewRequest(cmd *cobra.Command, args []string) error {
 		)
 	}
 
+	// Build the request with the appropriate target type.
 	req := &subtraterpc.CreateReviewRequest{
 		RequesterId: agentID,
-		Branch:      reviewBranch,
-		BaseBranch:  reviewBaseBranch,
-		CommitSha:   reviewCommitSHA,
 		RepoPath:    reviewRepoPath,
 		RemoteUrl:   reviewRemoteURL,
 		ReviewType:  reviewType,
 		Priority:    reviewPriority,
-		PrNumber:    int32(reviewPRNumber),
 		Description: reviewDesc,
+	}
+
+	// Set the target based on what was explicitly requested.
+	switch {
+	case prExplicit && reviewPRNumber > 0:
+		// PR review mode.
+		req.Target = &subtraterpc.CreateReviewRequest_PrTarget{
+			PrTarget: &subtraterpc.PRTarget{
+				Number:     int32(reviewPRNumber),
+				Branch:     reviewBranch,
+				BaseBranch: reviewBaseBranch,
+			},
+		}
+	case commitExplicit:
+		// Single commit review mode.
+		req.Target = &subtraterpc.CreateReviewRequest_CommitTarget{
+			CommitTarget: &subtraterpc.CommitTarget{
+				Sha:    reviewCommitSHA,
+				Branch: reviewBranch,
+			},
+		}
+	default:
+		// Full branch diff review mode.
+		req.Target = &subtraterpc.CreateReviewRequest_BranchTarget{
+			BranchTarget: &subtraterpc.BranchTarget{
+				Branch:     reviewBranch,
+				BaseBranch: reviewBaseBranch,
+			},
+		}
 	}
 
 	resp, err := client.CreateReview(ctx, req)
