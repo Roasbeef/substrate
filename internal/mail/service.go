@@ -286,6 +286,26 @@ func (s *Service) handleFetchInbox(ctx context.Context,
 		limit = 50
 	}
 
+	// Handle sender name prefix filter (for aggregate views like CodeReviewer).
+	if req.SenderNamePrefix != "" {
+		msgs, err := s.store.GetMessagesBySenderNamePrefix(
+			ctx, req.SenderNamePrefix, limit,
+		)
+		if err != nil {
+			response.Error = fmt.Errorf(
+				"failed to fetch by sender prefix: %w", err,
+			)
+			return response
+		}
+
+		for _, m := range msgs {
+			response.Messages = append(
+				response.Messages, storeInboxToMail(m),
+			)
+		}
+		return response
+	}
+
 	// Handle sent messages view.
 	if req.SentOnly {
 		// If AgentID is provided, get sent messages for that agent.
@@ -355,7 +375,14 @@ func (s *Service) handleFetchInbox(ctx context.Context,
 		return response
 	}
 
-	msgs, err := s.store.GetInboxMessages(ctx, req.AgentID, limit)
+	// Use global inbox query when no specific agent is selected (AgentID=0).
+	var msgs []store.InboxMessage
+	var err error
+	if req.AgentID == 0 {
+		msgs, err = s.store.GetAllInboxMessages(ctx, limit, 0)
+	} else {
+		msgs, err = s.store.GetInboxMessages(ctx, req.AgentID, limit)
+	}
 	if err != nil {
 		response.Error = fmt.Errorf("failed to fetch inbox: %w", err)
 		return response
