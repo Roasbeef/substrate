@@ -385,6 +385,30 @@ func (r *reviewSubActor) Run(parentCtx context.Context) {
 				"num_errors", len(m.Errors),
 			)
 
+		case claudeagent.UserMessage:
+			// Log tool result content for diagnostics.
+			// The UserMessage following a tool_use contains
+			// the Bash output, which is critical for debugging
+			// substrate CLI failures.
+			var preview string
+			if len(m.Message.Content) > 0 {
+				preview = truncateStr(
+					m.Message.Content[0].Text, 500,
+				)
+			}
+			var parentToolID string
+			if m.ParentToolUseID != nil {
+				parentToolID = *m.ParentToolUseID
+			}
+			log.InfoS(ctx, "Reviewer tool result",
+				"review_id", r.reviewID,
+				"msg_num", msgCount,
+				"parent_tool_use_id", parentToolID,
+				"content_blocks",
+				len(m.Message.Content),
+				"preview", preview,
+			)
+
 		default:
 			log.InfoS(ctx, "Reviewer received other message type",
 				"review_id", r.reviewID,
@@ -665,8 +689,8 @@ func (r *reviewSubActor) buildSystemPrompt() string {
 	sb.WriteString("## Substrate Messaging\n")
 	sb.WriteString(
 		"You are a substrate agent. After completing your " +
-			"review, send your results as a substrate mail " +
-			"message to the requesting agent.\n\n",
+			"review, send a **detailed** review mail to the " +
+			"requesting agent with your full findings.\n\n",
 	)
 	sb.WriteString("**Your agent name**: " +
 		r.reviewerAgentName() + "\n\n",
@@ -697,9 +721,81 @@ func (r *reviewSubActor) buildSystemPrompt() string {
 			" --to <requester-agent>" +
 			" --thread " + r.threadID +
 			" --subject \"Review: <decision>\"" +
-			" --body \"<your review summary>\"\n",
+			" --body \"$REVIEW_BODY\"\n",
 	)
 	sb.WriteString("```\n\n")
+
+	// Instruct the agent on what to include in the mail body.
+	sb.WriteString("### Mail Body Format\n")
+	sb.WriteString(
+		"The `--body` must contain a **full, rich review** " +
+			"in markdown format (similar to a GitHub PR " +
+			"review). Include ALL of the following:\n\n",
+	)
+	sb.WriteString(
+		"1. **Decision** (approve/request_changes/reject) " +
+			"and a brief summary paragraph\n",
+	)
+	sb.WriteString(
+		"2. **Per-issue details** for every issue found:\n",
+	)
+	sb.WriteString(
+		"   - Severity (critical/high/medium/low)\n",
+	)
+	sb.WriteString(
+		"   - File path and line numbers\n",
+	)
+	sb.WriteString(
+		"   - Description of the problem\n",
+	)
+	sb.WriteString(
+		"   - Code snippet showing the problematic code\n",
+	)
+	sb.WriteString(
+		"   - Suggested fix with code example\n",
+	)
+	sb.WriteString(
+		"3. **Positive observations** — what was done well\n",
+	)
+	sb.WriteString(
+		"4. **Stats** — files reviewed, lines analyzed\n\n",
+	)
+	sb.WriteString(
+		"Use markdown headers, code blocks, and formatting " +
+			"for readability. The body supports full markdown " +
+			"so use ``` for code snippets.\n\n",
+	)
+	sb.WriteString(
+		"**TIP**: Build the body string in a variable " +
+			"before calling substrate send, since the body " +
+			"can be long. Use a heredoc or variable:\n",
+	)
+	sb.WriteString("```bash\n")
+	sb.WriteString(
+		"REVIEW_BODY=$(cat <<'REVIEW_EOF'\n" +
+			"# Code Review: <decision>\n\n" +
+			"## Summary\n" +
+			"<overview paragraph>\n\n" +
+			"## Issues\n\n" +
+			"### 1. [critical] <title> (`file.go:42`)\n" +
+			"<description>\n" +
+			"```go\n" +
+			"// problematic code\n" +
+			"```\n" +
+			"**Suggestion**:\n" +
+			"```go\n" +
+			"// fixed code\n" +
+			"```\n\n" +
+			"## What Looks Good\n" +
+			"- <positive observations>\n\n" +
+			"## Stats\n" +
+			"- Files reviewed: N\n" +
+			"- Lines analyzed: ~N\n" +
+			"REVIEW_EOF\n" +
+			")\n",
+	)
+	sb.WriteString("```\n\n")
+
 	sb.WriteString(
 		"If you receive messages (injected by the stop hook), " +
 			"process them and respond. For re-review requests, " +
@@ -1134,6 +1230,7 @@ func (r *reviewSubActor) persistResults(
 		"iteration_num", iterNum,
 		"issues_persisted", len(parsed.Issues),
 	)
+
 }
 
 // ParseReviewerResponse extracts the YAML frontmatter block from a reviewer's
