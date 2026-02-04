@@ -98,17 +98,8 @@ func (s *Server) SendMail(ctx context.Context, req *SendMailRequest) (*SendMailR
 
 // FetchInbox retrieves messages from an agent's inbox.
 // If agent_id is not provided, uses the default "User" agent.
+// If sender_ids is provided, returns messages sent by those agents.
 func (s *Server) FetchInbox(ctx context.Context, req *FetchInboxRequest) (*FetchInboxResponse, error) {
-	agentID := req.AgentId
-	if agentID == 0 {
-		// Use the default "User" agent for global inbox view.
-		userAgent, err := s.store.Queries().GetAgentByName(ctx, "User")
-		if err != nil {
-			return nil, status.Error(codes.Internal, "failed to get User agent")
-		}
-		agentID = userAgent.ID
-	}
-
 	limit := 50
 	if req.Limit > 0 {
 		limit = int(req.Limit)
@@ -121,8 +112,36 @@ func (s *Server) FetchInbox(ctx context.Context, req *FetchInboxRequest) (*Fetch
 		stateFilter = &state
 	}
 
+	// If sender_name_prefix is provided, fetch messages from matching senders.
+	if req.SenderNamePrefix != "" {
+		fetchReq := mail.FetchInboxRequest{
+			AgentID:          0, // Not filtering by recipient.
+			Limit:            limit,
+			UnreadOnly:       req.UnreadOnly,
+			StateFilter:      stateFilter,
+			SenderNamePrefix: req.SenderNamePrefix,
+		}
+
+		resp, err := s.fetchInboxActor(ctx, fetchReq)
+		if err != nil {
+			return nil, status.Errorf(
+				codes.Internal, "failed to fetch inbox: %v", err,
+			)
+		}
+		if resp.Error != nil {
+			return nil, status.Errorf(
+				codes.Internal, "failed to fetch inbox: %v", resp.Error,
+			)
+		}
+
+		return &FetchInboxResponse{
+			Messages: convertMessages(resp.Messages),
+		}, nil
+	}
+
+	// Standard inbox fetch. AgentID=0 means global view (all agents).
 	fetchReq := mail.FetchInboxRequest{
-		AgentID:     agentID,
+		AgentID:     req.AgentId,
 		Limit:       limit,
 		UnreadOnly:  req.UnreadOnly,
 		StateFilter: stateFilter,
@@ -728,17 +747,55 @@ func (s *Server) MarkThreadUnread(
 func (s *Server) DeleteMessage(
 	ctx context.Context, req *DeleteMessageRequest,
 ) (*DeleteMessageResponse, error) {
-	agentID := req.AgentId
-	if agentID == 0 {
-		// Use the default "User" agent.
-		userAgent, err := s.store.Queries().GetAgentByName(ctx, "User")
-		if err != nil {
-			return nil, status.Error(codes.Internal, "failed to get User agent")
-		}
-		agentID = userAgent.ID
-	}
 	if req.MessageId == 0 {
 		return nil, status.Error(codes.InvalidArgument, "message_id is required")
+	}
+
+	// If mark_sender_deleted is true, mark the message as deleted from sender's
+	// perspective. This is used for aggregate views like CodeReviewer where
+	// messages are filtered by sender_name_prefix.
+	if req.MarkSenderDeleted {
+		// Look up the message to get the sender ID.
+		msg, err := s.store.Queries().GetMessage(ctx, req.MessageId)
+		if err != nil {
+			return nil, status.Errorf(
+				codes.Internal, "failed to get message: %v", err,
+			)
+		}
+		// Mark the message as deleted by sender.
+		err = s.store.Queries().MarkMessageDeletedBySender(
+			ctx, sqlc.MarkMessageDeletedBySenderParams{
+				ID:       req.MessageId,
+				SenderID: msg.SenderID,
+			},
+		)
+		if err != nil {
+			return nil, status.Errorf(
+				codes.Internal, "failed to mark message deleted by sender: %v",
+				err,
+			)
+		}
+		return &DeleteMessageResponse{Success: true}, nil
+	}
+
+	agentID := req.AgentId
+	if agentID == 0 {
+		// Global view: look up the actual recipient for this message.
+		recipients, err := s.store.Queries().GetMessageRecipients(
+			ctx, req.MessageId,
+		)
+		if err != nil {
+			return nil, status.Errorf(
+				codes.Internal, "failed to get message recipients: %v", err,
+			)
+		}
+		if len(recipients) == 0 {
+			return nil, status.Error(
+				codes.NotFound, "no recipients found for message",
+			)
+		}
+		// Use the first recipient's agent ID.
+		agentID = recipients[0].AgentID
 	}
 
 	// Move the message to trash.
