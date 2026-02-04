@@ -3,7 +3,6 @@ package review
 import (
 	"context"
 	"fmt"
-	"log"
 	"sync"
 
 	"github.com/google/uuid"
@@ -28,6 +27,10 @@ type ServiceConfig struct {
 	// SpawnConfig overrides the default reviewer spawn configuration.
 	// If nil, defaults are used.
 	SpawnConfig *SpawnConfig
+
+	// ActorSystem is used to register reviewer sub-actors for lifecycle
+	// management and graceful shutdown.
+	ActorSystem *actor.ActorSystem
 }
 
 // Service handles review orchestration as an actor. It creates DB records,
@@ -58,9 +61,11 @@ func NewService(cfg ServiceConfig) *Service {
 	}
 
 	return &Service{
-		store:         cfg.Store,
-		reviewers:     reviewers,
-		subActorMgr:   NewSubActorManager(cfg.Store, cfg.SpawnConfig),
+		store:     cfg.Store,
+		reviewers: reviewers,
+		subActorMgr: NewSubActorManager(
+			cfg.ActorSystem, cfg.Store, cfg.SpawnConfig,
+		),
 		activeReviews: make(map[string]*ReviewFSM),
 	}
 }
@@ -417,8 +422,8 @@ func (s *Service) processOutbox(ctx context.Context,
 }
 
 // spawnReviewer launches a reviewer sub-actor for the given review. The
-// sub-actor runs as a goroutine, spawns a Claude Agent SDK client, and calls
-// handleSubActorResult when the review completes.
+// sub-actor is registered with the actor system and receives a RunReviewMsg
+// to kick off the Claude Agent SDK review process.
 func (s *Service) spawnReviewer(ctx context.Context,
 	e SpawnReviewerAgent,
 ) {
@@ -428,10 +433,9 @@ func (s *Service) spawnReviewer(ctx context.Context,
 	s.mu.RUnlock()
 
 	if !ok {
-		log.Printf(
-			"review service: no active FSM for %s, "+
-				"skipping spawn",
-			e.ReviewID,
+		log.WarnS(ctx, "Review service: no active FSM, skipping "+
+			"spawn", nil,
+			"review_id", e.ReviewID,
 		)
 		return
 	}
@@ -439,9 +443,9 @@ func (s *Service) spawnReviewer(ctx context.Context,
 	// Determine reviewer config from the review type stored in the DB.
 	review, err := s.store.GetReview(ctx, e.ReviewID)
 	if err != nil {
-		log.Printf(
-			"review service: get review %s for spawn: %v",
-			e.ReviewID, err,
+		log.ErrorS(ctx, "Review service: failed to get review "+
+			"for spawn", err,
+			"review_id", e.ReviewID,
 		)
 		return
 	}
@@ -451,14 +455,21 @@ func (s *Service) spawnReviewer(ctx context.Context,
 		config = s.reviewers["full"]
 	}
 
+	log.InfoS(ctx, "Review service spawning reviewer sub-actor",
+		"review_id", e.ReviewID,
+		"review_type", review.ReviewType,
+		"reviewer", config.Name,
+		"repo_path", e.RepoPath,
+	)
+
 	// Transition FSM to under_review.
 	outbox, err := fsm.ProcessEvent(ctx, StartReviewEvent{
 		ReviewerID: config.Name,
 	})
 	if err != nil {
-		log.Printf(
-			"review service: start review event for %s: %v",
-			e.ReviewID, err,
+		log.ErrorS(ctx, "Review service: start review event "+
+			"failed", err,
+			"review_id", e.ReviewID,
 		)
 		return
 	}
@@ -478,9 +489,10 @@ func (s *Service) handleSubActorResult(ctx context.Context,
 	result *SubActorResult,
 ) {
 	if result.Error != nil {
-		log.Printf(
-			"review sub-actor error for %s: %v",
-			result.ReviewID, result.Error,
+		log.ErrorS(ctx, "Review sub-actor error",
+			result.Error,
+			"review_id", result.ReviewID,
+			"duration", result.Duration.String(),
 		)
 		// On error, we don't transition the FSM - the review stays
 		// in under_review and can be retried or cancelled.
@@ -492,13 +504,21 @@ func (s *Service) handleSubActorResult(ctx context.Context,
 	s.mu.RUnlock()
 
 	if !ok {
-		log.Printf(
-			"review service: no active FSM for %s after "+
-				"sub-actor completion",
-			result.ReviewID,
+		log.WarnS(ctx, "Review service: no active FSM after "+
+			"sub-actor completion", nil,
+			"review_id", result.ReviewID,
 		)
 		return
 	}
+
+	log.InfoS(ctx, "Review service processing sub-actor result",
+		"review_id", result.ReviewID,
+		"decision", result.Result.Decision,
+		"issues_found", len(result.Result.Issues),
+		"session_id", result.SessionID,
+		"cost_usd", result.CostUSD,
+		"duration", result.Duration.String(),
+	)
 
 	var event ReviewEvent
 	switch result.Result.Decision {
@@ -529,19 +549,20 @@ func (s *Service) handleSubActorResult(ctx context.Context,
 		}
 
 	default:
-		log.Printf(
-			"review sub-actor: unknown decision %q for %s",
-			result.Result.Decision, result.ReviewID,
+		log.WarnS(ctx, "Review sub-actor returned unknown "+
+			"decision", nil,
+			"review_id", result.ReviewID,
+			"decision", result.Result.Decision,
 		)
 		return
 	}
 
 	outbox, err := fsm.ProcessEvent(ctx, event)
 	if err != nil {
-		log.Printf(
-			"review service: process sub-actor result for "+
-				"%s: %v",
-			result.ReviewID, err,
+		log.ErrorS(ctx, "Review service: FSM event processing "+
+			"failed", err,
+			"review_id", result.ReviewID,
+			"decision", result.Result.Decision,
 		)
 		return
 	}
@@ -550,17 +571,33 @@ func (s *Service) handleSubActorResult(ctx context.Context,
 
 	// If the review reached a terminal state, remove from active.
 	if fsm.IsTerminal() {
+		log.InfoS(ctx, "Review reached terminal state, removing "+
+			"from active tracking",
+			"review_id", result.ReviewID,
+			"final_state", fsm.CurrentState(),
+		)
 		s.mu.Lock()
 		delete(s.activeReviews, result.ReviewID)
 		s.mu.Unlock()
 	}
 }
 
-// StopSubActors stops all active reviewer sub-actors. Called during graceful
-// shutdown.
-func (s *Service) StopSubActors() {
+// OnStop implements actor.Stoppable for graceful shutdown of reviewer
+// sub-actors when the daemon stops. The actor system calls this after the
+// message processing loop exits.
+func (s *Service) OnStop(ctx context.Context) error {
+	activeCount := s.subActorMgr.ActiveCount()
+	log.InfoS(ctx, "Review service OnStop called, cleaning up "+
+		"sub-actors",
+		"active_reviewers", activeCount,
+	)
 	s.subActorMgr.StopAll()
+	log.InfoS(ctx, "Review service OnStop completed")
+	return nil
 }
+
+// Ensure Service implements the Stoppable interface at compile time.
+var _ actor.Stoppable = (*Service)(nil)
 
 // RecoverActiveReviews loads active reviews from the database and restores
 // their FSMs. Called on server startup for restart recovery.
