@@ -34,6 +34,40 @@ func (GetIssuesResp) isReviewResponse()    {}
 func (UpdateIssueResp) isReviewResponse()  {}
 
 // =============================================================================
+// Reviewer sub-actor messages
+// =============================================================================
+
+// ReviewerRequest is the union type for all reviewer sub-actor requests.
+// These messages are sent to individual reviewer actors spawned per review.
+type ReviewerRequest interface {
+	actor.Message
+	isReviewerRequest()
+}
+
+// Ensure all reviewer request types implement ReviewerRequest.
+func (RunReviewMsg) isReviewerRequest()    {}
+func (ResumeReviewMsg) isReviewerRequest() {}
+
+// RunReviewMsg tells a reviewer sub-actor to execute a fresh code review.
+type RunReviewMsg struct {
+	actor.BaseMessage
+}
+
+// MessageType implements actor.Message.
+func (RunReviewMsg) MessageType() string { return "RunReviewMsg" }
+
+// ResumeReviewMsg tells a reviewer sub-actor to resume a review after the
+// author has pushed new changes (resubmit).
+type ResumeReviewMsg struct {
+	actor.BaseMessage
+
+	CommitSHA string
+}
+
+// MessageType implements actor.Message.
+func (ResumeReviewMsg) MessageType() string { return "ResumeReviewMsg" }
+
+// =============================================================================
 // Request messages
 // =============================================================================
 
