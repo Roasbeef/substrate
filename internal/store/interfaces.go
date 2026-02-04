@@ -117,6 +117,12 @@ type MessageStore interface {
 
 	// GetAllSentMessages retrieves all sent messages across all agents.
 	GetAllSentMessages(ctx context.Context, limit int) ([]InboxMessage, error)
+
+	// GetMessagesBySenderNamePrefix retrieves messages from agents whose name
+	// starts with the given prefix (e.g., "reviewer-" for CodeReviewer aggregate).
+	GetMessagesBySenderNamePrefix(
+		ctx context.Context, prefix string, limit int,
+	) ([]InboxMessage, error)
 }
 
 // AgentStore handles agent persistence operations.

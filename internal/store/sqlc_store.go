@@ -173,6 +173,9 @@ type QueryStore interface {
 	GetAllSentMessages(
 		ctx context.Context, limit int64,
 	) ([]sqlc.GetAllSentMessagesRow, error)
+	GetMessagesBySenderNamePrefix(
+		ctx context.Context, arg sqlc.GetMessagesBySenderNamePrefixParams,
+	) ([]sqlc.GetMessagesBySenderNamePrefixRow, error)
 
 	// Review operations.
 	CreateReview(
@@ -857,6 +860,43 @@ func (s *SqlcStore) GetAllSentMessages(ctx context.Context,
 	limit int,
 ) ([]InboxMessage, error) {
 	rows, err := s.db.GetAllSentMessages(ctx, int64(limit))
+	if err != nil {
+		return nil, err
+	}
+
+	messages := make([]InboxMessage, 0, len(rows))
+	for _, row := range rows {
+		messages = append(messages, InboxMessage{
+			Message: Message{
+				ID:        row.ID,
+				ThreadID:  row.ThreadID,
+				TopicID:   row.TopicID,
+				LogOffset: row.LogOffset,
+				SenderID:  row.SenderID,
+				Subject:   row.Subject,
+				Body:      row.BodyMd,
+				Priority:  row.Priority,
+				CreatedAt: time.Unix(row.CreatedAt, 0),
+			},
+			SenderName:       row.SenderName,
+			SenderProjectKey: row.SenderProjectKey.String,
+			SenderGitBranch:  row.SenderGitBranch.String,
+		})
+	}
+	return messages, nil
+}
+
+// GetMessagesBySenderNamePrefix retrieves messages from agents whose name
+// starts with the given prefix.
+func (s *SqlcStore) GetMessagesBySenderNamePrefix(ctx context.Context,
+	prefix string, limit int,
+) ([]InboxMessage, error) {
+	rows, err := s.db.GetMessagesBySenderNamePrefix(
+		ctx, sqlc.GetMessagesBySenderNamePrefixParams{
+			Prefix: ToSqlcNullString(prefix),
+			Limit:  int64(limit),
+		},
+	)
 	if err != nil {
 		return nil, err
 	}
@@ -2160,6 +2200,43 @@ func (s *txSqlcStore) GetAllSentMessages(ctx context.Context,
 	limit int,
 ) ([]InboxMessage, error) {
 	rows, err := s.queries.GetAllSentMessages(ctx, int64(limit))
+	if err != nil {
+		return nil, err
+	}
+
+	messages := make([]InboxMessage, 0, len(rows))
+	for _, row := range rows {
+		messages = append(messages, InboxMessage{
+			Message: Message{
+				ID:        row.ID,
+				ThreadID:  row.ThreadID,
+				TopicID:   row.TopicID,
+				LogOffset: row.LogOffset,
+				SenderID:  row.SenderID,
+				Subject:   row.Subject,
+				Body:      row.BodyMd,
+				Priority:  row.Priority,
+				CreatedAt: time.Unix(row.CreatedAt, 0),
+			},
+			SenderName:       row.SenderName,
+			SenderProjectKey: row.SenderProjectKey.String,
+			SenderGitBranch:  row.SenderGitBranch.String,
+		})
+	}
+	return messages, nil
+}
+
+// GetMessagesBySenderNamePrefix retrieves messages from agents whose name
+// starts with the given prefix.
+func (s *txSqlcStore) GetMessagesBySenderNamePrefix(ctx context.Context,
+	prefix string, limit int,
+) ([]InboxMessage, error) {
+	rows, err := s.queries.GetMessagesBySenderNamePrefix(
+		ctx, sqlc.GetMessagesBySenderNamePrefixParams{
+			Prefix: ToSqlcNullString(prefix),
+			Limit:  int64(limit),
+		},
+	)
 	if err != nil {
 		return nil, err
 	}

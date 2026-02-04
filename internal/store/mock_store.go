@@ -694,6 +694,40 @@ func (m *MockStore) GetAllSentMessages(
 	return results, nil
 }
 
+// GetMessagesBySenderNamePrefix retrieves messages from agents whose name
+// starts with the given prefix.
+func (m *MockStore) GetMessagesBySenderNamePrefix(
+	ctx context.Context, prefix string, limit int,
+) ([]InboxMessage, error) {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+
+	var results []InboxMessage
+	for _, msg := range m.messages {
+		var senderName, senderProjectKey, senderGitBranch string
+		if sender, ok := m.agents[msg.SenderID]; ok {
+			senderName = sender.Name
+			senderProjectKey = sender.ProjectKey
+			senderGitBranch = sender.GitBranch
+		}
+
+		// Check if sender name starts with prefix.
+		if len(senderName) >= len(prefix) && senderName[:len(prefix)] == prefix {
+			results = append(results, InboxMessage{
+				Message:          msg,
+				SenderName:       senderName,
+				SenderProjectKey: senderProjectKey,
+				SenderGitBranch:  senderGitBranch,
+			})
+
+			if len(results) >= limit {
+				break
+			}
+		}
+	}
+	return results, nil
+}
+
 // contains checks if s contains substr (case-insensitive).
 func contains(s, substr string) bool {
 	return len(s) >= len(substr) &&
