@@ -475,10 +475,12 @@ func (s *Service) spawnReviewer(ctx context.Context,
 	}
 	s.processOutbox(ctx, outbox)
 
-	// Spawn the sub-actor.
+	// Spawn the sub-actor with branch info for the diff command.
 	s.subActorMgr.SpawnReviewer(
 		ctx, e.ReviewID, e.ThreadID, e.RepoPath,
-		e.Requester, config, s.handleSubActorResult,
+		e.Requester,
+		review.Branch, review.BaseBranch, review.CommitSHA,
+		config, s.handleSubActorResult,
 	)
 }
 
