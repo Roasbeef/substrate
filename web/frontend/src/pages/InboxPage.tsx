@@ -58,8 +58,10 @@ export default function InboxPage() {
   const params = useParams<{ threadId?: string }>();
   const routeFilter = getRouteFilter(location.pathname);
 
-  // Get current agent from auth store for filtering.
+  // Get current agent and aggregate selection from auth store for filtering.
   const currentAgent = useAuthStore((state) => state.currentAgent);
+  const selectedAgentIds = useAuthStore((state) => state.selectedAgentIds);
+  const selectedAggregate = useAuthStore((state) => state.selectedAggregate);
 
   // Page state.
   const [state, setState] = useState<InboxState>({
@@ -101,6 +103,9 @@ export default function InboxPage() {
   // Extract agent ID for stable dependency.
   const currentAgentId = currentAgent?.id;
 
+  // Determine if we're filtering by aggregate (multiple agents).
+  const isAggregateFilter = selectedAggregate !== null && selectedAgentIds.length > 1;
+
   // Build query options from route and state.
   const queryOptions = useMemo(() => {
     const options: Record<string, string | boolean | number | undefined> = {};
@@ -124,13 +129,18 @@ export default function InboxPage() {
       options.category = state.category;
     }
 
-    // Apply agent filter if an agent is selected.
-    if (currentAgentId !== undefined) {
+    // Apply agent filter if a single agent is selected (not aggregate).
+    if (currentAgentId !== undefined && !isAggregateFilter) {
       options.agentId = currentAgentId;
     }
 
+    // For aggregates, filter by sender name prefix on the backend.
+    if (isAggregateFilter && selectedAggregate === 'CodeReviewer') {
+      options.senderNamePrefix = 'reviewer-';
+    }
+
     return options;
-  }, [state.category, state.filter, routeFilter, currentAgentId]);
+  }, [state.category, state.filter, routeFilter, currentAgentId, isAggregateFilter, selectedAggregate]);
 
   // Fetch messages.
   const {
@@ -141,10 +151,17 @@ export default function InboxPage() {
   } = useMessages(queryOptions);
 
   // Extract messages array from response with stable reference.
-  const allMessages = useMemo(
-    () => messagesResponse?.data ?? [],
-    [messagesResponse?.data],
-  );
+  // For aggregate selections, filter by sender_id matching any of the selected agent IDs.
+  const allMessages = useMemo(() => {
+    const messages = messagesResponse?.data ?? [];
+
+    // If aggregate is selected, filter to messages FROM those agents.
+    if (isAggregateFilter && selectedAgentIds.length > 0) {
+      return messages.filter((m) => selectedAgentIds.includes(m.sender_id));
+    }
+
+    return messages;
+  }, [messagesResponse?.data, isAggregateFilter, selectedAgentIds]);
 
   // Get unique senders for filter dropdown.
   const uniqueSenders = useMemo(() => {
@@ -346,12 +363,15 @@ export default function InboxPage() {
   );
 
   // Handle delete.
+  // For CodeReviewer aggregate view, mark as deleted by sender since we're
+  // filtering by sender_name_prefix.
   const handleDelete = useCallback(
     (id: number) => {
       // Would show confirmation dialog in real app.
-      deleteMessage.mutate(id);
+      const markSenderDeleted = selectedAggregate === 'CodeReviewer';
+      deleteMessage.mutate({ id, markSenderDeleted });
     },
-    [deleteMessage],
+    [deleteMessage, selectedAggregate],
   );
 
   // Bulk actions.
@@ -370,11 +390,12 @@ export default function InboxPage() {
   }, [selection, toggleStar]);
 
   const handleBulkDelete = useCallback(() => {
+    const markSenderDeleted = selectedAggregate === 'CodeReviewer';
     selection.selectedIds.forEach((id) => {
-      deleteMessage.mutate(id);
+      deleteMessage.mutate({ id, markSenderDeleted });
     });
     selection.clearSelection();
-  }, [selection, deleteMessage]);
+  }, [selection, deleteMessage, selectedAggregate]);
 
   // Mutation loading state (includes thread mutations).
   const isActionLoading =
