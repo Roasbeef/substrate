@@ -7,6 +7,8 @@ import type {
   DashboardStats,
   HealthResponse,
   MessageWithRecipients,
+  ReviewIssue,
+  ReviewSummary,
   Session,
   Thread,
   Topic,
@@ -107,6 +109,77 @@ const mockTopics: Topic[] = [
 const mockSessions: Session[] = [
   createMockSession({ id: 1, agent_name: 'Agent1' }),
 ];
+
+// Mock reviews.
+const mockReviews: ReviewSummary[] = [
+  {
+    review_id: 'abc123',
+    thread_id: 'thread-1',
+    requester_id: 1,
+    branch: 'feature/add-reviews',
+    state: 'under_review',
+    review_type: 'full',
+    created_at: Math.floor(Date.now() / 1000) - 3600,
+  },
+  {
+    review_id: 'def456',
+    thread_id: 'thread-2',
+    requester_id: 1,
+    branch: 'fix/null-pointer',
+    state: 'approved',
+    review_type: 'incremental',
+    created_at: Math.floor(Date.now() / 1000) - 7200,
+  },
+];
+
+const mockReviewIssues: ReviewIssue[] = [
+  {
+    id: 1,
+    review_id: 'abc123',
+    iteration_num: 1,
+    issue_type: 'bug',
+    severity: 'major',
+    file_path: 'internal/review/service.go',
+    line_start: 42,
+    line_end: 50,
+    title: 'Missing nil check before dereference',
+    description: 'The pointer could be nil when the review is not found.',
+    code_snippet: 'review := s.reviews[id]\nreview.State = "approved"',
+    suggestion: 'Add a nil check: if review == nil { return ErrNotFound }',
+    claude_md_ref: '',
+    status: 'open',
+  },
+  {
+    id: 2,
+    review_id: 'abc123',
+    iteration_num: 1,
+    issue_type: 'style',
+    severity: 'suggestion',
+    file_path: 'internal/review/fsm.go',
+    line_start: 15,
+    line_end: 15,
+    title: 'Missing function comment',
+    description: 'All exported functions should have comments.',
+    code_snippet: 'func NewFSM() *FSM {',
+    suggestion: '// NewFSM creates a new review state machine.',
+    claude_md_ref: 'Code Style: Function and Method Comments',
+    status: 'fixed',
+  },
+];
+
+export function createMockReview(
+  overrides: Partial<ReviewSummary> = {},
+): ReviewSummary {
+  return {
+    review_id: overrides.review_id ?? 'test-review-1',
+    thread_id: overrides.thread_id ?? 'thread-1',
+    requester_id: overrides.requester_id ?? 1,
+    branch: overrides.branch ?? 'test-branch',
+    state: overrides.state ?? 'under_review',
+    review_type: overrides.review_type ?? 'full',
+    created_at: overrides.created_at ?? Math.floor(Date.now() / 1000),
+  };
+}
 
 // Mock activities.
 const mockActivities: Activity[] = [
@@ -413,5 +486,67 @@ export const handlers = [
       data: paginated,
       meta: { total: filtered.length, page, page_size: pageSize },
     });
+  }),
+
+  // Reviews.
+  http.get(`${API_BASE}/reviews`, ({ request }) => {
+    const url = new URL(request.url);
+    const state = url.searchParams.get('state');
+    let filtered = [...mockReviews];
+    if (state) {
+      filtered = filtered.filter((r) => r.state === state);
+    }
+    return HttpResponse.json({ reviews: filtered });
+  }),
+
+  http.get(`${API_BASE}/reviews/:reviewId`, ({ params }) => {
+    const id = params.reviewId as string;
+    const review = mockReviews.find((r) => r.review_id === id);
+    if (!review) {
+      return HttpResponse.json(
+        { error: { code: 'not_found', message: 'Review not found' } },
+        { status: 404 },
+      );
+    }
+    return HttpResponse.json({
+      review_id: review.review_id,
+      thread_id: review.thread_id,
+      state: review.state,
+      branch: review.branch,
+      base_branch: 'main',
+      review_type: review.review_type,
+      iterations: 1,
+      open_issues: '1',
+    });
+  }),
+
+  http.post(`${API_BASE}/reviews`, async ({ request }) => {
+    const body = (await request.json()) as Record<string, unknown>;
+    return HttpResponse.json({
+      review_id: 'new-review-1',
+      thread_id: 'new-thread-1',
+      state: 'under_review',
+    }, { status: 201 });
+  }),
+
+  http.post(`${API_BASE}/reviews/:reviewId/resubmit`, () => {
+    return HttpResponse.json({
+      review_id: 'abc123',
+      state: 'under_review',
+    });
+  }),
+
+  http.delete(`${API_BASE}/reviews/:reviewId`, () => {
+    return new HttpResponse(null, { status: 204 });
+  }),
+
+  http.get(`${API_BASE}/reviews/:reviewId/issues`, ({ params }) => {
+    const id = params.reviewId as string;
+    const issues = mockReviewIssues.filter((i) => i.review_id === id);
+    return HttpResponse.json({ issues });
+  }),
+
+  http.patch(`${API_BASE}/reviews/:reviewId/issues/:issueId`, () => {
+    return HttpResponse.json({});
   }),
 ];

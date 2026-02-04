@@ -13,6 +13,8 @@ export const routes = {
   agent: (agentId: number | string) => `/agents/${agentId}`,
   sessions: '/sessions',
   session: (sessionId: number | string) => `/sessions/${sessionId}`,
+  reviews: '/reviews',
+  review: (reviewId: string) => `/reviews/${reviewId}`,
   settings: '/settings',
   search: '/search',
 } as const;
