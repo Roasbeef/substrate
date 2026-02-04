@@ -3,10 +3,13 @@ package review
 import (
 	"context"
 	"fmt"
+	"os"
+	"path/filepath"
 	"sync"
 	"testing"
 	"time"
 
+	claudeagent "github.com/roasbeef/claude-agent-sdk-go"
 	"github.com/roasbeef/subtrate/internal/baselib/actor"
 	"github.com/roasbeef/subtrate/internal/store"
 	"github.com/stretchr/testify/require"
@@ -304,17 +307,53 @@ func TestBuildSystemPrompt_WithIgnorePatterns(t *testing.T) {
 	require.Contains(t, prompt, "*.generated.go")
 }
 
-// TestBuildReviewPrompt verifies the user prompt content.
+// TestBuildReviewPrompt verifies the user prompt content with branch info.
 func TestBuildReviewPrompt(t *testing.T) {
-	actor := &reviewSubActor{
-		reviewID: "abc-123",
-		config:   DefaultReviewerConfig(),
+	tests := []struct {
+		name       string
+		branch     string
+		baseBranch string
+		commitSHA  string
+		expected   string
+	}{
+		{
+			name:       "full branch info",
+			branch:     "feature/auth",
+			baseBranch: "main",
+			expected:   "git diff main...feature/auth",
+		},
+		{
+			name:       "base branch only",
+			baseBranch: "develop",
+			expected:   "git diff develop...HEAD",
+		},
+		{
+			name:      "commit SHA only",
+			commitSHA: "abc123def",
+			expected:  "git show abc123def",
+		},
+		{
+			name:     "fallback no info",
+			expected: "git diff HEAD~1",
+		},
 	}
 
-	prompt := actor.buildReviewPrompt()
-	require.Contains(t, prompt, "abc-123")
-	require.Contains(t, prompt, "git diff main...HEAD")
-	require.Contains(t, prompt, "YAML frontmatter")
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			a := &reviewSubActor{
+				reviewID:   "abc-123",
+				branch:     tt.branch,
+				baseBranch: tt.baseBranch,
+				commitSHA:  tt.commitSHA,
+				config:     DefaultReviewerConfig(),
+			}
+
+			prompt := a.buildReviewPrompt()
+			require.Contains(t, prompt, "abc-123")
+			require.Contains(t, prompt, tt.expected)
+			require.Contains(t, prompt, "YAML frontmatter")
+		})
+	}
 }
 
 // TestBuildClientOptions verifies SDK options are correctly constructed.
@@ -335,11 +374,16 @@ func TestBuildClientOptions(t *testing.T) {
 		},
 	}
 
-	opts := actor.buildClientOptions()
+	opts, configDir := actor.buildClientOptions()
 
 	// We can't inspect the options directly, but we can verify that
 	// buildClientOptions doesn't panic and returns a non-empty slice.
 	require.NotEmpty(t, opts)
+
+	// Clean up the temp config dir if one was created.
+	if configDir != "" {
+		os.RemoveAll(filepath.Dir(configDir))
+	}
 }
 
 // TestSubActorManager_SpawnAndStop tests the manager lifecycle.
@@ -401,7 +445,8 @@ func TestSubActorManager_DuplicateSpawnPrevented(t *testing.T) {
 	mgr.SpawnReviewer(
 		context.Background(),
 		"test-review-1", "thread-1", "/tmp/repo",
-		1, DefaultReviewerConfig(), callback,
+		1, "feature-branch", "main", "abc123",
+		DefaultReviewerConfig(), callback,
 	)
 
 	// The callback should not have been invoked since the spawn was
@@ -779,7 +824,6 @@ func TestDefaultSubActorSpawnConfig(t *testing.T) {
 	cfg := DefaultSubActorSpawnConfig()
 	require.Equal(t, "claude", cfg.CLIPath)
 	require.Equal(t, 20, cfg.MaxTurns)
-	require.True(t, cfg.AllowDangerouslySkipPermissions)
 }
 
 // TestNewSubActorManager verifies manager creation.
@@ -920,6 +964,286 @@ func TestServiceWithSubActorManager(t *testing.T) {
 		},
 	})
 	require.NotNil(t, svc2.subActorMgr)
+}
+
+// TestReviewerPermissionPolicy_ReadOnlyTools tests that read-only tools are
+// allowed by the permission policy.
+func TestReviewerPermissionPolicy_ReadOnlyTools(t *testing.T) {
+	allowedTools := []string{
+		"Read", "Glob", "Grep", "LS",
+		"WebFetch", "WebSearch", "NotebookRead",
+	}
+
+	for _, tool := range allowedTools {
+		t.Run(tool, func(t *testing.T) {
+			result := reviewerPermissionPolicy(
+				context.Background(),
+				claudeagent.ToolPermissionRequest{
+					ToolName:  tool,
+					Arguments: []byte(`{}`),
+				},
+			)
+			require.True(t, result.IsAllow(),
+				"tool %q should be allowed", tool,
+			)
+		})
+	}
+}
+
+// TestReviewerPermissionPolicy_WriteToolsDenied tests that write tools are
+// denied by the permission policy.
+func TestReviewerPermissionPolicy_WriteToolsDenied(t *testing.T) {
+	deniedTools := []string{
+		"Write", "Edit", "MultiEdit",
+		"NotebookEdit", "Task", "TodoWrite",
+	}
+
+	for _, tool := range deniedTools {
+		t.Run(tool, func(t *testing.T) {
+			result := reviewerPermissionPolicy(
+				context.Background(),
+				claudeagent.ToolPermissionRequest{
+					ToolName:  tool,
+					Arguments: []byte(`{}`),
+				},
+			)
+			require.False(t, result.IsAllow(),
+				"tool %q should be denied", tool,
+			)
+		})
+	}
+}
+
+// TestReviewerPermissionPolicy_BashReadOnly tests that safe Bash commands
+// are allowed while destructive ones are denied.
+func TestReviewerPermissionPolicy_BashReadOnly(t *testing.T) {
+	tests := []struct {
+		name    string
+		command string
+		allowed bool
+	}{
+		{"git diff", `{"command":"git diff HEAD~1"}`, true},
+		{"git log", `{"command":"git log --oneline -10"}`, true},
+		{"git show", `{"command":"git show HEAD"}`, true},
+		{"cat file", `{"command":"cat main.go"}`, true},
+		{"ls dir", `{"command":"ls -la internal/"}`, true},
+		{"go doc", `{"command":"go doc fmt.Println"}`, true},
+		{"rm file", `{"command":"rm main.go"}`, false},
+		{"git push", `{"command":"git push origin main"}`, false},
+		{"git commit", `{"command":"git commit -m 'bad'"}`, false},
+		{"git add", `{"command":"git add ."}`, false},
+		{"git checkout", `{"command":"git checkout main"}`, false},
+		{"make", `{"command":"make build"}`, false},
+		{"redirect", `{"command":"echo bad > file.txt"}`, false},
+		{"stderr redirect ok", `{"command":"git diff 2>&1"}`, true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := reviewerPermissionPolicy(
+				context.Background(),
+				claudeagent.ToolPermissionRequest{
+					ToolName:  "Bash",
+					Arguments: []byte(tt.command),
+				},
+			)
+			if tt.allowed {
+				require.True(t, result.IsAllow(),
+					"command should be allowed",
+				)
+			} else {
+				require.False(t, result.IsAllow(),
+					"command should be denied",
+				)
+			}
+		})
+	}
+}
+
+// TestReviewerPermissionPolicy_UnknownToolDenied tests that unknown tools
+// are denied for safety.
+func TestReviewerPermissionPolicy_UnknownToolDenied(t *testing.T) {
+	result := reviewerPermissionPolicy(
+		context.Background(),
+		claudeagent.ToolPermissionRequest{
+			ToolName:  "SomeNewTool",
+			Arguments: []byte(`{}`),
+		},
+	)
+	require.False(t, result.IsAllow())
+}
+
+// TestReviewerPermissionPolicy_SubstrateAllowed tests that substrate CLI
+// commands pass the permission policy for inter-agent messaging.
+func TestReviewerPermissionPolicy_SubstrateAllowed(t *testing.T) {
+	substrateCmds := []string{
+		`{"command":"substrate send --to User --subject \"Review\" --body \"done\""}`,
+		`{"command":"substrate inbox"}`,
+		`{"command":"substrate status"}`,
+		`{"command":"substrate heartbeat"}`,
+	}
+
+	for _, cmd := range substrateCmds {
+		t.Run(cmd, func(t *testing.T) {
+			result := reviewerPermissionPolicy(
+				context.Background(),
+				claudeagent.ToolPermissionRequest{
+					ToolName:  "Bash",
+					Arguments: []byte(cmd),
+				},
+			)
+			require.True(t, result.IsAllow(),
+				"substrate command should be allowed",
+			)
+		})
+	}
+}
+
+// TestReviewerAgentName verifies the agent name generation.
+func TestReviewerAgentName(t *testing.T) {
+	actor := &reviewSubActor{
+		reviewID: "abcdef12-3456-7890-abcd-ef1234567890",
+		config:   &ReviewerConfig{Name: "full"},
+	}
+
+	name := actor.reviewerAgentName()
+	require.Equal(t, "reviewer-full-abcdef12", name)
+}
+
+// TestBuildSubstrateHooks verifies the hook map is constructed correctly.
+func TestBuildSubstrateHooks(t *testing.T) {
+	actor := &reviewSubActor{
+		reviewID: "test-hooks",
+		config:   DefaultReviewerConfig(),
+		store:    store.NewMockStore(),
+	}
+
+	hooks := actor.buildSubstrateHooks()
+
+	// Should have SessionStart and Stop hooks.
+	require.Contains(t, hooks, claudeagent.HookTypeSessionStart)
+	require.Contains(t, hooks, claudeagent.HookTypeStop)
+	require.Len(t, hooks[claudeagent.HookTypeSessionStart], 1)
+	require.Len(t, hooks[claudeagent.HookTypeStop], 1)
+}
+
+// TestHookSessionStart_RegistersAgent tests that the session start hook
+// creates an agent identity in the store.
+func TestHookSessionStart_RegistersAgent(t *testing.T) {
+	mockStore := store.NewMockStore()
+	actor := &reviewSubActor{
+		reviewID: "hook-test-1234",
+		config:   &ReviewerConfig{Name: "full"},
+		store:    mockStore,
+		branch:   "feature-branch",
+	}
+
+	result, err := actor.hookSessionStart(
+		context.Background(),
+		claudeagent.SessionStartInput{
+			BaseHookInput: claudeagent.BaseHookInput{
+				SessionID: "test-session",
+			},
+			Source: "startup",
+		},
+	)
+
+	require.NoError(t, err)
+	require.True(t, result.Continue)
+
+	// The agent should have been registered.
+	require.NotZero(t, actor.agentID)
+
+	// Verify agent exists in the store.
+	agentName := actor.reviewerAgentName()
+	agent, err := mockStore.GetAgentByName(
+		context.Background(), agentName,
+	)
+	require.NoError(t, err)
+	require.Equal(t, agentName, agent.Name)
+}
+
+// TestHookStop_NoAgentID tests that the stop hook approves exit when there
+// is no agent ID (agent wasn't registered).
+func TestHookStop_NoAgentID(t *testing.T) {
+	actor := &reviewSubActor{
+		reviewID: "hook-stop-test",
+		config:   DefaultReviewerConfig(),
+		store:    store.NewMockStore(),
+		agentID:  0,
+	}
+
+	result, err := actor.hookStop(
+		context.Background(),
+		claudeagent.StopInput{},
+	)
+
+	require.NoError(t, err)
+	require.Equal(t, "approve", result.Decision)
+}
+
+// TestHookStop_NoMessages tests that the stop hook eventually approves
+// exit when there are no unread messages (using a cancelled context to
+// avoid the full poll timeout).
+func TestHookStop_NoMessages(t *testing.T) {
+	mockStore := store.NewMockStore()
+
+	// Create an agent in the store.
+	agent, err := mockStore.CreateAgent(
+		context.Background(),
+		store.CreateAgentParams{Name: "reviewer-full-hookstop"},
+	)
+	require.NoError(t, err)
+
+	actor := &reviewSubActor{
+		reviewID: "hookstop-test",
+		config:   DefaultReviewerConfig(),
+		store:    mockStore,
+		agentID:  agent.ID,
+	}
+
+	// Use a cancelled context to exit the poll loop immediately.
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+
+	result, err := actor.hookStop(ctx, claudeagent.StopInput{})
+
+	require.NoError(t, err)
+	require.Equal(t, "approve", result.Decision)
+}
+
+// TestFormatMailAsPrompt tests formatting inbox messages for injection.
+func TestFormatMailAsPrompt(t *testing.T) {
+	msgs := []store.InboxMessage{
+		{
+			Message: store.Message{
+				Subject: "Re-review requested",
+				Body:    "I fixed the issues, please review again.",
+			},
+			SenderName: "dev-agent",
+		},
+	}
+
+	prompt := formatMailAsPrompt(msgs)
+	require.Contains(t, prompt, "dev-agent")
+	require.Contains(t, prompt, "Re-review requested")
+	require.Contains(t, prompt, "I fixed the issues")
+	require.Contains(t, prompt, "Message 1")
+}
+
+// TestBuildSystemPrompt_SubstrateSection verifies the system prompt
+// includes substrate messaging instructions.
+func TestBuildSystemPrompt_SubstrateSection(t *testing.T) {
+	actor := &reviewSubActor{
+		reviewID: "test-substrate-prompt",
+		config:   DefaultReviewerConfig(),
+		store:    store.NewMockStore(),
+	}
+
+	prompt := actor.buildSystemPrompt()
+	require.Contains(t, prompt, "Substrate Messaging")
+	require.Contains(t, prompt, "substrate send")
+	require.Contains(t, prompt, actor.reviewerAgentName())
 }
 
 // fmt is used in TestHandleSubActorResult_Error.
