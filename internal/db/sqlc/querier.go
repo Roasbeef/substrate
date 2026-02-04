@@ -60,6 +60,9 @@ type Querier interface {
 	// Fetch recipients for multiple messages at once with agent names.
 	// Pass message IDs as a comma-separated string using sqlc.slice.
 	GetMessageRecipientsWithAgentsBulk(ctx context.Context, messageIds []int64) ([]GetMessageRecipientsWithAgentsBulkRow, error)
+	// Get messages from agents whose name starts with a given prefix.
+	// Used for aggregate views like CodeReviewer (all reviewer-* agents).
+	GetMessagesBySenderNamePrefix(ctx context.Context, arg GetMessagesBySenderNamePrefixParams) ([]GetMessagesBySenderNamePrefixRow, error)
 	GetMessagesByThread(ctx context.Context, threadID string) ([]Message, error)
 	// Get messages in a thread with sender information (name, project, branch).
 	GetMessagesByThreadWithSender(ctx context.Context, threadID string) ([]GetMessagesByThreadWithSenderRow, error)

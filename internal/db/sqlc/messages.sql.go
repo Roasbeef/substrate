@@ -726,6 +726,81 @@ func (q *Queries) GetMessageRecipientsWithAgentsBulk(ctx context.Context, messag
 	return items, nil
 }
 
+const GetMessagesBySenderNamePrefix = `-- name: GetMessagesBySenderNamePrefix :many
+SELECT m.id, m.thread_id, m.topic_id, m.log_offset, m.sender_id, m.subject, m.body_md, m.priority, m.deadline_at, m.attachments, m.created_at, m.deleted_by_sender, m.metadata, a.name as sender_name, a.project_key as sender_project_key, a.git_branch as sender_git_branch
+FROM messages m
+JOIN agents a ON m.sender_id = a.id
+WHERE a.name LIKE ?1 || '%' AND m.deleted_by_sender = 0
+ORDER BY m.created_at DESC
+LIMIT ?2
+`
+
+type GetMessagesBySenderNamePrefixParams struct {
+	Prefix sql.NullString
+	Limit  int64
+}
+
+type GetMessagesBySenderNamePrefixRow struct {
+	ID               int64
+	ThreadID         string
+	TopicID          int64
+	LogOffset        int64
+	SenderID         int64
+	Subject          string
+	BodyMd           string
+	Priority         string
+	DeadlineAt       sql.NullInt64
+	Attachments      sql.NullString
+	CreatedAt        int64
+	DeletedBySender  int64
+	Metadata         sql.NullString
+	SenderName       string
+	SenderProjectKey sql.NullString
+	SenderGitBranch  sql.NullString
+}
+
+// Get messages from agents whose name starts with a given prefix.
+// Used for aggregate views like CodeReviewer (all reviewer-* agents).
+func (q *Queries) GetMessagesBySenderNamePrefix(ctx context.Context, arg GetMessagesBySenderNamePrefixParams) ([]GetMessagesBySenderNamePrefixRow, error) {
+	rows, err := q.db.QueryContext(ctx, GetMessagesBySenderNamePrefix, arg.Prefix, arg.Limit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []GetMessagesBySenderNamePrefixRow
+	for rows.Next() {
+		var i GetMessagesBySenderNamePrefixRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.ThreadID,
+			&i.TopicID,
+			&i.LogOffset,
+			&i.SenderID,
+			&i.Subject,
+			&i.BodyMd,
+			&i.Priority,
+			&i.DeadlineAt,
+			&i.Attachments,
+			&i.CreatedAt,
+			&i.DeletedBySender,
+			&i.Metadata,
+			&i.SenderName,
+			&i.SenderProjectKey,
+			&i.SenderGitBranch,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const GetMessagesByThread = `-- name: GetMessagesByThread :many
 SELECT id, thread_id, topic_id, log_offset, sender_id, subject, body_md, priority, deadline_at, attachments, created_at, deleted_by_sender, metadata FROM messages WHERE thread_id = ? ORDER BY created_at ASC
 `
