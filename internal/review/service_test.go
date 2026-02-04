@@ -5,6 +5,7 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+	"time"
 
 	"github.com/roasbeef/subtrate/internal/baselib/actor"
 	"github.com/roasbeef/subtrate/internal/db"
@@ -84,16 +85,31 @@ func createTestAgent(
 	return agent
 }
 
-// newTestService creates a review Service backed by a real database.
+// newTestService creates a review Service backed by a real database and a
+// test actor system for sub-actor lifecycle management.
 func newTestService(
 	t *testing.T,
 ) (*Service, store.Storage, func()) {
 	t.Helper()
 
+	as := actor.NewActorSystem()
 	storage, cleanup := testDB(t)
-	svc := NewService(ServiceConfig{Store: storage})
+	svc := NewService(ServiceConfig{
+		Store:       storage,
+		ActorSystem: as,
+	})
 
-	return svc, storage, cleanup
+	return svc, storage, func() {
+		// Use a short timeout for shutdown in tests since spawned
+		// reviewer actors may be stuck connecting to the Claude CLI
+		// which doesn't exist in the test environment.
+		shutdownCtx, cancel := context.WithTimeout(
+			context.Background(), 5*time.Second,
+		)
+		defer cancel()
+		as.Shutdown(shutdownCtx)
+		cleanup()
+	}
 }
 
 // TestService_CreateReview tests creating a new review and verifying the
@@ -742,7 +758,18 @@ func TestService_RecoverActiveReviews(t *testing.T) {
 	require.Equal(t, 2, svc.ActiveReviewCount())
 
 	// Create a fresh service to simulate restart.
-	svc2 := NewService(ServiceConfig{Store: storage})
+	as2 := actor.NewActorSystem()
+	defer func() {
+		shutdownCtx, cancel := context.WithTimeout(
+			context.Background(), 5*time.Second,
+		)
+		defer cancel()
+		as2.Shutdown(shutdownCtx)
+	}()
+	svc2 := NewService(ServiceConfig{
+		Store:       storage,
+		ActorSystem: as2,
+	})
 	require.Equal(t, 0, svc2.ActiveReviewCount())
 
 	// Recover active reviews from DB.

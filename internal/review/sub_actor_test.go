@@ -7,9 +7,25 @@ import (
 	"testing"
 	"time"
 
+	"github.com/roasbeef/subtrate/internal/baselib/actor"
 	"github.com/roasbeef/subtrate/internal/store"
 	"github.com/stretchr/testify/require"
 )
+
+// newTestActorSystem creates an actor system for testing and registers a
+// cleanup function that shuts the system down with a short timeout.
+func newTestActorSystem(t *testing.T) *actor.ActorSystem {
+	t.Helper()
+	as := actor.NewActorSystem()
+	t.Cleanup(func() {
+		shutdownCtx, cancel := context.WithTimeout(
+			context.Background(), 5*time.Second,
+		)
+		defer cancel()
+		as.Shutdown(shutdownCtx)
+	})
+	return as
+}
 
 // TestParseReviewerResponse_Approve tests parsing an approve decision.
 func TestParseReviewerResponse_Approve(t *testing.T) {
@@ -328,8 +344,9 @@ func TestBuildClientOptions(t *testing.T) {
 
 // TestSubActorManager_SpawnAndStop tests the manager lifecycle.
 func TestSubActorManager_SpawnAndStop(t *testing.T) {
+	as := newTestActorSystem(t)
 	mockStore := store.NewMockStore()
-	mgr := NewSubActorManager(mockStore, &SpawnConfig{
+	mgr := NewSubActorManager(as, mockStore, &SpawnConfig{
 		NoSessionPersistence: true,
 	})
 
@@ -339,21 +356,21 @@ func TestSubActorManager_SpawnAndStop(t *testing.T) {
 	// verify the manager tracks actors correctly by using the internal
 	// structure.
 	mgr.mu.Lock()
-	mgr.actors["test-review-1"] = &reviewSubActor{
-		reviewID: "test-review-1",
-	}
+	mgr.actorIDs["test-review-1"] = "reviewer-test-review-1"
 	mgr.mu.Unlock()
 
 	require.Equal(t, 1, mgr.ActiveCount())
 
-	// Stop a specific reviewer.
+	// Stop a specific reviewer (StopAndRemoveActor will be a no-op since
+	// the actor wasn't actually registered with the system, but the
+	// manager's own tracking should be cleaned up).
 	mgr.StopReviewer("test-review-1")
 	require.Equal(t, 0, mgr.ActiveCount())
 
 	// StopAll with multiple actors.
 	mgr.mu.Lock()
-	mgr.actors["review-a"] = &reviewSubActor{reviewID: "review-a"}
-	mgr.actors["review-b"] = &reviewSubActor{reviewID: "review-b"}
+	mgr.actorIDs["review-a"] = "reviewer-review-a"
+	mgr.actorIDs["review-b"] = "reviewer-review-b"
 	mgr.mu.Unlock()
 
 	require.Equal(t, 2, mgr.ActiveCount())
@@ -364,16 +381,15 @@ func TestSubActorManager_SpawnAndStop(t *testing.T) {
 // TestSubActorManager_DuplicateSpawnPrevented verifies that duplicate spawns
 // for the same review ID are prevented.
 func TestSubActorManager_DuplicateSpawnPrevented(t *testing.T) {
+	as := newTestActorSystem(t)
 	mockStore := store.NewMockStore()
-	mgr := NewSubActorManager(mockStore, &SpawnConfig{
+	mgr := NewSubActorManager(as, mockStore, &SpawnConfig{
 		NoSessionPersistence: true,
 	})
 
-	// Manually insert an actor to simulate an active review.
+	// Manually insert an actor ID to simulate an active review.
 	mgr.mu.Lock()
-	mgr.actors["test-review-1"] = &reviewSubActor{
-		reviewID: "test-review-1",
-	}
+	mgr.actorIDs["test-review-1"] = "reviewer-test-review-1"
 	mgr.mu.Unlock()
 
 	callCount := 0
@@ -402,7 +418,10 @@ func TestHandleSubActorResult_Approve(t *testing.T) {
 	defer cleanup()
 
 	agent := createTestAgent(t, st, "ApproveTest")
-	svc := NewService(ServiceConfig{Store: st})
+	svc := NewService(ServiceConfig{
+		Store:       st,
+		ActorSystem: newTestActorSystem(t),
+	})
 
 	// Create a review to get an active FSM. The spawnReviewer
 	// auto-transitions to under_review.
@@ -454,7 +473,10 @@ func TestHandleSubActorResult_RequestChanges(t *testing.T) {
 	defer cleanup()
 
 	agent := createTestAgent(t, st, "RequestChangesTest")
-	svc := NewService(ServiceConfig{Store: st})
+	svc := NewService(ServiceConfig{
+		Store:       st,
+		ActorSystem: newTestActorSystem(t),
+	})
 
 	createResp := svc.handleCreateReview(ctx, CreateReviewMsg{
 		RequesterID: agent.ID,
@@ -505,7 +527,10 @@ func TestHandleSubActorResult_Error(t *testing.T) {
 	defer cleanup()
 
 	agent := createTestAgent(t, st, "ErrorTest")
-	svc := NewService(ServiceConfig{Store: st})
+	svc := NewService(ServiceConfig{
+		Store:       st,
+		ActorSystem: newTestActorSystem(t),
+	})
 
 	createResp := svc.handleCreateReview(ctx, CreateReviewMsg{
 		RequesterID: agent.ID,
@@ -548,7 +573,10 @@ func TestHandleSubActorResult_NoActiveFSM(t *testing.T) {
 	st, cleanup := testDB(t)
 	defer cleanup()
 
-	svc := NewService(ServiceConfig{Store: st})
+	svc := NewService(ServiceConfig{
+		Store:       st,
+		ActorSystem: newTestActorSystem(t),
+	})
 
 	// Call with a non-existent review ID - should not panic.
 	svc.handleSubActorResult(ctx, &SubActorResult{
@@ -756,47 +784,50 @@ func TestDefaultSubActorSpawnConfig(t *testing.T) {
 
 // TestNewSubActorManager verifies manager creation.
 func TestNewSubActorManager(t *testing.T) {
+	as := newTestActorSystem(t)
 	mockStore := store.NewMockStore()
 
 	// With nil config - uses defaults.
-	mgr := NewSubActorManager(mockStore, nil)
+	mgr := NewSubActorManager(as, mockStore, nil)
 	require.NotNil(t, mgr)
 	require.Equal(t, 0, mgr.ActiveCount())
 
 	// With custom config.
-	mgr2 := NewSubActorManager(mockStore, &SpawnConfig{
+	mgr2 := NewSubActorManager(as, mockStore, &SpawnConfig{
 		MaxTurns: 10,
 	})
 	require.NotNil(t, mgr2)
 }
 
-// TestStopSubActors verifies the service cleanup method.
-func TestStopSubActors(t *testing.T) {
+// TestOnStop verifies the service OnStop cleanup method.
+func TestOnStop(t *testing.T) {
+	as := newTestActorSystem(t)
 	st, cleanup := testDB(t)
 	defer cleanup()
 
-	svc := NewService(ServiceConfig{Store: st})
+	svc := NewService(ServiceConfig{
+		Store:       st,
+		ActorSystem: as,
+	})
 
-	// Insert some fake actors.
+	// Insert some fake actor IDs.
 	svc.subActorMgr.mu.Lock()
-	svc.subActorMgr.actors["r1"] = &reviewSubActor{
-		reviewID: "r1",
-	}
-	svc.subActorMgr.actors["r2"] = &reviewSubActor{
-		reviewID: "r2",
-	}
+	svc.subActorMgr.actorIDs["r1"] = "reviewer-r1"
+	svc.subActorMgr.actorIDs["r2"] = "reviewer-r2"
 	svc.subActorMgr.mu.Unlock()
 
 	require.Equal(t, 2, svc.subActorMgr.ActiveCount())
-	svc.StopSubActors()
+	err := svc.OnStop(context.Background())
+	require.NoError(t, err)
 	require.Equal(t, 0, svc.subActorMgr.ActiveCount())
 }
 
 // TestSubActorCallbackCleanup verifies that the manager callback removes the
 // actor from tracking after completion.
 func TestSubActorCallbackCleanup(t *testing.T) {
+	as := newTestActorSystem(t)
 	mockStore := store.NewMockStore()
-	mgr := NewSubActorManager(mockStore, &SpawnConfig{
+	mgr := NewSubActorManager(as, mockStore, &SpawnConfig{
 		NoSessionPersistence: true,
 	})
 
@@ -815,7 +846,7 @@ func TestSubActorCallbackCleanup(t *testing.T) {
 		ctx context.Context, result *SubActorResult,
 	) {
 		mgr.mu.Lock()
-		delete(mgr.actors, "test-review-cleanup")
+		delete(mgr.actorIDs, "test-review-cleanup")
 		mgr.mu.Unlock()
 
 		callback(ctx, result)
@@ -823,9 +854,7 @@ func TestSubActorCallbackCleanup(t *testing.T) {
 
 	// Simulate actor being tracked.
 	mgr.mu.Lock()
-	mgr.actors["test-review-cleanup"] = &reviewSubActor{
-		reviewID: "test-review-cleanup",
-	}
+	mgr.actorIDs["test-review-cleanup"] = "reviewer-test-review-cleanup"
 	mgr.mu.Unlock()
 
 	require.Equal(t, 1, mgr.ActiveCount())
@@ -875,13 +904,17 @@ func TestServiceWithSubActorManager(t *testing.T) {
 	defer cleanup()
 
 	// Default config.
-	svc := NewService(ServiceConfig{Store: st})
+	svc := NewService(ServiceConfig{
+		Store:       st,
+		ActorSystem: newTestActorSystem(t),
+	})
 	require.NotNil(t, svc.subActorMgr)
 	require.Equal(t, 0, svc.subActorMgr.ActiveCount())
 
 	// With custom spawn config.
 	svc2 := NewService(ServiceConfig{
-		Store: st,
+		Store:       st,
+		ActorSystem: newTestActorSystem(t),
 		SpawnConfig: &SpawnConfig{
 			MaxTurns: 5,
 		},
