@@ -79,7 +79,7 @@ func (r *RotatingLogWriter) InitLogRotator(cfg *LogRotatorConfig) error {
 	logFile := filepath.Join(cfg.LogDir, filename)
 	logDir := filepath.Dir(logFile)
 
-	if err := os.MkdirAll(logDir, 0700); err != nil {
+	if err := os.MkdirAll(logDir, 0o700); err != nil {
 		return fmt.Errorf("failed to create log directory: %w", err)
 	}
 

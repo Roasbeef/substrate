@@ -32,8 +32,8 @@ func NewHandlerSet(handlers ...btclogv2.Handler) *HandlerSet {
 //
 // NOTE: this is part of the slog.Handler interface.
 func (h *HandlerSet) Enabled(ctx context.Context,
-	level slog.Level) bool {
-
+	level slog.Level,
+) bool {
 	for _, handler := range h.set {
 		if !handler.Enabled(ctx, level) {
 			return false
@@ -47,8 +47,8 @@ func (h *HandlerSet) Enabled(ctx context.Context,
 //
 // NOTE: this is part of the slog.Handler interface.
 func (h *HandlerSet) Handle(ctx context.Context,
-	record slog.Record) error {
-
+	record slog.Record,
+) error {
 	for _, handler := range h.set {
 		if err := handler.Handle(ctx, record); err != nil {
 			return err
@@ -143,8 +143,8 @@ type reducedSet struct {
 //
 // NOTE: this is part of the slog.Handler interface.
 func (r *reducedSet) Enabled(ctx context.Context,
-	level slog.Level) bool {
-
+	level slog.Level,
+) bool {
 	for _, handler := range r.set {
 		if !handler.Enabled(ctx, level) {
 			return false
@@ -158,8 +158,8 @@ func (r *reducedSet) Enabled(ctx context.Context,
 //
 // NOTE: this is part of the slog.Handler interface.
 func (r *reducedSet) Handle(ctx context.Context,
-	record slog.Record) error {
-
+	record slog.Record,
+) error {
 	for _, handler := range r.set {
 		if err := handler.Handle(ctx, record); err != nil {
 			return err
