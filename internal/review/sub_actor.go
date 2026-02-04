@@ -3,12 +3,13 @@ package review
 import (
 	"context"
 	"fmt"
-	"log"
 	"strings"
 	"sync"
 	"time"
 
+	"github.com/lightningnetwork/lnd/fn/v2"
 	claudeagent "github.com/roasbeef/claude-agent-sdk-go"
+	"github.com/roasbeef/subtrate/internal/baselib/actor"
 	"github.com/roasbeef/subtrate/internal/store"
 	"gopkg.in/yaml.v3"
 )
@@ -116,6 +117,63 @@ type SubActorResult struct {
 	Error     error
 }
 
+// ReviewerActorKey is the service key for reviewer sub-actors. Each reviewer
+// is registered with the actor system under this key when spawned.
+var ReviewerActorKey = actor.NewServiceKey[ReviewerRequest, any](
+	"reviewer-actor",
+)
+
+// Ensure reviewSubActor implements ActorBehavior and Stoppable at compile time.
+var _ actor.ActorBehavior[ReviewerRequest, any] = (*reviewSubActor)(nil)
+var _ actor.Stoppable = (*reviewSubActor)(nil)
+
+// Receive implements actor.ActorBehavior. It dispatches to the review
+// execution logic based on the message type.
+func (r *reviewSubActor) Receive(
+	ctx context.Context, msg ReviewerRequest,
+) fn.Result[any] {
+	switch m := msg.(type) {
+	case RunReviewMsg:
+		log.InfoS(ctx, "Reviewer actor received RunReviewMsg",
+			"review_id", r.reviewID,
+			"reviewer", r.config.Name,
+			"repo_path", r.repoPath,
+		)
+		r.Run(ctx)
+		return fn.Ok[any](nil)
+
+	case ResumeReviewMsg:
+		log.InfoS(ctx, "Reviewer actor received ResumeReviewMsg",
+			"review_id", r.reviewID,
+			"reviewer", r.config.Name,
+			"commit_sha", m.CommitSHA,
+		)
+		r.Run(ctx)
+		return fn.Ok[any](nil)
+
+	default:
+		log.WarnS(ctx, "Reviewer actor received unknown message",
+			nil,
+			"review_id", r.reviewID,
+			"msg_type", fmt.Sprintf("%T", msg),
+		)
+		return fn.Err[any](fmt.Errorf(
+			"unknown reviewer message: %T", msg,
+		))
+	}
+}
+
+// OnStop implements actor.Stoppable. Called during actor shutdown to cancel
+// the running review and trigger Claude CLI subprocess cleanup.
+func (r *reviewSubActor) OnStop(ctx context.Context) error {
+	log.InfoS(ctx, "Reviewer actor OnStop called, cancelling review",
+		"review_id", r.reviewID,
+		"reviewer", r.config.Name,
+	)
+	r.Stop()
+	return nil
+}
+
 // newReviewSubActor creates a new reviewer sub-actor for the given review.
 func newReviewSubActor(
 	reviewID, threadID, repoPath string,
@@ -152,6 +210,15 @@ func (r *reviewSubActor) Run(parentCtx context.Context) {
 
 	startTime := time.Now()
 
+	log.InfoS(ctx, "Reviewer sub-actor starting review",
+		"review_id", r.reviewID,
+		"thread_id", r.threadID,
+		"reviewer", r.config.Name,
+		"model", r.config.Model,
+		"timeout", r.config.Timeout.String(),
+		"repo_path", r.repoPath,
+	)
+
 	result := &SubActorResult{
 		ReviewID: r.reviewID,
 		ThreadID: r.threadID,
@@ -164,18 +231,37 @@ func (r *reviewSubActor) Run(parentCtx context.Context) {
 	if err != nil {
 		result.Error = fmt.Errorf("create claude client: %w", err)
 		result.Duration = time.Since(startTime)
+		log.ErrorS(ctx, "Reviewer failed to create Claude client",
+			err,
+			"review_id", r.reviewID,
+			"duration", result.Duration.String(),
+		)
 		r.callback(ctx, result)
 		return
 	}
 	defer client.Close()
 
+	log.InfoS(ctx, "Reviewer connecting to Claude CLI subprocess",
+		"review_id", r.reviewID,
+		"cli_path", r.spawnCfg.CLIPath,
+	)
+
 	// Connect to the CLI subprocess.
 	if err := client.Connect(ctx); err != nil {
 		result.Error = fmt.Errorf("connect to claude CLI: %w", err)
 		result.Duration = time.Since(startTime)
+		log.ErrorS(ctx, "Reviewer failed to connect to Claude CLI",
+			err,
+			"review_id", r.reviewID,
+			"duration", result.Duration.String(),
+		)
 		r.callback(ctx, result)
 		return
 	}
+
+	log.InfoS(ctx, "Reviewer connected, sending review query",
+		"review_id", r.reviewID,
+	)
 
 	// Build and send the review prompt.
 	prompt := r.buildReviewPrompt()
@@ -209,6 +295,11 @@ func (r *reviewSubActor) Run(parentCtx context.Context) {
 	if !gotResult {
 		result.Error = fmt.Errorf("no result message received")
 		result.Duration = time.Since(startTime)
+		log.ErrorS(ctx, "Reviewer received no result message",
+			result.Error,
+			"review_id", r.reviewID,
+			"duration", result.Duration.String(),
+		)
 		r.callback(ctx, result)
 		return
 	}
@@ -220,6 +311,11 @@ func (r *reviewSubActor) Run(parentCtx context.Context) {
 		}
 		result.Error = fmt.Errorf("reviewer error: %s", errMsg)
 		result.Duration = time.Since(startTime)
+		log.ErrorS(ctx, "Reviewer returned error result",
+			result.Error,
+			"review_id", r.reviewID,
+			"duration", result.Duration.String(),
+		)
 		r.callback(ctx, result)
 		return
 	}
@@ -234,11 +330,27 @@ func (r *reviewSubActor) Run(parentCtx context.Context) {
 	if err != nil {
 		result.Error = fmt.Errorf("parse reviewer response: %w", err)
 		result.Duration = time.Since(startTime)
+		log.ErrorS(ctx, "Reviewer failed to parse response YAML",
+			err,
+			"review_id", r.reviewID,
+			"duration", result.Duration.String(),
+		)
 		r.callback(ctx, result)
 		return
 	}
 
 	result.Result = parsed
+
+	log.InfoS(ctx, "Reviewer completed review",
+		"review_id", r.reviewID,
+		"decision", parsed.Decision,
+		"issues_found", len(parsed.Issues),
+		"files_reviewed", parsed.FilesReviewed,
+		"lines_analyzed", parsed.LinesAnalyzed,
+		"session_id", result.SessionID,
+		"cost_usd", result.CostUSD,
+		"duration", result.Duration.String(),
+	)
 
 	// Persist the iteration and issues to the database.
 	r.persistResults(ctx, result, startTime)
@@ -247,9 +359,13 @@ func (r *reviewSubActor) Run(parentCtx context.Context) {
 	r.callback(ctx, result)
 }
 
-// Stop cancels the sub-actor's context.
+// Stop cancels the sub-actor's context, triggering Claude CLI subprocess
+// cleanup (stdin close → 5s grace period → SIGKILL).
 func (r *reviewSubActor) Stop() {
 	if r.cancel != nil {
+		log.Infof("Reviewer sub-actor stopping, cancelling "+
+			"context: review_id=%s", r.reviewID,
+		)
 		r.cancel()
 	}
 }
@@ -428,13 +544,20 @@ func (r *reviewSubActor) persistResults(
 	// Determine iteration number by querying existing iterations.
 	iters, err := r.store.GetReviewIterations(ctx, r.reviewID)
 	if err != nil {
-		log.Printf(
-			"review sub-actor: get iterations for %s: %v",
-			r.reviewID, err,
+		log.ErrorS(ctx, "Reviewer failed to get iterations for persist",
+			err,
+			"review_id", r.reviewID,
 		)
 		return
 	}
 	iterNum := len(iters) + 1
+
+	log.InfoS(ctx, "Reviewer persisting iteration results",
+		"review_id", r.reviewID,
+		"iteration_num", iterNum,
+		"decision", parsed.Decision,
+		"issues_count", len(parsed.Issues),
+	)
 
 	// Create the iteration record.
 	_, err = r.store.CreateReviewIteration(
@@ -454,15 +577,16 @@ func (r *reviewSubActor) persistResults(
 		},
 	)
 	if err != nil {
-		log.Printf(
-			"review sub-actor: create iteration for %s: %v",
-			r.reviewID, err,
+		log.ErrorS(ctx, "Reviewer failed to create iteration record",
+			err,
+			"review_id", r.reviewID,
+			"iteration_num", iterNum,
 		)
 		return
 	}
 
 	// Create issue records for each issue found.
-	for _, issue := range parsed.Issues {
+	for i, issue := range parsed.Issues {
 		_, err := r.store.CreateReviewIssue(
 			ctx, store.CreateReviewIssueParams{
 				ReviewID:     r.reviewID,
@@ -480,12 +604,20 @@ func (r *reviewSubActor) persistResults(
 			},
 		)
 		if err != nil {
-			log.Printf(
-				"review sub-actor: create issue for %s: %v",
-				r.reviewID, err,
+			log.ErrorS(ctx, "Reviewer failed to create issue record",
+				err,
+				"review_id", r.reviewID,
+				"issue_index", i,
+				"issue_title", issue.Title,
 			)
 		}
 	}
+
+	log.InfoS(ctx, "Reviewer persisted results successfully",
+		"review_id", r.reviewID,
+		"iteration_num", iterNum,
+		"issues_persisted", len(parsed.Issues),
+	)
 }
 
 // ParseReviewerResponse extracts the YAML frontmatter block from a reviewer's
@@ -554,32 +686,38 @@ func extractYAMLBlock(text string) string {
 	return strings.TrimSpace(remaining[:closingIdx])
 }
 
-// SubActorManager manages active reviewer sub-actors. It tracks running
-// goroutines and provides cleanup on shutdown.
+// SubActorManager manages active reviewer sub-actors by registering them
+// with the actor system. Each reviewer is a proper actor with lifecycle
+// management, WaitGroup tracking, and OnStop cleanup hooks.
 type SubActorManager struct {
-	mu       sync.Mutex
-	actors   map[string]*reviewSubActor
-	store    store.Storage
-	spawnCfg *SpawnConfig
+	mu          sync.Mutex
+	actorIDs    map[string]string // reviewID → actor system ID.
+	store       store.Storage
+	spawnCfg    *SpawnConfig
+	actorSystem *actor.ActorSystem
 }
 
-// NewSubActorManager creates a new sub-actor manager.
+// NewSubActorManager creates a new sub-actor manager that registers reviewer
+// actors with the given actor system.
 func NewSubActorManager(
-	st store.Storage, spawnCfg *SpawnConfig,
+	as *actor.ActorSystem, st store.Storage, spawnCfg *SpawnConfig,
 ) *SubActorManager {
 	if spawnCfg == nil {
 		spawnCfg = DefaultSubActorSpawnConfig()
 	}
 
 	return &SubActorManager{
-		actors:   make(map[string]*reviewSubActor),
-		store:    st,
-		spawnCfg: spawnCfg,
+		actorIDs:    make(map[string]string),
+		store:       st,
+		spawnCfg:    spawnCfg,
+		actorSystem: as,
 	}
 }
 
 // SpawnReviewer creates and starts a reviewer sub-actor for the given review.
-// The callback is invoked when the reviewer completes.
+// The sub-actor is registered with the actor system as a proper actor, giving
+// it automatic lifecycle management and graceful shutdown support. The callback
+// is invoked when the reviewer completes.
 func (m *SubActorManager) SpawnReviewer(
 	ctx context.Context,
 	reviewID, threadID, repoPath string,
@@ -591,52 +729,107 @@ func (m *SubActorManager) SpawnReviewer(
 	defer m.mu.Unlock()
 
 	// Avoid duplicate spawns for the same review.
-	if _, exists := m.actors[reviewID]; exists {
-		log.Printf(
-			"sub-actor manager: reviewer already active for %s",
-			reviewID,
+	if _, exists := m.actorIDs[reviewID]; exists {
+		log.WarnS(ctx, "Sub-actor manager: reviewer already active, "+
+			"skipping duplicate spawn",
+			nil,
+			"review_id", reviewID,
 		)
 		return
 	}
 
-	actor := newReviewSubActor(
+	log.InfoS(ctx, "Sub-actor manager spawning reviewer",
+		"review_id", reviewID,
+		"thread_id", threadID,
+		"reviewer", config.Name,
+		"repo_path", repoPath,
+		"requester_id", requester,
+	)
+
+	// Create the sub-actor which implements ActorBehavior.
+	sub := newReviewSubActor(
 		reviewID, threadID, repoPath, requester,
 		config, m.store, m.spawnCfg,
 		func(ctx context.Context, result *SubActorResult) {
-			// Remove from active actors when done.
+			// Remove from tracking when done.
 			m.mu.Lock()
-			delete(m.actors, reviewID)
+			delete(m.actorIDs, reviewID)
 			m.mu.Unlock()
+
+			log.InfoS(ctx, "Sub-actor manager: reviewer completed, "+
+				"removed from tracking",
+				"review_id", reviewID,
+				"active_count", m.ActiveCount(),
+			)
 
 			// Forward to the service callback.
 			callback(ctx, result)
 		},
 	)
 
-	m.actors[reviewID] = actor
+	// Register as a proper actor in the system with extended cleanup
+	// timeout for subprocess shutdown (SDK uses 5s grace + SIGKILL).
+	actorID := fmt.Sprintf("reviewer-%s", reviewID)
+	ref := actor.RegisterWithSystem(
+		m.actorSystem, actorID, ReviewerActorKey, sub,
+		actor.WithCleanupTimeout(15*time.Second),
+	)
 
-	go actor.Run(ctx)
+	m.actorIDs[reviewID] = actorID
+
+	log.InfoS(ctx, "Sub-actor manager registered reviewer with actor system",
+		"review_id", reviewID,
+		"actor_id", actorID,
+		"active_count", len(m.actorIDs),
+	)
+
+	// Send the run message to kick off the review.
+	ref.Tell(ctx, RunReviewMsg{})
 }
 
-// StopReviewer stops a running reviewer sub-actor.
+// StopReviewer stops a running reviewer sub-actor by removing it from the
+// actor system. The system calls OnStop which cancels the review context.
 func (m *SubActorManager) StopReviewer(reviewID string) {
 	m.mu.Lock()
-	defer m.mu.Unlock()
+	actorID, ok := m.actorIDs[reviewID]
+	if ok {
+		delete(m.actorIDs, reviewID)
+	}
+	m.mu.Unlock()
 
-	if actor, ok := m.actors[reviewID]; ok {
-		actor.Stop()
-		delete(m.actors, reviewID)
+	if ok {
+		log.Infof("Sub-actor manager stopping reviewer: "+
+			"review_id=%s, actor_id=%s", reviewID, actorID,
+		)
+		m.actorSystem.StopAndRemoveActor(actorID)
 	}
 }
 
-// StopAll stops all active reviewer sub-actors.
+// StopAll stops all active reviewer sub-actors. Called during graceful
+// shutdown as a safety net (the actor system also stops them directly).
 func (m *SubActorManager) StopAll() {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
-	for id, actor := range m.actors {
-		actor.Stop()
-		delete(m.actors, id)
+	count := len(m.actorIDs)
+	if count > 0 {
+		log.Infof("Sub-actor manager stopping all reviewers: "+
+			"active_count=%d", count,
+		)
+	}
+
+	for reviewID, actorID := range m.actorIDs {
+		log.Infof("Sub-actor manager stopping reviewer: "+
+			"review_id=%s, actor_id=%s", reviewID, actorID,
+		)
+		m.actorSystem.StopAndRemoveActor(actorID)
+		delete(m.actorIDs, reviewID)
+	}
+
+	if count > 0 {
+		log.Infof("Sub-actor manager stopped all reviewers: "+
+			"stopped_count=%d", count,
+		)
 	}
 }
 
@@ -644,5 +837,5 @@ func (m *SubActorManager) StopAll() {
 func (m *SubActorManager) ActiveCount() int {
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	return len(m.actors)
+	return len(m.actorIDs)
 }
