@@ -309,6 +309,14 @@ export function MessageRow({
         ) : null}
       </div>
 
+      {/* Recipient names (To field). */}
+      {message.recipients && message.recipients.length > 0 ? (
+        <div className="w-32 flex-shrink-0 truncate text-sm text-gray-500">
+          <span className="text-gray-400">→ </span>
+          {message.recipients.map((r) => r.agent_name).join(', ')}
+        </div>
+      ) : null}
+
       {/* Subject and preview - flexible width. */}
       <div className="flex min-w-0 flex-1 items-baseline gap-1.5">
         {message.priority !== 'normal' ? (
