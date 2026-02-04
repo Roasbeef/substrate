@@ -72,17 +72,22 @@ func main() {
 			},
 		)
 		if err != nil {
-			log.Fatalf(
-				"Failed to init log rotator: %v", err,
+			log.Printf(
+				"Failed to init log rotator: %v "+
+					"(continuing without file logging)",
+				err,
 			)
-		}
-		defer logRotator.Close()
+			logRotator = nil
+		} else {
+			defer logRotator.Close()
 
-		// Redirect the standard log package to write to both
-		// stderr and the log file.
-		multiWriter := io.MultiWriter(os.Stderr, logRotator)
-		log.SetOutput(multiWriter)
-		log.SetFlags(log.LstdFlags)
+			// Redirect the standard log package to write to both
+			// stderr and the log file (only if rotator init
+			// succeeded).
+			multiWriter := io.MultiWriter(os.Stderr, logRotator)
+			log.SetOutput(multiWriter)
+			log.SetFlags(log.LstdFlags)
+		}
 	}
 
 	// Create a logger for the database.
