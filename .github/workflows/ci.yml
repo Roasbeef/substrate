@@ -46,7 +46,15 @@ jobs:
           export CGO_ENABLED=1
           export CGO_CFLAGS="-DSQLITE_ENABLE_FTS5"
           export CGO_LDFLAGS="-lm"
-          go test -v -race -cover -coverprofile=coverage.out -p 4 ./...
+          go test -v -race -count=1 ./...
+
+      - name: Generate coverage
+        if: success()
+        run: |
+          export CGO_ENABLED=1
+          export CGO_CFLAGS="-DSQLITE_ENABLE_FTS5"
+          export CGO_LDFLAGS="-lm"
+          go test -coverprofile=coverage.out -count=1 ./... 2>/dev/null || true
 
       - name: Upload coverage
         uses: codecov/codecov-action@v4
