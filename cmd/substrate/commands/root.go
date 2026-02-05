@@ -92,4 +92,5 @@ func init() {
 	rootCmd.AddCommand(publishCmd)
 	rootCmd.AddCommand(statusUpdateCmd)
 	rootCmd.AddCommand(reviewCmd)
+	rootCmd.AddCommand(sendDiffCmd)
 }
