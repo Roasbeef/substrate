@@ -49,9 +49,9 @@ func (s *Server) CreateReview(
 		baseBranch = t.PrTarget.BaseBranch
 	default:
 		// Fall back to deprecated fields for backward compatibility.
-		branch = req.Branch      //nolint:staticcheck
-		baseBranch = req.BaseBranch //nolint:staticcheck
-		commitSHA = req.CommitSha   //nolint:staticcheck
+		branch = req.Branch          //nolint:staticcheck
+		baseBranch = req.BaseBranch  //nolint:staticcheck
+		commitSHA = req.CommitSha    //nolint:staticcheck
 		prNumber = int(req.PrNumber) //nolint:staticcheck
 	}
 
