@@ -271,31 +271,31 @@ describe('messages API', () => {
   describe('toggleMessageStar', () => {
     it('should star a message', async () => {
       server.use(
-        http.post('/api/v1/messages/1/star', async ({ request }) => {
-          const body = (await request.json()) as { starred?: boolean };
-          expect(body.starred).toBe(true);
-          return new HttpResponse(null, { status: 204 });
+        http.patch('/api/v1/messages/1', async ({ request }) => {
+          const body = (await request.json()) as { new_state?: string };
+          expect(body.new_state).toBe('STATE_STARRED');
+          return HttpResponse.json({ success: true });
         }),
       );
 
-      await expect(toggleMessageStar(1, true)).resolves.toBeUndefined();
+      await toggleMessageStar(1, true);
     });
 
     it('should unstar a message', async () => {
       server.use(
-        http.post('/api/v1/messages/1/star', async ({ request }) => {
-          const body = (await request.json()) as { starred?: boolean };
-          expect(body.starred).toBe(false);
-          return new HttpResponse(null, { status: 204 });
+        http.patch('/api/v1/messages/1', async ({ request }) => {
+          const body = (await request.json()) as { new_state?: string };
+          expect(body.new_state).toBe('STATE_READ');
+          return HttpResponse.json({ success: true });
         }),
       );
 
-      await expect(toggleMessageStar(1, false)).resolves.toBeUndefined();
+      await toggleMessageStar(1, false);
     });
 
     it('should handle error', async () => {
       server.use(
-        http.post('/api/v1/messages/1/star', () => {
+        http.patch('/api/v1/messages/1', () => {
           return HttpResponse.json(
             { error: { code: 'not_found', message: 'Message not found' } },
             { status: 404 },
@@ -310,17 +310,19 @@ describe('messages API', () => {
   describe('archiveMessage', () => {
     it('should archive a message', async () => {
       server.use(
-        http.post('/api/v1/messages/1/archive', () => {
-          return new HttpResponse(null, { status: 204 });
+        http.patch('/api/v1/messages/1', async ({ request }) => {
+          const body = (await request.json()) as { new_state?: string };
+          expect(body.new_state).toBe('STATE_ARCHIVED');
+          return HttpResponse.json({ success: true });
         }),
       );
 
-      await expect(archiveMessage(1)).resolves.toBeUndefined();
+      await archiveMessage(1);
     });
 
     it('should handle 404 for non-existent message', async () => {
       server.use(
-        http.post('/api/v1/messages/999/archive', () => {
+        http.patch('/api/v1/messages/999', () => {
           return HttpResponse.json(
             { error: { code: 'not_found', message: 'Message not found' } },
             { status: 404 },
@@ -335,17 +337,19 @@ describe('messages API', () => {
   describe('unarchiveMessage', () => {
     it('should unarchive a message', async () => {
       server.use(
-        http.post('/api/v1/messages/1/unarchive', () => {
-          return new HttpResponse(null, { status: 204 });
+        http.patch('/api/v1/messages/1', async ({ request }) => {
+          const body = (await request.json()) as { new_state?: string };
+          expect(body.new_state).toBe('STATE_READ');
+          return HttpResponse.json({ success: true });
         }),
       );
 
-      await expect(unarchiveMessage(1)).resolves.toBeUndefined();
+      await unarchiveMessage(1);
     });
 
     it('should handle error for non-archived message', async () => {
       server.use(
-        http.post('/api/v1/messages/1/unarchive', () => {
+        http.patch('/api/v1/messages/1', () => {
           return HttpResponse.json(
             { error: { code: 'invalid_state', message: 'Message not archived' } },
             { status: 400 },
@@ -362,19 +366,20 @@ describe('messages API', () => {
       const snoozeUntil = new Date(Date.now() + 3600000).toISOString();
 
       server.use(
-        http.post('/api/v1/messages/1/snooze', async ({ request }) => {
-          const body = (await request.json()) as { until?: string };
-          expect(body.until).toBe(snoozeUntil);
-          return new HttpResponse(null, { status: 204 });
+        http.patch('/api/v1/messages/1', async ({ request }) => {
+          const body = (await request.json()) as { new_state?: string; snoozed_until?: string };
+          expect(body.new_state).toBe('STATE_SNOOZED');
+          expect(body.snoozed_until).toBe(snoozeUntil);
+          return HttpResponse.json({ success: true });
         }),
       );
 
-      await expect(snoozeMessage(1, snoozeUntil)).resolves.toBeUndefined();
+      await snoozeMessage(1, snoozeUntil);
     });
 
     it('should handle invalid date error', async () => {
       server.use(
-        http.post('/api/v1/messages/1/snooze', () => {
+        http.patch('/api/v1/messages/1', () => {
           return HttpResponse.json(
             { error: { code: 'validation_error', message: 'Invalid date' } },
             { status: 400 },
@@ -389,17 +394,19 @@ describe('messages API', () => {
   describe('markMessageRead', () => {
     it('should mark a message as read', async () => {
       server.use(
-        http.post('/api/v1/messages/1/read', () => {
-          return new HttpResponse(null, { status: 204 });
+        http.patch('/api/v1/messages/1', async ({ request }) => {
+          const body = (await request.json()) as { new_state?: string };
+          expect(body.new_state).toBe('STATE_READ');
+          return HttpResponse.json({ success: true });
         }),
       );
 
-      await expect(markMessageRead(1)).resolves.toBeUndefined();
+      await markMessageRead(1);
     });
 
     it('should handle error', async () => {
       server.use(
-        http.post('/api/v1/messages/999/read', () => {
+        http.patch('/api/v1/messages/999', () => {
           return HttpResponse.json(
             { error: { code: 'not_found', message: 'Message not found' } },
             { status: 404 },

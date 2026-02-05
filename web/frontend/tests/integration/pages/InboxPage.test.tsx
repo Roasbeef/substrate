@@ -436,9 +436,9 @@ describe('InboxPage', () => {
       let starCalled = false;
 
       server.use(
-        http.post('/api/v1/messages/:id/star', () => {
+        http.patch('/api/v1/messages/:id', () => {
           starCalled = true;
-          return new HttpResponse(null, { status: 204 });
+          return HttpResponse.json({ success: true });
         }),
       );
 

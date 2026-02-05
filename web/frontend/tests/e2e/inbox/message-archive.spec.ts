@@ -29,7 +29,28 @@ async function setupMessagesAPI(page: import('@playwright/test').Page) {
 
   const archivedIds: string[] = [];
 
-  await page.route('**/api/v1/messages*', async (route) => {
+  // Single handler for all /messages requests (GET list, PATCH update).
+  // Use ** to match both /messages?... and /messages/1.
+  await page.route('**/api/v1/messages**', async (route, request) => {
+    if (request.method() === 'PATCH') {
+      const url = request.url();
+      const idMatch = url.match(/messages\/(\d+)/);
+      const id = idMatch ? idMatch[1] : '1';
+
+      const body = request.postDataJSON() as { new_state?: string };
+      if (body.new_state === 'STATE_ARCHIVED') {
+        archivedIds.push(id);
+      }
+
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ success: true }),
+      });
+      return;
+    }
+
+    // GET: return active (non-archived) messages.
     const activeMessages = messages.filter((m) => !archivedIds.includes(m.id));
     await route.fulfill({
       status: 200,
@@ -51,20 +72,6 @@ async function setupMessagesAPI(page: import('@playwright/test').Page) {
       status: 200,
       contentType: 'application/json',
       body: JSON.stringify({ topics: [] }),
-    });
-  });
-
-  await page.route('**/api/v1/messages/*/archive', async (route) => {
-    const url = route.request().url();
-    const idMatch = url.match(/messages\/(\d+)\/archive/);
-    const id = idMatch ? idMatch[1] : '1';
-
-    archivedIds.push(id);
-
-    await route.fulfill({
-      status: 200,
-      contentType: 'application/json',
-      body: JSON.stringify({ id, state: 'archived' }),
     });
   });
 
