@@ -53,7 +53,7 @@ async function setupAPIs(page: import('@playwright/test').Page) {
     }
   });
 
-  await page.route('**/api/v1/sessions/active', async (route) => {
+  await page.route('**/api/v1/sessions', async (route) => {
     await route.fulfill({
       status: 200,
       contentType: 'application/json',

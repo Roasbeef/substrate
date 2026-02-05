@@ -6,8 +6,8 @@ test.describe('App smoke tests', () => {
   test('homepage loads', async ({ page }) => {
     await page.goto('/');
 
-    // Check that the page has a heading.
-    await expect(page.locator('h1')).toBeVisible();
+    // Check that the inbox page loads with stats cards visible.
+    await expect(page.locator('.grid')).toBeVisible();
   });
 
   test('has correct title', async ({ page }) => {
