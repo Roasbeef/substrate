@@ -898,6 +898,22 @@ message ReviewDetailResponse {
     int32 iterations = 7;
     int64 open_issues = 8;
     string error = 9;
+    // Iteration details for displaying review history.
+    repeated ReviewIterationProto iteration_details = 10;
+}
+
+// ReviewIterationProto represents a single review iteration with results.
+message ReviewIterationProto {
+    int32 iteration_num = 1;
+    string reviewer_id = 2;
+    string decision = 3;
+    string summary = 4;
+    int32 files_reviewed = 5;
+    int32 lines_analyzed = 6;
+    int64 duration_ms = 7;
+    double cost_usd = 8;
+    int64 started_at = 9;
+    int64 completed_at = 10;
 }
 
 // ResubmitReviewRequest is the request for ResubmitReview.

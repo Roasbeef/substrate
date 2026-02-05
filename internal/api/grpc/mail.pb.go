@@ -5840,18 +5840,20 @@ func (x *GetReviewProtoRequest) GetReviewId() string {
 
 // ReviewDetailResponse is the response for GetReview.
 type ReviewDetailResponse struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	ReviewId      string                 `protobuf:"bytes,1,opt,name=review_id,json=reviewId,proto3" json:"review_id,omitempty"`
-	ThreadId      string                 `protobuf:"bytes,2,opt,name=thread_id,json=threadId,proto3" json:"thread_id,omitempty"`
-	State         string                 `protobuf:"bytes,3,opt,name=state,proto3" json:"state,omitempty"`
-	Branch        string                 `protobuf:"bytes,4,opt,name=branch,proto3" json:"branch,omitempty"`
-	BaseBranch    string                 `protobuf:"bytes,5,opt,name=base_branch,json=baseBranch,proto3" json:"base_branch,omitempty"`
-	ReviewType    string                 `protobuf:"bytes,6,opt,name=review_type,json=reviewType,proto3" json:"review_type,omitempty"`
-	Iterations    int32                  `protobuf:"varint,7,opt,name=iterations,proto3" json:"iterations,omitempty"`
-	OpenIssues    int64                  `protobuf:"varint,8,opt,name=open_issues,json=openIssues,proto3" json:"open_issues,omitempty"`
-	Error         string                 `protobuf:"bytes,9,opt,name=error,proto3" json:"error,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	state      protoimpl.MessageState `protogen:"open.v1"`
+	ReviewId   string                 `protobuf:"bytes,1,opt,name=review_id,json=reviewId,proto3" json:"review_id,omitempty"`
+	ThreadId   string                 `protobuf:"bytes,2,opt,name=thread_id,json=threadId,proto3" json:"thread_id,omitempty"`
+	State      string                 `protobuf:"bytes,3,opt,name=state,proto3" json:"state,omitempty"`
+	Branch     string                 `protobuf:"bytes,4,opt,name=branch,proto3" json:"branch,omitempty"`
+	BaseBranch string                 `protobuf:"bytes,5,opt,name=base_branch,json=baseBranch,proto3" json:"base_branch,omitempty"`
+	ReviewType string                 `protobuf:"bytes,6,opt,name=review_type,json=reviewType,proto3" json:"review_type,omitempty"`
+	Iterations int32                  `protobuf:"varint,7,opt,name=iterations,proto3" json:"iterations,omitempty"`
+	OpenIssues int64                  `protobuf:"varint,8,opt,name=open_issues,json=openIssues,proto3" json:"open_issues,omitempty"`
+	Error      string                 `protobuf:"bytes,9,opt,name=error,proto3" json:"error,omitempty"`
+	// Iteration details for displaying review history.
+	IterationDetails []*ReviewIterationProto `protobuf:"bytes,10,rep,name=iteration_details,json=iterationDetails,proto3" json:"iteration_details,omitempty"`
+	unknownFields    protoimpl.UnknownFields
+	sizeCache        protoimpl.SizeCache
 }
 
 func (x *ReviewDetailResponse) Reset() {
@@ -5947,6 +5949,130 @@ func (x *ReviewDetailResponse) GetError() string {
 	return ""
 }
 
+func (x *ReviewDetailResponse) GetIterationDetails() []*ReviewIterationProto {
+	if x != nil {
+		return x.IterationDetails
+	}
+	return nil
+}
+
+// ReviewIterationProto represents a single review iteration with results.
+type ReviewIterationProto struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	IterationNum  int32                  `protobuf:"varint,1,opt,name=iteration_num,json=iterationNum,proto3" json:"iteration_num,omitempty"`
+	ReviewerId    string                 `protobuf:"bytes,2,opt,name=reviewer_id,json=reviewerId,proto3" json:"reviewer_id,omitempty"`
+	Decision      string                 `protobuf:"bytes,3,opt,name=decision,proto3" json:"decision,omitempty"`
+	Summary       string                 `protobuf:"bytes,4,opt,name=summary,proto3" json:"summary,omitempty"`
+	FilesReviewed int32                  `protobuf:"varint,5,opt,name=files_reviewed,json=filesReviewed,proto3" json:"files_reviewed,omitempty"`
+	LinesAnalyzed int32                  `protobuf:"varint,6,opt,name=lines_analyzed,json=linesAnalyzed,proto3" json:"lines_analyzed,omitempty"`
+	DurationMs    int64                  `protobuf:"varint,7,opt,name=duration_ms,json=durationMs,proto3" json:"duration_ms,omitempty"`
+	CostUsd       float64                `protobuf:"fixed64,8,opt,name=cost_usd,json=costUsd,proto3" json:"cost_usd,omitempty"`
+	StartedAt     int64                  `protobuf:"varint,9,opt,name=started_at,json=startedAt,proto3" json:"started_at,omitempty"`
+	CompletedAt   int64                  `protobuf:"varint,10,opt,name=completed_at,json=completedAt,proto3" json:"completed_at,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ReviewIterationProto) Reset() {
+	*x = ReviewIterationProto{}
+	mi := &file_mail_proto_msgTypes[94]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ReviewIterationProto) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ReviewIterationProto) ProtoMessage() {}
+
+func (x *ReviewIterationProto) ProtoReflect() protoreflect.Message {
+	mi := &file_mail_proto_msgTypes[94]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ReviewIterationProto.ProtoReflect.Descriptor instead.
+func (*ReviewIterationProto) Descriptor() ([]byte, []int) {
+	return file_mail_proto_rawDescGZIP(), []int{94}
+}
+
+func (x *ReviewIterationProto) GetIterationNum() int32 {
+	if x != nil {
+		return x.IterationNum
+	}
+	return 0
+}
+
+func (x *ReviewIterationProto) GetReviewerId() string {
+	if x != nil {
+		return x.ReviewerId
+	}
+	return ""
+}
+
+func (x *ReviewIterationProto) GetDecision() string {
+	if x != nil {
+		return x.Decision
+	}
+	return ""
+}
+
+func (x *ReviewIterationProto) GetSummary() string {
+	if x != nil {
+		return x.Summary
+	}
+	return ""
+}
+
+func (x *ReviewIterationProto) GetFilesReviewed() int32 {
+	if x != nil {
+		return x.FilesReviewed
+	}
+	return 0
+}
+
+func (x *ReviewIterationProto) GetLinesAnalyzed() int32 {
+	if x != nil {
+		return x.LinesAnalyzed
+	}
+	return 0
+}
+
+func (x *ReviewIterationProto) GetDurationMs() int64 {
+	if x != nil {
+		return x.DurationMs
+	}
+	return 0
+}
+
+func (x *ReviewIterationProto) GetCostUsd() float64 {
+	if x != nil {
+		return x.CostUsd
+	}
+	return 0
+}
+
+func (x *ReviewIterationProto) GetStartedAt() int64 {
+	if x != nil {
+		return x.StartedAt
+	}
+	return 0
+}
+
+func (x *ReviewIterationProto) GetCompletedAt() int64 {
+	if x != nil {
+		return x.CompletedAt
+	}
+	return 0
+}
+
 // ResubmitReviewRequest is the request for ResubmitReview.
 type ResubmitReviewRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
@@ -5958,7 +6084,7 @@ type ResubmitReviewRequest struct {
 
 func (x *ResubmitReviewRequest) Reset() {
 	*x = ResubmitReviewRequest{}
-	mi := &file_mail_proto_msgTypes[94]
+	mi := &file_mail_proto_msgTypes[95]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -5970,7 +6096,7 @@ func (x *ResubmitReviewRequest) String() string {
 func (*ResubmitReviewRequest) ProtoMessage() {}
 
 func (x *ResubmitReviewRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_mail_proto_msgTypes[94]
+	mi := &file_mail_proto_msgTypes[95]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -5983,7 +6109,7 @@ func (x *ResubmitReviewRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ResubmitReviewRequest.ProtoReflect.Descriptor instead.
 func (*ResubmitReviewRequest) Descriptor() ([]byte, []int) {
-	return file_mail_proto_rawDescGZIP(), []int{94}
+	return file_mail_proto_rawDescGZIP(), []int{95}
 }
 
 func (x *ResubmitReviewRequest) GetReviewId() string {
@@ -6011,7 +6137,7 @@ type CancelReviewProtoRequest struct {
 
 func (x *CancelReviewProtoRequest) Reset() {
 	*x = CancelReviewProtoRequest{}
-	mi := &file_mail_proto_msgTypes[95]
+	mi := &file_mail_proto_msgTypes[96]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -6023,7 +6149,7 @@ func (x *CancelReviewProtoRequest) String() string {
 func (*CancelReviewProtoRequest) ProtoMessage() {}
 
 func (x *CancelReviewProtoRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_mail_proto_msgTypes[95]
+	mi := &file_mail_proto_msgTypes[96]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -6036,7 +6162,7 @@ func (x *CancelReviewProtoRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CancelReviewProtoRequest.ProtoReflect.Descriptor instead.
 func (*CancelReviewProtoRequest) Descriptor() ([]byte, []int) {
-	return file_mail_proto_rawDescGZIP(), []int{95}
+	return file_mail_proto_rawDescGZIP(), []int{96}
 }
 
 func (x *CancelReviewProtoRequest) GetReviewId() string {
@@ -6063,7 +6189,7 @@ type CancelReviewProtoResponse struct {
 
 func (x *CancelReviewProtoResponse) Reset() {
 	*x = CancelReviewProtoResponse{}
-	mi := &file_mail_proto_msgTypes[96]
+	mi := &file_mail_proto_msgTypes[97]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -6075,7 +6201,7 @@ func (x *CancelReviewProtoResponse) String() string {
 func (*CancelReviewProtoResponse) ProtoMessage() {}
 
 func (x *CancelReviewProtoResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_mail_proto_msgTypes[96]
+	mi := &file_mail_proto_msgTypes[97]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -6088,7 +6214,7 @@ func (x *CancelReviewProtoResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CancelReviewProtoResponse.ProtoReflect.Descriptor instead.
 func (*CancelReviewProtoResponse) Descriptor() ([]byte, []int) {
-	return file_mail_proto_rawDescGZIP(), []int{96}
+	return file_mail_proto_rawDescGZIP(), []int{97}
 }
 
 func (x *CancelReviewProtoResponse) GetError() string {
@@ -6108,7 +6234,7 @@ type DeleteReviewProtoRequest struct {
 
 func (x *DeleteReviewProtoRequest) Reset() {
 	*x = DeleteReviewProtoRequest{}
-	mi := &file_mail_proto_msgTypes[97]
+	mi := &file_mail_proto_msgTypes[98]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -6120,7 +6246,7 @@ func (x *DeleteReviewProtoRequest) String() string {
 func (*DeleteReviewProtoRequest) ProtoMessage() {}
 
 func (x *DeleteReviewProtoRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_mail_proto_msgTypes[97]
+	mi := &file_mail_proto_msgTypes[98]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -6133,7 +6259,7 @@ func (x *DeleteReviewProtoRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DeleteReviewProtoRequest.ProtoReflect.Descriptor instead.
 func (*DeleteReviewProtoRequest) Descriptor() ([]byte, []int) {
-	return file_mail_proto_rawDescGZIP(), []int{97}
+	return file_mail_proto_rawDescGZIP(), []int{98}
 }
 
 func (x *DeleteReviewProtoRequest) GetReviewId() string {
@@ -6153,7 +6279,7 @@ type DeleteReviewProtoResponse struct {
 
 func (x *DeleteReviewProtoResponse) Reset() {
 	*x = DeleteReviewProtoResponse{}
-	mi := &file_mail_proto_msgTypes[98]
+	mi := &file_mail_proto_msgTypes[99]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -6165,7 +6291,7 @@ func (x *DeleteReviewProtoResponse) String() string {
 func (*DeleteReviewProtoResponse) ProtoMessage() {}
 
 func (x *DeleteReviewProtoResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_mail_proto_msgTypes[98]
+	mi := &file_mail_proto_msgTypes[99]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -6178,7 +6304,7 @@ func (x *DeleteReviewProtoResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DeleteReviewProtoResponse.ProtoReflect.Descriptor instead.
 func (*DeleteReviewProtoResponse) Descriptor() ([]byte, []int) {
-	return file_mail_proto_rawDescGZIP(), []int{98}
+	return file_mail_proto_rawDescGZIP(), []int{99}
 }
 
 func (x *DeleteReviewProtoResponse) GetError() string {
@@ -6198,7 +6324,7 @@ type ListReviewIssuesRequest struct {
 
 func (x *ListReviewIssuesRequest) Reset() {
 	*x = ListReviewIssuesRequest{}
-	mi := &file_mail_proto_msgTypes[99]
+	mi := &file_mail_proto_msgTypes[100]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -6210,7 +6336,7 @@ func (x *ListReviewIssuesRequest) String() string {
 func (*ListReviewIssuesRequest) ProtoMessage() {}
 
 func (x *ListReviewIssuesRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_mail_proto_msgTypes[99]
+	mi := &file_mail_proto_msgTypes[100]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -6223,7 +6349,7 @@ func (x *ListReviewIssuesRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListReviewIssuesRequest.ProtoReflect.Descriptor instead.
 func (*ListReviewIssuesRequest) Descriptor() ([]byte, []int) {
-	return file_mail_proto_rawDescGZIP(), []int{99}
+	return file_mail_proto_rawDescGZIP(), []int{100}
 }
 
 func (x *ListReviewIssuesRequest) GetReviewId() string {
@@ -6243,7 +6369,7 @@ type ListReviewIssuesResponse struct {
 
 func (x *ListReviewIssuesResponse) Reset() {
 	*x = ListReviewIssuesResponse{}
-	mi := &file_mail_proto_msgTypes[100]
+	mi := &file_mail_proto_msgTypes[101]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -6255,7 +6381,7 @@ func (x *ListReviewIssuesResponse) String() string {
 func (*ListReviewIssuesResponse) ProtoMessage() {}
 
 func (x *ListReviewIssuesResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_mail_proto_msgTypes[100]
+	mi := &file_mail_proto_msgTypes[101]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -6268,7 +6394,7 @@ func (x *ListReviewIssuesResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListReviewIssuesResponse.ProtoReflect.Descriptor instead.
 func (*ListReviewIssuesResponse) Descriptor() ([]byte, []int) {
-	return file_mail_proto_rawDescGZIP(), []int{100}
+	return file_mail_proto_rawDescGZIP(), []int{101}
 }
 
 func (x *ListReviewIssuesResponse) GetIssues() []*ReviewIssueProto {
@@ -6301,7 +6427,7 @@ type ReviewIssueProto struct {
 
 func (x *ReviewIssueProto) Reset() {
 	*x = ReviewIssueProto{}
-	mi := &file_mail_proto_msgTypes[101]
+	mi := &file_mail_proto_msgTypes[102]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -6313,7 +6439,7 @@ func (x *ReviewIssueProto) String() string {
 func (*ReviewIssueProto) ProtoMessage() {}
 
 func (x *ReviewIssueProto) ProtoReflect() protoreflect.Message {
-	mi := &file_mail_proto_msgTypes[101]
+	mi := &file_mail_proto_msgTypes[102]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -6326,7 +6452,7 @@ func (x *ReviewIssueProto) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ReviewIssueProto.ProtoReflect.Descriptor instead.
 func (*ReviewIssueProto) Descriptor() ([]byte, []int) {
-	return file_mail_proto_rawDescGZIP(), []int{101}
+	return file_mail_proto_rawDescGZIP(), []int{102}
 }
 
 func (x *ReviewIssueProto) GetId() int64 {
@@ -6439,7 +6565,7 @@ type UpdateIssueStatusRequest struct {
 
 func (x *UpdateIssueStatusRequest) Reset() {
 	*x = UpdateIssueStatusRequest{}
-	mi := &file_mail_proto_msgTypes[102]
+	mi := &file_mail_proto_msgTypes[103]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -6451,7 +6577,7 @@ func (x *UpdateIssueStatusRequest) String() string {
 func (*UpdateIssueStatusRequest) ProtoMessage() {}
 
 func (x *UpdateIssueStatusRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_mail_proto_msgTypes[102]
+	mi := &file_mail_proto_msgTypes[103]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -6464,7 +6590,7 @@ func (x *UpdateIssueStatusRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use UpdateIssueStatusRequest.ProtoReflect.Descriptor instead.
 func (*UpdateIssueStatusRequest) Descriptor() ([]byte, []int) {
-	return file_mail_proto_rawDescGZIP(), []int{102}
+	return file_mail_proto_rawDescGZIP(), []int{103}
 }
 
 func (x *UpdateIssueStatusRequest) GetReviewId() string {
@@ -6498,7 +6624,7 @@ type UpdateIssueStatusResponse struct {
 
 func (x *UpdateIssueStatusResponse) Reset() {
 	*x = UpdateIssueStatusResponse{}
-	mi := &file_mail_proto_msgTypes[103]
+	mi := &file_mail_proto_msgTypes[104]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -6510,7 +6636,7 @@ func (x *UpdateIssueStatusResponse) String() string {
 func (*UpdateIssueStatusResponse) ProtoMessage() {}
 
 func (x *UpdateIssueStatusResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_mail_proto_msgTypes[103]
+	mi := &file_mail_proto_msgTypes[104]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -6523,7 +6649,7 @@ func (x *UpdateIssueStatusResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use UpdateIssueStatusResponse.ProtoReflect.Descriptor instead.
 func (*UpdateIssueStatusResponse) Descriptor() ([]byte, []int) {
-	return file_mail_proto_rawDescGZIP(), []int{103}
+	return file_mail_proto_rawDescGZIP(), []int{104}
 }
 
 func (x *UpdateIssueStatusResponse) GetError() string {
@@ -6953,7 +7079,7 @@ const file_mail_proto_rawDesc = "" +
 	"\n" +
 	"created_at\x18\a \x01(\x03R\tcreatedAt\"4\n" +
 	"\x15GetReviewProtoRequest\x12\x1b\n" +
-	"\treview_id\x18\x01 \x01(\tR\breviewId\"\x97\x02\n" +
+	"\treview_id\x18\x01 \x01(\tR\breviewId\"\xe7\x02\n" +
 	"\x14ReviewDetailResponse\x12\x1b\n" +
 	"\treview_id\x18\x01 \x01(\tR\breviewId\x12\x1b\n" +
 	"\tthread_id\x18\x02 \x01(\tR\bthreadId\x12\x14\n" +
@@ -6968,7 +7094,24 @@ const file_mail_proto_rawDesc = "" +
 	"iterations\x12\x1f\n" +
 	"\vopen_issues\x18\b \x01(\x03R\n" +
 	"openIssues\x12\x14\n" +
-	"\x05error\x18\t \x01(\tR\x05error\"S\n" +
+	"\x05error\x18\t \x01(\tR\x05error\x12N\n" +
+	"\x11iteration_details\x18\n" +
+	" \x03(\v2!.subtraterpc.ReviewIterationProtoR\x10iterationDetails\"\xde\x02\n" +
+	"\x14ReviewIterationProto\x12#\n" +
+	"\riteration_num\x18\x01 \x01(\x05R\fiterationNum\x12\x1f\n" +
+	"\vreviewer_id\x18\x02 \x01(\tR\n" +
+	"reviewerId\x12\x1a\n" +
+	"\bdecision\x18\x03 \x01(\tR\bdecision\x12\x18\n" +
+	"\asummary\x18\x04 \x01(\tR\asummary\x12%\n" +
+	"\x0efiles_reviewed\x18\x05 \x01(\x05R\rfilesReviewed\x12%\n" +
+	"\x0elines_analyzed\x18\x06 \x01(\x05R\rlinesAnalyzed\x12\x1f\n" +
+	"\vduration_ms\x18\a \x01(\x03R\n" +
+	"durationMs\x12\x19\n" +
+	"\bcost_usd\x18\b \x01(\x01R\acostUsd\x12\x1d\n" +
+	"\n" +
+	"started_at\x18\t \x01(\x03R\tstartedAt\x12!\n" +
+	"\fcompleted_at\x18\n" +
+	" \x01(\x03R\vcompletedAt\"S\n" +
 	"\x15ResubmitReviewRequest\x12\x1b\n" +
 	"\treview_id\x18\x01 \x01(\tR\breviewId\x12\x1d\n" +
 	"\n" +
@@ -7117,7 +7260,7 @@ func file_mail_proto_rawDescGZIP() []byte {
 }
 
 var file_mail_proto_enumTypes = make([]protoimpl.EnumInfo, 5)
-var file_mail_proto_msgTypes = make([]protoimpl.MessageInfo, 107)
+var file_mail_proto_msgTypes = make([]protoimpl.MessageInfo, 108)
 var file_mail_proto_goTypes = []any{
 	(Priority)(0),                          // 0: subtraterpc.Priority
 	(MessageState)(0),                      // 1: subtraterpc.MessageState
@@ -7218,170 +7361,172 @@ var file_mail_proto_goTypes = []any{
 	(*ReviewSummaryProto)(nil),             // 96: subtraterpc.ReviewSummaryProto
 	(*GetReviewProtoRequest)(nil),          // 97: subtraterpc.GetReviewProtoRequest
 	(*ReviewDetailResponse)(nil),           // 98: subtraterpc.ReviewDetailResponse
-	(*ResubmitReviewRequest)(nil),          // 99: subtraterpc.ResubmitReviewRequest
-	(*CancelReviewProtoRequest)(nil),       // 100: subtraterpc.CancelReviewProtoRequest
-	(*CancelReviewProtoResponse)(nil),      // 101: subtraterpc.CancelReviewProtoResponse
-	(*DeleteReviewProtoRequest)(nil),       // 102: subtraterpc.DeleteReviewProtoRequest
-	(*DeleteReviewProtoResponse)(nil),      // 103: subtraterpc.DeleteReviewProtoResponse
-	(*ListReviewIssuesRequest)(nil),        // 104: subtraterpc.ListReviewIssuesRequest
-	(*ListReviewIssuesResponse)(nil),       // 105: subtraterpc.ListReviewIssuesResponse
-	(*ReviewIssueProto)(nil),               // 106: subtraterpc.ReviewIssueProto
-	(*UpdateIssueStatusRequest)(nil),       // 107: subtraterpc.UpdateIssueStatusRequest
-	(*UpdateIssueStatusResponse)(nil),      // 108: subtraterpc.UpdateIssueStatusResponse
-	nil,                                    // 109: subtraterpc.PollChangesRequest.SinceOffsetsEntry
-	nil,                                    // 110: subtraterpc.PollChangesResponse.NewOffsetsEntry
-	nil,                                    // 111: subtraterpc.SaveIdentityRequest.ConsumerOffsetsEntry
-	(*timestamppb.Timestamp)(nil),          // 112: google.protobuf.Timestamp
+	(*ReviewIterationProto)(nil),           // 99: subtraterpc.ReviewIterationProto
+	(*ResubmitReviewRequest)(nil),          // 100: subtraterpc.ResubmitReviewRequest
+	(*CancelReviewProtoRequest)(nil),       // 101: subtraterpc.CancelReviewProtoRequest
+	(*CancelReviewProtoResponse)(nil),      // 102: subtraterpc.CancelReviewProtoResponse
+	(*DeleteReviewProtoRequest)(nil),       // 103: subtraterpc.DeleteReviewProtoRequest
+	(*DeleteReviewProtoResponse)(nil),      // 104: subtraterpc.DeleteReviewProtoResponse
+	(*ListReviewIssuesRequest)(nil),        // 105: subtraterpc.ListReviewIssuesRequest
+	(*ListReviewIssuesResponse)(nil),       // 106: subtraterpc.ListReviewIssuesResponse
+	(*ReviewIssueProto)(nil),               // 107: subtraterpc.ReviewIssueProto
+	(*UpdateIssueStatusRequest)(nil),       // 108: subtraterpc.UpdateIssueStatusRequest
+	(*UpdateIssueStatusResponse)(nil),      // 109: subtraterpc.UpdateIssueStatusResponse
+	nil,                                    // 110: subtraterpc.PollChangesRequest.SinceOffsetsEntry
+	nil,                                    // 111: subtraterpc.PollChangesResponse.NewOffsetsEntry
+	nil,                                    // 112: subtraterpc.SaveIdentityRequest.ConsumerOffsetsEntry
+	(*timestamppb.Timestamp)(nil),          // 113: google.protobuf.Timestamp
 }
 var file_mail_proto_depIdxs = []int32{
 	0,   // 0: subtraterpc.InboxMessage.priority:type_name -> subtraterpc.Priority
 	1,   // 1: subtraterpc.InboxMessage.state:type_name -> subtraterpc.MessageState
-	112, // 2: subtraterpc.InboxMessage.created_at:type_name -> google.protobuf.Timestamp
-	112, // 3: subtraterpc.InboxMessage.deadline_at:type_name -> google.protobuf.Timestamp
-	112, // 4: subtraterpc.InboxMessage.snoozed_until:type_name -> google.protobuf.Timestamp
-	112, // 5: subtraterpc.InboxMessage.read_at:type_name -> google.protobuf.Timestamp
-	112, // 6: subtraterpc.InboxMessage.acknowledged_at:type_name -> google.protobuf.Timestamp
+	113, // 2: subtraterpc.InboxMessage.created_at:type_name -> google.protobuf.Timestamp
+	113, // 3: subtraterpc.InboxMessage.deadline_at:type_name -> google.protobuf.Timestamp
+	113, // 4: subtraterpc.InboxMessage.snoozed_until:type_name -> google.protobuf.Timestamp
+	113, // 5: subtraterpc.InboxMessage.read_at:type_name -> google.protobuf.Timestamp
+	113, // 6: subtraterpc.InboxMessage.acknowledged_at:type_name -> google.protobuf.Timestamp
 	0,   // 7: subtraterpc.SendMailRequest.priority:type_name -> subtraterpc.Priority
-	112, // 8: subtraterpc.SendMailRequest.deadline_at:type_name -> google.protobuf.Timestamp
+	113, // 8: subtraterpc.SendMailRequest.deadline_at:type_name -> google.protobuf.Timestamp
 	1,   // 9: subtraterpc.FetchInboxRequest.state_filter:type_name -> subtraterpc.MessageState
 	5,   // 10: subtraterpc.FetchInboxResponse.messages:type_name -> subtraterpc.InboxMessage
 	5,   // 11: subtraterpc.ReadMessageResponse.message:type_name -> subtraterpc.InboxMessage
 	5,   // 12: subtraterpc.ReadThreadResponse.messages:type_name -> subtraterpc.InboxMessage
 	1,   // 13: subtraterpc.UpdateStateRequest.new_state:type_name -> subtraterpc.MessageState
-	112, // 14: subtraterpc.UpdateStateRequest.snoozed_until:type_name -> google.protobuf.Timestamp
-	109, // 15: subtraterpc.PollChangesRequest.since_offsets:type_name -> subtraterpc.PollChangesRequest.SinceOffsetsEntry
+	113, // 14: subtraterpc.UpdateStateRequest.snoozed_until:type_name -> google.protobuf.Timestamp
+	110, // 15: subtraterpc.PollChangesRequest.since_offsets:type_name -> subtraterpc.PollChangesRequest.SinceOffsetsEntry
 	5,   // 16: subtraterpc.PollChangesResponse.new_messages:type_name -> subtraterpc.InboxMessage
-	110, // 17: subtraterpc.PollChangesResponse.new_offsets:type_name -> subtraterpc.PollChangesResponse.NewOffsetsEntry
+	111, // 17: subtraterpc.PollChangesResponse.new_offsets:type_name -> subtraterpc.PollChangesResponse.NewOffsetsEntry
 	0,   // 18: subtraterpc.PublishRequest.priority:type_name -> subtraterpc.Priority
-	112, // 19: subtraterpc.Topic.created_at:type_name -> google.protobuf.Timestamp
+	113, // 19: subtraterpc.Topic.created_at:type_name -> google.protobuf.Timestamp
 	29,  // 20: subtraterpc.ListTopicsResponse.topics:type_name -> subtraterpc.Topic
 	5,   // 21: subtraterpc.SearchResponse.results:type_name -> subtraterpc.InboxMessage
-	112, // 22: subtraterpc.GetAgentResponse.created_at:type_name -> google.protobuf.Timestamp
-	112, // 23: subtraterpc.GetAgentResponse.last_active_at:type_name -> google.protobuf.Timestamp
+	113, // 22: subtraterpc.GetAgentResponse.created_at:type_name -> google.protobuf.Timestamp
+	113, // 23: subtraterpc.GetAgentResponse.last_active_at:type_name -> google.protobuf.Timestamp
 	39,  // 24: subtraterpc.ListAgentsResponse.agents:type_name -> subtraterpc.GetAgentResponse
-	111, // 25: subtraterpc.SaveIdentityRequest.consumer_offsets:type_name -> subtraterpc.SaveIdentityRequest.ConsumerOffsetsEntry
+	112, // 25: subtraterpc.SaveIdentityRequest.consumer_offsets:type_name -> subtraterpc.SaveIdentityRequest.ConsumerOffsetsEntry
 	29,  // 26: subtraterpc.GetTopicResponse.topic:type_name -> subtraterpc.Topic
 	59,  // 27: subtraterpc.AutocompleteRecipientsResponse.recipients:type_name -> subtraterpc.AutocompleteRecipient
 	39,  // 28: subtraterpc.UpdateAgentResponse.agent:type_name -> subtraterpc.GetAgentResponse
 	2,   // 29: subtraterpc.AgentWithStatus.status:type_name -> subtraterpc.AgentStatus
-	112, // 30: subtraterpc.AgentWithStatus.last_active_at:type_name -> google.protobuf.Timestamp
+	113, // 30: subtraterpc.AgentWithStatus.last_active_at:type_name -> google.protobuf.Timestamp
 	65,  // 31: subtraterpc.GetAgentsStatusResponse.agents:type_name -> subtraterpc.AgentWithStatus
 	66,  // 32: subtraterpc.GetAgentsStatusResponse.counts:type_name -> subtraterpc.AgentStatusCounts
-	112, // 33: subtraterpc.SessionInfo.started_at:type_name -> google.protobuf.Timestamp
-	112, // 34: subtraterpc.SessionInfo.ended_at:type_name -> google.protobuf.Timestamp
+	113, // 33: subtraterpc.SessionInfo.started_at:type_name -> google.protobuf.Timestamp
+	113, // 34: subtraterpc.SessionInfo.ended_at:type_name -> google.protobuf.Timestamp
 	3,   // 35: subtraterpc.SessionInfo.status:type_name -> subtraterpc.SessionStatus
 	71,  // 36: subtraterpc.ListSessionsResponse.sessions:type_name -> subtraterpc.SessionInfo
 	71,  // 37: subtraterpc.GetSessionResponse.session:type_name -> subtraterpc.SessionInfo
 	71,  // 38: subtraterpc.StartSessionResponse.session:type_name -> subtraterpc.SessionInfo
 	4,   // 39: subtraterpc.ActivityInfo.type:type_name -> subtraterpc.ActivityType
-	112, // 40: subtraterpc.ActivityInfo.created_at:type_name -> google.protobuf.Timestamp
+	113, // 40: subtraterpc.ActivityInfo.created_at:type_name -> google.protobuf.Timestamp
 	4,   // 41: subtraterpc.ListActivitiesRequest.type:type_name -> subtraterpc.ActivityType
 	80,  // 42: subtraterpc.ListActivitiesResponse.activities:type_name -> subtraterpc.ActivityInfo
 	83,  // 43: subtraterpc.GetDashboardStatsResponse.stats:type_name -> subtraterpc.DashboardStats
-	112, // 44: subtraterpc.HealthCheckResponse.time:type_name -> google.protobuf.Timestamp
+	113, // 44: subtraterpc.HealthCheckResponse.time:type_name -> google.protobuf.Timestamp
 	88,  // 45: subtraterpc.CreateReviewRequest.branch_target:type_name -> subtraterpc.BranchTarget
 	89,  // 46: subtraterpc.CreateReviewRequest.commit_target:type_name -> subtraterpc.CommitTarget
 	90,  // 47: subtraterpc.CreateReviewRequest.commit_range_target:type_name -> subtraterpc.CommitRangeTarget
 	91,  // 48: subtraterpc.CreateReviewRequest.pr_target:type_name -> subtraterpc.PRTarget
 	96,  // 49: subtraterpc.ListReviewsProtoResponse.reviews:type_name -> subtraterpc.ReviewSummaryProto
-	106, // 50: subtraterpc.ListReviewIssuesResponse.issues:type_name -> subtraterpc.ReviewIssueProto
-	6,   // 51: subtraterpc.Mail.SendMail:input_type -> subtraterpc.SendMailRequest
-	8,   // 52: subtraterpc.Mail.FetchInbox:input_type -> subtraterpc.FetchInboxRequest
-	10,  // 53: subtraterpc.Mail.ReadMessage:input_type -> subtraterpc.ReadMessageRequest
-	12,  // 54: subtraterpc.Mail.ReadThread:input_type -> subtraterpc.ReadThreadRequest
-	14,  // 55: subtraterpc.Mail.UpdateState:input_type -> subtraterpc.UpdateStateRequest
-	16,  // 56: subtraterpc.Mail.AckMessage:input_type -> subtraterpc.AckMessageRequest
-	18,  // 57: subtraterpc.Mail.GetStatus:input_type -> subtraterpc.GetStatusRequest
-	20,  // 58: subtraterpc.Mail.PollChanges:input_type -> subtraterpc.PollChangesRequest
-	22,  // 59: subtraterpc.Mail.SubscribeInbox:input_type -> subtraterpc.SubscribeInboxRequest
-	23,  // 60: subtraterpc.Mail.Publish:input_type -> subtraterpc.PublishRequest
-	25,  // 61: subtraterpc.Mail.Subscribe:input_type -> subtraterpc.SubscribeRequest
-	27,  // 62: subtraterpc.Mail.Unsubscribe:input_type -> subtraterpc.UnsubscribeRequest
-	30,  // 63: subtraterpc.Mail.ListTopics:input_type -> subtraterpc.ListTopicsRequest
-	32,  // 64: subtraterpc.Mail.Search:input_type -> subtraterpc.SearchRequest
-	34,  // 65: subtraterpc.Mail.HasUnackedStatusTo:input_type -> subtraterpc.HasUnackedStatusToRequest
-	48,  // 66: subtraterpc.Mail.ReplyToThread:input_type -> subtraterpc.ReplyToThreadRequest
-	50,  // 67: subtraterpc.Mail.ArchiveThread:input_type -> subtraterpc.ArchiveThreadRequest
-	52,  // 68: subtraterpc.Mail.DeleteThread:input_type -> subtraterpc.DeleteThreadRequest
-	54,  // 69: subtraterpc.Mail.MarkThreadUnread:input_type -> subtraterpc.MarkThreadUnreadRequest
-	56,  // 70: subtraterpc.Mail.GetTopic:input_type -> subtraterpc.GetTopicRequest
-	58,  // 71: subtraterpc.Mail.AutocompleteRecipients:input_type -> subtraterpc.AutocompleteRecipientsRequest
-	61,  // 72: subtraterpc.Mail.DeleteMessage:input_type -> subtraterpc.DeleteMessageRequest
-	36,  // 73: subtraterpc.Agent.RegisterAgent:input_type -> subtraterpc.RegisterAgentRequest
-	38,  // 74: subtraterpc.Agent.GetAgent:input_type -> subtraterpc.GetAgentRequest
-	40,  // 75: subtraterpc.Agent.ListAgents:input_type -> subtraterpc.ListAgentsRequest
-	46,  // 76: subtraterpc.Agent.DeleteAgent:input_type -> subtraterpc.DeleteAgentRequest
-	63,  // 77: subtraterpc.Agent.UpdateAgent:input_type -> subtraterpc.UpdateAgentRequest
-	67,  // 78: subtraterpc.Agent.GetAgentsStatus:input_type -> subtraterpc.GetAgentsStatusRequest
-	69,  // 79: subtraterpc.Agent.Heartbeat:input_type -> subtraterpc.HeartbeatRequest
-	42,  // 80: subtraterpc.Agent.EnsureIdentity:input_type -> subtraterpc.EnsureIdentityRequest
-	44,  // 81: subtraterpc.Agent.SaveIdentity:input_type -> subtraterpc.SaveIdentityRequest
-	72,  // 82: subtraterpc.Session.ListSessions:input_type -> subtraterpc.ListSessionsRequest
-	74,  // 83: subtraterpc.Session.GetSession:input_type -> subtraterpc.GetSessionRequest
-	76,  // 84: subtraterpc.Session.StartSession:input_type -> subtraterpc.StartSessionRequest
-	78,  // 85: subtraterpc.Session.CompleteSession:input_type -> subtraterpc.CompleteSessionRequest
-	81,  // 86: subtraterpc.Activity.ListActivities:input_type -> subtraterpc.ListActivitiesRequest
-	84,  // 87: subtraterpc.Stats.GetDashboardStats:input_type -> subtraterpc.GetDashboardStatsRequest
-	86,  // 88: subtraterpc.Stats.HealthCheck:input_type -> subtraterpc.HealthCheckRequest
-	92,  // 89: subtraterpc.ReviewService.CreateReview:input_type -> subtraterpc.CreateReviewRequest
-	94,  // 90: subtraterpc.ReviewService.ListReviews:input_type -> subtraterpc.ListReviewsProtoRequest
-	97,  // 91: subtraterpc.ReviewService.GetReview:input_type -> subtraterpc.GetReviewProtoRequest
-	99,  // 92: subtraterpc.ReviewService.ResubmitReview:input_type -> subtraterpc.ResubmitReviewRequest
-	100, // 93: subtraterpc.ReviewService.CancelReview:input_type -> subtraterpc.CancelReviewProtoRequest
-	102, // 94: subtraterpc.ReviewService.DeleteReview:input_type -> subtraterpc.DeleteReviewProtoRequest
-	104, // 95: subtraterpc.ReviewService.ListReviewIssues:input_type -> subtraterpc.ListReviewIssuesRequest
-	107, // 96: subtraterpc.ReviewService.UpdateIssueStatus:input_type -> subtraterpc.UpdateIssueStatusRequest
-	7,   // 97: subtraterpc.Mail.SendMail:output_type -> subtraterpc.SendMailResponse
-	9,   // 98: subtraterpc.Mail.FetchInbox:output_type -> subtraterpc.FetchInboxResponse
-	11,  // 99: subtraterpc.Mail.ReadMessage:output_type -> subtraterpc.ReadMessageResponse
-	13,  // 100: subtraterpc.Mail.ReadThread:output_type -> subtraterpc.ReadThreadResponse
-	15,  // 101: subtraterpc.Mail.UpdateState:output_type -> subtraterpc.UpdateStateResponse
-	17,  // 102: subtraterpc.Mail.AckMessage:output_type -> subtraterpc.AckMessageResponse
-	19,  // 103: subtraterpc.Mail.GetStatus:output_type -> subtraterpc.GetStatusResponse
-	21,  // 104: subtraterpc.Mail.PollChanges:output_type -> subtraterpc.PollChangesResponse
-	5,   // 105: subtraterpc.Mail.SubscribeInbox:output_type -> subtraterpc.InboxMessage
-	24,  // 106: subtraterpc.Mail.Publish:output_type -> subtraterpc.PublishResponse
-	26,  // 107: subtraterpc.Mail.Subscribe:output_type -> subtraterpc.SubscribeResponse
-	28,  // 108: subtraterpc.Mail.Unsubscribe:output_type -> subtraterpc.UnsubscribeResponse
-	31,  // 109: subtraterpc.Mail.ListTopics:output_type -> subtraterpc.ListTopicsResponse
-	33,  // 110: subtraterpc.Mail.Search:output_type -> subtraterpc.SearchResponse
-	35,  // 111: subtraterpc.Mail.HasUnackedStatusTo:output_type -> subtraterpc.HasUnackedStatusToResponse
-	49,  // 112: subtraterpc.Mail.ReplyToThread:output_type -> subtraterpc.ReplyToThreadResponse
-	51,  // 113: subtraterpc.Mail.ArchiveThread:output_type -> subtraterpc.ArchiveThreadResponse
-	53,  // 114: subtraterpc.Mail.DeleteThread:output_type -> subtraterpc.DeleteThreadResponse
-	55,  // 115: subtraterpc.Mail.MarkThreadUnread:output_type -> subtraterpc.MarkThreadUnreadResponse
-	57,  // 116: subtraterpc.Mail.GetTopic:output_type -> subtraterpc.GetTopicResponse
-	60,  // 117: subtraterpc.Mail.AutocompleteRecipients:output_type -> subtraterpc.AutocompleteRecipientsResponse
-	62,  // 118: subtraterpc.Mail.DeleteMessage:output_type -> subtraterpc.DeleteMessageResponse
-	37,  // 119: subtraterpc.Agent.RegisterAgent:output_type -> subtraterpc.RegisterAgentResponse
-	39,  // 120: subtraterpc.Agent.GetAgent:output_type -> subtraterpc.GetAgentResponse
-	41,  // 121: subtraterpc.Agent.ListAgents:output_type -> subtraterpc.ListAgentsResponse
-	47,  // 122: subtraterpc.Agent.DeleteAgent:output_type -> subtraterpc.DeleteAgentResponse
-	64,  // 123: subtraterpc.Agent.UpdateAgent:output_type -> subtraterpc.UpdateAgentResponse
-	68,  // 124: subtraterpc.Agent.GetAgentsStatus:output_type -> subtraterpc.GetAgentsStatusResponse
-	70,  // 125: subtraterpc.Agent.Heartbeat:output_type -> subtraterpc.HeartbeatResponse
-	43,  // 126: subtraterpc.Agent.EnsureIdentity:output_type -> subtraterpc.EnsureIdentityResponse
-	45,  // 127: subtraterpc.Agent.SaveIdentity:output_type -> subtraterpc.SaveIdentityResponse
-	73,  // 128: subtraterpc.Session.ListSessions:output_type -> subtraterpc.ListSessionsResponse
-	75,  // 129: subtraterpc.Session.GetSession:output_type -> subtraterpc.GetSessionResponse
-	77,  // 130: subtraterpc.Session.StartSession:output_type -> subtraterpc.StartSessionResponse
-	79,  // 131: subtraterpc.Session.CompleteSession:output_type -> subtraterpc.CompleteSessionResponse
-	82,  // 132: subtraterpc.Activity.ListActivities:output_type -> subtraterpc.ListActivitiesResponse
-	85,  // 133: subtraterpc.Stats.GetDashboardStats:output_type -> subtraterpc.GetDashboardStatsResponse
-	87,  // 134: subtraterpc.Stats.HealthCheck:output_type -> subtraterpc.HealthCheckResponse
-	93,  // 135: subtraterpc.ReviewService.CreateReview:output_type -> subtraterpc.CreateReviewResponse
-	95,  // 136: subtraterpc.ReviewService.ListReviews:output_type -> subtraterpc.ListReviewsProtoResponse
-	98,  // 137: subtraterpc.ReviewService.GetReview:output_type -> subtraterpc.ReviewDetailResponse
-	93,  // 138: subtraterpc.ReviewService.ResubmitReview:output_type -> subtraterpc.CreateReviewResponse
-	101, // 139: subtraterpc.ReviewService.CancelReview:output_type -> subtraterpc.CancelReviewProtoResponse
-	103, // 140: subtraterpc.ReviewService.DeleteReview:output_type -> subtraterpc.DeleteReviewProtoResponse
-	105, // 141: subtraterpc.ReviewService.ListReviewIssues:output_type -> subtraterpc.ListReviewIssuesResponse
-	108, // 142: subtraterpc.ReviewService.UpdateIssueStatus:output_type -> subtraterpc.UpdateIssueStatusResponse
-	97,  // [97:143] is the sub-list for method output_type
-	51,  // [51:97] is the sub-list for method input_type
-	51,  // [51:51] is the sub-list for extension type_name
-	51,  // [51:51] is the sub-list for extension extendee
-	0,   // [0:51] is the sub-list for field type_name
+	99,  // 50: subtraterpc.ReviewDetailResponse.iteration_details:type_name -> subtraterpc.ReviewIterationProto
+	107, // 51: subtraterpc.ListReviewIssuesResponse.issues:type_name -> subtraterpc.ReviewIssueProto
+	6,   // 52: subtraterpc.Mail.SendMail:input_type -> subtraterpc.SendMailRequest
+	8,   // 53: subtraterpc.Mail.FetchInbox:input_type -> subtraterpc.FetchInboxRequest
+	10,  // 54: subtraterpc.Mail.ReadMessage:input_type -> subtraterpc.ReadMessageRequest
+	12,  // 55: subtraterpc.Mail.ReadThread:input_type -> subtraterpc.ReadThreadRequest
+	14,  // 56: subtraterpc.Mail.UpdateState:input_type -> subtraterpc.UpdateStateRequest
+	16,  // 57: subtraterpc.Mail.AckMessage:input_type -> subtraterpc.AckMessageRequest
+	18,  // 58: subtraterpc.Mail.GetStatus:input_type -> subtraterpc.GetStatusRequest
+	20,  // 59: subtraterpc.Mail.PollChanges:input_type -> subtraterpc.PollChangesRequest
+	22,  // 60: subtraterpc.Mail.SubscribeInbox:input_type -> subtraterpc.SubscribeInboxRequest
+	23,  // 61: subtraterpc.Mail.Publish:input_type -> subtraterpc.PublishRequest
+	25,  // 62: subtraterpc.Mail.Subscribe:input_type -> subtraterpc.SubscribeRequest
+	27,  // 63: subtraterpc.Mail.Unsubscribe:input_type -> subtraterpc.UnsubscribeRequest
+	30,  // 64: subtraterpc.Mail.ListTopics:input_type -> subtraterpc.ListTopicsRequest
+	32,  // 65: subtraterpc.Mail.Search:input_type -> subtraterpc.SearchRequest
+	34,  // 66: subtraterpc.Mail.HasUnackedStatusTo:input_type -> subtraterpc.HasUnackedStatusToRequest
+	48,  // 67: subtraterpc.Mail.ReplyToThread:input_type -> subtraterpc.ReplyToThreadRequest
+	50,  // 68: subtraterpc.Mail.ArchiveThread:input_type -> subtraterpc.ArchiveThreadRequest
+	52,  // 69: subtraterpc.Mail.DeleteThread:input_type -> subtraterpc.DeleteThreadRequest
+	54,  // 70: subtraterpc.Mail.MarkThreadUnread:input_type -> subtraterpc.MarkThreadUnreadRequest
+	56,  // 71: subtraterpc.Mail.GetTopic:input_type -> subtraterpc.GetTopicRequest
+	58,  // 72: subtraterpc.Mail.AutocompleteRecipients:input_type -> subtraterpc.AutocompleteRecipientsRequest
+	61,  // 73: subtraterpc.Mail.DeleteMessage:input_type -> subtraterpc.DeleteMessageRequest
+	36,  // 74: subtraterpc.Agent.RegisterAgent:input_type -> subtraterpc.RegisterAgentRequest
+	38,  // 75: subtraterpc.Agent.GetAgent:input_type -> subtraterpc.GetAgentRequest
+	40,  // 76: subtraterpc.Agent.ListAgents:input_type -> subtraterpc.ListAgentsRequest
+	46,  // 77: subtraterpc.Agent.DeleteAgent:input_type -> subtraterpc.DeleteAgentRequest
+	63,  // 78: subtraterpc.Agent.UpdateAgent:input_type -> subtraterpc.UpdateAgentRequest
+	67,  // 79: subtraterpc.Agent.GetAgentsStatus:input_type -> subtraterpc.GetAgentsStatusRequest
+	69,  // 80: subtraterpc.Agent.Heartbeat:input_type -> subtraterpc.HeartbeatRequest
+	42,  // 81: subtraterpc.Agent.EnsureIdentity:input_type -> subtraterpc.EnsureIdentityRequest
+	44,  // 82: subtraterpc.Agent.SaveIdentity:input_type -> subtraterpc.SaveIdentityRequest
+	72,  // 83: subtraterpc.Session.ListSessions:input_type -> subtraterpc.ListSessionsRequest
+	74,  // 84: subtraterpc.Session.GetSession:input_type -> subtraterpc.GetSessionRequest
+	76,  // 85: subtraterpc.Session.StartSession:input_type -> subtraterpc.StartSessionRequest
+	78,  // 86: subtraterpc.Session.CompleteSession:input_type -> subtraterpc.CompleteSessionRequest
+	81,  // 87: subtraterpc.Activity.ListActivities:input_type -> subtraterpc.ListActivitiesRequest
+	84,  // 88: subtraterpc.Stats.GetDashboardStats:input_type -> subtraterpc.GetDashboardStatsRequest
+	86,  // 89: subtraterpc.Stats.HealthCheck:input_type -> subtraterpc.HealthCheckRequest
+	92,  // 90: subtraterpc.ReviewService.CreateReview:input_type -> subtraterpc.CreateReviewRequest
+	94,  // 91: subtraterpc.ReviewService.ListReviews:input_type -> subtraterpc.ListReviewsProtoRequest
+	97,  // 92: subtraterpc.ReviewService.GetReview:input_type -> subtraterpc.GetReviewProtoRequest
+	100, // 93: subtraterpc.ReviewService.ResubmitReview:input_type -> subtraterpc.ResubmitReviewRequest
+	101, // 94: subtraterpc.ReviewService.CancelReview:input_type -> subtraterpc.CancelReviewProtoRequest
+	103, // 95: subtraterpc.ReviewService.DeleteReview:input_type -> subtraterpc.DeleteReviewProtoRequest
+	105, // 96: subtraterpc.ReviewService.ListReviewIssues:input_type -> subtraterpc.ListReviewIssuesRequest
+	108, // 97: subtraterpc.ReviewService.UpdateIssueStatus:input_type -> subtraterpc.UpdateIssueStatusRequest
+	7,   // 98: subtraterpc.Mail.SendMail:output_type -> subtraterpc.SendMailResponse
+	9,   // 99: subtraterpc.Mail.FetchInbox:output_type -> subtraterpc.FetchInboxResponse
+	11,  // 100: subtraterpc.Mail.ReadMessage:output_type -> subtraterpc.ReadMessageResponse
+	13,  // 101: subtraterpc.Mail.ReadThread:output_type -> subtraterpc.ReadThreadResponse
+	15,  // 102: subtraterpc.Mail.UpdateState:output_type -> subtraterpc.UpdateStateResponse
+	17,  // 103: subtraterpc.Mail.AckMessage:output_type -> subtraterpc.AckMessageResponse
+	19,  // 104: subtraterpc.Mail.GetStatus:output_type -> subtraterpc.GetStatusResponse
+	21,  // 105: subtraterpc.Mail.PollChanges:output_type -> subtraterpc.PollChangesResponse
+	5,   // 106: subtraterpc.Mail.SubscribeInbox:output_type -> subtraterpc.InboxMessage
+	24,  // 107: subtraterpc.Mail.Publish:output_type -> subtraterpc.PublishResponse
+	26,  // 108: subtraterpc.Mail.Subscribe:output_type -> subtraterpc.SubscribeResponse
+	28,  // 109: subtraterpc.Mail.Unsubscribe:output_type -> subtraterpc.UnsubscribeResponse
+	31,  // 110: subtraterpc.Mail.ListTopics:output_type -> subtraterpc.ListTopicsResponse
+	33,  // 111: subtraterpc.Mail.Search:output_type -> subtraterpc.SearchResponse
+	35,  // 112: subtraterpc.Mail.HasUnackedStatusTo:output_type -> subtraterpc.HasUnackedStatusToResponse
+	49,  // 113: subtraterpc.Mail.ReplyToThread:output_type -> subtraterpc.ReplyToThreadResponse
+	51,  // 114: subtraterpc.Mail.ArchiveThread:output_type -> subtraterpc.ArchiveThreadResponse
+	53,  // 115: subtraterpc.Mail.DeleteThread:output_type -> subtraterpc.DeleteThreadResponse
+	55,  // 116: subtraterpc.Mail.MarkThreadUnread:output_type -> subtraterpc.MarkThreadUnreadResponse
+	57,  // 117: subtraterpc.Mail.GetTopic:output_type -> subtraterpc.GetTopicResponse
+	60,  // 118: subtraterpc.Mail.AutocompleteRecipients:output_type -> subtraterpc.AutocompleteRecipientsResponse
+	62,  // 119: subtraterpc.Mail.DeleteMessage:output_type -> subtraterpc.DeleteMessageResponse
+	37,  // 120: subtraterpc.Agent.RegisterAgent:output_type -> subtraterpc.RegisterAgentResponse
+	39,  // 121: subtraterpc.Agent.GetAgent:output_type -> subtraterpc.GetAgentResponse
+	41,  // 122: subtraterpc.Agent.ListAgents:output_type -> subtraterpc.ListAgentsResponse
+	47,  // 123: subtraterpc.Agent.DeleteAgent:output_type -> subtraterpc.DeleteAgentResponse
+	64,  // 124: subtraterpc.Agent.UpdateAgent:output_type -> subtraterpc.UpdateAgentResponse
+	68,  // 125: subtraterpc.Agent.GetAgentsStatus:output_type -> subtraterpc.GetAgentsStatusResponse
+	70,  // 126: subtraterpc.Agent.Heartbeat:output_type -> subtraterpc.HeartbeatResponse
+	43,  // 127: subtraterpc.Agent.EnsureIdentity:output_type -> subtraterpc.EnsureIdentityResponse
+	45,  // 128: subtraterpc.Agent.SaveIdentity:output_type -> subtraterpc.SaveIdentityResponse
+	73,  // 129: subtraterpc.Session.ListSessions:output_type -> subtraterpc.ListSessionsResponse
+	75,  // 130: subtraterpc.Session.GetSession:output_type -> subtraterpc.GetSessionResponse
+	77,  // 131: subtraterpc.Session.StartSession:output_type -> subtraterpc.StartSessionResponse
+	79,  // 132: subtraterpc.Session.CompleteSession:output_type -> subtraterpc.CompleteSessionResponse
+	82,  // 133: subtraterpc.Activity.ListActivities:output_type -> subtraterpc.ListActivitiesResponse
+	85,  // 134: subtraterpc.Stats.GetDashboardStats:output_type -> subtraterpc.GetDashboardStatsResponse
+	87,  // 135: subtraterpc.Stats.HealthCheck:output_type -> subtraterpc.HealthCheckResponse
+	93,  // 136: subtraterpc.ReviewService.CreateReview:output_type -> subtraterpc.CreateReviewResponse
+	95,  // 137: subtraterpc.ReviewService.ListReviews:output_type -> subtraterpc.ListReviewsProtoResponse
+	98,  // 138: subtraterpc.ReviewService.GetReview:output_type -> subtraterpc.ReviewDetailResponse
+	93,  // 139: subtraterpc.ReviewService.ResubmitReview:output_type -> subtraterpc.CreateReviewResponse
+	102, // 140: subtraterpc.ReviewService.CancelReview:output_type -> subtraterpc.CancelReviewProtoResponse
+	104, // 141: subtraterpc.ReviewService.DeleteReview:output_type -> subtraterpc.DeleteReviewProtoResponse
+	106, // 142: subtraterpc.ReviewService.ListReviewIssues:output_type -> subtraterpc.ListReviewIssuesResponse
+	109, // 143: subtraterpc.ReviewService.UpdateIssueStatus:output_type -> subtraterpc.UpdateIssueStatusResponse
+	98,  // [98:144] is the sub-list for method output_type
+	52,  // [52:98] is the sub-list for method input_type
+	52,  // [52:52] is the sub-list for extension type_name
+	52,  // [52:52] is the sub-list for extension extendee
+	0,   // [0:52] is the sub-list for field type_name
 }
 
 func init() { file_mail_proto_init() }
@@ -7401,7 +7546,7 @@ func file_mail_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_mail_proto_rawDesc), len(file_mail_proto_rawDesc)),
 			NumEnums:      5,
-			NumMessages:   107,
+			NumMessages:   108,
 			NumExtensions: 0,
 			NumServices:   6,
 		},

@@ -203,6 +203,19 @@ export interface ReviewSummary {
   created_at: number;
 }
 
+export interface ReviewIterationDetail {
+  iteration_num: number;
+  reviewer_id: string;
+  decision: string;
+  summary: string;
+  files_reviewed: number;
+  lines_analyzed: number;
+  duration_ms: number;
+  cost_usd: number;
+  started_at: number;
+  completed_at: number;
+}
+
 export interface ReviewDetail {
   review_id: string;
   thread_id: string;
@@ -213,6 +226,7 @@ export interface ReviewDetail {
   iterations: number;
   open_issues: number;
   error?: string;
+  iteration_details?: ReviewIterationDetail[];
 }
 
 export type IssueSeverity = 'critical' | 'major' | 'minor' | 'suggestion';

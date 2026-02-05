@@ -198,15 +198,37 @@ func (s *Service) handleGetReview(ctx context.Context,
 		return GetReviewResp{Error: err}
 	}
 
+	// Build iteration details for the response.
+	iterDetails := make([]IterationDetail, len(iters))
+	for i, iter := range iters {
+		var completedAt int64
+		if iter.CompletedAt != nil {
+			completedAt = iter.CompletedAt.Unix()
+		}
+		iterDetails[i] = IterationDetail{
+			IterationNum:  iter.IterationNum,
+			ReviewerID:    iter.ReviewerID,
+			Decision:      iter.Decision,
+			Summary:       iter.Summary,
+			FilesReviewed: iter.FilesReviewed,
+			LinesAnalyzed: iter.LinesAnalyzed,
+			DurationMS:    iter.DurationMS,
+			CostUSD:       iter.CostUSD,
+			StartedAt:     iter.StartedAt.Unix(),
+			CompletedAt:   completedAt,
+		}
+	}
+
 	return GetReviewResp{
-		ReviewID:   review.ReviewID,
-		ThreadID:   review.ThreadID,
-		State:      review.State,
-		Branch:     review.Branch,
-		BaseBranch: review.BaseBranch,
-		ReviewType: review.ReviewType,
-		Iterations: len(iters),
-		OpenIssues: openIssues,
+		ReviewID:         review.ReviewID,
+		ThreadID:         review.ThreadID,
+		State:            review.State,
+		Branch:           review.Branch,
+		BaseBranch:       review.BaseBranch,
+		ReviewType:       review.ReviewType,
+		Iterations:       len(iters),
+		OpenIssues:       openIssues,
+		IterationDetails: iterDetails,
 	}
 }
 

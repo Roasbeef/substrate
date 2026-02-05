@@ -171,15 +171,35 @@ func (s *Server) GetReview(
 		)
 	}
 
+	// Convert iteration details to proto.
+	iterProtos := make(
+		[]*ReviewIterationProto, len(getResp.IterationDetails),
+	)
+	for i, iter := range getResp.IterationDetails {
+		iterProtos[i] = &ReviewIterationProto{
+			IterationNum:  int32(iter.IterationNum),
+			ReviewerId:    iter.ReviewerID,
+			Decision:      iter.Decision,
+			Summary:       iter.Summary,
+			FilesReviewed: int32(iter.FilesReviewed),
+			LinesAnalyzed: int32(iter.LinesAnalyzed),
+			DurationMs:    iter.DurationMS,
+			CostUsd:       iter.CostUSD,
+			StartedAt:     iter.StartedAt,
+			CompletedAt:   iter.CompletedAt,
+		}
+	}
+
 	result := &ReviewDetailResponse{
-		ReviewId:   getResp.ReviewID,
-		ThreadId:   getResp.ThreadID,
-		State:      getResp.State,
-		Branch:     getResp.Branch,
-		BaseBranch: getResp.BaseBranch,
-		ReviewType: getResp.ReviewType,
-		Iterations: int32(getResp.Iterations),
-		OpenIssues: getResp.OpenIssues,
+		ReviewId:         getResp.ReviewID,
+		ThreadId:         getResp.ThreadID,
+		State:            getResp.State,
+		Branch:           getResp.Branch,
+		BaseBranch:       getResp.BaseBranch,
+		ReviewType:       getResp.ReviewType,
+		Iterations:       int32(getResp.Iterations),
+		OpenIssues:       getResp.OpenIssues,
+		IterationDetails: iterProtos,
 	}
 	if getResp.Error != nil {
 		result.Error = getResp.Error.Error()

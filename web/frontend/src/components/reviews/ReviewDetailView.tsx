@@ -1,9 +1,10 @@
 // ReviewDetailView component - shows full review details with issues list.
 
+import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { clsx } from 'clsx';
 import { twMerge } from 'tailwind-merge';
-import type { IssueStatus, ReviewDetail } from '@/types/api.js';
+import type { IssueStatus, ReviewDetail, ReviewIterationDetail } from '@/types/api.js';
 import { useReviewIssues, useUpdateIssueStatus, useCancelReview } from '@/hooks/useReviews.js';
 import { ReviewStateBadge } from './ReviewStateBadge.js';
 import { ReviewIssueCard } from './ReviewIssueCard.js';
@@ -12,6 +13,35 @@ import { routes } from '@/lib/routes.js';
 
 function cn(...inputs: (string | undefined | null | false)[]) {
   return twMerge(clsx(inputs));
+}
+
+// Decision badge styles.
+const decisionStyles: Record<string, string> = {
+  approved: 'bg-green-100 text-green-800',
+  rejected: 'bg-red-100 text-red-800',
+  changes_requested: 'bg-orange-100 text-orange-800',
+};
+
+// Format milliseconds into human-readable duration.
+function formatDuration(ms: number): string {
+  if (ms < 1000) return `${ms}ms`;
+  const seconds = Math.floor(ms / 1000);
+  if (seconds < 60) return `${seconds}s`;
+  const minutes = Math.floor(seconds / 60);
+  const remainingSeconds = seconds % 60;
+  return remainingSeconds > 0 ? `${minutes}m ${remainingSeconds}s` : `${minutes}m`;
+}
+
+// Format unix timestamp to locale string.
+function formatTimestamp(ts: number): string {
+  if (ts === 0) return '--';
+  return new Date(ts * 1000).toLocaleString();
+}
+
+// Format cost in USD.
+function formatCost(usd: number): string {
+  if (usd === 0) return '--';
+  return `$${usd.toFixed(4)}`;
 }
 
 export interface ReviewDetailViewProps {
@@ -159,6 +189,20 @@ export function ReviewDetailView({ review }: ReviewDetailViewProps) {
         ) : null}
       </div>
 
+      {/* Iterations section. */}
+      {review.iteration_details && review.iteration_details.length > 0 ? (
+        <div>
+          <h3 className="mb-3 text-base font-semibold text-gray-900">
+            Iterations ({review.iteration_details.length})
+          </h3>
+          <div className="space-y-3">
+            {review.iteration_details.map((iter) => (
+              <IterationCard key={iter.iteration_num} iteration={iter} />
+            ))}
+          </div>
+        </div>
+      ) : null}
+
       {/* Issues section. */}
       <div>
         <h3 className="mb-3 text-base font-semibold text-gray-900">
@@ -190,6 +234,107 @@ export function ReviewDetailView({ review }: ReviewDetailViewProps) {
           </div>
         )}
       </div>
+    </div>
+  );
+}
+
+// IterationCard displays details for a single review iteration.
+function IterationCard({ iteration }: { iteration: ReviewIterationDetail }) {
+  const [expanded, setExpanded] = useState(false);
+
+  const decisionLabel = iteration.decision
+    .replace(/_/g, ' ')
+    .replace(/\b\w/g, (c) => c.toUpperCase());
+
+  const badgeStyle = decisionStyles[iteration.decision] ?? 'bg-gray-100 text-gray-600';
+
+  return (
+    <div className="rounded-lg border border-gray-200 bg-white p-4">
+      {/* Iteration header. */}
+      <div className="flex items-start justify-between">
+        <div className="flex items-center gap-3">
+          <span className="text-sm font-semibold text-gray-900">
+            Iteration {iteration.iteration_num}
+          </span>
+          <span
+            className={cn(
+              'inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium',
+              badgeStyle,
+            )}
+          >
+            {decisionLabel}
+          </span>
+        </div>
+        {iteration.reviewer_id ? (
+          <span className="text-xs text-gray-500">
+            by {iteration.reviewer_id}
+          </span>
+        ) : null}
+      </div>
+
+      {/* Metrics row. */}
+      <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-4">
+        <div>
+          <dt className="text-xs text-gray-500">Files</dt>
+          <dd className="text-sm font-medium text-gray-900">
+            {iteration.files_reviewed}
+          </dd>
+        </div>
+        <div>
+          <dt className="text-xs text-gray-500">Lines</dt>
+          <dd className="text-sm font-medium text-gray-900">
+            {iteration.lines_analyzed.toLocaleString()}
+          </dd>
+        </div>
+        <div>
+          <dt className="text-xs text-gray-500">Duration</dt>
+          <dd className="text-sm font-medium text-gray-900">
+            {formatDuration(iteration.duration_ms)}
+          </dd>
+        </div>
+        <div>
+          <dt className="text-xs text-gray-500">Cost</dt>
+          <dd className="text-sm font-medium text-gray-900">
+            {formatCost(iteration.cost_usd)}
+          </dd>
+        </div>
+      </div>
+
+      {/* Summary toggle. */}
+      {iteration.summary ? (
+        <>
+          <button
+            type="button"
+            onClick={() => setExpanded(!expanded)}
+            className="mt-3 text-xs font-medium text-gray-500 hover:text-gray-700"
+          >
+            {expanded ? 'Hide summary' : 'Show summary'}
+          </button>
+          {expanded ? (
+            <div className="mt-2 rounded bg-gray-50 p-3">
+              <p className="text-sm text-gray-700 whitespace-pre-wrap">
+                {iteration.summary}
+              </p>
+            </div>
+          ) : null}
+        </>
+      ) : null}
+
+      {/* Timestamps. */}
+      {iteration.started_at > 0 || iteration.completed_at > 0 ? (
+        <div className="mt-3 flex gap-4 border-t border-gray-100 pt-2">
+          {iteration.started_at > 0 ? (
+            <span className="text-xs text-gray-400">
+              Started: {formatTimestamp(iteration.started_at)}
+            </span>
+          ) : null}
+          {iteration.completed_at > 0 ? (
+            <span className="text-xs text-gray-400">
+              Completed: {formatTimestamp(iteration.completed_at)}
+            </span>
+          ) : null}
+        </div>
+      ) : null}
     </div>
   );
 }

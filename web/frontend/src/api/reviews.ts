@@ -6,6 +6,7 @@ import type {
   CreateReviewRequest,
   CreateReviewResponse,
   ReviewDetail,
+  ReviewIterationDetail,
   ReviewIssue,
   ReviewSummary,
 } from '@/types/api.js';
@@ -29,6 +30,20 @@ interface GatewayListReviewsResponse {
   }>;
 }
 
+// Gateway response format for a single review iteration.
+interface GatewayReviewIterationProto {
+  iteration_num?: number;
+  reviewer_id?: string;
+  decision?: string;
+  summary?: string;
+  files_reviewed?: number;
+  lines_analyzed?: number;
+  duration_ms?: string;
+  cost_usd?: number;
+  started_at?: string;
+  completed_at?: string;
+}
+
 // Gateway response format for GetReview.
 interface GatewayReviewDetailResponse {
   review_id?: string;
@@ -40,6 +55,7 @@ interface GatewayReviewDetailResponse {
   iterations?: number;
   open_issues?: string;
   error?: string;
+  iteration_details?: GatewayReviewIterationProto[];
 }
 
 // Gateway response format for ListReviewIssues.
@@ -106,6 +122,24 @@ function parseListReviewsResponse(
   }));
 }
 
+// Parse gateway iteration proto into typed iteration detail.
+function parseIterationDetail(
+  iter: GatewayReviewIterationProto,
+): ReviewIterationDetail {
+  return {
+    iteration_num: iter.iteration_num ?? 0,
+    reviewer_id: iter.reviewer_id ?? '',
+    decision: iter.decision ?? '',
+    summary: iter.summary ?? '',
+    files_reviewed: iter.files_reviewed ?? 0,
+    lines_analyzed: iter.lines_analyzed ?? 0,
+    duration_ms: toNumber(iter.duration_ms),
+    cost_usd: iter.cost_usd ?? 0,
+    started_at: toNumber(iter.started_at),
+    completed_at: toNumber(iter.completed_at),
+  };
+}
+
 // Parse gateway response into ReviewDetail.
 function parseReviewDetailResponse(
   response: GatewayReviewDetailResponse,
@@ -122,6 +156,11 @@ function parseReviewDetailResponse(
   };
   if (response.error !== undefined) {
     result.error = response.error;
+  }
+  if (response.iteration_details) {
+    result.iteration_details = response.iteration_details.map(
+      parseIterationDetail,
+    );
   }
   return result;
 }

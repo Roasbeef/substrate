@@ -184,15 +184,30 @@ type CreateReviewResp struct {
 
 // GetReviewResp is the response for a GetReviewMsg.
 type GetReviewResp struct {
-	ReviewID   string
-	ThreadID   string
-	State      string
-	Branch     string
-	BaseBranch string
-	ReviewType string
-	Iterations int
-	OpenIssues int64
-	Error      error
+	ReviewID         string
+	ThreadID         string
+	State            string
+	Branch           string
+	BaseBranch       string
+	ReviewType       string
+	Iterations       int
+	OpenIssues       int64
+	IterationDetails []IterationDetail
+	Error            error
+}
+
+// IterationDetail contains the full details of a review iteration.
+type IterationDetail struct {
+	IterationNum  int
+	ReviewerID    string
+	Decision      string
+	Summary       string
+	FilesReviewed int
+	LinesAnalyzed int
+	DurationMS    int64
+	CostUSD       float64
+	StartedAt     int64
+	CompletedAt   int64
 }
 
 // ListReviewsResp is the response for a ListReviewsMsg.
