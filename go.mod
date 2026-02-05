@@ -14,7 +14,7 @@ require (
 	github.com/lightningnetwork/lnd/fn/v2 v2.0.9
 	github.com/mattn/go-sqlite3 v1.14.24
 	github.com/modelcontextprotocol/go-sdk v1.2.0
-	github.com/roasbeef/claude-agent-sdk-go v1.0.3
+	github.com/roasbeef/claude-agent-sdk-go v1.0.5
 	github.com/spf13/cobra v1.10.2
 	github.com/stretchr/testify v1.11.1
 	google.golang.org/grpc v1.78.0
@@ -55,5 +55,3 @@ require (
 	modernc.org/strutil v1.1.3 // indirect
 	modernc.org/token v1.0.0 // indirect
 )
-
-replace github.com/roasbeef/claude-agent-sdk-go => /Users/roasbeef/gocode/src/github.com/roasbeef/claude-agent-sdk-go
