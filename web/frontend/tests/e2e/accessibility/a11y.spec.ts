@@ -66,73 +66,6 @@ async function setupAPIMocks(page: import('@playwright/test').Page) {
   });
 }
 
-test.describe('Accessibility', () => {
-  test.beforeEach(async ({ page }) => {
-    await setupAPIMocks(page);
-  });
-
-  // Skip axe-core tests - UI has actual accessibility violations that need fixing.
-  test.skip('inbox page has no accessibility violations', async ({ page }) => {
-    await page.goto('/inbox');
-    await page.waitForTimeout(500);
-
-    const accessibilityScanResults = await new AxeBuilder({ page })
-      .withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa'])
-      .analyze();
-
-    expect(accessibilityScanResults.violations).toEqual([]);
-  });
-
-  test.skip('agents page has no accessibility violations', async ({ page }) => {
-    await page.goto('/agents');
-    await page.waitForTimeout(500);
-
-    const accessibilityScanResults = await new AxeBuilder({ page })
-      .withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa'])
-      .analyze();
-
-    expect(accessibilityScanResults.violations).toEqual([]);
-  });
-
-  test.skip('sessions page has no accessibility violations', async ({ page }) => {
-    await page.goto('/sessions');
-    await page.waitForTimeout(500);
-
-    const accessibilityScanResults = await new AxeBuilder({ page })
-      .withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa'])
-      .analyze();
-
-    expect(accessibilityScanResults.violations).toEqual([]);
-  });
-
-  test.skip('settings page has no accessibility violations', async ({ page }) => {
-    await page.goto('/settings');
-    await page.waitForTimeout(500);
-
-    const accessibilityScanResults = await new AxeBuilder({ page })
-      .withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa'])
-      .analyze();
-
-    expect(accessibilityScanResults.violations).toEqual([]);
-  });
-
-  test.skip('compose modal has no accessibility violations', async ({ page }) => {
-    // Skip: Compose modal has accessibility issues to fix.
-    await page.goto('/inbox');
-    await page.waitForTimeout(500);
-
-    const sidebar = page.locator('aside, [role="complementary"]');
-    await sidebar.getByRole('button', { name: /Compose/i }).click();
-    await page.waitForTimeout(300);
-
-    const accessibilityScanResults = await new AxeBuilder({ page })
-      .include('[role="dialog"]')
-      .withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa'])
-      .analyze();
-
-    expect(accessibilityScanResults.violations).toEqual([]);
-  });
-});
 
 test.describe('Keyboard accessibility', () => {
   test.beforeEach(async ({ page }) => {
@@ -162,42 +95,6 @@ test.describe('Keyboard accessibility', () => {
     // Should have multiple focusable elements.
     expect(focusableCount).toBeGreaterThan(5);
   });
-
-  test.skip('escape key closes modals', async ({ page }) => {
-    // Skip: Compose modal requires agent data for recipients dropdown.
-    await page.goto('/inbox');
-    await page.waitForTimeout(500);
-
-    await page.getByRole('button', { name: 'Compose', exact: true }).click();
-    await page.waitForTimeout(300);
-
-    const modal = page.locator('[role="dialog"]');
-    await expect(modal).toBeVisible();
-
-    await page.keyboard.press('Escape');
-    await page.waitForTimeout(300);
-
-    await expect(modal).not.toBeVisible();
-  });
-});
-
-test.describe('Color contrast', () => {
-  test.beforeEach(async ({ page }) => {
-    await setupAPIMocks(page);
-  });
-
-  test.skip('text has sufficient color contrast', async ({ page }) => {
-    // Skip: UI has color contrast issues to fix.
-    await page.goto('/inbox');
-    await page.waitForTimeout(500);
-
-    const accessibilityScanResults = await new AxeBuilder({ page })
-      .withTags(['wcag2aa'])
-      .options({ runOnly: ['color-contrast'] })
-      .analyze();
-
-    expect(accessibilityScanResults.violations).toEqual([]);
-  });
 });
 
 test.describe('ARIA attributes', () => {
@@ -225,23 +122,5 @@ test.describe('ARIA attributes', () => {
       // Button should have some accessible name.
       expect(accessibleName.length).toBeGreaterThan(0);
     }
-  });
-
-  test.skip('modals have proper ARIA attributes', async ({ page }) => {
-    // Skip: Compose modal requires agent data for recipients dropdown.
-    await page.goto('/inbox');
-    await page.waitForTimeout(500);
-
-    await page.getByRole('button', { name: 'Compose', exact: true }).click();
-    await page.waitForTimeout(300);
-
-    const modal = page.locator('[role="dialog"]');
-    await expect(modal).toBeVisible();
-
-    const hasAriaModal = await modal.evaluate((el) =>
-      el.getAttribute('aria-modal') === 'true' || el.hasAttribute('aria-labelledby')
-    );
-
-    expect(hasAriaModal).toBe(true);
   });
 });

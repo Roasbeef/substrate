@@ -81,17 +81,6 @@ test.describe('Inbox message list', () => {
     await expect(page.getByText('Test Message')).toBeVisible();
   });
 
-  test.skip('shows empty state when no messages', async ({ page }) => {
-    // Skip: route mocking doesn't reliably intercept all API calls.
-    await setupAPIs(page, []);
-    await page.goto('/');
-    await expect(page.getByRole('link', { name: 'Inbox' })).toBeVisible();
-    await page.waitForTimeout(500);
-
-    // Should show empty state text.
-    await expect(page.getByText(/no messages|inbox is empty/i)).toBeVisible();
-  });
-
   test('displays message sender, subject, and preview', async ({ page }) => {
     const messages = [
       {

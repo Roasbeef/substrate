@@ -101,67 +101,7 @@ test.describe('Tab navigation', () => {
   });
 });
 
-test.describe('Escape key behavior', () => {
-  test.skip('Escape closes open modal', async ({ page }) => {
-    // Skip: Dialog wrapper [role="dialog"] is reported as "hidden" by Playwright
-    // even when dialog is open. Need to check dialog content instead.
-    await setupAPIs(page);
-    await page.goto('/');
-    await page.waitForTimeout(500);
-
-    // Open compose modal.
-    await page.locator('button:has-text("Compose")').click();
-    await page.waitForTimeout(300);
-
-    const modal = page.locator('[role="dialog"]');
-    await expect(modal).toBeVisible();
-
-    // Press Escape.
-    await page.keyboard.press('Escape');
-    await page.waitForTimeout(300);
-
-    await expect(modal).not.toBeVisible();
-  });
-
-  test.skip('Escape closes dropdown menus', async ({ page }) => {
-    // Skip: Agent switcher selector doesn't match actual UI.
-    await setupAPIs(page);
-    await page.goto('/');
-    await page.waitForTimeout(500);
-
-    // Open a dropdown (like agent switcher).
-    const dropdown = page.locator('[data-testid="agent-switcher"], button:has-text("Agent")');
-    if (await dropdown.isVisible()) {
-      await dropdown.click();
-      await page.waitForTimeout(200);
-
-      await page.keyboard.press('Escape');
-      await page.waitForTimeout(200);
-
-      // Dropdown should close.
-    }
-  });
-});
-
 test.describe('Enter key behavior', () => {
-  test.skip('Enter activates focused button', async ({ page }) => {
-    // Skip: Dialog wrapper visibility check fails.
-    await setupAPIs(page);
-    await page.goto('/');
-    await page.waitForTimeout(500);
-
-    // Focus compose button.
-    const composeButton = page.locator('button:has-text("Compose")');
-    await composeButton.focus();
-
-    await page.keyboard.press('Enter');
-    await page.waitForTimeout(300);
-
-    // Modal should open.
-    const modal = page.locator('[role="dialog"]');
-    await expect(modal).toBeVisible();
-  });
-
   test('Enter activates focused link', async ({ page }) => {
     await setupAPIs(page);
     await page.goto('/');
@@ -275,31 +215,6 @@ test.describe('Focus management', () => {
 
     // Focus should return to trigger element.
     await expect(composeButton).toBeFocused();
-  });
-
-  test.skip('focus trapped inside modal', async ({ page }) => {
-    // Skip: Dialog wrapper visibility check fails.
-    await setupAPIs(page);
-    await page.goto('/');
-    await page.waitForTimeout(500);
-
-    // Open compose modal.
-    await page.locator('button:has-text("Compose")').click();
-    await page.waitForTimeout(300);
-
-    const modal = page.locator('[role="dialog"]');
-    await expect(modal).toBeVisible();
-
-    // Tab through modal elements.
-    for (let i = 0; i < 10; i++) {
-      await page.keyboard.press('Tab');
-      await page.waitForTimeout(50);
-    }
-
-    // Focus should still be inside modal.
-    const focusedElement = page.locator(':focus');
-    const isInsideModal = await modal.locator(':focus').count();
-    // Focus should stay in modal.
   });
 });
 

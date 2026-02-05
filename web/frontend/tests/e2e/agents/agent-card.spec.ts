@@ -112,20 +112,6 @@ test.describe('Agent card display', () => {
   });
 });
 
-test.describe('Agent card actions', () => {
-  test.skip('shows action buttons on hover', async ({ page }) => {
-    // Skip: action buttons on hover not implemented in AgentCard component.
-    await setupAPIs(page);
-    await page.goto('/agents');
-  });
-
-  test.skip('card is clickable', async ({ page }) => {
-    // Skip: card click behavior depends on parent component implementation.
-    await setupAPIs(page);
-    await page.goto('/agents');
-  });
-});
-
 test.describe('Agent card accessibility', () => {
   test('cards are keyboard navigable', async ({ page }) => {
     await setupAPIs(page);
@@ -141,12 +127,6 @@ test.describe('Agent card accessibility', () => {
     // Should have a focused element.
     const focusedElement = page.locator(':focus');
     await expect(focusedElement).toBeVisible();
-  });
-
-  test.skip('Enter key activates focused card', async ({ page }) => {
-    // Skip: card activation behavior depends on parent component.
-    await setupAPIs(page);
-    await page.goto('/agents');
   });
 
   test('page has proper heading', async ({ page }) => {

@@ -221,12 +221,6 @@ test.describe('Agent filters', () => {
 });
 
 test.describe('Agent card interactions', () => {
-  test.skip('clicking agent card opens detail', async ({ page }) => {
-    // Skip: agent detail modal not implemented.
-    await setupAPIs(page);
-    await page.goto('/agents');
-  });
-
   test('agent card shows last active time', async ({ page }) => {
     await setupAPIs(page);
     await page.goto('/agents');
@@ -234,26 +228,6 @@ test.describe('Agent card interactions', () => {
 
     // Agent cards show status and time info.
     await expect(page.getByText(/ago|just now|active|idle|offline/i).first()).toBeVisible();
-  });
-});
-
-test.describe('Activity feed', () => {
-  test.skip('displays activity feed', async ({ page }) => {
-    // Skip: activity feed not implemented in AgentsDashboard.
-    await setupAPIs(page);
-    await page.goto('/agents');
-  });
-
-  test.skip('shows activity items', async ({ page }) => {
-    // Skip: activity feed not implemented.
-    await setupAPIs(page);
-    await page.goto('/agents');
-  });
-
-  test.skip('activity items show agent name', async ({ page }) => {
-    // Skip: activity feed not implemented.
-    await setupAPIs(page);
-    await page.goto('/agents');
   });
 });
 
@@ -266,23 +240,5 @@ test.describe('New agent registration', () => {
     // Button text is "Add Agent" in the sidebar.
     const newAgentButton = page.getByRole('button', { name: /Add Agent/i });
     await expect(newAgentButton).toBeVisible();
-  });
-
-  test.skip('clicking new agent opens modal', async ({ page }) => {
-    // Skip: Registration modal behavior depends on parent component callback.
-    await setupAPIs(page);
-    await page.goto('/agents');
-  });
-
-  test.skip('can register new agent', async ({ page }) => {
-    // Skip: Registration modal not rendered in standalone dashboard tests.
-    await setupAPIs(page);
-    await page.goto('/agents');
-  });
-
-  test.skip('new agent appears in list after registration', async ({ page }) => {
-    // Skip: Registration modal not rendered in standalone dashboard tests.
-    await setupAPIs(page);
-    await page.goto('/agents');
   });
 });
