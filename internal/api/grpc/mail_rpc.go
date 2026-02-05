@@ -98,17 +98,8 @@ func (s *Server) SendMail(ctx context.Context, req *SendMailRequest) (*SendMailR
 
 // FetchInbox retrieves messages from an agent's inbox.
 // If agent_id is not provided, uses the default "User" agent.
+// If sender_ids is provided, returns messages sent by those agents.
 func (s *Server) FetchInbox(ctx context.Context, req *FetchInboxRequest) (*FetchInboxResponse, error) {
-	agentID := req.AgentId
-	if agentID == 0 {
-		// Use the default "User" agent for global inbox view.
-		userAgent, err := s.store.Queries().GetAgentByName(ctx, "User")
-		if err != nil {
-			return nil, status.Error(codes.Internal, "failed to get User agent")
-		}
-		agentID = userAgent.ID
-	}
-
 	limit := 50
 	if req.Limit > 0 {
 		limit = int(req.Limit)
@@ -121,8 +112,36 @@ func (s *Server) FetchInbox(ctx context.Context, req *FetchInboxRequest) (*Fetch
 		stateFilter = &state
 	}
 
+	// If sender_name_prefix is provided, fetch messages from matching senders.
+	if req.SenderNamePrefix != "" {
+		fetchReq := mail.FetchInboxRequest{
+			AgentID:          0, // Not filtering by recipient.
+			Limit:            limit,
+			UnreadOnly:       req.UnreadOnly,
+			StateFilter:      stateFilter,
+			SenderNamePrefix: req.SenderNamePrefix,
+		}
+
+		resp, err := s.fetchInboxActor(ctx, fetchReq)
+		if err != nil {
+			return nil, status.Errorf(
+				codes.Internal, "failed to fetch inbox: %v", err,
+			)
+		}
+		if resp.Error != nil {
+			return nil, status.Errorf(
+				codes.Internal, "failed to fetch inbox: %v", resp.Error,
+			)
+		}
+
+		return &FetchInboxResponse{
+			Messages: convertMessages(resp.Messages),
+		}, nil
+	}
+
+	// Standard inbox fetch. AgentID=0 means global view (all agents).
 	fetchReq := mail.FetchInboxRequest{
-		AgentID:     agentID,
+		AgentID:     req.AgentId,
 		Limit:       limit,
 		UnreadOnly:  req.UnreadOnly,
 		StateFilter: stateFilter,
@@ -535,7 +554,6 @@ func (s *Server) HasUnackedStatusTo(
 func (s *Server) ReplyToThread(
 	ctx context.Context, req *ReplyToThreadRequest,
 ) (*ReplyToThreadResponse, error) {
-
 	senderID := req.SenderId
 	if senderID == 0 {
 		// Use the default "User" agent.
@@ -610,7 +628,6 @@ func hasPrefix(s, prefix string) bool {
 func (s *Server) ArchiveThread(
 	ctx context.Context, req *ArchiveThreadRequest,
 ) (*ArchiveThreadResponse, error) {
-
 	agentID := req.AgentId
 	if agentID == 0 {
 		// Use the default "User" agent.
@@ -654,7 +671,6 @@ func (s *Server) ArchiveThread(
 func (s *Server) DeleteThread(
 	ctx context.Context, req *DeleteThreadRequest,
 ) (*DeleteThreadResponse, error) {
-
 	agentID := req.AgentId
 	if agentID == 0 {
 		// Use the default "User" agent.
@@ -698,7 +714,6 @@ func (s *Server) DeleteThread(
 func (s *Server) MarkThreadUnread(
 	ctx context.Context, req *MarkThreadUnreadRequest,
 ) (*MarkThreadUnreadResponse, error) {
-
 	agentID := req.AgentId
 	if agentID == 0 {
 		// Use the default "User" agent.
@@ -732,18 +747,55 @@ func (s *Server) MarkThreadUnread(
 func (s *Server) DeleteMessage(
 	ctx context.Context, req *DeleteMessageRequest,
 ) (*DeleteMessageResponse, error) {
+	if req.MessageId == 0 {
+		return nil, status.Error(codes.InvalidArgument, "message_id is required")
+	}
+
+	// If mark_sender_deleted is true, mark the message as deleted from sender's
+	// perspective. This is used for aggregate views like CodeReviewer where
+	// messages are filtered by sender_name_prefix.
+	if req.MarkSenderDeleted {
+		// Look up the message to get the sender ID.
+		msg, err := s.store.Queries().GetMessage(ctx, req.MessageId)
+		if err != nil {
+			return nil, status.Errorf(
+				codes.Internal, "failed to get message: %v", err,
+			)
+		}
+		// Mark the message as deleted by sender.
+		err = s.store.Queries().MarkMessageDeletedBySender(
+			ctx, sqlc.MarkMessageDeletedBySenderParams{
+				ID:       req.MessageId,
+				SenderID: msg.SenderID,
+			},
+		)
+		if err != nil {
+			return nil, status.Errorf(
+				codes.Internal, "failed to mark message deleted by sender: %v",
+				err,
+			)
+		}
+		return &DeleteMessageResponse{Success: true}, nil
+	}
 
 	agentID := req.AgentId
 	if agentID == 0 {
-		// Use the default "User" agent.
-		userAgent, err := s.store.Queries().GetAgentByName(ctx, "User")
+		// Global view: look up the actual recipient for this message.
+		recipients, err := s.store.Queries().GetMessageRecipients(
+			ctx, req.MessageId,
+		)
 		if err != nil {
-			return nil, status.Error(codes.Internal, "failed to get User agent")
+			return nil, status.Errorf(
+				codes.Internal, "failed to get message recipients: %v", err,
+			)
 		}
-		agentID = userAgent.ID
-	}
-	if req.MessageId == 0 {
-		return nil, status.Error(codes.InvalidArgument, "message_id is required")
+		if len(recipients) == 0 {
+			return nil, status.Error(
+				codes.NotFound, "no recipients found for message",
+			)
+		}
+		// Use the first recipient's agent ID.
+		agentID = recipients[0].AgentID
 	}
 
 	// Move the message to trash.
@@ -1010,7 +1062,6 @@ func (s *Server) SaveIdentity(ctx context.Context, req *SaveIdentityRequest) (*S
 func (s *Server) HealthCheck(
 	ctx context.Context, req *HealthCheckRequest,
 ) (*HealthCheckResponse, error) {
-
 	return &HealthCheckResponse{
 		Status: "ok",
 		Time:   timestamppb.Now(),
@@ -1021,7 +1072,6 @@ func (s *Server) HealthCheck(
 func (s *Server) GetDashboardStats(
 	ctx context.Context, req *GetDashboardStatsRequest,
 ) (*GetDashboardStatsResponse, error) {
-
 	// TODO: Implement actual stats queries.
 	return &GetDashboardStatsResponse{
 		Stats: &DashboardStats{
@@ -1037,7 +1087,6 @@ func (s *Server) GetDashboardStats(
 func (s *Server) GetAgentsStatus(
 	ctx context.Context, req *GetAgentsStatusRequest,
 ) (*GetAgentsStatusResponse, error) {
-
 	// Get all agents with their computed status.
 	agents, err := s.heartbeatMgr.ListAgentsWithStatus(ctx)
 	if err != nil {
@@ -1083,7 +1132,6 @@ func (s *Server) GetAgentsStatus(
 func (s *Server) Heartbeat(
 	ctx context.Context, req *HeartbeatRequest,
 ) (*HeartbeatResponse, error) {
-
 	agentID := req.AgentId
 
 	// If agent_id is not provided, look up by agent_name.
@@ -1144,7 +1192,6 @@ func agentStatusToProto(s agent.AgentStatus) AgentStatus {
 func (s *Server) ListSessions(
 	ctx context.Context, req *ListSessionsRequest,
 ) (*ListSessionsResponse, error) {
-
 	// Get all session identities from the database.
 	agents, err := s.store.Queries().ListAgents(ctx)
 	if err != nil {
@@ -1191,7 +1238,6 @@ func (s *Server) ListSessions(
 func (s *Server) GetSession(
 	ctx context.Context, req *GetSessionRequest,
 ) (*GetSessionResponse, error) {
-
 	if req.SessionId == 0 {
 		return nil, status.Error(codes.InvalidArgument, "session_id is required")
 	}
@@ -1226,7 +1272,6 @@ func (s *Server) GetSession(
 func (s *Server) StartSession(
 	ctx context.Context, req *StartSessionRequest,
 ) (*StartSessionResponse, error) {
-
 	if req.AgentId == 0 {
 		return nil, status.Error(codes.InvalidArgument, "agent_id is required")
 	}
@@ -1267,7 +1312,6 @@ func (s *Server) StartSession(
 func (s *Server) CompleteSession(
 	ctx context.Context, req *CompleteSessionRequest,
 ) (*CompleteSessionResponse, error) {
-
 	if req.SessionId == 0 {
 		return nil, status.Error(codes.InvalidArgument, "session_id is required")
 	}
@@ -1301,7 +1345,6 @@ var _ SessionServer = (*Server)(nil)
 func (s *Server) ListActivities(
 	ctx context.Context, req *ListActivitiesRequest,
 ) (*ListActivitiesResponse, error) {
-
 	pageSize := int64(20)
 	if req.PageSize > 0 {
 		pageSize = int64(req.PageSize)

@@ -145,17 +145,19 @@ describe('activities API', () => {
         http.get('/api/v1/activities', ({ request }) => {
           receivedUrl = request.url;
           return HttpResponse.json({
-            data: [
+            activities: [
               {
-                id: 1,
-                type: 'message_sent',
-                agent_id: 5,
+                id: '1',
+                type: 'ACTIVITY_TYPE_MESSAGE_SENT',
+                agent_id: '5',
                 agent_name: 'Agent5',
                 description: 'Sent a message',
                 created_at: new Date().toISOString(),
               },
             ],
-            meta: { total: 1, page: 1, page_size: 20 },
+            total: '1',
+            page: 1,
+            page_size: 20,
           });
         }),
       );

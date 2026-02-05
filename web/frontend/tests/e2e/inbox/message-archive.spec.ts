@@ -6,52 +6,72 @@ import { test, expect } from '@playwright/test';
 async function setupMessagesAPI(page: import('@playwright/test').Page) {
   const messages = [
     {
-      id: 1,
-      sender_id: 1,
+      id: '1',
+      sender_id: '1',
       sender_name: 'Agent A',
       subject: 'Message to Archive',
       body: 'This message will be archived.',
-      priority: 'normal',
+      priority: 'PRIORITY_NORMAL',
       created_at: new Date().toISOString(),
-      recipients: [{ message_id: 1, agent_id: 100, state: 'unread' }],
+      recipients: [],
     },
     {
-      id: 2,
-      sender_id: 2,
+      id: '2',
+      sender_id: '2',
       sender_name: 'Agent B',
       subject: 'Keep This Message',
       body: 'This message stays in inbox.',
-      priority: 'normal',
+      priority: 'PRIORITY_NORMAL',
       created_at: new Date().toISOString(),
-      recipients: [{ message_id: 2, agent_id: 100, state: 'read' }],
+      recipients: [],
     },
   ];
 
-  const archivedIds: number[] = [];
+  const archivedIds: string[] = [];
 
-  await page.route('**/api/v1/messages*', async (route) => {
+  // Single handler for all /messages requests (GET list, PATCH update).
+  // Use ** to match both /messages?... and /messages/1.
+  await page.route('**/api/v1/messages**', async (route, request) => {
+    if (request.method() === 'PATCH') {
+      const url = request.url();
+      const idMatch = url.match(/messages\/(\d+)/);
+      const id = idMatch ? idMatch[1] : '1';
+
+      const body = request.postDataJSON() as { new_state?: string };
+      if (body.new_state === 'STATE_ARCHIVED') {
+        archivedIds.push(id);
+      }
+
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ success: true }),
+      });
+      return;
+    }
+
+    // GET: return active (non-archived) messages.
     const activeMessages = messages.filter((m) => !archivedIds.includes(m.id));
     await route.fulfill({
       status: 200,
       contentType: 'application/json',
-      body: JSON.stringify({
-        data: activeMessages,
-        meta: { total: activeMessages.length, page: 1, page_size: 20 },
-      }),
+      body: JSON.stringify({ messages: activeMessages }),
     });
   });
 
-  await page.route('**/api/v1/messages/*/archive', async (route) => {
-    const url = route.request().url();
-    const idMatch = url.match(/messages\/(\d+)\/archive/);
-    const id = idMatch ? parseInt(idMatch[1]) : 1;
-
-    archivedIds.push(id);
-
+  await page.route('**/api/v1/agents-status', async (route) => {
     await route.fulfill({
       status: 200,
       contentType: 'application/json',
-      body: JSON.stringify({ id, state: 'archived' }),
+      body: JSON.stringify({ agents: [], counts: {} }),
+    });
+  });
+
+  await page.route('**/api/v1/topics*', async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({ topics: [] }),
     });
   });
 
@@ -62,7 +82,7 @@ test.describe('Message archive button', () => {
   test('displays archive button on message row', async ({ page }) => {
     await setupMessagesAPI(page);
     await page.goto('/');
-    await expect(page.locator('text=Inbox')).toBeVisible();
+    await expect(page.getByRole('link', { name: 'Inbox' })).toBeVisible();
     await page.waitForTimeout(500);
 
     // Check for archive buttons.
@@ -78,7 +98,7 @@ test.describe('Message archive button', () => {
   test('archive button is visible on hover', async ({ page }) => {
     await setupMessagesAPI(page);
     await page.goto('/');
-    await expect(page.locator('text=Inbox')).toBeVisible();
+    await expect(page.getByRole('link', { name: 'Inbox' })).toBeVisible();
     await page.waitForTimeout(500);
 
     // Hover over message row.
@@ -98,7 +118,7 @@ test.describe('Archive interaction', () => {
   test('clicking archive removes message from list', async ({ page }) => {
     const { getArchivedIds } = await setupMessagesAPI(page);
     await page.goto('/');
-    await expect(page.locator('text=Inbox')).toBeVisible();
+    await expect(page.getByRole('link', { name: 'Inbox' })).toBeVisible();
     await page.waitForTimeout(500);
 
     // Verify message is visible.
@@ -124,7 +144,7 @@ test.describe('Archive interaction', () => {
   test('shows confirmation toast after archive', async ({ page }) => {
     await setupMessagesAPI(page);
     await page.goto('/');
-    await expect(page.locator('text=Inbox')).toBeVisible();
+    await expect(page.getByRole('link', { name: 'Inbox' })).toBeVisible();
     await page.waitForTimeout(500);
 
     // Archive a message.
@@ -144,7 +164,7 @@ test.describe('Archive interaction', () => {
   test('archived message count updates stats', async ({ page }) => {
     await setupMessagesAPI(page);
     await page.goto('/');
-    await expect(page.locator('text=Inbox')).toBeVisible();
+    await expect(page.getByRole('link', { name: 'Inbox' })).toBeVisible();
     await page.waitForTimeout(500);
 
     // Get initial message count.
@@ -167,7 +187,7 @@ test.describe('Bulk archive', () => {
   test('select multiple messages and archive', async ({ page }) => {
     await setupMessagesAPI(page);
     await page.goto('/');
-    await expect(page.locator('text=Inbox')).toBeVisible();
+    await expect(page.getByRole('link', { name: 'Inbox' })).toBeVisible();
     await page.waitForTimeout(500);
 
     // Select multiple messages.
@@ -193,7 +213,7 @@ test.describe('Bulk archive', () => {
   test('select all and archive', async ({ page }) => {
     await setupMessagesAPI(page);
     await page.goto('/');
-    await expect(page.locator('text=Inbox')).toBeVisible();
+    await expect(page.getByRole('link', { name: 'Inbox' })).toBeVisible();
     await page.waitForTimeout(500);
 
     // Click select all checkbox.
@@ -252,7 +272,7 @@ test.describe('Archive undo', () => {
     });
 
     await page.goto('/');
-    await expect(page.locator('text=Inbox')).toBeVisible();
+    await expect(page.getByRole('link', { name: 'Inbox' })).toBeVisible();
     await page.waitForTimeout(500);
 
     // Archive the message.
@@ -278,7 +298,7 @@ test.describe('Archive keyboard accessibility', () => {
   test('archive button is keyboard accessible', async ({ page }) => {
     await setupMessagesAPI(page);
     await page.goto('/');
-    await expect(page.locator('text=Inbox')).toBeVisible();
+    await expect(page.getByRole('link', { name: 'Inbox' })).toBeVisible();
     await page.waitForTimeout(500);
 
     // Focus archive button.

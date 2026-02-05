@@ -1885,3 +1885,351 @@ var Stats_ServiceDesc = grpc.ServiceDesc{
 	Streams:  []grpc.StreamDesc{},
 	Metadata: "mail.proto",
 }
+
+const (
+	ReviewService_CreateReview_FullMethodName      = "/subtraterpc.ReviewService/CreateReview"
+	ReviewService_ListReviews_FullMethodName       = "/subtraterpc.ReviewService/ListReviews"
+	ReviewService_GetReview_FullMethodName         = "/subtraterpc.ReviewService/GetReview"
+	ReviewService_ResubmitReview_FullMethodName    = "/subtraterpc.ReviewService/ResubmitReview"
+	ReviewService_CancelReview_FullMethodName      = "/subtraterpc.ReviewService/CancelReview"
+	ReviewService_ListReviewIssues_FullMethodName  = "/subtraterpc.ReviewService/ListReviewIssues"
+	ReviewService_UpdateIssueStatus_FullMethodName = "/subtraterpc.ReviewService/UpdateIssueStatus"
+)
+
+// ReviewServiceClient is the client API for ReviewService service.
+//
+// For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
+//
+// ReviewService handles code review operations.
+type ReviewServiceClient interface {
+	// CreateReview creates a new review request.
+	CreateReview(ctx context.Context, in *CreateReviewRequest, opts ...grpc.CallOption) (*CreateReviewResponse, error)
+	// ListReviews lists reviews with optional filters.
+	ListReviews(ctx context.Context, in *ListReviewsProtoRequest, opts ...grpc.CallOption) (*ListReviewsProtoResponse, error)
+	// GetReview gets a single review with its iterations.
+	GetReview(ctx context.Context, in *GetReviewProtoRequest, opts ...grpc.CallOption) (*ReviewDetailResponse, error)
+	// ResubmitReview re-requests review after author changes.
+	ResubmitReview(ctx context.Context, in *ResubmitReviewRequest, opts ...grpc.CallOption) (*CreateReviewResponse, error)
+	// CancelReview cancels an active review.
+	CancelReview(ctx context.Context, in *CancelReviewProtoRequest, opts ...grpc.CallOption) (*CancelReviewProtoResponse, error)
+	// ListReviewIssues lists issues for a review.
+	ListReviewIssues(ctx context.Context, in *ListReviewIssuesRequest, opts ...grpc.CallOption) (*ListReviewIssuesResponse, error)
+	// UpdateIssueStatus updates the status of a review issue.
+	UpdateIssueStatus(ctx context.Context, in *UpdateIssueStatusRequest, opts ...grpc.CallOption) (*UpdateIssueStatusResponse, error)
+}
+
+type reviewServiceClient struct {
+	cc grpc.ClientConnInterface
+}
+
+func NewReviewServiceClient(cc grpc.ClientConnInterface) ReviewServiceClient {
+	return &reviewServiceClient{cc}
+}
+
+func (c *reviewServiceClient) CreateReview(ctx context.Context, in *CreateReviewRequest, opts ...grpc.CallOption) (*CreateReviewResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(CreateReviewResponse)
+	err := c.cc.Invoke(ctx, ReviewService_CreateReview_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *reviewServiceClient) ListReviews(ctx context.Context, in *ListReviewsProtoRequest, opts ...grpc.CallOption) (*ListReviewsProtoResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ListReviewsProtoResponse)
+	err := c.cc.Invoke(ctx, ReviewService_ListReviews_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *reviewServiceClient) GetReview(ctx context.Context, in *GetReviewProtoRequest, opts ...grpc.CallOption) (*ReviewDetailResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ReviewDetailResponse)
+	err := c.cc.Invoke(ctx, ReviewService_GetReview_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *reviewServiceClient) ResubmitReview(ctx context.Context, in *ResubmitReviewRequest, opts ...grpc.CallOption) (*CreateReviewResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(CreateReviewResponse)
+	err := c.cc.Invoke(ctx, ReviewService_ResubmitReview_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *reviewServiceClient) CancelReview(ctx context.Context, in *CancelReviewProtoRequest, opts ...grpc.CallOption) (*CancelReviewProtoResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(CancelReviewProtoResponse)
+	err := c.cc.Invoke(ctx, ReviewService_CancelReview_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *reviewServiceClient) ListReviewIssues(ctx context.Context, in *ListReviewIssuesRequest, opts ...grpc.CallOption) (*ListReviewIssuesResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ListReviewIssuesResponse)
+	err := c.cc.Invoke(ctx, ReviewService_ListReviewIssues_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *reviewServiceClient) UpdateIssueStatus(ctx context.Context, in *UpdateIssueStatusRequest, opts ...grpc.CallOption) (*UpdateIssueStatusResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(UpdateIssueStatusResponse)
+	err := c.cc.Invoke(ctx, ReviewService_UpdateIssueStatus_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+// ReviewServiceServer is the server API for ReviewService service.
+// All implementations must embed UnimplementedReviewServiceServer
+// for forward compatibility.
+//
+// ReviewService handles code review operations.
+type ReviewServiceServer interface {
+	// CreateReview creates a new review request.
+	CreateReview(context.Context, *CreateReviewRequest) (*CreateReviewResponse, error)
+	// ListReviews lists reviews with optional filters.
+	ListReviews(context.Context, *ListReviewsProtoRequest) (*ListReviewsProtoResponse, error)
+	// GetReview gets a single review with its iterations.
+	GetReview(context.Context, *GetReviewProtoRequest) (*ReviewDetailResponse, error)
+	// ResubmitReview re-requests review after author changes.
+	ResubmitReview(context.Context, *ResubmitReviewRequest) (*CreateReviewResponse, error)
+	// CancelReview cancels an active review.
+	CancelReview(context.Context, *CancelReviewProtoRequest) (*CancelReviewProtoResponse, error)
+	// ListReviewIssues lists issues for a review.
+	ListReviewIssues(context.Context, *ListReviewIssuesRequest) (*ListReviewIssuesResponse, error)
+	// UpdateIssueStatus updates the status of a review issue.
+	UpdateIssueStatus(context.Context, *UpdateIssueStatusRequest) (*UpdateIssueStatusResponse, error)
+	mustEmbedUnimplementedReviewServiceServer()
+}
+
+// UnimplementedReviewServiceServer must be embedded to have
+// forward compatible implementations.
+//
+// NOTE: this should be embedded by value instead of pointer to avoid a nil
+// pointer dereference when methods are called.
+type UnimplementedReviewServiceServer struct{}
+
+func (UnimplementedReviewServiceServer) CreateReview(context.Context, *CreateReviewRequest) (*CreateReviewResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method CreateReview not implemented")
+}
+func (UnimplementedReviewServiceServer) ListReviews(context.Context, *ListReviewsProtoRequest) (*ListReviewsProtoResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method ListReviews not implemented")
+}
+func (UnimplementedReviewServiceServer) GetReview(context.Context, *GetReviewProtoRequest) (*ReviewDetailResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method GetReview not implemented")
+}
+func (UnimplementedReviewServiceServer) ResubmitReview(context.Context, *ResubmitReviewRequest) (*CreateReviewResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method ResubmitReview not implemented")
+}
+func (UnimplementedReviewServiceServer) CancelReview(context.Context, *CancelReviewProtoRequest) (*CancelReviewProtoResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method CancelReview not implemented")
+}
+func (UnimplementedReviewServiceServer) ListReviewIssues(context.Context, *ListReviewIssuesRequest) (*ListReviewIssuesResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method ListReviewIssues not implemented")
+}
+func (UnimplementedReviewServiceServer) UpdateIssueStatus(context.Context, *UpdateIssueStatusRequest) (*UpdateIssueStatusResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method UpdateIssueStatus not implemented")
+}
+func (UnimplementedReviewServiceServer) mustEmbedUnimplementedReviewServiceServer() {}
+func (UnimplementedReviewServiceServer) testEmbeddedByValue()                       {}
+
+// UnsafeReviewServiceServer may be embedded to opt out of forward compatibility for this service.
+// Use of this interface is not recommended, as added methods to ReviewServiceServer will
+// result in compilation errors.
+type UnsafeReviewServiceServer interface {
+	mustEmbedUnimplementedReviewServiceServer()
+}
+
+func RegisterReviewServiceServer(s grpc.ServiceRegistrar, srv ReviewServiceServer) {
+	// If the following call pancis, it indicates UnimplementedReviewServiceServer was
+	// embedded by pointer and is nil.  This will cause panics if an
+	// unimplemented method is ever invoked, so we test this at initialization
+	// time to prevent it from happening at runtime later due to I/O.
+	if t, ok := srv.(interface{ testEmbeddedByValue() }); ok {
+		t.testEmbeddedByValue()
+	}
+	s.RegisterService(&ReviewService_ServiceDesc, srv)
+}
+
+func _ReviewService_CreateReview_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(CreateReviewRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ReviewServiceServer).CreateReview(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: ReviewService_CreateReview_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ReviewServiceServer).CreateReview(ctx, req.(*CreateReviewRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _ReviewService_ListReviews_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ListReviewsProtoRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ReviewServiceServer).ListReviews(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: ReviewService_ListReviews_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ReviewServiceServer).ListReviews(ctx, req.(*ListReviewsProtoRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _ReviewService_GetReview_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetReviewProtoRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ReviewServiceServer).GetReview(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: ReviewService_GetReview_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ReviewServiceServer).GetReview(ctx, req.(*GetReviewProtoRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _ReviewService_ResubmitReview_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ResubmitReviewRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ReviewServiceServer).ResubmitReview(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: ReviewService_ResubmitReview_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ReviewServiceServer).ResubmitReview(ctx, req.(*ResubmitReviewRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _ReviewService_CancelReview_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(CancelReviewProtoRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ReviewServiceServer).CancelReview(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: ReviewService_CancelReview_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ReviewServiceServer).CancelReview(ctx, req.(*CancelReviewProtoRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _ReviewService_ListReviewIssues_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ListReviewIssuesRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ReviewServiceServer).ListReviewIssues(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: ReviewService_ListReviewIssues_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ReviewServiceServer).ListReviewIssues(ctx, req.(*ListReviewIssuesRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _ReviewService_UpdateIssueStatus_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(UpdateIssueStatusRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ReviewServiceServer).UpdateIssueStatus(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: ReviewService_UpdateIssueStatus_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ReviewServiceServer).UpdateIssueStatus(ctx, req.(*UpdateIssueStatusRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+// ReviewService_ServiceDesc is the grpc.ServiceDesc for ReviewService service.
+// It's only intended for direct use with grpc.RegisterService,
+// and not to be introspected or modified (even as a copy)
+var ReviewService_ServiceDesc = grpc.ServiceDesc{
+	ServiceName: "subtraterpc.ReviewService",
+	HandlerType: (*ReviewServiceServer)(nil),
+	Methods: []grpc.MethodDesc{
+		{
+			MethodName: "CreateReview",
+			Handler:    _ReviewService_CreateReview_Handler,
+		},
+		{
+			MethodName: "ListReviews",
+			Handler:    _ReviewService_ListReviews_Handler,
+		},
+		{
+			MethodName: "GetReview",
+			Handler:    _ReviewService_GetReview_Handler,
+		},
+		{
+			MethodName: "ResubmitReview",
+			Handler:    _ReviewService_ResubmitReview_Handler,
+		},
+		{
+			MethodName: "CancelReview",
+			Handler:    _ReviewService_CancelReview_Handler,
+		},
+		{
+			MethodName: "ListReviewIssues",
+			Handler:    _ReviewService_ListReviewIssues_Handler,
+		},
+		{
+			MethodName: "UpdateIssueStatus",
+			Handler:    _ReviewService_UpdateIssueStatus_Handler,
+		},
+	},
+	Streams:  []grpc.StreamDesc{},
+	Metadata: "mail.proto",
+}

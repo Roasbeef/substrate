@@ -54,7 +54,7 @@ test.describe('Inbox real-time updates', () => {
     await page.goto('/');
 
     // Wait for initial content to load.
-    await expect(page.locator('text=Inbox')).toBeVisible();
+    await expect(page.getByRole('link', { name: 'Inbox' })).toBeVisible();
 
     // Get initial message count (if any visible).
     const initialMessages = await page.locator('[data-testid="message-row"]').count();
@@ -87,7 +87,7 @@ test.describe('Inbox real-time updates', () => {
     });
 
     await page.goto('/');
-    await expect(page.locator('text=Inbox')).toBeVisible();
+    await expect(page.getByRole('link', { name: 'Inbox' })).toBeVisible();
 
     // Find the unread count indicator if present.
     const unreadBadge = page.locator('[data-testid="unread-count"]').first();
@@ -112,7 +112,7 @@ test.describe('Inbox real-time updates', () => {
     });
 
     await page.goto('/');
-    await expect(page.locator('text=Inbox')).toBeVisible();
+    await expect(page.getByRole('link', { name: 'Inbox' })).toBeVisible();
 
     // Simulate message update event.
     if (wsConnection) {
@@ -137,7 +137,7 @@ test.describe('Inbox real-time updates', () => {
     });
 
     await page.goto('/');
-    await expect(page.locator('text=Inbox')).toBeVisible();
+    await expect(page.getByRole('link', { name: 'Inbox' })).toBeVisible();
 
     // Simulate message deleted event (archived).
     if (wsConnection) {
@@ -173,7 +173,7 @@ test.describe('Inbox WebSocket connection state', () => {
     });
 
     await page.goto('/');
-    await expect(page.locator('text=Inbox')).toBeVisible();
+    await expect(page.getByRole('link', { name: 'Inbox' })).toBeVisible();
 
     // Close the WebSocket connection.
     if (wsConnection) {
@@ -182,6 +182,6 @@ test.describe('Inbox WebSocket connection state', () => {
 
     // Page should still be functional.
     await page.waitForTimeout(500);
-    await expect(page.locator('text=Inbox')).toBeVisible();
+    await expect(page.getByRole('link', { name: 'Inbox' })).toBeVisible();
   });
 });

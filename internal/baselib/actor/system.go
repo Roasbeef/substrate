@@ -6,9 +6,29 @@ import (
 	"fmt"
 	"reflect"
 	"sync"
+	"time"
 
 	"github.com/lightningnetwork/lnd/fn/v2"
 )
+
+// registerConfig holds optional configuration for actor registration.
+type registerConfig struct {
+	// cleanupTimeout overrides the default OnStop cleanup timeout.
+	cleanupTimeout fn.Option[time.Duration]
+}
+
+// RegisterOption is a functional option for configuring actor registration
+// via RegisterWithSystem.
+type RegisterOption func(*registerConfig)
+
+// WithCleanupTimeout sets the OnStop cleanup timeout for the actor. If not
+// specified, the default of 5 seconds is used. Use a longer timeout for
+// actors that manage external subprocesses requiring graceful shutdown.
+func WithCleanupTimeout(d time.Duration) RegisterOption {
+	return func(cfg *registerConfig) {
+		cfg.cleanupTimeout = fn.Some(d)
+	}
+}
 
 // stoppable defines an interface for components that can be stopped.
 // This is unexported as it's an internal detail of ActorSystem for managing
@@ -126,7 +146,7 @@ func newStoppedActorRef[M Message, R any](id string) ActorRef[M, R] {
 // the system's management, registers it with the receptionist using the
 // provided key, and returns its ActorRef.
 func RegisterWithSystem[M Message, R any](as *ActorSystem, id string, key ServiceKey[M, R],
-	behavior ActorBehavior[M, R],
+	behavior ActorBehavior[M, R], opts ...RegisterOption,
 ) ActorRef[M, R] {
 	if as.ctx.Err() != nil {
 		// To avoid returning nil and causing a panic, we can create and
@@ -136,12 +156,19 @@ func RegisterWithSystem[M Message, R any](as *ActorSystem, id string, key Servic
 		return newStoppedActorRef[M, R](id)
 	}
 
+	// Apply functional options.
+	var regCfg registerConfig
+	for _, opt := range opts {
+		opt(&regCfg)
+	}
+
 	actorCfg := ActorConfig[M, R]{
-		ID:          id,
-		Behavior:    behavior,
-		DLO:         as.deadLetterActor,
-		MailboxSize: as.config.MailboxCapacity,
-		Wg:          &as.actorWg,
+		ID:             id,
+		Behavior:       behavior,
+		DLO:            as.deadLetterActor,
+		MailboxSize:    as.config.MailboxCapacity,
+		Wg:             &as.actorWg,
+		CleanupTimeout: regCfg.cleanupTimeout,
 	}
 	actorInstance := NewActor(actorCfg)
 	actorInstance.Start()

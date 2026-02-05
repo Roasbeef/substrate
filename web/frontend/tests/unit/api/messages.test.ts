@@ -48,85 +48,90 @@ describe('messages API', () => {
     });
 
     it('should include page parameter in query string', async () => {
+      let receivedUrl = '';
       server.use(
         http.get('/api/v1/messages', ({ request }) => {
-          const url = new URL(request.url);
-          const page = url.searchParams.get('page');
+          receivedUrl = request.url;
           return HttpResponse.json({
-            data: [mockMessage],
-            meta: { total: 1, page: page ? Number(page) : 1, page_size: 20 },
+            messages: [],
           });
         }),
       );
 
-      const response = await fetchMessages({ page: 2 });
+      await fetchMessages({ page: 2 });
 
-      expect(response.meta.page).toBe(2);
+      expect(receivedUrl).toContain('page=2');
     });
 
     it('should include filter parameter in query string', async () => {
+      let receivedUrl = '';
       server.use(
         http.get('/api/v1/messages', ({ request }) => {
-          const url = new URL(request.url);
-          const filter = url.searchParams.get('filter');
-          expect(filter).toBe('unread');
+          receivedUrl = request.url;
           return HttpResponse.json({
-            data: [mockMessage],
-            meta: { total: 1, page: 1, page_size: 20 },
+            messages: [],
           });
         }),
       );
 
       await fetchMessages({ filter: 'unread' });
+
+      // Filter 'unread' maps to unread_only=true.
+      expect(receivedUrl).toContain('unread_only=true');
     });
 
     it('should include category parameter in query string', async () => {
+      let receivedUrl = '';
       server.use(
         http.get('/api/v1/messages', ({ request }) => {
-          const url = new URL(request.url);
-          const category = url.searchParams.get('category');
-          expect(category).toBe('starred');
+          receivedUrl = request.url;
           return HttpResponse.json({
-            data: [],
-            meta: { total: 0, page: 1, page_size: 20 },
+            messages: [],
           });
         }),
       );
 
-      await fetchMessages({ category: 'starred' });
+      // Note: 'starred' category actually uses filter='starred' which maps to
+      // state_filter, and 'sent' maps to sent_only=true. The category param
+      // is only used for 'sent'.
+      await fetchMessages({ category: 'sent' });
+
+      expect(receivedUrl).toContain('sent_only=true');
     });
 
     it('should include pageSize parameter in query string', async () => {
+      let receivedUrl = '';
       server.use(
         http.get('/api/v1/messages', ({ request }) => {
-          const url = new URL(request.url);
-          const pageSize = url.searchParams.get('page_size');
-          expect(pageSize).toBe('50');
+          receivedUrl = request.url;
           return HttpResponse.json({
-            data: [],
-            meta: { total: 0, page: 1, page_size: 50 },
+            messages: [],
           });
         }),
       );
 
       await fetchMessages({ pageSize: 50 });
+
+      // pageSize maps to 'limit' in the query string.
+      expect(receivedUrl).toContain('limit=50');
     });
 
     it('should handle multiple query parameters', async () => {
+      let receivedUrl = '';
       server.use(
         http.get('/api/v1/messages', ({ request }) => {
-          const url = new URL(request.url);
-          expect(url.searchParams.get('page')).toBe('3');
-          expect(url.searchParams.get('filter')).toBe('starred');
-          expect(url.searchParams.get('category')).toBe('inbox');
+          receivedUrl = request.url;
           return HttpResponse.json({
-            data: [mockMessage],
-            meta: { total: 1, page: 3, page_size: 20 },
+            messages: [],
           });
         }),
       );
 
-      await fetchMessages({ page: 3, filter: 'starred', category: 'inbox' });
+      await fetchMessages({ page: 3, filter: 'starred' });
+
+      // filter 'starred' maps to state_filter=STATE_STARRED.
+      expect(receivedUrl).toContain('page=3');
+      expect(receivedUrl).toContain('state_filter=STATE_STARRED');
     });
 
     it('should handle abort signal', async () => {
@@ -266,31 +271,31 @@ describe('messages API', () => {
   describe('toggleMessageStar', () => {
     it('should star a message', async () => {
       server.use(
-        http.post('/api/v1/messages/1/star', async ({ request }) => {
-          const body = (await request.json()) as { starred?: boolean };
-          expect(body.starred).toBe(true);
-          return new HttpResponse(null, { status: 204 });
+        http.patch('/api/v1/messages/1', async ({ request }) => {
+          const body = (await request.json()) as { new_state?: string };
+          expect(body.new_state).toBe('STATE_STARRED');
+          return HttpResponse.json({ success: true });
         }),
       );
 
-      await expect(toggleMessageStar(1, true)).resolves.toBeUndefined();
+      await toggleMessageStar(1, true);
     });
 
     it('should unstar a message', async () => {
       server.use(
-        http.post('/api/v1/messages/1/star', async ({ request }) => {
-          const body = (await request.json()) as { starred?: boolean };
-          expect(body.starred).toBe(false);
-          return new HttpResponse(null, { status: 204 });
+        http.patch('/api/v1/messages/1', async ({ request }) => {
+          const body = (await request.json()) as { new_state?: string };
+          expect(body.new_state).toBe('STATE_READ');
+          return HttpResponse.json({ success: true });
         }),
       );
 
-      await expect(toggleMessageStar(1, false)).resolves.toBeUndefined();
+      await toggleMessageStar(1, false);
     });
 
     it('should handle error', async () => {
       server.use(
-        http.post('/api/v1/messages/1/star', () => {
+        http.patch('/api/v1/messages/1', () => {
           return HttpResponse.json(
             { error: { code: 'not_found', message: 'Message not found' } },
             { status: 404 },
@@ -305,17 +310,19 @@ describe('messages API', () => {
   describe('archiveMessage', () => {
     it('should archive a message', async () => {
       server.use(
-        http.post('/api/v1/messages/1/archive', () => {
-          return new HttpResponse(null, { status: 204 });
+        http.patch('/api/v1/messages/1', async ({ request }) => {
+          const body = (await request.json()) as { new_state?: string };
+          expect(body.new_state).toBe('STATE_ARCHIVED');
+          return HttpResponse.json({ success: true });
         }),
       );
 
-      await expect(archiveMessage(1)).resolves.toBeUndefined();
+      await archiveMessage(1);
     });
 
     it('should handle 404 for non-existent message', async () => {
       server.use(
-        http.post('/api/v1/messages/999/archive', () => {
+        http.patch('/api/v1/messages/999', () => {
           return HttpResponse.json(
             { error: { code: 'not_found', message: 'Message not found' } },
             { status: 404 },
@@ -330,17 +337,19 @@ describe('messages API', () => {
   describe('unarchiveMessage', () => {
     it('should unarchive a message', async () => {
       server.use(
-        http.post('/api/v1/messages/1/unarchive', () => {
-          return new HttpResponse(null, { status: 204 });
+        http.patch('/api/v1/messages/1', async ({ request }) => {
+          const body = (await request.json()) as { new_state?: string };
+          expect(body.new_state).toBe('STATE_READ');
+          return HttpResponse.json({ success: true });
         }),
       );
 
-      await expect(unarchiveMessage(1)).resolves.toBeUndefined();
+      await unarchiveMessage(1);
     });
 
     it('should handle error for non-archived message', async () => {
       server.use(
-        http.post('/api/v1/messages/1/unarchive', () => {
+        http.patch('/api/v1/messages/1', () => {
           return HttpResponse.json(
             { error: { code: 'invalid_state', message: 'Message not archived' } },
             { status: 400 },
@@ -357,19 +366,20 @@ describe('messages API', () => {
       const snoozeUntil = new Date(Date.now() + 3600000).toISOString();
 
       server.use(
-        http.post('/api/v1/messages/1/snooze', async ({ request }) => {
-          const body = (await request.json()) as { until?: string };
-          expect(body.until).toBe(snoozeUntil);
-          return new HttpResponse(null, { status: 204 });
+        http.patch('/api/v1/messages/1', async ({ request }) => {
+          const body = (await request.json()) as { new_state?: string; snoozed_until?: string };
+          expect(body.new_state).toBe('STATE_SNOOZED');
+          expect(body.snoozed_until).toBe(snoozeUntil);
+          return HttpResponse.json({ success: true });
         }),
       );
 
-      await expect(snoozeMessage(1, snoozeUntil)).resolves.toBeUndefined();
+      await snoozeMessage(1, snoozeUntil);
     });
 
     it('should handle invalid date error', async () => {
       server.use(
-        http.post('/api/v1/messages/1/snooze', () => {
+        http.patch('/api/v1/messages/1', () => {
           return HttpResponse.json(
             { error: { code: 'validation_error', message: 'Invalid date' } },
             { status: 400 },
@@ -384,17 +394,19 @@ describe('messages API', () => {
   describe('markMessageRead', () => {
     it('should mark a message as read', async () => {
       server.use(
-        http.post('/api/v1/messages/1/read', () => {
-          return new HttpResponse(null, { status: 204 });
+        http.patch('/api/v1/messages/1', async ({ request }) => {
+          const body = (await request.json()) as { new_state?: string };
+          expect(body.new_state).toBe('STATE_READ');
+          return HttpResponse.json({ success: true });
         }),
       );
 
-      await expect(markMessageRead(1)).resolves.toBeUndefined();
+      await markMessageRead(1);
     });
 
     it('should handle error', async () => {
       server.use(
-        http.post('/api/v1/messages/999/read', () => {
+        http.patch('/api/v1/messages/999', () => {
           return HttpResponse.json(
             { error: { code: 'not_found', message: 'Message not found' } },
             { status: 404 },

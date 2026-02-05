@@ -295,13 +295,22 @@ export function useAcknowledgeMessage() {
   });
 }
 
+// Delete message request parameters.
+export interface DeleteMessageParams {
+  id: number;
+  // markSenderDeleted should be true when deleting from aggregate views like
+  // CodeReviewer where messages are filtered by sender name.
+  markSenderDeleted?: boolean;
+}
+
 // Hook for deleting a message.
 export function useDeleteMessage() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: (id: number) => deleteMessage(id),
-    onMutate: async (id) => {
+    mutationFn: (params: DeleteMessageParams) =>
+      deleteMessage(params.id, params.markSenderDeleted ?? false),
+    onMutate: async (params) => {
       // Cancel outgoing refetches to prevent overwriting optimistic update.
       await queryClient.cancelQueries({ queryKey: messageKeys.lists() });
 
@@ -317,17 +326,17 @@ export function useDeleteMessage() {
           if (!old?.data) return old;
           return {
             ...old,
-            data: old.data.filter((m) => m.id !== id),
+            data: old.data.filter((m) => m.id !== params.id),
           };
         },
       );
 
       // Also remove the detail cache.
-      queryClient.removeQueries({ queryKey: messageKeys.detail(id) });
+      queryClient.removeQueries({ queryKey: messageKeys.detail(params.id) });
 
       return { previousLists };
     },
-    onError: (_err, _id, context) => {
+    onError: (_err, _params, context) => {
       // Rollback all lists on error.
       if (context?.previousLists) {
         for (const [queryKey, data] of context.previousLists) {

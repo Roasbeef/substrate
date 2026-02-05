@@ -34,10 +34,19 @@ describe('sessions API', () => {
 
     it('should only return active sessions', async () => {
       server.use(
-        http.get('/api/v1/sessions/active', () => {
+        http.get('/api/v1/sessions', () => {
           return HttpResponse.json({
-            data: [mockSession],
-            meta: { total: 1, page: 1, page_size: 20 },
+            sessions: [
+              {
+                id: String(mockSession.id),
+                agent_id: String(mockSession.agent_id),
+                agent_name: mockSession.agent_name,
+                project: mockSession.project,
+                branch: mockSession.branch,
+                started_at: mockSession.started_at,
+                status: 'SESSION_STATUS_ACTIVE',
+              },
+            ],
           });
         }),
       );
@@ -69,12 +78,29 @@ describe('sessions API', () => {
       server.use(
         http.get('/api/v1/sessions', () => {
           return HttpResponse.json({
-            data: [
-              { ...mockSession, id: 1, status: 'active' },
-              { ...mockSession, id: 2, status: 'completed' },
-              { ...mockSession, id: 3, status: 'abandoned' },
+            sessions: [
+              {
+                id: '1',
+                agent_id: String(mockSession.agent_id),
+                agent_name: mockSession.agent_name,
+                started_at: mockSession.started_at,
+                status: 'SESSION_STATUS_ACTIVE',
+              },
+              {
+                id: '2',
+                agent_id: String(mockSession.agent_id),
+                agent_name: mockSession.agent_name,
+                started_at: mockSession.started_at,
+                status: 'SESSION_STATUS_COMPLETED',
+              },
+              {
+                id: '3',
+                agent_id: String(mockSession.agent_id),
+                agent_name: mockSession.agent_name,
+                started_at: mockSession.started_at,
+                status: 'SESSION_STATUS_ABANDONED',
+              },
             ],
-            meta: { total: 3, page: 1, page_size: 20 },
           });
         }),
       );
@@ -96,7 +122,17 @@ describe('sessions API', () => {
     it('should fetch a single session by ID', async () => {
       server.use(
         http.get('/api/v1/sessions/1', () => {
-          return HttpResponse.json(mockSession);
+          return HttpResponse.json({
+            session: {
+              id: '1',
+              agent_id: String(mockSession.agent_id),
+              agent_name: mockSession.agent_name,
+              project: mockSession.project,
+              branch: mockSession.branch,
+              started_at: mockSession.started_at,
+              status: 'SESSION_STATUS_ACTIVE',
+            },
+          });
         }),
       );
 
@@ -139,10 +175,15 @@ describe('sessions API', () => {
         http.post('/api/v1/sessions', async ({ request }) => {
           const body = (await request.json()) as { project?: string; branch?: string };
           return HttpResponse.json({
-            ...mockSession,
-            id: 100,
-            project: body.project,
-            branch: body.branch,
+            session: {
+              id: '100',
+              agent_id: String(mockSession.agent_id),
+              agent_name: mockSession.agent_name,
+              project: body.project,
+              branch: body.branch,
+              started_at: mockSession.started_at,
+              status: 'SESSION_STATUS_ACTIVE',
+            },
           });
         }),
       );
@@ -161,10 +202,13 @@ describe('sessions API', () => {
       server.use(
         http.post('/api/v1/sessions', () => {
           return HttpResponse.json({
-            ...mockSession,
-            id: 101,
-            project: undefined,
-            branch: undefined,
+            session: {
+              id: '101',
+              agent_id: String(mockSession.agent_id),
+              agent_name: mockSession.agent_name,
+              started_at: mockSession.started_at,
+              status: 'SESSION_STATUS_ACTIVE',
+            },
           });
         }),
       );

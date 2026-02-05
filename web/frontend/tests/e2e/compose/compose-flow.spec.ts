@@ -60,9 +60,8 @@ test.describe('Compose modal opening', () => {
     await composeButton.click();
     await page.waitForTimeout(300);
 
-    // Modal should open.
-    const composeModal = page.locator('[data-testid="compose-modal"], [role="dialog"]');
-    await expect(composeModal).toBeVisible();
+    // Modal should open - check for the dialog heading instead of wrapper.
+    await expect(page.getByRole('heading', { name: 'Compose Message' })).toBeVisible();
   });
 
   test('compose modal has required fields', async ({ page }) => {

@@ -92,7 +92,7 @@ export default defineConfig({
           timeout: 120000,
         },
         {
-          command: `bun run dev --port ${VITE_DEV_PORT}`,
+          command: `API_PORT=${API_PORT} bun run dev --port ${VITE_DEV_PORT}`,
           url: `http://localhost:${VITE_DEV_PORT}`,
           reuseExistingServer: !process.env.CI,
           timeout: 120000,

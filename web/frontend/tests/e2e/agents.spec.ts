@@ -25,9 +25,9 @@ test.describe('Agents Dashboard', () => {
 
   test('filter tabs are visible and clickable', async ({ page }) => {
     // Look for filter tabs.
-    const allTab = page.getByRole('button', { name: /all/i });
-    const activeTab = page.getByRole('button', { name: /active/i });
-    const idleTab = page.getByRole('button', { name: /idle/i });
+    const allTab = page.getByRole('button', { name: 'All', exact: true });
+    const activeTab = page.getByRole('button', { name: 'Active', exact: true });
+    const idleTab = page.getByRole('button', { name: 'Idle', exact: true });
 
     // At least one filter should be visible.
     const anyVisible = await allTab.isVisible() || await activeTab.isVisible() || await idleTab.isVisible();

@@ -12,6 +12,10 @@ import (
 type Querier interface {
 	CountActivitiesByAgentToday(ctx context.Context, arg CountActivitiesByAgentTodayParams) (int64, error)
 	CountArchivedByAgent(ctx context.Context, agentID int64) (int64, error)
+	CountOpenIssues(ctx context.Context, reviewID string) (int64, error)
+	CountReviewIssuesByStatus(ctx context.Context, arg CountReviewIssuesByStatusParams) (int64, error)
+	CountReviewsByRequester(ctx context.Context, requesterID int64) (int64, error)
+	CountReviewsByState(ctx context.Context, state string) (int64, error)
 	CountSentByAgent(ctx context.Context, senderID int64) (int64, error)
 	CountSnoozedByAgent(ctx context.Context, agentID int64) (int64, error)
 	CountStarredByAgent(ctx context.Context, agentID int64) (int64, error)
@@ -22,6 +26,9 @@ type Querier interface {
 	CreateAgent(ctx context.Context, arg CreateAgentParams) (Agent, error)
 	CreateMessage(ctx context.Context, arg CreateMessageParams) (Message, error)
 	CreateMessageRecipient(ctx context.Context, arg CreateMessageRecipientParams) error
+	CreateReview(ctx context.Context, arg CreateReviewParams) (Review, error)
+	CreateReviewIssue(ctx context.Context, arg CreateReviewIssueParams) (ReviewIssue, error)
+	CreateReviewIteration(ctx context.Context, arg CreateReviewIterationParams) (ReviewIteration, error)
 	CreateSessionIdentity(ctx context.Context, arg CreateSessionIdentityParams) error
 	CreateSubscription(ctx context.Context, arg CreateSubscriptionParams) error
 	CreateTopic(ctx context.Context, arg CreateTopicParams) (Topic, error)
@@ -45,6 +52,7 @@ type Querier interface {
 	GetArchivedMessages(ctx context.Context, arg GetArchivedMessagesParams) ([]GetArchivedMessagesRow, error)
 	GetConsumerOffset(ctx context.Context, arg GetConsumerOffsetParams) (int64, error)
 	GetInboxMessages(ctx context.Context, arg GetInboxMessagesParams) ([]GetInboxMessagesRow, error)
+	GetLatestIteration(ctx context.Context, reviewID string) (ReviewIteration, error)
 	GetMaxLogOffset(ctx context.Context, topicID int64) (interface{}, error)
 	GetMessage(ctx context.Context, id int64) (Message, error)
 	GetMessageRecipient(ctx context.Context, arg GetMessageRecipientParams) (MessageRecipient, error)
@@ -52,13 +60,24 @@ type Querier interface {
 	// Fetch recipients for multiple messages at once with agent names.
 	// Pass message IDs as a comma-separated string using sqlc.slice.
 	GetMessageRecipientsWithAgentsBulk(ctx context.Context, messageIds []int64) ([]GetMessageRecipientsWithAgentsBulkRow, error)
+	// Get messages from agents whose name starts with a given prefix.
+	// Used for aggregate views like CodeReviewer (all reviewer-* agents).
+	GetMessagesBySenderNamePrefix(ctx context.Context, arg GetMessagesBySenderNamePrefixParams) ([]GetMessagesBySenderNamePrefixRow, error)
 	GetMessagesByThread(ctx context.Context, threadID string) ([]Message, error)
 	// Get messages in a thread with sender information (name, project, branch).
 	GetMessagesByThreadWithSender(ctx context.Context, threadID string) ([]GetMessagesByThreadWithSenderRow, error)
 	GetMessagesByTopic(ctx context.Context, topicID int64) ([]Message, error)
 	GetMessagesSinceOffset(ctx context.Context, arg GetMessagesSinceOffsetParams) ([]Message, error)
+	GetOpenReviewIssues(ctx context.Context, reviewID string) ([]ReviewIssue, error)
 	GetOrCreateAgentInboxTopic(ctx context.Context, arg GetOrCreateAgentInboxTopicParams) (Topic, error)
 	GetOrCreateTopic(ctx context.Context, arg GetOrCreateTopicParams) (Topic, error)
+	GetReview(ctx context.Context, reviewID string) (Review, error)
+	GetReviewByID(ctx context.Context, id int64) (Review, error)
+	GetReviewIssue(ctx context.Context, id int64) (ReviewIssue, error)
+	GetReviewIssues(ctx context.Context, reviewID string) ([]ReviewIssue, error)
+	GetReviewIssuesByIteration(ctx context.Context, arg GetReviewIssuesByIterationParams) ([]ReviewIssue, error)
+	GetReviewIteration(ctx context.Context, arg GetReviewIterationParams) (ReviewIteration, error)
+	GetReviewIterations(ctx context.Context, reviewID string) ([]ReviewIteration, error)
 	// Get messages sent by a specific agent with sender details.
 	GetSentMessages(ctx context.Context, arg GetSentMessagesParams) ([]GetSentMessagesRow, error)
 	GetSessionIdentity(ctx context.Context, sessionID string) (SessionIdentity, error)
@@ -74,6 +93,8 @@ type Querier interface {
 	// Check if there are any unacked status messages from sender to recipient.
 	// Used for deduplication in status-update command.
 	HasUnackedStatusToAgent(ctx context.Context, arg HasUnackedStatusToAgentParams) (int64, error)
+	// Returns reviews that are in non-terminal states (for restart recovery).
+	ListActiveReviews(ctx context.Context) ([]Review, error)
 	ListActivitiesByAgent(ctx context.Context, arg ListActivitiesByAgentParams) ([]Activity, error)
 	ListActivitiesByType(ctx context.Context, arg ListActivitiesByTypeParams) ([]Activity, error)
 	ListActivitiesSince(ctx context.Context, arg ListActivitiesSinceParams) ([]Activity, error)
@@ -82,6 +103,9 @@ type Querier interface {
 	ListConsumerOffsetsByAgent(ctx context.Context, agentID int64) ([]ListConsumerOffsetsByAgentRow, error)
 	ListMessagesByPriority(ctx context.Context, arg ListMessagesByPriorityParams) ([]Message, error)
 	ListRecentActivities(ctx context.Context, limit int64) ([]Activity, error)
+	ListReviews(ctx context.Context, arg ListReviewsParams) ([]Review, error)
+	ListReviewsByRequester(ctx context.Context, arg ListReviewsByRequesterParams) ([]Review, error)
+	ListReviewsByState(ctx context.Context, arg ListReviewsByStateParams) ([]Review, error)
 	ListSessionIdentitiesByAgent(ctx context.Context, agentID int64) ([]SessionIdentity, error)
 	ListSubscriptionsByAgent(ctx context.Context, agentID int64) ([]Topic, error)
 	ListSubscriptionsByTopic(ctx context.Context, topicID int64) ([]Agent, error)
@@ -102,6 +126,9 @@ type Querier interface {
 	UpdateRecipientAcked(ctx context.Context, arg UpdateRecipientAckedParams) error
 	UpdateRecipientSnoozed(ctx context.Context, arg UpdateRecipientSnoozedParams) error
 	UpdateRecipientState(ctx context.Context, arg UpdateRecipientStateParams) (int64, error)
+	UpdateReviewCompleted(ctx context.Context, arg UpdateReviewCompletedParams) error
+	UpdateReviewIssueStatus(ctx context.Context, arg UpdateReviewIssueStatusParams) error
+	UpdateReviewState(ctx context.Context, arg UpdateReviewStateParams) error
 	UpdateSessionIdentityLastActive(ctx context.Context, arg UpdateSessionIdentityLastActiveParams) error
 	// Update the state of all message recipients in a thread for a specific agent.
 	// Used for archive, trash, and mark as unread operations.

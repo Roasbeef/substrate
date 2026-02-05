@@ -310,7 +310,7 @@ describe('enrichSearchResult', () => {
     };
 
     const enriched = enrichSearchResult(result);
-    expect(enriched.route).toBe('/inbox/thread/123');
+    expect(enriched.route).toBe('/thread/123');
   });
 
   it('adds route for thread type', () => {
@@ -323,7 +323,7 @@ describe('enrichSearchResult', () => {
     };
 
     const enriched = enrichSearchResult(result);
-    expect(enriched.route).toBe('/inbox/thread/456');
+    expect(enriched.route).toBe('/thread/456');
   });
 
   it('adds route for agent type', () => {
@@ -393,7 +393,7 @@ describe('useEnrichedSearch', () => {
       expect(result.current.enrichedResults.length).toBe(2);
     }, { timeout: 500 });
 
-    expect(result.current.enrichedResults[0]?.route).toBe('/inbox/thread/1');
+    expect(result.current.enrichedResults[0]?.route).toBe('/thread/1');
     expect(result.current.enrichedResults[1]?.route).toBe('/agents/2');
   });
 

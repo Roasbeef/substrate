@@ -45,7 +45,13 @@ describe('API client', () => {
     });
 
     it('should handle 204 No Content responses', async () => {
-      const response = await post('/messages/1/star', { starred: true });
+      server.use(
+        http.post('/api/v1/messages/1/ack', () => {
+          return new HttpResponse(null, { status: 204 });
+        }),
+      );
+
+      const response = await post('/messages/1/ack', {});
       expect(response).toBeUndefined();
     });
   });

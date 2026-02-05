@@ -182,6 +182,81 @@ export interface AutocompleteRecipient {
   status?: AgentStatusType;
 }
 
+// Review types.
+export type ReviewState =
+  | 'pending_review'
+  | 'under_review'
+  | 'changes_requested'
+  | 'approved'
+  | 'rejected'
+  | 'cancelled';
+
+export type ReviewType = 'full' | 'incremental' | 'security' | 'performance';
+
+export interface ReviewSummary {
+  review_id: string;
+  thread_id: string;
+  requester_id: number;
+  branch: string;
+  state: ReviewState;
+  review_type: ReviewType;
+  created_at: number;
+}
+
+export interface ReviewDetail {
+  review_id: string;
+  thread_id: string;
+  state: ReviewState;
+  branch: string;
+  base_branch: string;
+  review_type: ReviewType;
+  iterations: number;
+  open_issues: number;
+  error?: string;
+}
+
+export type IssueSeverity = 'critical' | 'major' | 'minor' | 'suggestion';
+export type IssueType = 'bug' | 'security' | 'performance' | 'style' | 'documentation' | 'other';
+export type IssueStatus = 'open' | 'fixed' | 'wont_fix' | 'duplicate';
+
+export interface ReviewIssue {
+  id: number;
+  review_id: string;
+  iteration_num: number;
+  issue_type: IssueType;
+  severity: IssueSeverity;
+  file_path: string;
+  line_start: number;
+  line_end: number;
+  title: string;
+  description: string;
+  code_snippet: string;
+  suggestion: string;
+  claude_md_ref: string;
+  status: IssueStatus;
+}
+
+export interface CreateReviewRequest {
+  branch: string;
+  base_branch?: string;
+  commit_sha: string;
+  repo_path: string;
+  pr_number?: number;
+  review_type?: ReviewType;
+  priority?: string;
+  reviewers?: string[];
+  description?: string;
+  requester_id: number;
+  remote_url?: string;
+}
+
+export interface CreateReviewResponse {
+  review_id: string;
+  thread_id: string;
+  state: string;
+  error?: string;
+}
+
 // Create/update request types.
 export interface SendMessageRequest {
   to: number[];

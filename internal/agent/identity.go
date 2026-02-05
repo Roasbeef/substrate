@@ -34,22 +34,48 @@ type IdentityFile struct {
 	ConsumerOffsets map[string]int64 `json:"consumer_offsets,omitempty"`
 }
 
-// NewIdentityManager creates a new identity manager.
-func NewIdentityManager(store *db.Store, registry *Registry) (*IdentityManager,
-	error,
-) {
-	// Get home directory for identity storage.
-	home, err := os.UserHomeDir()
-	if err != nil {
-		return nil, fmt.Errorf("failed to get home directory: %w", err)
+// IdentityManagerOption is a functional option for configuring IdentityManager.
+type IdentityManagerOption func(*identityManagerConfig)
+
+// identityManagerConfig holds configuration options for IdentityManager.
+type identityManagerConfig struct {
+	identityDir string
+}
+
+// WithIdentityDir sets a custom identity directory for the manager. This is
+// useful for testing with temporary directories.
+func WithIdentityDir(dir string) IdentityManagerOption {
+	return func(c *identityManagerConfig) {
+		c.identityDir = dir
+	}
+}
+
+// NewIdentityManager creates a new identity manager. By default it uses
+// ~/.subtrate/identities for storage. Use WithIdentityDir to override.
+func NewIdentityManager(store *db.Store, registry *Registry,
+	opts ...IdentityManagerOption,
+) (*IdentityManager, error) {
+	// Apply default configuration.
+	cfg := &identityManagerConfig{}
+
+	// Apply options.
+	for _, opt := range opts {
+		opt(cfg)
 	}
 
-	identityDir := filepath.Join(home, ".subtrate", "identities")
+	// If no custom directory specified, use the default.
+	if cfg.identityDir == "" {
+		home, err := os.UserHomeDir()
+		if err != nil {
+			return nil, fmt.Errorf("failed to get home directory: %w", err)
+		}
+		cfg.identityDir = filepath.Join(home, ".subtrate", "identities")
+	}
 
 	// Ensure directory structure exists.
 	dirs := []string{
-		filepath.Join(identityDir, "by-session"),
-		filepath.Join(identityDir, "by-project"),
+		filepath.Join(cfg.identityDir, "by-session"),
+		filepath.Join(cfg.identityDir, "by-project"),
 	}
 	for _, dir := range dirs {
 		if err := os.MkdirAll(dir, 0o700); err != nil {
@@ -61,7 +87,7 @@ func NewIdentityManager(store *db.Store, registry *Registry) (*IdentityManager,
 	return &IdentityManager{
 		store:       store,
 		registry:    registry,
-		identityDir: identityDir,
+		identityDir: cfg.identityDir,
 	}, nil
 }
 
@@ -225,7 +251,6 @@ func (m *IdentityManager) RestoreIdentity(ctx context.Context,
 
 		return nil
 	})
-
 	if err != nil {
 		return nil, err
 	}
@@ -353,7 +378,6 @@ func (m *IdentityManager) GetProjectDefaultIdentity(ctx context.Context,
 
 		return nil
 	})
-
 	if err != nil {
 		return nil, err
 	}

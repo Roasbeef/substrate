@@ -1,6 +1,6 @@
 // AgentSwitcher component - dropdown for selecting current agent context.
 
-import { Fragment, useState, useMemo } from 'react';
+import { Fragment, useState, useMemo, useEffect } from 'react';
 import {
   Menu,
   MenuButton,
@@ -12,9 +12,21 @@ import { clsx } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 import { Avatar } from '@/components/ui/Avatar.js';
 import { StatusBadge } from '@/components/ui/Badge.js';
-import { useAuthStore } from '@/stores/auth.js';
+import { useAuthStore, type AgentAggregate } from '@/stores/auth.js';
 import { getAgentContext } from '@/lib/utils.js';
 import type { AgentWithStatus, AgentStatusType } from '@/types/api.js';
+
+// Aggregate entry for grouped agents (e.g., all reviewer-* agents).
+export interface AggregateEntry {
+  type: 'aggregate';
+  name: string;
+  displayName: string;
+  agentIds: number[];
+  count: number;
+  // Use best status from underlying agents.
+  status: AgentStatusType;
+  totalUnread: number;
+}
 
 // Combine clsx and tailwind-merge for class name handling.
 function cn(...inputs: (string | undefined | null | false)[]) {
@@ -97,6 +109,25 @@ function GlobeIcon({ className }: { className?: string }) {
   );
 }
 
+// Code review icon for CodeReviewer aggregate.
+function CodeReviewIcon({ className }: { className?: string }) {
+  return (
+    <svg
+      className={cn('h-6 w-6', className)}
+      fill="none"
+      viewBox="0 0 24 24"
+      stroke="currentColor"
+    >
+      <path
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        strokeWidth={2}
+        d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4"
+      />
+    </svg>
+  );
+}
+
 // Extended agent data with unread count.
 export interface AgentWithUnread extends AgentWithStatus {
   unreadCount?: number;
@@ -110,6 +141,10 @@ export interface AgentSwitcherProps {
   selectedAgentId?: number | null;
   /** Handler for agent selection (null = Global/All). */
   onSelectAgent?: (agentId: number | null) => void;
+  /** Handler for aggregate selection. */
+  onSelectAggregate?: (aggregate: AgentAggregate) => void;
+  /** Currently selected aggregate name (null if single agent selected). */
+  selectedAggregate?: string | null;
   /** Whether data is loading. */
   isLoading?: boolean;
   /** Whether the dropdown is disabled. */
@@ -181,11 +216,21 @@ function AgentListItem({
   );
 }
 
+// Helper to determine best status from a list of agents.
+function getBestStatus(agents: AgentWithUnread[]): AgentStatusType {
+  if (agents.some((a) => a.status === 'active')) return 'active';
+  if (agents.some((a) => a.status === 'busy')) return 'busy';
+  if (agents.some((a) => a.status === 'idle')) return 'idle';
+  return 'offline';
+}
+
 // Presentational AgentSwitcher component.
 export function AgentSwitcher({
   agents,
   selectedAgentId,
   onSelectAgent,
+  onSelectAggregate,
+  selectedAggregate,
   isLoading = false,
   disabled = false,
   className,
@@ -200,12 +245,43 @@ export function AgentSwitcher({
     [agents, selectedAgentId],
   );
 
+  // Create aggregates for reviewer-* agents.
+  const { aggregates, nonReviewerAgents } = useMemo(() => {
+    const reviewerAgents = agents.filter((a) => a.name.startsWith('reviewer-'));
+    const otherAgents = agents.filter((a) => !a.name.startsWith('reviewer-'));
+
+    const aggs: AggregateEntry[] = [];
+    if (reviewerAgents.length > 0) {
+      aggs.push({
+        type: 'aggregate',
+        name: 'CodeReviewer',
+        displayName: 'CodeReviewer',
+        agentIds: reviewerAgents.map((a) => a.id),
+        count: reviewerAgents.length,
+        status: getBestStatus(reviewerAgents),
+        totalUnread: reviewerAgents.reduce(
+          (sum, a) => sum + (a.unreadCount ?? 0),
+          0,
+        ),
+      });
+    }
+
+    return { aggregates: aggs, nonReviewerAgents: otherAgents };
+  }, [agents]);
+
   // Filter agents by search query.
   const filteredAgents = useMemo(() => {
-    if (!searchQuery.trim()) return agents;
+    if (!searchQuery.trim()) return nonReviewerAgents;
     const query = searchQuery.toLowerCase();
-    return agents.filter((a) => a.name.toLowerCase().includes(query));
-  }, [agents, searchQuery]);
+    return nonReviewerAgents.filter((a) => a.name.toLowerCase().includes(query));
+  }, [nonReviewerAgents, searchQuery]);
+
+  // Filter aggregates by search query.
+  const filteredAggregates = useMemo(() => {
+    if (!searchQuery.trim()) return aggregates;
+    const query = searchQuery.toLowerCase();
+    return aggregates.filter((a) => a.displayName.toLowerCase().includes(query));
+  }, [aggregates, searchQuery]);
 
   // Group agents by status for better organization.
   const groupedAgents = useMemo(() => {
@@ -238,8 +314,15 @@ export function AgentSwitcher({
     setSearchQuery('');
   };
 
+  const handleSelectAggregate = (agg: AggregateEntry) => {
+    onSelectAggregate?.({ name: agg.name, agentIds: agg.agentIds });
+    setSearchQuery('');
+  };
+
   // Check if Global (all agents) is selected.
-  const isGlobalSelected = selectedAgentId === null || selectedAgentId === undefined;
+  const isGlobalSelected =
+    (selectedAgentId === null || selectedAgentId === undefined) &&
+    !selectedAggregate;
 
   // Calculate total unread if not provided.
   const displayUnreadCount = totalUnreadCount ?? agents.reduce(
@@ -275,6 +358,18 @@ export function AgentSwitcher({
             </div>
             <span className="font-medium text-gray-900">{selectedAgent.name}</span>
             <StatusBadge status={selectedAgent.status} size="sm" />
+          </>
+        ) : selectedAggregate ? (
+          <>
+            <div className="relative flex h-6 w-6 items-center justify-center rounded-full bg-purple-100 text-purple-600">
+              <CodeReviewIcon className="h-4 w-4" />
+              {displayUnreadCount > 0 ? (
+                <span className="absolute -right-1 -top-1 flex h-4 w-4 items-center justify-center rounded-full bg-red-500 text-[10px] font-bold text-white">
+                  {displayUnreadCount > 9 ? '9+' : displayUnreadCount}
+                </span>
+              ) : null}
+            </div>
+            <span className="font-medium text-gray-900">{selectedAggregate}</span>
           </>
         ) : (
           <>
@@ -359,12 +454,59 @@ export function AgentSwitcher({
               )}
             </MenuItem>
 
-            {/* Divider. */}
+            {/* Aggregates section (e.g., CodeReviewer). */}
+            {filteredAggregates.length > 0 ? (
+              <>
+                <div className="my-1 border-t border-gray-100" />
+                {filteredAggregates.map((agg) => (
+                  <MenuItem key={agg.name}>
+                    {({ focus }) => (
+                      <button
+                        type="button"
+                        onClick={() => handleSelectAggregate(agg)}
+                        className={cn(
+                          'flex w-full items-center gap-3 px-3 py-2 text-left text-sm',
+                          focus ? 'bg-gray-100' : '',
+                          selectedAggregate === agg.name ? 'bg-purple-50' : '',
+                        )}
+                      >
+                        <div className="relative flex h-8 w-8 items-center justify-center rounded-full bg-purple-100 text-purple-600">
+                          <CodeReviewIcon className="h-5 w-5" />
+                          {agg.totalUnread > 0 ? (
+                            <span className="absolute -right-1 -top-1 flex h-4 w-4 items-center justify-center rounded-full bg-red-500 text-[10px] font-bold text-white">
+                              {agg.totalUnread > 9 ? '9+' : agg.totalUnread}
+                            </span>
+                          ) : null}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2">
+                            <span className="font-medium text-gray-900">
+                              {agg.displayName}
+                            </span>
+                            {selectedAggregate === agg.name ? (
+                              <CheckIcon className="h-4 w-4 text-purple-600 flex-shrink-0" />
+                            ) : null}
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <StatusBadge status={agg.status} size="sm" />
+                            <span className="text-xs text-gray-500">
+                              {agg.count} reviewer{agg.count !== 1 ? 's' : ''}
+                            </span>
+                          </div>
+                        </div>
+                      </button>
+                    )}
+                  </MenuItem>
+                ))}
+              </>
+            ) : null}
+
+            {/* Divider before individual agents. */}
             {sortedAgents.length > 0 ? (
               <div className="my-1 border-t border-gray-100" />
             ) : null}
 
-            {sortedAgents.length === 0 && searchQuery ? (
+            {sortedAgents.length === 0 && filteredAggregates.length === 0 && searchQuery ? (
               <div className="px-3 py-4 text-center text-sm text-gray-500">
                 No agents found
               </div>
@@ -373,7 +515,7 @@ export function AgentSwitcher({
                 <AgentListItem
                   key={agent.id}
                   agent={agent}
-                  isSelected={agent.id === selectedAgentId}
+                  isSelected={agent.id === selectedAgentId && !selectedAggregate}
                   onClick={() => handleSelect(agent.id)}
                 />
               ))
@@ -397,14 +539,36 @@ export function ConnectedAgentSwitcher({
   className?: string;
   totalUnreadCount?: number;
 }) {
-  const { currentAgent, switchAgent, setAvailableAgents, setCurrentAgent } = useAuthStore();
+  const {
+    currentAgent,
+    selectedAggregate,
+    switchAgent,
+    selectAggregate,
+    clearSelection,
+    setAvailableAgents,
+  } = useAuthStore();
+
+  // Update available agents in store when agents list changes.
+  // This triggers the default User agent selection on first load.
+  useEffect(() => {
+    if (agents.length > 0) {
+      setAvailableAgents(
+        agents.map((a) => ({
+          id: a.id,
+          name: a.name,
+          createdAt: a.last_active_at,
+          lastActiveAt: a.last_active_at,
+        })),
+      );
+    }
+  }, [agents, setAvailableAgents]);
 
   // Update available agents in store when agents prop changes.
   // Convert AgentWithUnread to Agent format for store.
   const handleSelectAgent = (agentId: number | null) => {
     // Handle Global selection (null = all agents).
     if (agentId === null) {
-      setCurrentAgent(null);
+      clearSelection();
       return;
     }
 
@@ -423,11 +587,17 @@ export function ConnectedAgentSwitcher({
     }
   };
 
+  const handleSelectAggregate = (aggregate: AgentAggregate) => {
+    selectAggregate(aggregate);
+  };
+
   return (
     <AgentSwitcher
       agents={agents}
       selectedAgentId={currentAgent?.id ?? null}
+      selectedAggregate={selectedAggregate}
       onSelectAgent={handleSelectAgent}
+      onSelectAggregate={handleSelectAggregate}
       {...(isLoading !== undefined && { isLoading })}
       {...(className !== undefined && { className })}
       {...(totalUnreadCount !== undefined && { totalUnreadCount })}

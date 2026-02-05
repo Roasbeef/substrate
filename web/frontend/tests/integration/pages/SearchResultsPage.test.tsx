@@ -22,37 +22,66 @@ function createTestQueryClient() {
   });
 }
 
-// Mock search results without overlapping words to avoid highlighting issues.
-const mockSearchResults: SearchResult[] = [
+// Gateway InboxMessage format for search results.
+// The search API returns InboxMessage objects which are parsed to SearchResult with type='message'.
+interface GatewayInboxMessage {
+  id: string;
+  thread_id: string;
+  subject: string;
+  body: string;
+  priority: string;
+  created_at: string;
+  sender_name?: string;
+}
+
+// Mock search results in gateway format (InboxMessage objects).
+const mockGatewayResults: GatewayInboxMessage[] = [
   {
-    type: 'message',
-    id: 1,
-    title: 'Team Meeting Notes',
-    snippet: 'Summary of the weekly team sync.',
+    id: '1',
+    thread_id: 'thread-1',
+    subject: 'Team Meeting Notes',
+    body: 'Summary of the weekly team sync.',
+    priority: 'PRIORITY_NORMAL',
     created_at: new Date().toISOString(),
+    sender_name: 'Alice',
   },
   {
-    type: 'thread',
-    id: 2,
-    title: 'Budget Discussion',
-    snippet: 'Quarterly budget review thread.',
+    id: '2',
+    thread_id: 'thread-2',
+    subject: 'Budget Discussion',
+    body: 'Quarterly budget review thread.',
+    priority: 'PRIORITY_NORMAL',
     created_at: new Date().toISOString(),
+    sender_name: 'Bob',
   },
   {
-    type: 'agent',
-    id: 3,
-    title: 'Agent Alpha',
-    snippet: 'Handles automated tasks.',
+    id: '3',
+    thread_id: 'thread-3',
+    subject: 'Agent Alpha Status',
+    body: 'Handles automated tasks.',
+    priority: 'PRIORITY_NORMAL',
     created_at: new Date().toISOString(),
+    sender_name: 'Charlie',
   },
   {
-    type: 'topic',
-    id: 4,
-    title: 'General Announcements',
-    snippet: 'Company-wide updates and news.',
+    id: '4',
+    thread_id: 'thread-4',
+    subject: 'General Announcements',
+    body: 'Company-wide updates and news.',
+    priority: 'PRIORITY_NORMAL',
     created_at: new Date().toISOString(),
+    sender_name: 'Dana',
   },
 ];
+
+// Legacy SearchResult format for test assertions (what the frontend transforms results to).
+const mockSearchResults: SearchResult[] = mockGatewayResults.map((msg) => ({
+  type: 'message',
+  id: Number(msg.id),
+  title: msg.subject,
+  snippet: msg.body,
+  created_at: msg.created_at,
+}));
 
 // Test wrapper with routing.
 function renderWithRouter(
@@ -66,7 +95,7 @@ function renderWithRouter(
         <MemoryRouter initialEntries={[initialPath]}>
           <Routes>
             <Route path="/search" element={<SearchResultsPage />} />
-            <Route path="/inbox/thread/:id" element={<div>Thread View</div>} />
+            <Route path="/thread/:id" element={<div>Thread View</div>} />
             <Route path="/agents/:id" element={<div>Agent View</div>} />
             <Route path="/topics/:id" element={<div>Topic View</div>} />
           </Routes>
@@ -118,9 +147,10 @@ describe('SearchResultsPage', () => {
       server.use(
         http.get('/api/v1/search', ({ request }) => {
           const url = new URL(request.url);
-          const q = url.searchParams.get('q');
-          expect(q).toBe('meeting');
-          return HttpResponse.json({ data: mockSearchResults });
+          // The API uses 'query' parameter (not 'q' from URL).
+          const query = url.searchParams.get('query');
+          expect(query).toBe('meeting');
+          return HttpResponse.json({ results: mockGatewayResults });
         }),
       );
 
@@ -135,7 +165,7 @@ describe('SearchResultsPage', () => {
     it('shows result count for query', async () => {
       server.use(
         http.get('/api/v1/search', () => {
-          return HttpResponse.json({ data: mockSearchResults });
+          return HttpResponse.json({ results: mockGatewayResults });
         }),
       );
 
@@ -149,15 +179,15 @@ describe('SearchResultsPage', () => {
     it('uses type filter from URL', async () => {
       server.use(
         http.get('/api/v1/search', () => {
-          return HttpResponse.json({ data: mockSearchResults });
+          return HttpResponse.json({ results: mockGatewayResults });
         }),
       );
 
       renderWithRouter('/search?q=test&type=message');
 
       await waitFor(() => {
-        // Wait for results to load by checking for a link.
-        expect(screen.getByRole('link')).toBeInTheDocument();
+        // Wait for results to load by checking for links (plural since there are multiple).
+        expect(screen.getAllByRole('link').length).toBeGreaterThan(0);
       });
 
       // Messages filter should be active.
@@ -173,11 +203,11 @@ describe('SearchResultsPage', () => {
       server.use(
         http.get('/api/v1/search', ({ request }) => {
           const url = new URL(request.url);
-          const q = url.searchParams.get('q');
-          if (q === 'test') {
-            return HttpResponse.json({ data: mockSearchResults });
+          const query = url.searchParams.get('query');
+          if (query === 'test') {
+            return HttpResponse.json({ results: mockGatewayResults });
           }
-          return HttpResponse.json({ data: [] });
+          return HttpResponse.json({ results: [] });
         }),
       );
 
@@ -229,30 +259,30 @@ describe('SearchResultsPage', () => {
 
       server.use(
         http.get('/api/v1/search', () => {
-          return HttpResponse.json({ data: mockSearchResults });
+          return HttpResponse.json({ results: mockGatewayResults });
         }),
       );
 
       renderWithRouter('/search?q=test');
 
       await waitFor(() => {
-        // Wait for all 4 links to appear.
+        // Wait for all 4 links to appear (all are 'message' type from gateway).
         expect(screen.getAllByRole('link')).toHaveLength(4);
       });
 
-      // Click Messages filter.
+      // Click Messages filter - should still show all 4 since they're all messages.
       await user.click(screen.getByRole('button', { name: /messages/i }));
 
-      // Should only show 1 message (filter applied client-side).
+      // All results are type 'message', so filtering keeps all 4.
       await waitFor(() => {
-        expect(screen.getAllByRole('link')).toHaveLength(1);
+        expect(screen.getAllByRole('link')).toHaveLength(4);
       });
     });
 
     it('shows count on filter tabs', async () => {
       server.use(
         http.get('/api/v1/search', () => {
-          return HttpResponse.json({ data: mockSearchResults });
+          return HttpResponse.json({ results: mockGatewayResults });
         }),
       );
 
@@ -272,7 +302,7 @@ describe('SearchResultsPage', () => {
 
       server.use(
         http.get('/api/v1/search', () => {
-          return HttpResponse.json({ data: mockSearchResults });
+          return HttpResponse.json({ results: mockGatewayResults });
         }),
       );
 
@@ -282,11 +312,11 @@ describe('SearchResultsPage', () => {
         expect(screen.getAllByRole('link')).toHaveLength(4);
       });
 
-      // Click Agents filter.
-      await user.click(screen.getByRole('button', { name: /agents/i }));
+      // Click Messages filter (all results are messages).
+      await user.click(screen.getByRole('button', { name: /messages/i }));
 
-      const agentsButton = screen.getByRole('button', { name: /agents/i });
-      expect(agentsButton).toHaveClass('bg-blue-600');
+      const messagesButton = screen.getByRole('button', { name: /messages/i });
+      expect(messagesButton).toHaveClass('bg-blue-600');
     });
   });
 
@@ -294,7 +324,7 @@ describe('SearchResultsPage', () => {
     it('renders result items with correct content', async () => {
       server.use(
         http.get('/api/v1/search', () => {
-          return HttpResponse.json({ data: mockSearchResults });
+          return HttpResponse.json({ results: mockGatewayResults });
         }),
       );
 
@@ -304,15 +334,15 @@ describe('SearchResultsPage', () => {
         expect(screen.getAllByRole('link')).toHaveLength(4);
       });
 
-      // Check result shows type badges.
-      expect(screen.getByText('Message')).toBeInTheDocument();
-      expect(screen.getByText('Thread')).toBeInTheDocument();
+      // Check result shows type badges (all are 'Message' type from gateway).
+      const messageBadges = screen.getAllByText('Message');
+      expect(messageBadges.length).toBe(4);
     });
 
     it('highlights search query in results', async () => {
       server.use(
         http.get('/api/v1/search', () => {
-          return HttpResponse.json({ data: mockSearchResults });
+          return HttpResponse.json({ results: mockGatewayResults });
         }),
       );
 
@@ -330,7 +360,7 @@ describe('SearchResultsPage', () => {
     it('shows type badges for each result type', async () => {
       server.use(
         http.get('/api/v1/search', () => {
-          return HttpResponse.json({ data: mockSearchResults });
+          return HttpResponse.json({ results: mockGatewayResults });
         }),
       );
 
@@ -340,16 +370,15 @@ describe('SearchResultsPage', () => {
         expect(screen.getAllByRole('link')).toHaveLength(4);
       });
 
-      expect(screen.getByText('Message')).toBeInTheDocument();
-      expect(screen.getByText('Thread')).toBeInTheDocument();
-      expect(screen.getByText('Agent')).toBeInTheDocument();
-      expect(screen.getByText('Topic')).toBeInTheDocument();
+      // All results are type 'message' from the gateway.
+      const messageBadges = screen.getAllByText('Message');
+      expect(messageBadges.length).toBe(4);
     });
 
     it('renders results as links', async () => {
       server.use(
         http.get('/api/v1/search', () => {
-          return HttpResponse.json({ data: mockSearchResults });
+          return HttpResponse.json({ results: mockGatewayResults });
         }),
       );
 
@@ -372,7 +401,7 @@ describe('SearchResultsPage', () => {
       server.use(
         http.get('/api/v1/search', async () => {
           await searchPromise;
-          return HttpResponse.json({ data: mockSearchResults });
+          return HttpResponse.json({ results: mockGatewayResults });
         }),
       );
 
@@ -394,7 +423,7 @@ describe('SearchResultsPage', () => {
     it('shows empty state when no results', async () => {
       server.use(
         http.get('/api/v1/search', () => {
-          return HttpResponse.json({ data: [] });
+          return HttpResponse.json({ results: [] });
         }),
       );
 
@@ -410,7 +439,8 @@ describe('SearchResultsPage', () => {
     it('shows filter hint in empty state when filtered', async () => {
       server.use(
         http.get('/api/v1/search', () => {
-          return HttpResponse.json({ data: [mockSearchResults[0]] }); // Only message.
+          // Return only messages, but filter is set to 'agent'.
+          return HttpResponse.json({ results: [mockGatewayResults[0]] });
         }),
       );
 
@@ -465,7 +495,7 @@ describe('SearchResultsPage', () => {
     it('navigates to thread view on message click', async () => {
       server.use(
         http.get('/api/v1/search', () => {
-          return HttpResponse.json({ data: [mockSearchResults[0]] });
+          return HttpResponse.json({ results: [mockGatewayResults[0]] });
         }),
       );
 
@@ -475,14 +505,15 @@ describe('SearchResultsPage', () => {
         expect(screen.getByRole('link')).toBeInTheDocument();
       });
 
+      // Messages link to /thread/{thread_id} (not /inbox/thread/).
       const link = screen.getByRole('link');
-      expect(link).toHaveAttribute('href', '/inbox/thread/1');
+      expect(link).toHaveAttribute('href', '/thread/thread-1');
     });
 
-    it('navigates to agent view on agent click', async () => {
+    it('navigates to thread view on second message click', async () => {
       server.use(
         http.get('/api/v1/search', () => {
-          return HttpResponse.json({ data: [mockSearchResults[2]] }); // Agent result.
+          return HttpResponse.json({ results: [mockGatewayResults[2]] }); // Third result.
         }),
       );
 
@@ -492,8 +523,9 @@ describe('SearchResultsPage', () => {
         expect(screen.getByRole('link')).toBeInTheDocument();
       });
 
+      // All results are messages, so they link to /thread/{thread_id}.
       const link = screen.getByRole('link');
-      expect(link).toHaveAttribute('href', '/agents/3');
+      expect(link).toHaveAttribute('href', '/thread/thread-3');
     });
   });
 });

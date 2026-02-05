@@ -38,7 +38,7 @@ export interface ModalData {
 }
 
 // Sidebar navigation state.
-export type SidebarSection = 'inbox' | 'starred' | 'snoozed' | 'sent' | 'archive' | 'agents' | 'sessions';
+export type SidebarSection = 'inbox' | 'starred' | 'snoozed' | 'sent' | 'archive' | 'agents' | 'sessions' | 'reviews';
 
 interface UIState {
   // Modal state.

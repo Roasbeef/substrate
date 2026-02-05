@@ -115,6 +115,8 @@ export interface MessageListOptions {
   filter?: 'all' | 'unread' | 'starred';
   category?: 'inbox' | 'starred' | 'snoozed' | 'sent' | 'archive';
   agentId?: number;
+  // Filter by sender name prefix (for aggregate views like CodeReviewer).
+  senderNamePrefix?: string;
 }
 
 // Build query string from options.
@@ -140,6 +142,9 @@ function buildQueryString(options: MessageListOptions): string {
   }
   if (options.agentId !== undefined) {
     params.set('agent_id', String(options.agentId));
+  }
+  if (options.senderNamePrefix) {
+    params.set('sender_name_prefix', options.senderNamePrefix);
   }
 
   const queryString = params.toString();
@@ -208,6 +213,13 @@ export function acknowledgeMessage(id: number): Promise<void> {
 }
 
 // Delete a message.
-export function deleteMessage(id: number): Promise<void> {
-  return post<void>(`/messages/${id}/delete`, {});
+// markSenderDeleted should be true when deleting from aggregate views like
+// CodeReviewer where messages are filtered by sender name.
+export function deleteMessage(
+  id: number,
+  markSenderDeleted = false,
+): Promise<void> {
+  return post<void>(`/messages/${id}/delete`, {
+    mark_sender_deleted: markSenderDeleted,
+  });
 }

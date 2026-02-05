@@ -170,7 +170,61 @@ type QueryStore interface {
 	GetSentMessages(
 		ctx context.Context, arg sqlc.GetSentMessagesParams,
 	) ([]sqlc.GetSentMessagesRow, error)
-	GetAllSentMessages(ctx context.Context, limit int64) ([]sqlc.GetAllSentMessagesRow, error)
+	GetAllSentMessages(
+		ctx context.Context, limit int64,
+	) ([]sqlc.GetAllSentMessagesRow, error)
+	GetMessagesBySenderNamePrefix(
+		ctx context.Context, arg sqlc.GetMessagesBySenderNamePrefixParams,
+	) ([]sqlc.GetMessagesBySenderNamePrefixRow, error)
+
+	// Review operations.
+	CreateReview(
+		ctx context.Context, arg sqlc.CreateReviewParams,
+	) (sqlc.Review, error)
+	GetReview(
+		ctx context.Context, reviewID string,
+	) (sqlc.Review, error)
+	ListReviews(
+		ctx context.Context, arg sqlc.ListReviewsParams,
+	) ([]sqlc.Review, error)
+	ListReviewsByState(
+		ctx context.Context, arg sqlc.ListReviewsByStateParams,
+	) ([]sqlc.Review, error)
+	ListReviewsByRequester(
+		ctx context.Context, arg sqlc.ListReviewsByRequesterParams,
+	) ([]sqlc.Review, error)
+	ListActiveReviews(ctx context.Context) ([]sqlc.Review, error)
+	UpdateReviewState(
+		ctx context.Context, arg sqlc.UpdateReviewStateParams,
+	) error
+	UpdateReviewCompleted(
+		ctx context.Context, arg sqlc.UpdateReviewCompletedParams,
+	) error
+
+	// Review iteration operations.
+	CreateReviewIteration(
+		ctx context.Context, arg sqlc.CreateReviewIterationParams,
+	) (sqlc.ReviewIteration, error)
+	GetReviewIterations(
+		ctx context.Context, reviewID string,
+	) ([]sqlc.ReviewIteration, error)
+
+	// Review issue operations.
+	CreateReviewIssue(
+		ctx context.Context, arg sqlc.CreateReviewIssueParams,
+	) (sqlc.ReviewIssue, error)
+	GetReviewIssues(
+		ctx context.Context, reviewID string,
+	) ([]sqlc.ReviewIssue, error)
+	GetOpenReviewIssues(
+		ctx context.Context, reviewID string,
+	) ([]sqlc.ReviewIssue, error)
+	UpdateReviewIssueStatus(
+		ctx context.Context, arg sqlc.UpdateReviewIssueStatusParams,
+	) error
+	CountOpenIssues(
+		ctx context.Context, reviewID string,
+	) (int64, error)
 }
 
 // BatchedQueryStore is a version of QueryStore that's capable of batched
@@ -620,8 +674,8 @@ func (s *SqlcStore) SearchMessagesForAgent(ctx context.Context, query string,
 
 // GetAllInboxMessages retrieves inbox messages across all agents (global view).
 func (s *SqlcStore) GetAllInboxMessages(ctx context.Context, limit,
-	offset int) ([]InboxMessage, error) {
-
+	offset int,
+) ([]InboxMessage, error) {
 	rows, err := s.db.GetAllInboxMessagesPaginated(ctx, sqlc.GetAllInboxMessagesPaginatedParams{
 		Limit:  int64(limit),
 		Offset: int64(offset),
@@ -658,8 +712,8 @@ func (s *SqlcStore) GetAllInboxMessages(ctx context.Context, limit,
 
 // GetMessageRecipients retrieves all recipients for a message.
 func (s *SqlcStore) GetMessageRecipients(ctx context.Context,
-	messageID int64) ([]MessageRecipientWithAgent, error) {
-
+	messageID int64,
+) ([]MessageRecipientWithAgent, error) {
 	rows, err := s.db.GetMessageRecipients(ctx, messageID)
 	if err != nil {
 		return nil, err
@@ -686,8 +740,8 @@ func (s *SqlcStore) GetMessageRecipients(ctx context.Context,
 
 // GetMessageRecipientsBulk retrieves recipients for multiple messages.
 func (s *SqlcStore) GetMessageRecipientsBulk(ctx context.Context,
-	messageIDs []int64) (map[int64][]MessageRecipientWithAgent, error) {
-
+	messageIDs []int64,
+) (map[int64][]MessageRecipientWithAgent, error) {
 	rows, err := s.db.GetMessageRecipientsWithAgentsBulk(ctx, messageIDs)
 	if err != nil {
 		return nil, err
@@ -713,8 +767,8 @@ func (s *SqlcStore) GetMessageRecipientsBulk(ctx context.Context,
 
 // SearchMessages performs global search across all messages.
 func (s *SqlcStore) SearchMessages(ctx context.Context, query string,
-	limit int) ([]InboxMessage, error) {
-
+	limit int,
+) ([]InboxMessage, error) {
 	// Escape LIKE wildcards.
 	escapedQuery := "%" + query + "%"
 	rows, err := s.db.SearchMessages(ctx, sqlc.SearchMessagesParams{
@@ -749,8 +803,8 @@ func (s *SqlcStore) SearchMessages(ctx context.Context, query string,
 
 // GetMessagesByTopic retrieves all messages for a topic.
 func (s *SqlcStore) GetMessagesByTopic(ctx context.Context,
-	topicID int64) ([]Message, error) {
-
+	topicID int64,
+) ([]Message, error) {
 	rows, err := s.db.GetMessagesByTopic(ctx, topicID)
 	if err != nil {
 		return nil, err
@@ -765,8 +819,8 @@ func (s *SqlcStore) GetMessagesByTopic(ctx context.Context,
 
 // GetSentMessages retrieves messages sent by a specific agent.
 func (s *SqlcStore) GetSentMessages(ctx context.Context, senderID int64,
-	limit int) ([]Message, error) {
-
+	limit int,
+) ([]Message, error) {
 	rows, err := s.db.GetSentMessages(ctx, sqlc.GetSentMessagesParams{
 		SenderID: senderID,
 		Limit:    int64(limit),
@@ -803,9 +857,46 @@ func (s *SqlcStore) GetSentMessages(ctx context.Context, senderID int64,
 
 // GetAllSentMessages retrieves all sent messages across all agents.
 func (s *SqlcStore) GetAllSentMessages(ctx context.Context,
-	limit int) ([]InboxMessage, error) {
-
+	limit int,
+) ([]InboxMessage, error) {
 	rows, err := s.db.GetAllSentMessages(ctx, int64(limit))
+	if err != nil {
+		return nil, err
+	}
+
+	messages := make([]InboxMessage, 0, len(rows))
+	for _, row := range rows {
+		messages = append(messages, InboxMessage{
+			Message: Message{
+				ID:        row.ID,
+				ThreadID:  row.ThreadID,
+				TopicID:   row.TopicID,
+				LogOffset: row.LogOffset,
+				SenderID:  row.SenderID,
+				Subject:   row.Subject,
+				Body:      row.BodyMd,
+				Priority:  row.Priority,
+				CreatedAt: time.Unix(row.CreatedAt, 0),
+			},
+			SenderName:       row.SenderName,
+			SenderProjectKey: row.SenderProjectKey.String,
+			SenderGitBranch:  row.SenderGitBranch.String,
+		})
+	}
+	return messages, nil
+}
+
+// GetMessagesBySenderNamePrefix retrieves messages from agents whose name
+// starts with the given prefix.
+func (s *SqlcStore) GetMessagesBySenderNamePrefix(ctx context.Context,
+	prefix string, limit int,
+) ([]InboxMessage, error) {
+	rows, err := s.db.GetMessagesBySenderNamePrefix(
+		ctx, sqlc.GetMessagesBySenderNamePrefixParams{
+			Prefix: ToSqlcNullString(prefix),
+			Limit:  int64(limit),
+		},
+	)
 	if err != nil {
 		return nil, err
 	}
@@ -935,8 +1026,8 @@ func (s *SqlcStore) UpdateSession(ctx context.Context, id int64,
 
 // UpdateAgentName updates an agent's display name.
 func (s *SqlcStore) UpdateAgentName(ctx context.Context, id int64,
-	name string) error {
-
+	name string,
+) error {
 	return s.db.UpdateAgentName(ctx, sqlc.UpdateAgentNameParams{
 		Name: name,
 		ID:   id,
@@ -1924,8 +2015,8 @@ func (s *txSqlcStore) UpdateSessionIdentityLastActive(ctx context.Context,
 
 // GetAllInboxMessages retrieves inbox messages across all agents (global view).
 func (s *txSqlcStore) GetAllInboxMessages(ctx context.Context, limit,
-	offset int) ([]InboxMessage, error) {
-
+	offset int,
+) ([]InboxMessage, error) {
 	rows, err := s.queries.GetAllInboxMessagesPaginated(
 		ctx, sqlc.GetAllInboxMessagesPaginatedParams{
 			Limit:  int64(limit),
@@ -1964,8 +2055,8 @@ func (s *txSqlcStore) GetAllInboxMessages(ctx context.Context, limit,
 
 // GetMessageRecipients retrieves all recipients for a message.
 func (s *txSqlcStore) GetMessageRecipients(ctx context.Context,
-	messageID int64) ([]MessageRecipientWithAgent, error) {
-
+	messageID int64,
+) ([]MessageRecipientWithAgent, error) {
 	rows, err := s.queries.GetMessageRecipients(ctx, messageID)
 	if err != nil {
 		return nil, err
@@ -1992,8 +2083,8 @@ func (s *txSqlcStore) GetMessageRecipients(ctx context.Context,
 
 // GetMessageRecipientsBulk retrieves recipients for multiple messages.
 func (s *txSqlcStore) GetMessageRecipientsBulk(ctx context.Context,
-	messageIDs []int64) (map[int64][]MessageRecipientWithAgent, error) {
-
+	messageIDs []int64,
+) (map[int64][]MessageRecipientWithAgent, error) {
 	rows, err := s.queries.GetMessageRecipientsWithAgentsBulk(ctx, messageIDs)
 	if err != nil {
 		return nil, err
@@ -2019,8 +2110,8 @@ func (s *txSqlcStore) GetMessageRecipientsBulk(ctx context.Context,
 
 // SearchMessages performs global search across all messages.
 func (s *txSqlcStore) SearchMessages(ctx context.Context, query string,
-	limit int) ([]InboxMessage, error) {
-
+	limit int,
+) ([]InboxMessage, error) {
 	escapedQuery := "%" + query + "%"
 	rows, err := s.queries.SearchMessages(ctx, sqlc.SearchMessagesParams{
 		Subject: escapedQuery,
@@ -2052,8 +2143,8 @@ func (s *txSqlcStore) SearchMessages(ctx context.Context, query string,
 
 // GetMessagesByTopic retrieves all messages for a topic.
 func (s *txSqlcStore) GetMessagesByTopic(ctx context.Context,
-	topicID int64) ([]Message, error) {
-
+	topicID int64,
+) ([]Message, error) {
 	rows, err := s.queries.GetMessagesByTopic(ctx, topicID)
 	if err != nil {
 		return nil, err
@@ -2068,8 +2159,8 @@ func (s *txSqlcStore) GetMessagesByTopic(ctx context.Context,
 
 // GetSentMessages retrieves messages sent by a specific agent.
 func (s *txSqlcStore) GetSentMessages(ctx context.Context, senderID int64,
-	limit int) ([]Message, error) {
-
+	limit int,
+) ([]Message, error) {
 	rows, err := s.queries.GetSentMessages(ctx, sqlc.GetSentMessagesParams{
 		SenderID: senderID,
 		Limit:    int64(limit),
@@ -2106,9 +2197,46 @@ func (s *txSqlcStore) GetSentMessages(ctx context.Context, senderID int64,
 
 // GetAllSentMessages retrieves all sent messages across all agents.
 func (s *txSqlcStore) GetAllSentMessages(ctx context.Context,
-	limit int) ([]InboxMessage, error) {
-
+	limit int,
+) ([]InboxMessage, error) {
 	rows, err := s.queries.GetAllSentMessages(ctx, int64(limit))
+	if err != nil {
+		return nil, err
+	}
+
+	messages := make([]InboxMessage, 0, len(rows))
+	for _, row := range rows {
+		messages = append(messages, InboxMessage{
+			Message: Message{
+				ID:        row.ID,
+				ThreadID:  row.ThreadID,
+				TopicID:   row.TopicID,
+				LogOffset: row.LogOffset,
+				SenderID:  row.SenderID,
+				Subject:   row.Subject,
+				Body:      row.BodyMd,
+				Priority:  row.Priority,
+				CreatedAt: time.Unix(row.CreatedAt, 0),
+			},
+			SenderName:       row.SenderName,
+			SenderProjectKey: row.SenderProjectKey.String,
+			SenderGitBranch:  row.SenderGitBranch.String,
+		})
+	}
+	return messages, nil
+}
+
+// GetMessagesBySenderNamePrefix retrieves messages from agents whose name
+// starts with the given prefix.
+func (s *txSqlcStore) GetMessagesBySenderNamePrefix(ctx context.Context,
+	prefix string, limit int,
+) ([]InboxMessage, error) {
+	rows, err := s.queries.GetMessagesBySenderNamePrefix(
+		ctx, sqlc.GetMessagesBySenderNamePrefixParams{
+			Prefix: ToSqlcNullString(prefix),
+			Limit:  int64(limit),
+		},
+	)
 	if err != nil {
 		return nil, err
 	}
@@ -2137,8 +2265,8 @@ func (s *txSqlcStore) GetAllSentMessages(ctx context.Context,
 
 // UpdateAgentName updates an agent's display name.
 func (s *txSqlcStore) UpdateAgentName(ctx context.Context, id int64,
-	name string) error {
-
+	name string,
+) error {
 	return s.queries.UpdateAgentName(ctx, sqlc.UpdateAgentNameParams{
 		Name: name,
 		ID:   id,

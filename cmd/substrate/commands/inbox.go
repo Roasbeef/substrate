@@ -9,22 +9,22 @@ import (
 )
 
 var (
-	inboxLimit      int
-	inboxUnreadOnly bool
+	inboxLimit int
+	inboxAll   bool
 )
 
 var inboxCmd = &cobra.Command{
 	Use:   "inbox",
 	Short: "View your inbox",
-	Long:  `Display messages in your inbox with optional filters.`,
+	Long:  `Display messages in your inbox. By default shows only unread messages.`,
 	RunE:  runInbox,
 }
 
 func init() {
 	inboxCmd.Flags().IntVarP(&inboxLimit, "limit", "n", 20,
 		"Maximum number of messages to display")
-	inboxCmd.Flags().BoolVar(&inboxUnreadOnly, "unread-only", false,
-		"Show only unread messages")
+	inboxCmd.Flags().BoolVarP(&inboxAll, "all", "a", false,
+		"Show all messages (default: only unread)")
 }
 
 func runInbox(cmd *cobra.Command, args []string) error {
@@ -47,7 +47,7 @@ func runInbox(cmd *cobra.Command, args []string) error {
 	req := mail.FetchInboxRequest{
 		AgentID:    agentID,
 		Limit:      inboxLimit,
-		UnreadOnly: inboxUnreadOnly,
+		UnreadOnly: !inboxAll,
 	}
 
 	messages, err := client.FetchInbox(ctx, req)

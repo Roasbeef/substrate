@@ -69,8 +69,8 @@ func DefaultConfig() *Config {
 // NewServer creates a new web server. The config must have non-nil MailRef and
 // ActivityRef since the server requires actor system support for all operations.
 func NewServer(cfg *Config, st store.Storage,
-	registry *agent.Registry) (*Server, error) {
-
+	registry *agent.Registry,
+) (*Server, error) {
 	// Validate required actor refs are provided.
 	if cfg.MailRef == nil {
 		return nil, fmt.Errorf("config.MailRef is required")
@@ -212,6 +212,16 @@ func (s *Server) registerGateway(ctx context.Context) error {
 	)
 	if err != nil {
 		return fmt.Errorf("failed to register Stats handler: %w", err)
+	}
+
+	// Register ReviewService handler.
+	err = subtraterpc.RegisterReviewServiceHandlerFromEndpoint(
+		ctx, s.gatewayMux, s.grpcEndpoint, opts,
+	)
+	if err != nil {
+		return fmt.Errorf(
+			"failed to register ReviewService handler: %w", err,
+		)
 	}
 
 	// Mount the gateway at /api/v1/ as the primary API endpoint.

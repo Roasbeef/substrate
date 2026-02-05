@@ -198,7 +198,8 @@ describe('MessageList', () => {
       <MessageList messages={mockMessages} selectedIds={selectedIds} />,
     );
 
-    const rows = container.querySelectorAll('.bg-blue-100');
+    // Selected messages have bg-blue-50 style.
+    const rows = container.querySelectorAll('.bg-blue-50');
     expect(rows.length).toBe(2);
   });
 

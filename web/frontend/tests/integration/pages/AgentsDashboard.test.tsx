@@ -116,7 +116,7 @@ describe('AgentsDashboard', () => {
     resetWebSocketHookState();
     // Set up the default handler for agents status.
     server.use(
-      http.get('/api/v1/agents/status', () => {
+      http.get('/api/v1/agents-status', () => {
         return HttpResponse.json(mockAgentsResponse);
       }),
     );
@@ -279,7 +279,7 @@ describe('AgentsDashboard', () => {
 
     // Override with response that has no busy agents.
     server.use(
-      http.get('/api/v1/agents/status', () => {
+      http.get('/api/v1/agents-status', () => {
         return HttpResponse.json({
           agents: [mockAgents[0]], // Only active agent.
           counts: { active: 1, busy: 0, idle: 0, offline: 0 },
@@ -305,7 +305,7 @@ describe('AgentsDashboard', () => {
 
   it('shows empty state when no agents exist', async () => {
     server.use(
-      http.get('/api/v1/agents/status', () => {
+      http.get('/api/v1/agents-status', () => {
         return HttpResponse.json({
           agents: [],
           counts: { active: 0, busy: 0, idle: 0, offline: 0 },
@@ -326,7 +326,7 @@ describe('AgentsDashboard', () => {
 
   it('shows error state when fetch fails', async () => {
     server.use(
-      http.get('/api/v1/agents/status', () => {
+      http.get('/api/v1/agents-status', () => {
         return HttpResponse.json(
           { error: { code: 'server_error', message: 'Internal server error' } },
           { status: 500 },
@@ -346,7 +346,7 @@ describe('AgentsDashboard', () => {
     let callCount = 0;
 
     server.use(
-      http.get('/api/v1/agents/status', () => {
+      http.get('/api/v1/agents-status', () => {
         callCount++;
         if (callCount === 1) {
           return HttpResponse.json(

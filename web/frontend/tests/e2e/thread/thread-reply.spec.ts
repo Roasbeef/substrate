@@ -2,27 +2,25 @@
 
 import { test, expect } from '@playwright/test';
 
-// Helper to setup API endpoints.
+// Helper to setup API endpoints with grpc-gateway format.
 async function setupAPIs(page: import('@playwright/test').Page) {
   await page.route('**/api/v1/messages*', async (route) => {
     await route.fulfill({
       status: 200,
       contentType: 'application/json',
       body: JSON.stringify({
-        data: [
+        messages: [
           {
-            id: 1,
-            sender_id: 1,
+            id: '1',
+            sender_id: '1',
             sender_name: 'Alice Agent',
             subject: 'Test Thread',
             body: 'Initial message.',
-            priority: 'normal',
+            priority: 'PRIORITY_NORMAL',
             created_at: new Date().toISOString(),
             thread_id: 'thread-1',
-            recipients: [],
           },
         ],
-        meta: { total: 1, page: 1, page_size: 20 },
       }),
     });
   });
@@ -35,12 +33,12 @@ async function setupAPIs(page: import('@playwright/test').Page) {
         id: 'thread-1',
         messages: [
           {
-            id: 1,
-            sender_id: 1,
+            id: '1',
+            sender_id: '1',
             sender_name: 'Alice Agent',
             subject: 'Test Thread',
             body: 'Initial message.',
-            priority: 'normal',
+            priority: 'PRIORITY_NORMAL',
             created_at: new Date().toISOString(),
           },
         ],
@@ -53,16 +51,16 @@ test.describe('Thread reply box', () => {
   test('displays reply input at bottom of thread', async ({ page }) => {
     await setupAPIs(page);
     await page.goto('/');
-    await expect(page.locator('text=Inbox')).toBeVisible();
+    await expect(page.locator('.grid')).toBeVisible();
     await page.waitForTimeout(500);
 
-    await page.locator('text=Test Thread').click();
+    await page.getByText('Test Thread').click();
     await page.waitForTimeout(500);
 
-    const threadView = page.locator('[data-testid="thread-view"], [role="dialog"]');
+    const threadView = page.locator('[role="dialog"]');
     if (await threadView.isVisible()) {
       // Should have reply textarea.
-      const replyInput = threadView.locator('textarea[placeholder*="reply" i], [data-testid="reply-input"]');
+      const replyInput = threadView.locator('textarea');
       await expect(replyInput).toBeVisible();
     }
   });
@@ -70,13 +68,13 @@ test.describe('Thread reply box', () => {
   test('reply input is focusable', async ({ page }) => {
     await setupAPIs(page);
     await page.goto('/');
-    await expect(page.locator('text=Inbox')).toBeVisible();
+    await expect(page.locator('.grid')).toBeVisible();
     await page.waitForTimeout(500);
 
-    await page.locator('text=Test Thread').click();
+    await page.getByText('Test Thread').click();
     await page.waitForTimeout(500);
 
-    const threadView = page.locator('[data-testid="thread-view"], [role="dialog"]');
+    const threadView = page.locator('[role="dialog"]');
     if (await threadView.isVisible()) {
       const replyInput = threadView.locator('textarea').first();
       if (await replyInput.isVisible()) {
@@ -89,13 +87,13 @@ test.describe('Thread reply box', () => {
   test('typing in reply input works', async ({ page }) => {
     await setupAPIs(page);
     await page.goto('/');
-    await expect(page.locator('text=Inbox')).toBeVisible();
+    await expect(page.locator('.grid')).toBeVisible();
     await page.waitForTimeout(500);
 
-    await page.locator('text=Test Thread').click();
+    await page.getByText('Test Thread').click();
     await page.waitForTimeout(500);
 
-    const threadView = page.locator('[data-testid="thread-view"], [role="dialog"]');
+    const threadView = page.locator('[role="dialog"]');
     if (await threadView.isVisible()) {
       const replyInput = threadView.locator('textarea').first();
       if (await replyInput.isVisible()) {
@@ -110,15 +108,15 @@ test.describe('Sending reply', () => {
   test('send button is visible', async ({ page }) => {
     await setupAPIs(page);
     await page.goto('/');
-    await expect(page.locator('text=Inbox')).toBeVisible();
+    await expect(page.locator('.grid')).toBeVisible();
     await page.waitForTimeout(500);
 
-    await page.locator('text=Test Thread').click();
+    await page.getByText('Test Thread').click();
     await page.waitForTimeout(500);
 
-    const threadView = page.locator('[data-testid="thread-view"], [role="dialog"]');
+    const threadView = page.locator('[role="dialog"]');
     if (await threadView.isVisible()) {
-      const sendButton = threadView.locator('button:has-text("Send"), button[aria-label*="send" i]');
+      const sendButton = threadView.getByRole('button', { name: /Send/i });
       await expect(sendButton).toBeVisible();
     }
   });
@@ -126,15 +124,15 @@ test.describe('Sending reply', () => {
   test('send button is disabled when input is empty', async ({ page }) => {
     await setupAPIs(page);
     await page.goto('/');
-    await expect(page.locator('text=Inbox')).toBeVisible();
+    await expect(page.locator('.grid')).toBeVisible();
     await page.waitForTimeout(500);
 
-    await page.locator('text=Test Thread').click();
+    await page.getByText('Test Thread').click();
     await page.waitForTimeout(500);
 
-    const threadView = page.locator('[data-testid="thread-view"], [role="dialog"]');
+    const threadView = page.locator('[role="dialog"]');
     if (await threadView.isVisible()) {
-      const sendButton = threadView.locator('button:has-text("Send")');
+      const sendButton = threadView.getByRole('button', { name: /Send/i });
       if (await sendButton.isVisible()) {
         // Should be disabled with empty input.
         await expect(sendButton).toBeDisabled();
@@ -145,16 +143,16 @@ test.describe('Sending reply', () => {
   test('send button enables when input has text', async ({ page }) => {
     await setupAPIs(page);
     await page.goto('/');
-    await expect(page.locator('text=Inbox')).toBeVisible();
+    await expect(page.locator('.grid')).toBeVisible();
     await page.waitForTimeout(500);
 
-    await page.locator('text=Test Thread').click();
+    await page.getByText('Test Thread').click();
     await page.waitForTimeout(500);
 
-    const threadView = page.locator('[data-testid="thread-view"], [role="dialog"]');
+    const threadView = page.locator('[role="dialog"]');
     if (await threadView.isVisible()) {
       const replyInput = threadView.locator('textarea').first();
-      const sendButton = threadView.locator('button:has-text("Send")');
+      const sendButton = threadView.getByRole('button', { name: /Send/i });
 
       if (await replyInput.isVisible()) {
         await replyInput.fill('My reply');
@@ -176,7 +174,7 @@ test.describe('Sending reply', () => {
         status: 200,
         contentType: 'application/json',
         body: JSON.stringify({
-          id: 100,
+          id: '100',
           sender_name: 'Me',
           body: 'My reply',
           created_at: new Date().toISOString(),
@@ -185,16 +183,16 @@ test.describe('Sending reply', () => {
     });
 
     await page.goto('/');
-    await expect(page.locator('text=Inbox')).toBeVisible();
+    await expect(page.locator('.grid')).toBeVisible();
     await page.waitForTimeout(500);
 
-    await page.locator('text=Test Thread').click();
+    await page.getByText('Test Thread').click();
     await page.waitForTimeout(500);
 
-    const threadView = page.locator('[data-testid="thread-view"], [role="dialog"]');
+    const threadView = page.locator('[role="dialog"]');
     if (await threadView.isVisible()) {
       const replyInput = threadView.locator('textarea').first();
-      const sendButton = threadView.locator('button:has-text("Send")');
+      const sendButton = threadView.getByRole('button', { name: /Send/i });
 
       if (await replyInput.isVisible()) {
         await replyInput.fill('My reply');
@@ -215,7 +213,7 @@ test.describe('Sending reply', () => {
         status: 200,
         contentType: 'application/json',
         body: JSON.stringify({
-          id: 100,
+          id: '100',
           sender_name: 'Me',
           body: 'My new reply',
           created_at: new Date().toISOString(),
@@ -224,16 +222,16 @@ test.describe('Sending reply', () => {
     });
 
     await page.goto('/');
-    await expect(page.locator('text=Inbox')).toBeVisible();
+    await expect(page.locator('.grid')).toBeVisible();
     await page.waitForTimeout(500);
 
-    await page.locator('text=Test Thread').click();
+    await page.getByText('Test Thread').click();
     await page.waitForTimeout(500);
 
-    const threadView = page.locator('[data-testid="thread-view"], [role="dialog"]');
+    const threadView = page.locator('[role="dialog"]');
     if (await threadView.isVisible()) {
       const replyInput = threadView.locator('textarea').first();
-      const sendButton = threadView.locator('button:has-text("Send")');
+      const sendButton = threadView.getByRole('button', { name: /Send/i });
 
       if (await replyInput.isVisible()) {
         await replyInput.fill('My new reply');
@@ -241,7 +239,7 @@ test.describe('Sending reply', () => {
         await page.waitForTimeout(500);
 
         // New reply should appear in thread.
-        await expect(threadView.locator('text=My new reply')).toBeVisible();
+        await expect(threadView.getByText('My new reply')).toBeVisible();
       }
     }
   });
@@ -254,16 +252,16 @@ test.describe('Sending reply', () => {
     });
 
     await page.goto('/');
-    await expect(page.locator('text=Inbox')).toBeVisible();
+    await expect(page.locator('.grid')).toBeVisible();
     await page.waitForTimeout(500);
 
-    await page.locator('text=Test Thread').click();
+    await page.getByText('Test Thread').click();
     await page.waitForTimeout(500);
 
-    const threadView = page.locator('[data-testid="thread-view"], [role="dialog"]');
+    const threadView = page.locator('[role="dialog"]');
     if (await threadView.isVisible()) {
       const replyInput = threadView.locator('textarea').first();
-      const sendButton = threadView.locator('button:has-text("Send")');
+      const sendButton = threadView.getByRole('button', { name: /Send/i });
 
       if (await replyInput.isVisible()) {
         await replyInput.fill('My reply');
@@ -288,13 +286,13 @@ test.describe('Reply keyboard shortcuts', () => {
     });
 
     await page.goto('/');
-    await expect(page.locator('text=Inbox')).toBeVisible();
+    await expect(page.locator('.grid')).toBeVisible();
     await page.waitForTimeout(500);
 
-    await page.locator('text=Test Thread').click();
+    await page.getByText('Test Thread').click();
     await page.waitForTimeout(500);
 
-    const threadView = page.locator('[data-testid="thread-view"], [role="dialog"]');
+    const threadView = page.locator('[role="dialog"]');
     if (await threadView.isVisible()) {
       const replyInput = threadView.locator('textarea').first();
 
@@ -319,13 +317,13 @@ test.describe('Reply keyboard shortcuts', () => {
     });
 
     await page.goto('/');
-    await expect(page.locator('text=Inbox')).toBeVisible();
+    await expect(page.locator('.grid')).toBeVisible();
     await page.waitForTimeout(500);
 
-    await page.locator('text=Test Thread').click();
+    await page.getByText('Test Thread').click();
     await page.waitForTimeout(500);
 
-    const threadView = page.locator('[data-testid="thread-view"], [role="dialog"]');
+    const threadView = page.locator('[role="dialog"]');
     if (await threadView.isVisible()) {
       const replyInput = threadView.locator('textarea').first();
 
@@ -349,16 +347,16 @@ test.describe('Reply error handling', () => {
     });
 
     await page.goto('/');
-    await expect(page.locator('text=Inbox')).toBeVisible();
+    await expect(page.locator('.grid')).toBeVisible();
     await page.waitForTimeout(500);
 
-    await page.locator('text=Test Thread').click();
+    await page.getByText('Test Thread').click();
     await page.waitForTimeout(500);
 
-    const threadView = page.locator('[data-testid="thread-view"], [role="dialog"]');
+    const threadView = page.locator('[role="dialog"]');
     if (await threadView.isVisible()) {
       const replyInput = threadView.locator('textarea').first();
-      const sendButton = threadView.locator('button:has-text("Send")');
+      const sendButton = threadView.getByRole('button', { name: /Send/i });
 
       if (await replyInput.isVisible()) {
         await replyInput.fill('My reply');
@@ -366,7 +364,6 @@ test.describe('Reply error handling', () => {
         await page.waitForTimeout(500);
 
         // Should show error toast or message.
-        const error = page.locator('[role="alert"], text=/error|failed/i');
         // Error handling depends on implementation.
       }
     }
@@ -380,16 +377,16 @@ test.describe('Reply error handling', () => {
     });
 
     await page.goto('/');
-    await expect(page.locator('text=Inbox')).toBeVisible();
+    await expect(page.locator('.grid')).toBeVisible();
     await page.waitForTimeout(500);
 
-    await page.locator('text=Test Thread').click();
+    await page.getByText('Test Thread').click();
     await page.waitForTimeout(500);
 
-    const threadView = page.locator('[data-testid="thread-view"], [role="dialog"]');
+    const threadView = page.locator('[role="dialog"]');
     if (await threadView.isVisible()) {
       const replyInput = threadView.locator('textarea').first();
-      const sendButton = threadView.locator('button:has-text("Send")');
+      const sendButton = threadView.getByRole('button', { name: /Send/i });
 
       if (await replyInput.isVisible()) {
         await replyInput.fill('My reply that failed');

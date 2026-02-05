@@ -137,6 +137,30 @@ service Stats {
     rpc HealthCheck (HealthCheckRequest) returns (HealthCheckResponse);
 }
 
+// ReviewService handles code review operations.
+service ReviewService {
+    // CreateReview creates a new review request.
+    rpc CreateReview (CreateReviewRequest) returns (CreateReviewResponse);
+
+    // ListReviews lists reviews with optional filters.
+    rpc ListReviews (ListReviewsProtoRequest) returns (ListReviewsProtoResponse);
+
+    // GetReview gets a single review with its iterations.
+    rpc GetReview (GetReviewProtoRequest) returns (ReviewDetailResponse);
+
+    // ResubmitReview re-requests review after author changes.
+    rpc ResubmitReview (ResubmitReviewRequest) returns (CreateReviewResponse);
+
+    // CancelReview cancels an active review.
+    rpc CancelReview (CancelReviewProtoRequest) returns (CancelReviewProtoResponse);
+
+    // ListReviewIssues lists issues for a review.
+    rpc ListReviewIssues (ListReviewIssuesRequest) returns (ListReviewIssuesResponse);
+
+    // UpdateIssueStatus updates the status of a review issue.
+    rpc UpdateIssueStatus (UpdateIssueStatusRequest) returns (UpdateIssueStatusResponse);
+}
+
 // Priority represents message priority levels.
 enum Priority {
     PRIORITY_UNSPECIFIED = 0;
@@ -204,6 +228,9 @@ message FetchInboxRequest {
     bool unread_only = 3;       // Only return unread messages
     MessageState state_filter = 4;  // Filter by state
     bool sent_only = 5;         // Only return messages sent by the agent
+    // sender_name_prefix filters to messages from agents whose name starts with
+    // this prefix (e.g., "reviewer-" for CodeReviewer aggregate).
+    string sender_name_prefix = 6;
 }
 
 // FetchInboxResponse is the response for FetchInbox.
@@ -531,6 +558,9 @@ message AutocompleteRecipientsResponse {
 message DeleteMessageRequest {
     int64 agent_id = 1;
     int64 message_id = 2;
+    // mark_sender_deleted marks the message as deleted from sender's perspective.
+    // Used when deleting from aggregate views like CodeReviewer.
+    bool mark_sender_deleted = 3;
 }
 
 // DeleteMessageResponse is the response for DeleteMessage.
@@ -738,4 +768,188 @@ message HealthCheckRequest {}
 message HealthCheckResponse {
     string status = 1;  // "ok" or "error"
     google.protobuf.Timestamp time = 2;
+}
+
+// =============================================================================
+// ReviewService Messages
+// =============================================================================
+
+// BranchTarget specifies a full branch diff review.
+message BranchTarget {
+    // branch is the feature branch to review.
+    string branch = 1;
+    // base_branch is the branch to diff against (e.g., "main").
+    string base_branch = 2;
+}
+
+// CommitTarget specifies a single commit review.
+message CommitTarget {
+    // sha is the commit SHA to review.
+    string sha = 1;
+    // branch is the branch name for display/naming purposes only.
+    string branch = 2;
+}
+
+// CommitRangeTarget specifies a range of commits to review.
+message CommitRangeTarget {
+    // start_sha is the first commit in the range (exclusive).
+    string start_sha = 1;
+    // end_sha is the last commit in the range (inclusive).
+    string end_sha = 2;
+    // branch is the branch name for display/naming purposes only.
+    string branch = 3;
+}
+
+// PRTarget specifies a pull request review.
+message PRTarget {
+    // number is the PR number.
+    int32 number = 1;
+    // branch is the PR's head branch.
+    string branch = 2;
+    // base_branch is the PR's base branch.
+    string base_branch = 3;
+}
+
+// CreateReviewRequest is the request for CreateReview.
+message CreateReviewRequest {
+    // repo_path is the local path to the repository.
+    string repo_path = 4;
+    // remote_url is the git remote URL.
+    string remote_url = 11;
+    // review_type is the type of review: full, security, performance, architecture.
+    string review_type = 6;
+    // priority is the review priority: urgent, normal, low.
+    string priority = 7;
+    // reviewers is optional list of specific reviewers to assign.
+    repeated string reviewers = 8;
+    // description is an optional description of what to review.
+    string description = 9;
+    // requester_id is the agent ID requesting the review.
+    int64 requester_id = 10;
+
+    // target specifies what to review. Exactly one must be set.
+    oneof target {
+        // branch_target reviews a full branch diff against base.
+        BranchTarget branch_target = 20;
+        // commit_target reviews a single commit.
+        CommitTarget commit_target = 21;
+        // commit_range_target reviews a range of commits.
+        CommitRangeTarget commit_range_target = 22;
+        // pr_target reviews a pull request.
+        PRTarget pr_target = 23;
+    }
+
+    // Deprecated fields kept for backward compatibility.
+    // Use target oneof instead.
+    string branch = 1 [deprecated = true];
+    string base_branch = 2 [deprecated = true];
+    string commit_sha = 3 [deprecated = true];
+    int32 pr_number = 5 [deprecated = true];
+}
+
+// CreateReviewResponse is the response for CreateReview and ResubmitReview.
+message CreateReviewResponse {
+    string review_id = 1;
+    string thread_id = 2;
+    string state = 3;
+    string error = 4;
+}
+
+// ListReviewsProtoRequest is the request for ListReviews.
+message ListReviewsProtoRequest {
+    string state = 1;             // Optional state filter
+    int64 requester_id = 2;       // Optional requester filter
+    int32 limit = 3;
+    int32 offset = 4;
+}
+
+// ListReviewsProtoResponse is the response for ListReviews.
+message ListReviewsProtoResponse {
+    repeated ReviewSummaryProto reviews = 1;
+}
+
+// ReviewSummaryProto represents a review summary in proto format.
+message ReviewSummaryProto {
+    string review_id = 1;
+    string thread_id = 2;
+    int64 requester_id = 3;
+    string branch = 4;
+    string state = 5;
+    string review_type = 6;
+    int64 created_at = 7;
+}
+
+// GetReviewProtoRequest is the request for GetReview.
+message GetReviewProtoRequest {
+    string review_id = 1;
+}
+
+// ReviewDetailResponse is the response for GetReview.
+message ReviewDetailResponse {
+    string review_id = 1;
+    string thread_id = 2;
+    string state = 3;
+    string branch = 4;
+    string base_branch = 5;
+    string review_type = 6;
+    int32 iterations = 7;
+    int64 open_issues = 8;
+    string error = 9;
+}
+
+// ResubmitReviewRequest is the request for ResubmitReview.
+message ResubmitReviewRequest {
+    string review_id = 1;
+    string commit_sha = 2;
+}
+
+// CancelReviewProtoRequest is the request for CancelReview.
+message CancelReviewProtoRequest {
+    string review_id = 1;
+    string reason = 2;
+}
+
+// CancelReviewProtoResponse is the response for CancelReview.
+message CancelReviewProtoResponse {
+    string error = 1;
+}
+
+// ListReviewIssuesRequest is the request for ListReviewIssues.
+message ListReviewIssuesRequest {
+    string review_id = 1;
+}
+
+// ListReviewIssuesResponse is the response for ListReviewIssues.
+message ListReviewIssuesResponse {
+    repeated ReviewIssueProto issues = 1;
+}
+
+// ReviewIssueProto represents a review issue in proto format.
+message ReviewIssueProto {
+    int64 id = 1;
+    string review_id = 2;
+    int32 iteration_num = 3;
+    string issue_type = 4;
+    string severity = 5;
+    string file_path = 6;
+    int32 line_start = 7;
+    int32 line_end = 8;
+    string title = 9;
+    string description = 10;
+    string code_snippet = 11;
+    string suggestion = 12;
+    string claude_md_ref = 13;
+    string status = 14;
+}
+
+// UpdateIssueStatusRequest is the request for UpdateIssueStatus.
+message UpdateIssueStatusRequest {
+    string review_id = 1;
+    int64 issue_id = 2;
+    string status = 3;            // open, fixed, wont_fix, duplicate
+}
+
+// UpdateIssueStatusResponse is the response for UpdateIssueStatus.
+message UpdateIssueStatusResponse {
+    string error = 1;
 }

@@ -29,3 +29,7 @@ coverage.out
 coverage.html
 node_modules/
 .test-data/
+
+# Review output files
+.reviews/
+review.test

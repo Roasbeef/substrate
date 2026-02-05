@@ -7,7 +7,7 @@ import { marked } from 'marked';
 import DOMPurify from 'dompurify';
 import { Avatar } from '@/components/ui/Avatar.js';
 import { PriorityBadge } from '@/components/ui/Badge.js';
-import type { Message } from '@/types/api.js';
+import type { Message, MessageWithRecipients } from '@/types/api.js';
 import { formatAgentDisplayName, getAgentContext } from '@/lib/utils.js';
 
 // Convert message sender to AgentLike format for display formatting.
@@ -76,10 +76,15 @@ function renderMarkdownToHtml(text: string): string {
   });
 }
 
+// Message with optional recipients for flexible usage.
+type MessageMaybeWithRecipients = Message & {
+  recipients?: MessageWithRecipients['recipients'];
+};
+
 // Props for ThreadMessage component.
 export interface ThreadMessageProps {
-  /** The message to display. */
-  message: Message;
+  /** The message to display (recipients optional for "To" field). */
+  message: MessageMaybeWithRecipients;
   /** Whether this is the first (original) message in the thread. */
   isFirst?: boolean;
   /** Whether this message is currently focused. */
@@ -134,6 +139,13 @@ export function ThreadMessage({
             <span className="text-sm text-gray-500">
               {formatMessageDate(message.created_at)}
             </span>
+            {/* Recipient (To) field. */}
+            {message.recipients && message.recipients.length > 0 ? (
+              <div className="text-sm text-gray-500">
+                <span className="text-gray-400">To: </span>
+                {message.recipients.map((r) => r.agent_name).join(', ')}
+              </div>
+            ) : null}
           </div>
         </div>
 

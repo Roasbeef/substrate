@@ -3,6 +3,8 @@ package commands
 import (
 	"context"
 	"fmt"
+	"os"
+	"strings"
 	"time"
 
 	"github.com/roasbeef/subtrate/internal/mail"
@@ -13,6 +15,7 @@ var (
 	sendTo       string
 	sendSubject  string
 	sendBody     string
+	sendBodyFile string
 	sendPriority string
 	sendDeadline string
 	sendThreadID string
@@ -21,8 +24,13 @@ var (
 var sendCmd = &cobra.Command{
 	Use:   "send",
 	Short: "Send a message",
-	Long:  `Send a message to another agent or topic.`,
-	RunE:  runSend,
+	Long: `Send a message to another agent or topic.
+
+The message body can be specified inline with --body, or read from a
+file with --body-file. When both are provided, --body-file takes
+precedence. Use --body-file for long multi-line markdown content to
+avoid shell quoting issues.`,
+	RunE: runSend,
 }
 
 func init() {
@@ -32,6 +40,8 @@ func init() {
 		"Message subject (required)")
 	sendCmd.Flags().StringVar(&sendBody, "body", "",
 		"Message body in markdown")
+	sendCmd.Flags().StringVar(&sendBodyFile, "body-file", "",
+		"Read message body from file (overrides --body)")
 	sendCmd.Flags().StringVar(&sendPriority, "priority", "normal",
 		"Priority: urgent, normal, low")
 	sendCmd.Flags().StringVar(&sendDeadline, "deadline", "",
@@ -55,6 +65,18 @@ func runSend(cmd *cobra.Command, args []string) error {
 	agentID, _, err := getCurrentAgentWithClient(ctx, client)
 	if err != nil {
 		return err
+	}
+
+	// Resolve the message body. --body-file takes precedence over
+	// --body so agents can write rich markdown to a temp file and
+	// avoid shell quoting issues with long content.
+	body := sendBody
+	if sendBodyFile != "" {
+		data, err := os.ReadFile(sendBodyFile)
+		if err != nil {
+			return fmt.Errorf("failed to read body file: %w", err)
+		}
+		body = strings.TrimSpace(string(data))
 	}
 
 	// Parse priority.
@@ -84,7 +106,7 @@ func runSend(cmd *cobra.Command, args []string) error {
 		SenderID:       agentID,
 		RecipientNames: []string{sendTo},
 		Subject:        sendSubject,
-		Body:           sendBody,
+		Body:           body,
 		Priority:       priority,
 		Deadline:       deadline,
 		ThreadID:       sendThreadID,
@@ -102,7 +124,8 @@ func runSend(cmd *cobra.Command, args []string) error {
 			"thread_id":  threadID,
 		})
 	default:
-		fmt.Printf("Message sent! ID: %d, Thread: %s\n", msgID, threadID)
+		fmt.Printf("Message sent! ID: %d, Thread: %s\n",
+			msgID, threadID)
 	}
 
 	return nil
@@ -128,6 +151,7 @@ func parseDuration(s string) (time.Time, error) {
 		return t, nil
 	}
 
-	return time.Time{}, fmt.Errorf("cannot parse %q as duration or timestamp",
-		s)
+	return time.Time{}, fmt.Errorf(
+		"cannot parse %q as duration or timestamp", s,
+	)
 }

@@ -12,6 +12,7 @@ const AgentsDashboard = lazy(() => import('@/pages/AgentsDashboard'));
 const SessionsPage = lazy(() => import('@/pages/SessionsPage'));
 const SettingsPage = lazy(() => import('@/pages/SettingsPage'));
 const SearchResultsPage = lazy(() => import('@/pages/SearchResultsPage'));
+const ReviewsPage = lazy(() => import('@/pages/ReviewsPage'));
 
 // Page loading fallback.
 function PageLoader() {
@@ -179,6 +180,17 @@ export const router = createBrowserRouter([
       {
         path: 'sessions/:sessionId',
         element: <SessionsPage />,
+        errorElement: <RouteErrorBoundary />,
+      },
+      // Reviews routes.
+      {
+        path: 'reviews',
+        element: <ReviewsPage />,
+        errorElement: <RouteErrorBoundary />,
+      },
+      {
+        path: 'reviews/:reviewId',
+        element: <ReviewsPage />,
         errorElement: <RouteErrorBoundary />,
       },
       // Settings.

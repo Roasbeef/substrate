@@ -14,7 +14,7 @@ test.describe('WebSocket reconnection', () => {
     });
 
     await page.goto('/');
-    await expect(page.locator('text=Inbox')).toBeVisible();
+    await expect(page.getByRole('link', { name: 'Inbox' })).toBeVisible();
 
     // Wait for initial connection.
     await page.waitForTimeout(1000);
@@ -41,7 +41,7 @@ test.describe('WebSocket reconnection', () => {
     });
 
     await page.goto('/');
-    await expect(page.locator('text=Inbox')).toBeVisible();
+    await expect(page.getByRole('link', { name: 'Inbox' })).toBeVisible();
 
     // Wait for initial connection.
     await page.waitForTimeout(1000);
@@ -83,7 +83,7 @@ test.describe('WebSocket reconnection', () => {
     });
 
     await page.goto('/');
-    await expect(page.locator('text=Inbox')).toBeVisible();
+    await expect(page.getByRole('link', { name: 'Inbox' })).toBeVisible();
 
     await page.waitForTimeout(1000);
 
@@ -96,7 +96,7 @@ test.describe('WebSocket reconnection', () => {
     await page.waitForTimeout(5000);
 
     // Page should still be functional.
-    await expect(page.locator('text=Inbox')).toBeVisible();
+    await expect(page.getByRole('link', { name: 'Inbox' })).toBeVisible();
   });
 
   test('shows connection status indicator', async ({ page }) => {
@@ -105,7 +105,7 @@ test.describe('WebSocket reconnection', () => {
     });
 
     await page.goto('/');
-    await expect(page.locator('text=Inbox')).toBeVisible();
+    await expect(page.getByRole('link', { name: 'Inbox' })).toBeVisible();
 
     // Check for any connection status UI elements.
     // This test verifies the page loads and handles connection.
@@ -126,7 +126,7 @@ test.describe('Reconnection with pending actions', () => {
     });
 
     await page.goto('/');
-    await expect(page.locator('text=Inbox')).toBeVisible();
+    await expect(page.getByRole('link', { name: 'Inbox' })).toBeVisible();
 
     await page.waitForTimeout(1000);
 
@@ -142,12 +142,12 @@ test.describe('Reconnection with pending actions', () => {
     });
 
     await page.goto('/');
-    await expect(page.locator('text=Inbox')).toBeVisible();
+    await expect(page.getByRole('link', { name: 'Inbox' })).toBeVisible();
 
     await page.waitForTimeout(1000);
 
     // Get current page state (check for any visible elements).
-    const hasInbox = await page.locator('text=Inbox').isVisible();
+    const hasInbox = await page.getByRole('link', { name: 'Inbox' }).isVisible();
     expect(hasInbox).toBe(true);
 
     // Close and reopen connection quickly.
@@ -158,6 +158,6 @@ test.describe('Reconnection with pending actions', () => {
     await page.waitForTimeout(500);
 
     // Page should maintain state.
-    await expect(page.locator('text=Inbox')).toBeVisible();
+    await expect(page.getByRole('link', { name: 'Inbox' })).toBeVisible();
   });
 });

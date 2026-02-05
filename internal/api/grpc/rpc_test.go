@@ -65,7 +65,14 @@ func newTestHarness(t *testing.T) *testHarness {
 	// Create services.
 	mailSvc := mail.NewServiceWithStore(storage)
 	agentReg := agent.NewRegistry(sqliteStore.Store)
-	identityMgr, err := agent.NewIdentityManager(sqliteStore.Store, agentReg)
+
+	// Use temp directory for identity storage to avoid writing to
+	// ~/.subtrate/identities which may not be writable in sandbox.
+	identityDir := filepath.Join(tmpDir, "identities")
+	identityMgr, err := agent.NewIdentityManager(
+		sqliteStore.Store, agentReg,
+		agent.WithIdentityDir(identityDir),
+	)
 	require.NoError(t, err)
 
 	// Create actor system and actors.

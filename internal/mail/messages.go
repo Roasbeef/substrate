@@ -172,6 +172,10 @@ type FetchInboxRequest struct {
 
 	// SentOnly retrieves messages sent by the agent instead of received.
 	SentOnly bool
+
+	// SenderNamePrefix filters to messages from agents whose name starts
+	// with this prefix (e.g., "reviewer-" for CodeReviewer aggregate).
+	SenderNamePrefix string
 }
 
 // MessageType implements actor.Message.

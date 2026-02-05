@@ -29,7 +29,6 @@ func newPoolTestBehavior(idx int) *poolTestBehavior {
 func (b *poolTestBehavior) Receive(
 	ctx context.Context, msg testMessage,
 ) fn.Result[int] {
-
 	b.mu.Lock()
 	b.received = append(b.received, msg.value)
 	b.mu.Unlock()
@@ -388,7 +387,7 @@ func TestPoolRef_ImplementsActorRef(t *testing.T) {
 	defer pool.Stop()
 
 	// This should compile if PoolRef implements ActorRef.
-	var ref = NewPoolRef(pool)
+	ref := NewPoolRef(pool)
 	_ = ref
 }
 

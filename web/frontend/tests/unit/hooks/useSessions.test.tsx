@@ -104,14 +104,29 @@ describe('sessionKeys', () => {
   });
 });
 
+// Helper to format sessions in grpc-gateway format.
+function formatSessionsResponse(sessions: Session[]) {
+  return {
+    sessions: sessions.map((s) => ({
+      id: String(s.id),
+      agent_id: String(s.agent_id),
+      agent_name: s.agent_name,
+      project: s.project,
+      branch: s.branch,
+      started_at: s.started_at,
+      ended_at: s.ended_at,
+      status: `SESSION_STATUS_${s.status?.toUpperCase() ?? 'ACTIVE'}`,
+    })),
+  };
+}
+
 describe('useActiveSessions', () => {
   beforeEach(() => {
     server.use(
-      http.get('/api/v1/sessions/active', () => {
-        return HttpResponse.json({
-          data: mockSessions.filter((s) => s.status === 'active'),
-          meta: { total: 1, page: 1, page_size: 20 },
-        });
+      http.get('/api/v1/sessions', () => {
+        return HttpResponse.json(
+          formatSessionsResponse(mockSessions.filter((s) => s.status === 'active'))
+        );
       }),
     );
   });
@@ -130,7 +145,7 @@ describe('useActiveSessions', () => {
 
   it('handles fetch error', async () => {
     server.use(
-      http.get('/api/v1/sessions/active', () => {
+      http.get('/api/v1/sessions', () => {
         return HttpResponse.json(
           { error: { code: 'server_error', message: 'Internal error' } },
           { status: 500 },
@@ -153,10 +168,7 @@ describe('useSessions', () => {
   beforeEach(() => {
     server.use(
       http.get('/api/v1/sessions', () => {
-        return HttpResponse.json({
-          data: mockSessions,
-          meta: { total: 3, page: 1, page_size: 20 },
-        });
+        return HttpResponse.json(formatSessionsResponse(mockSessions));
       }),
     );
   });
@@ -203,7 +215,19 @@ describe('useSession', () => {
             { status: 404 },
           );
         }
-        return HttpResponse.json(session);
+        // Return in grpc-gateway format.
+        return HttpResponse.json({
+          session: {
+            id: String(session.id),
+            agent_id: String(session.agent_id),
+            agent_name: session.agent_name,
+            project: session.project,
+            branch: session.branch,
+            started_at: session.started_at,
+            ended_at: session.ended_at,
+            status: `SESSION_STATUS_${session.status?.toUpperCase() ?? 'ACTIVE'}`,
+          },
+        });
       }),
     );
   });
@@ -245,13 +269,15 @@ describe('useStartSession', () => {
       http.post('/api/v1/sessions', async ({ request }) => {
         const body = (await request.json()) as { project?: string; branch?: string };
         return HttpResponse.json({
-          id: 100,
-          agent_id: 1,
-          agent_name: 'TestAgent',
-          project: body.project,
-          branch: body.branch,
-          started_at: new Date().toISOString(),
-          status: 'active',
+          session: {
+            id: '100',
+            agent_id: '1',
+            agent_name: 'TestAgent',
+            project: body.project,
+            branch: body.branch,
+            started_at: new Date().toISOString(),
+            status: 'SESSION_STATUS_ACTIVE',
+          },
         });
       }),
     );
@@ -351,10 +377,7 @@ describe('useSessionsByStatus', () => {
   beforeEach(() => {
     server.use(
       http.get('/api/v1/sessions', () => {
-        return HttpResponse.json({
-          data: mockSessions,
-          meta: { total: 3, page: 1, page_size: 20 },
-        });
+        return HttpResponse.json(formatSessionsResponse(mockSessions));
       }),
     );
   });
@@ -414,10 +437,7 @@ describe('useSessionCounts', () => {
   beforeEach(() => {
     server.use(
       http.get('/api/v1/sessions', () => {
-        return HttpResponse.json({
-          data: mockSessions,
-          meta: { total: 3, page: 1, page_size: 20 },
-        });
+        return HttpResponse.json(formatSessionsResponse(mockSessions));
       }),
     );
   });
