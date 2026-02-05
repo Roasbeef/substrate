@@ -416,6 +416,43 @@ func (s *Server) UpdateIssueStatus(
 	return result, nil
 }
 
+// GetReviewDiff returns the git diff for a review's branch.
+func (s *Server) GetReviewDiff(
+	ctx context.Context, req *GetReviewDiffRequest,
+) (*GetReviewDiffResponse, error) {
+	if req.ReviewId == "" {
+		return nil, status.Error(
+			codes.InvalidArgument, "review_id is required",
+		)
+	}
+
+	resp, err := s.askReview(ctx, review.GetReviewDiffMsg{
+		ReviewID: req.ReviewId,
+	})
+	if err != nil {
+		return nil, status.Errorf(
+			codes.Internal, "review actor error: %v", err,
+		)
+	}
+
+	diffResp, ok := resp.(review.GetReviewDiffResp)
+	if !ok {
+		return nil, status.Error(
+			codes.Internal, "unexpected response type",
+		)
+	}
+
+	result := &GetReviewDiffResponse{
+		Patch:   diffResp.Patch,
+		Command: diffResp.Command,
+	}
+	if diffResp.Error != nil {
+		result.Error = diffResp.Error.Error()
+	}
+
+	return result, nil
+}
+
 // askReview sends a request to the review actor and awaits the response.
 func (s *Server) askReview(
 	ctx context.Context, msg review.ReviewRequest,

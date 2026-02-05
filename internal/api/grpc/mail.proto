@@ -162,6 +162,9 @@ service ReviewService {
 
     // UpdateIssueStatus updates the status of a review issue.
     rpc UpdateIssueStatus (UpdateIssueStatusRequest) returns (UpdateIssueStatusResponse);
+
+    // GetReviewDiff returns the git diff for a review's branch.
+    rpc GetReviewDiff (GetReviewDiffRequest) returns (GetReviewDiffResponse);
 }
 
 // Priority represents message priority levels.
@@ -981,4 +984,18 @@ message UpdateIssueStatusRequest {
 // UpdateIssueStatusResponse is the response for UpdateIssueStatus.
 message UpdateIssueStatusResponse {
     string error = 1;
+}
+
+// GetReviewDiffRequest is the request for GetReviewDiff.
+message GetReviewDiffRequest {
+    string review_id = 1;
+}
+
+// GetReviewDiffResponse is the response for GetReviewDiff.
+message GetReviewDiffResponse {
+    // The raw unified diff output from git diff.
+    string patch = 1;
+    // The git command that was run to produce the diff.
+    string command = 2;
+    string error = 3;
 }

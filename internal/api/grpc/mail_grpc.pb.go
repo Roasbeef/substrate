@@ -1895,6 +1895,7 @@ const (
 	ReviewService_DeleteReview_FullMethodName      = "/subtraterpc.ReviewService/DeleteReview"
 	ReviewService_ListReviewIssues_FullMethodName  = "/subtraterpc.ReviewService/ListReviewIssues"
 	ReviewService_UpdateIssueStatus_FullMethodName = "/subtraterpc.ReviewService/UpdateIssueStatus"
+	ReviewService_GetReviewDiff_FullMethodName     = "/subtraterpc.ReviewService/GetReviewDiff"
 )
 
 // ReviewServiceClient is the client API for ReviewService service.
@@ -1919,6 +1920,8 @@ type ReviewServiceClient interface {
 	ListReviewIssues(ctx context.Context, in *ListReviewIssuesRequest, opts ...grpc.CallOption) (*ListReviewIssuesResponse, error)
 	// UpdateIssueStatus updates the status of a review issue.
 	UpdateIssueStatus(ctx context.Context, in *UpdateIssueStatusRequest, opts ...grpc.CallOption) (*UpdateIssueStatusResponse, error)
+	// GetReviewDiff returns the git diff for a review's branch.
+	GetReviewDiff(ctx context.Context, in *GetReviewDiffRequest, opts ...grpc.CallOption) (*GetReviewDiffResponse, error)
 }
 
 type reviewServiceClient struct {
@@ -2009,6 +2012,16 @@ func (c *reviewServiceClient) UpdateIssueStatus(ctx context.Context, in *UpdateI
 	return out, nil
 }
 
+func (c *reviewServiceClient) GetReviewDiff(ctx context.Context, in *GetReviewDiffRequest, opts ...grpc.CallOption) (*GetReviewDiffResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(GetReviewDiffResponse)
+	err := c.cc.Invoke(ctx, ReviewService_GetReviewDiff_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // ReviewServiceServer is the server API for ReviewService service.
 // All implementations must embed UnimplementedReviewServiceServer
 // for forward compatibility.
@@ -2031,6 +2044,8 @@ type ReviewServiceServer interface {
 	ListReviewIssues(context.Context, *ListReviewIssuesRequest) (*ListReviewIssuesResponse, error)
 	// UpdateIssueStatus updates the status of a review issue.
 	UpdateIssueStatus(context.Context, *UpdateIssueStatusRequest) (*UpdateIssueStatusResponse, error)
+	// GetReviewDiff returns the git diff for a review's branch.
+	GetReviewDiff(context.Context, *GetReviewDiffRequest) (*GetReviewDiffResponse, error)
 	mustEmbedUnimplementedReviewServiceServer()
 }
 
@@ -2064,6 +2079,9 @@ func (UnimplementedReviewServiceServer) ListReviewIssues(context.Context, *ListR
 }
 func (UnimplementedReviewServiceServer) UpdateIssueStatus(context.Context, *UpdateIssueStatusRequest) (*UpdateIssueStatusResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method UpdateIssueStatus not implemented")
+}
+func (UnimplementedReviewServiceServer) GetReviewDiff(context.Context, *GetReviewDiffRequest) (*GetReviewDiffResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method GetReviewDiff not implemented")
 }
 func (UnimplementedReviewServiceServer) mustEmbedUnimplementedReviewServiceServer() {}
 func (UnimplementedReviewServiceServer) testEmbeddedByValue()                       {}
@@ -2230,6 +2248,24 @@ func _ReviewService_UpdateIssueStatus_Handler(srv interface{}, ctx context.Conte
 	return interceptor(ctx, in, info, handler)
 }
 
+func _ReviewService_GetReviewDiff_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetReviewDiffRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ReviewServiceServer).GetReviewDiff(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: ReviewService_GetReviewDiff_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ReviewServiceServer).GetReviewDiff(ctx, req.(*GetReviewDiffRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // ReviewService_ServiceDesc is the grpc.ServiceDesc for ReviewService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -2268,6 +2304,10 @@ var ReviewService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "UpdateIssueStatus",
 			Handler:    _ReviewService_UpdateIssueStatus_Handler,
+		},
+		{
+			MethodName: "GetReviewDiff",
+			Handler:    _ReviewService_GetReviewDiff_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

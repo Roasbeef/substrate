@@ -2148,6 +2148,76 @@ func local_request_ReviewService_CancelReview_0(ctx context.Context, marshaler r
 
 }
 
+func request_ReviewService_DeleteReview_0(ctx context.Context, marshaler runtime.Marshaler, client ReviewServiceClient, req *http.Request, pathParams map[string]string) (proto.Message, runtime.ServerMetadata, error) {
+	var protoReq DeleteReviewProtoRequest
+	var metadata runtime.ServerMetadata
+
+	newReader, berr := utilities.IOReaderFactory(req.Body)
+	if berr != nil {
+		return nil, metadata, status.Errorf(codes.InvalidArgument, "%v", berr)
+	}
+	if err := marshaler.NewDecoder(newReader()).Decode(&protoReq); err != nil && err != io.EOF {
+		return nil, metadata, status.Errorf(codes.InvalidArgument, "%v", err)
+	}
+
+	var (
+		val string
+		ok  bool
+		err error
+		_   = err
+	)
+
+	val, ok = pathParams["review_id"]
+	if !ok {
+		return nil, metadata, status.Errorf(codes.InvalidArgument, "missing parameter %s", "review_id")
+	}
+
+	protoReq.ReviewId, err = runtime.String(val)
+
+	if err != nil {
+		return nil, metadata, status.Errorf(codes.InvalidArgument, "type mismatch, parameter: %s, error: %v", "review_id", err)
+	}
+
+	msg, err := client.DeleteReview(ctx, &protoReq, grpc.Header(&metadata.HeaderMD), grpc.Trailer(&metadata.TrailerMD))
+	return msg, metadata, err
+
+}
+
+func local_request_ReviewService_DeleteReview_0(ctx context.Context, marshaler runtime.Marshaler, server ReviewServiceServer, req *http.Request, pathParams map[string]string) (proto.Message, runtime.ServerMetadata, error) {
+	var protoReq DeleteReviewProtoRequest
+	var metadata runtime.ServerMetadata
+
+	newReader, berr := utilities.IOReaderFactory(req.Body)
+	if berr != nil {
+		return nil, metadata, status.Errorf(codes.InvalidArgument, "%v", berr)
+	}
+	if err := marshaler.NewDecoder(newReader()).Decode(&protoReq); err != nil && err != io.EOF {
+		return nil, metadata, status.Errorf(codes.InvalidArgument, "%v", err)
+	}
+
+	var (
+		val string
+		ok  bool
+		err error
+		_   = err
+	)
+
+	val, ok = pathParams["review_id"]
+	if !ok {
+		return nil, metadata, status.Errorf(codes.InvalidArgument, "missing parameter %s", "review_id")
+	}
+
+	protoReq.ReviewId, err = runtime.String(val)
+
+	if err != nil {
+		return nil, metadata, status.Errorf(codes.InvalidArgument, "type mismatch, parameter: %s, error: %v", "review_id", err)
+	}
+
+	msg, err := server.DeleteReview(ctx, &protoReq)
+	return msg, metadata, err
+
+}
+
 func request_ReviewService_ListReviewIssues_0(ctx context.Context, marshaler runtime.Marshaler, client ReviewServiceClient, req *http.Request, pathParams map[string]string) (proto.Message, runtime.ServerMetadata, error) {
 	var protoReq ListReviewIssuesRequest
 	var metadata runtime.ServerMetadata
@@ -2290,6 +2360,60 @@ func local_request_ReviewService_UpdateIssueStatus_0(ctx context.Context, marsha
 	}
 
 	msg, err := server.UpdateIssueStatus(ctx, &protoReq)
+	return msg, metadata, err
+
+}
+
+func request_ReviewService_GetReviewDiff_0(ctx context.Context, marshaler runtime.Marshaler, client ReviewServiceClient, req *http.Request, pathParams map[string]string) (proto.Message, runtime.ServerMetadata, error) {
+	var protoReq GetReviewDiffRequest
+	var metadata runtime.ServerMetadata
+
+	var (
+		val string
+		ok  bool
+		err error
+		_   = err
+	)
+
+	val, ok = pathParams["review_id"]
+	if !ok {
+		return nil, metadata, status.Errorf(codes.InvalidArgument, "missing parameter %s", "review_id")
+	}
+
+	protoReq.ReviewId, err = runtime.String(val)
+
+	if err != nil {
+		return nil, metadata, status.Errorf(codes.InvalidArgument, "type mismatch, parameter: %s, error: %v", "review_id", err)
+	}
+
+	msg, err := client.GetReviewDiff(ctx, &protoReq, grpc.Header(&metadata.HeaderMD), grpc.Trailer(&metadata.TrailerMD))
+	return msg, metadata, err
+
+}
+
+func local_request_ReviewService_GetReviewDiff_0(ctx context.Context, marshaler runtime.Marshaler, server ReviewServiceServer, req *http.Request, pathParams map[string]string) (proto.Message, runtime.ServerMetadata, error) {
+	var protoReq GetReviewDiffRequest
+	var metadata runtime.ServerMetadata
+
+	var (
+		val string
+		ok  bool
+		err error
+		_   = err
+	)
+
+	val, ok = pathParams["review_id"]
+	if !ok {
+		return nil, metadata, status.Errorf(codes.InvalidArgument, "missing parameter %s", "review_id")
+	}
+
+	protoReq.ReviewId, err = runtime.String(val)
+
+	if err != nil {
+		return nil, metadata, status.Errorf(codes.InvalidArgument, "type mismatch, parameter: %s, error: %v", "review_id", err)
+	}
+
+	msg, err := server.GetReviewDiff(ctx, &protoReq)
 	return msg, metadata, err
 
 }
@@ -3219,6 +3343,26 @@ func RegisterReviewServiceHandlerServer(ctx context.Context, mux *runtime.ServeM
 
 	})
 
+	mux.Handle("POST", pattern_ReviewService_DeleteReview_0, func(w http.ResponseWriter, req *http.Request, pathParams map[string]string) {
+		ctx, cancel := context.WithCancel(req.Context())
+		defer cancel()
+		inboundMarshaler, outboundMarshaler := runtime.MarshalerForRequest(mux, req)
+		rctx, err := runtime.AnnotateIncomingContext(ctx, mux, req)
+		if err != nil {
+			runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
+			return
+		}
+		resp, md, err := local_request_ReviewService_DeleteReview_0(rctx, inboundMarshaler, server, req, pathParams)
+		ctx = runtime.NewServerMetadataContext(ctx, md)
+		if err != nil {
+			runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
+			return
+		}
+
+		forward_ReviewService_DeleteReview_0(ctx, mux, outboundMarshaler, w, req, resp, mux.GetForwardResponseOptions()...)
+
+	})
+
 	mux.Handle("GET", pattern_ReviewService_ListReviewIssues_0, func(w http.ResponseWriter, req *http.Request, pathParams map[string]string) {
 		ctx, cancel := context.WithCancel(req.Context())
 		defer cancel()
@@ -3256,6 +3400,26 @@ func RegisterReviewServiceHandlerServer(ctx context.Context, mux *runtime.ServeM
 		}
 
 		forward_ReviewService_UpdateIssueStatus_0(ctx, mux, outboundMarshaler, w, req, resp, mux.GetForwardResponseOptions()...)
+
+	})
+
+	mux.Handle("GET", pattern_ReviewService_GetReviewDiff_0, func(w http.ResponseWriter, req *http.Request, pathParams map[string]string) {
+		ctx, cancel := context.WithCancel(req.Context())
+		defer cancel()
+		inboundMarshaler, outboundMarshaler := runtime.MarshalerForRequest(mux, req)
+		rctx, err := runtime.AnnotateIncomingContext(ctx, mux, req)
+		if err != nil {
+			runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
+			return
+		}
+		resp, md, err := local_request_ReviewService_GetReviewDiff_0(rctx, inboundMarshaler, server, req, pathParams)
+		ctx = runtime.NewServerMetadataContext(ctx, md)
+		if err != nil {
+			runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
+			return
+		}
+
+		forward_ReviewService_GetReviewDiff_0(ctx, mux, outboundMarshaler, w, req, resp, mux.GetForwardResponseOptions()...)
 
 	})
 
@@ -4561,6 +4725,26 @@ func RegisterReviewServiceHandlerClient(ctx context.Context, mux *runtime.ServeM
 
 	})
 
+	mux.Handle("POST", pattern_ReviewService_DeleteReview_0, func(w http.ResponseWriter, req *http.Request, pathParams map[string]string) {
+		ctx, cancel := context.WithCancel(req.Context())
+		defer cancel()
+		inboundMarshaler, outboundMarshaler := runtime.MarshalerForRequest(mux, req)
+		rctx, err := runtime.AnnotateContext(ctx, mux, req)
+		if err != nil {
+			runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
+			return
+		}
+		resp, md, err := request_ReviewService_DeleteReview_0(rctx, inboundMarshaler, client, req, pathParams)
+		ctx = runtime.NewServerMetadataContext(ctx, md)
+		if err != nil {
+			runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
+			return
+		}
+
+		forward_ReviewService_DeleteReview_0(ctx, mux, outboundMarshaler, w, req, resp, mux.GetForwardResponseOptions()...)
+
+	})
+
 	mux.Handle("GET", pattern_ReviewService_ListReviewIssues_0, func(w http.ResponseWriter, req *http.Request, pathParams map[string]string) {
 		ctx, cancel := context.WithCancel(req.Context())
 		defer cancel()
@@ -4601,6 +4785,26 @@ func RegisterReviewServiceHandlerClient(ctx context.Context, mux *runtime.ServeM
 
 	})
 
+	mux.Handle("GET", pattern_ReviewService_GetReviewDiff_0, func(w http.ResponseWriter, req *http.Request, pathParams map[string]string) {
+		ctx, cancel := context.WithCancel(req.Context())
+		defer cancel()
+		inboundMarshaler, outboundMarshaler := runtime.MarshalerForRequest(mux, req)
+		rctx, err := runtime.AnnotateContext(ctx, mux, req)
+		if err != nil {
+			runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
+			return
+		}
+		resp, md, err := request_ReviewService_GetReviewDiff_0(rctx, inboundMarshaler, client, req, pathParams)
+		ctx = runtime.NewServerMetadataContext(ctx, md)
+		if err != nil {
+			runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
+			return
+		}
+
+		forward_ReviewService_GetReviewDiff_0(ctx, mux, outboundMarshaler, w, req, resp, mux.GetForwardResponseOptions()...)
+
+	})
+
 	return nil
 }
 
@@ -4615,9 +4819,13 @@ var (
 
 	pattern_ReviewService_CancelReview_0 = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 2, 2, 1, 0, 4, 1, 5, 3}, []string{"api", "v1", "reviews", "review_id"}, "", runtime.AssumeColonVerbOpt(true)))
 
+	pattern_ReviewService_DeleteReview_0 = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 2, 2, 1, 0, 4, 1, 5, 3, 2, 4}, []string{"api", "v1", "reviews", "review_id", "delete"}, "", runtime.AssumeColonVerbOpt(true)))
+
 	pattern_ReviewService_ListReviewIssues_0 = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 2, 2, 1, 0, 4, 1, 5, 3, 2, 4}, []string{"api", "v1", "reviews", "review_id", "issues"}, "", runtime.AssumeColonVerbOpt(true)))
 
 	pattern_ReviewService_UpdateIssueStatus_0 = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 2, 2, 1, 0, 4, 1, 5, 3, 2, 4, 1, 0, 4, 1, 5, 5}, []string{"api", "v1", "reviews", "review_id", "issues", "issue_id"}, "", runtime.AssumeColonVerbOpt(true)))
+
+	pattern_ReviewService_GetReviewDiff_0 = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 2, 2, 1, 0, 4, 1, 5, 3, 2, 4}, []string{"api", "v1", "reviews", "review_id", "diff"}, "", runtime.AssumeColonVerbOpt(true)))
 )
 
 var (
@@ -4631,7 +4839,11 @@ var (
 
 	forward_ReviewService_CancelReview_0 = runtime.ForwardResponseMessage
 
+	forward_ReviewService_DeleteReview_0 = runtime.ForwardResponseMessage
+
 	forward_ReviewService_ListReviewIssues_0 = runtime.ForwardResponseMessage
 
 	forward_ReviewService_UpdateIssueStatus_0 = runtime.ForwardResponseMessage
+
+	forward_ReviewService_GetReviewDiff_0 = runtime.ForwardResponseMessage
 )

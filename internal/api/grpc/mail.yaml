@@ -179,6 +179,13 @@ http:
     - selector: subtraterpc.ReviewService.CancelReview
       delete: "/api/v1/reviews/{review_id}"
 
+    - selector: subtraterpc.ReviewService.DeleteReview
+      post: "/api/v1/reviews/{review_id}/delete"
+      body: "*"
+
+    - selector: subtraterpc.ReviewService.GetReviewDiff
+      get: "/api/v1/reviews/{review_id}/diff"
+
     # ReviewService - Issue Operations
     - selector: subtraterpc.ReviewService.ListReviewIssues
       get: "/api/v1/reviews/{review_id}/issues"

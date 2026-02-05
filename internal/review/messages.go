@@ -16,24 +16,26 @@ type ReviewResponse interface {
 }
 
 // Ensure all request types implement ReviewRequest.
-func (CreateReviewMsg) isReviewRequest() {}
-func (GetReviewMsg) isReviewRequest()    {}
-func (ListReviewsMsg) isReviewRequest()  {}
-func (ResubmitMsg) isReviewRequest()     {}
-func (CancelReviewMsg) isReviewRequest() {}
-func (DeleteReviewMsg) isReviewRequest() {}
-func (GetIssuesMsg) isReviewRequest()    {}
-func (UpdateIssueMsg) isReviewRequest()  {}
+func (CreateReviewMsg) isReviewRequest()  {}
+func (GetReviewMsg) isReviewRequest()     {}
+func (ListReviewsMsg) isReviewRequest()   {}
+func (ResubmitMsg) isReviewRequest()      {}
+func (CancelReviewMsg) isReviewRequest()  {}
+func (DeleteReviewMsg) isReviewRequest()  {}
+func (GetIssuesMsg) isReviewRequest()     {}
+func (UpdateIssueMsg) isReviewRequest()   {}
+func (GetReviewDiffMsg) isReviewRequest() {}
 
 // Ensure all response types implement ReviewResponse.
-func (CreateReviewResp) isReviewResponse() {}
-func (GetReviewResp) isReviewResponse()    {}
-func (ListReviewsResp) isReviewResponse()  {}
-func (ResubmitResp) isReviewResponse()     {}
-func (CancelReviewResp) isReviewResponse() {}
-func (DeleteReviewResp) isReviewResponse() {}
-func (GetIssuesResp) isReviewResponse()    {}
-func (UpdateIssueResp) isReviewResponse()  {}
+func (CreateReviewResp) isReviewResponse()  {}
+func (GetReviewResp) isReviewResponse()     {}
+func (ListReviewsResp) isReviewResponse()   {}
+func (ResubmitResp) isReviewResponse()      {}
+func (CancelReviewResp) isReviewResponse()  {}
+func (DeleteReviewResp) isReviewResponse()  {}
+func (GetIssuesResp) isReviewResponse()     {}
+func (UpdateIssueResp) isReviewResponse()   {}
+func (GetReviewDiffResp) isReviewResponse() {}
 
 // =============================================================================
 // Reviewer sub-actor messages
@@ -266,4 +268,23 @@ type IssueSummary struct {
 // UpdateIssueResp is the response for an UpdateIssueMsg.
 type UpdateIssueResp struct {
 	Error error
+}
+
+// GetReviewDiffMsg requests the git diff for a review's branch.
+type GetReviewDiffMsg struct {
+	actor.BaseMessage
+
+	ReviewID string
+}
+
+// MessageType implements actor.Message.
+func (GetReviewDiffMsg) MessageType() string { return "GetReviewDiffMsg" }
+
+// GetReviewDiffResp is the response for a GetReviewDiffMsg.
+type GetReviewDiffResp struct {
+	// Patch is the raw unified diff output.
+	Patch string
+	// Command is the git command that was executed.
+	Command string
+	Error   error
 }

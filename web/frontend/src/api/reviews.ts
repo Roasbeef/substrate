@@ -263,3 +263,36 @@ export function updateIssueStatus(
     { status },
   );
 }
+
+// Gateway response format for GetReviewDiff.
+interface GatewayReviewDiffResponse {
+  patch?: string;
+  command?: string;
+  error?: string;
+}
+
+// Review diff result.
+export interface ReviewDiff {
+  patch: string;
+  command: string;
+  error?: string;
+}
+
+// Fetch the git diff for a review's branch.
+export async function fetchReviewDiff(
+  reviewId: string,
+  signal?: AbortSignal,
+): Promise<ReviewDiff> {
+  const response = await get<GatewayReviewDiffResponse>(
+    `/reviews/${reviewId}/diff`,
+    signal,
+  );
+  const result: ReviewDiff = {
+    patch: response.patch ?? '',
+    command: response.command ?? '',
+  };
+  if (response.error) {
+    result.error = response.error;
+  }
+  return result;
+}

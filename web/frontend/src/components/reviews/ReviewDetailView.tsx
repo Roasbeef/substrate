@@ -5,9 +5,10 @@ import { useNavigate } from 'react-router-dom';
 import { clsx } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 import type { IssueStatus, ReviewDetail, ReviewIterationDetail } from '@/types/api.js';
-import { useReviewIssues, useUpdateIssueStatus, useCancelReview } from '@/hooks/useReviews.js';
+import { useReviewIssues, useReviewDiff, useUpdateIssueStatus, useCancelReview } from '@/hooks/useReviews.js';
 import { ReviewStateBadge } from './ReviewStateBadge.js';
 import { ReviewIssueCard } from './ReviewIssueCard.js';
+import { DiffViewer } from './DiffViewer.js';
 import { Spinner } from '@/components/ui/Spinner.js';
 import { routes } from '@/lib/routes.js';
 
@@ -55,6 +56,10 @@ export function ReviewDetailView({ review }: ReviewDetailViewProps) {
   );
   const updateStatus = useUpdateIssueStatus();
   const cancelMutation = useCancelReview();
+  const { data: diffData, isLoading: diffLoading } = useReviewDiff(
+    review.review_id,
+  );
+  const [showDiff, setShowDiff] = useState(false);
 
   const handleStatusChange = (issueId: number, status: IssueStatus) => {
     updateStatus.mutate({
@@ -202,6 +207,52 @@ export function ReviewDetailView({ review }: ReviewDetailViewProps) {
           </div>
         </div>
       ) : null}
+
+      {/* Diff section. */}
+      <div>
+        <div className="mb-3 flex items-center justify-between">
+          <h3 className="text-base font-semibold text-gray-900">
+            Changes
+          </h3>
+          <button
+            type="button"
+            onClick={() => setShowDiff(!showDiff)}
+            className={cn(
+              'rounded-lg border px-3 py-1.5 text-sm font-medium transition-colors',
+              showDiff
+                ? 'border-blue-200 bg-blue-50 text-blue-700'
+                : 'border-gray-200 text-gray-600 hover:bg-gray-50',
+            )}
+          >
+            {showDiff ? 'Hide diff' : 'Show diff'}
+          </button>
+        </div>
+
+        {showDiff ? (
+          diffLoading ? (
+            <div className="flex justify-center py-8">
+              <Spinner size="md" variant="primary" label="Loading diff..." />
+            </div>
+          ) : diffData?.error ? (
+            <div className="rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-700">
+              {diffData.error}
+            </div>
+          ) : diffData?.patch ? (
+            <div>
+              {diffData.command ? (
+                <p className="mb-2 text-xs text-gray-400">
+                  <code>{diffData.command}</code>
+                </p>
+              ) : null}
+              <DiffViewer patch={diffData.patch} />
+            </div>
+          ) : (
+            <div className="rounded-lg border border-gray-200 bg-white p-8 text-center">
+              <p className="text-sm text-gray-500">No diff available.</p>
+            </div>
+          )
+        ) : null}
+      </div>
 
       {/* Issues section. */}
       <div>
