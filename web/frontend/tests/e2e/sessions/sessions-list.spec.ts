@@ -106,9 +106,9 @@ test.describe('Sessions page loading', () => {
     await page.goto('/sessions');
     await page.waitForTimeout(500);
 
-    // Should show agent names.
-    await expect(page.getByText('BuildAgent')).toBeVisible();
-    await expect(page.getByText('TestAgent')).toBeVisible();
+    // Should show agent names (use .first() to avoid matching agent dropdown options).
+    await expect(page.getByText('BuildAgent').first()).toBeVisible();
+    await expect(page.getByText('TestAgent').first()).toBeVisible();
   });
 });
 

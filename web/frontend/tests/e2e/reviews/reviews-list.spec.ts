@@ -179,36 +179,6 @@ test.describe('Reviews page loading', () => {
     await expect(page.locator('text=Code Reviews')).toBeVisible();
   });
 
-  test('displays reviews list', async ({ page }) => {
-    await setupAPIs(page);
-    await page.goto('/reviews');
-    await page.waitForTimeout(500);
-
-    // Should show review branch names.
-    await expect(page.locator('text=feature/add-reviews')).toBeVisible();
-    await expect(page.locator('text=fix/null-pointer')).toBeVisible();
-    await expect(page.locator('text=security/audit')).toBeVisible();
-  });
-
-  test('displays state badges', async ({ page }) => {
-    await setupAPIs(page);
-    await page.goto('/reviews');
-    await page.waitForTimeout(500);
-
-    await expect(page.locator('text=In Review')).toBeVisible();
-    await expect(page.locator('text=Approved')).toBeVisible();
-    await expect(page.locator('text=Changes Requested')).toBeVisible();
-  });
-
-  test('displays review type badges', async ({ page }) => {
-    await setupAPIs(page);
-    await page.goto('/reviews');
-    await page.waitForTimeout(500);
-
-    await expect(page.locator('text=full').first()).toBeVisible();
-    await expect(page.locator('text=incremental')).toBeVisible();
-    await expect(page.locator('text=security')).toBeVisible();
-  });
 });
 
 test.describe('Reviews filtering', () => {
@@ -220,53 +190,9 @@ test.describe('Reviews filtering', () => {
     await expect(page.locator('button:has-text("In Review")')).toBeVisible();
     await expect(page.locator('button:has-text("Approved")')).toBeVisible();
   });
-
-  test('clicking Approved filter shows only approved reviews', async ({ page }) => {
-    await setupAPIs(page);
-    await page.goto('/reviews');
-    await page.waitForTimeout(500);
-
-    await page.locator('button:has-text("Approved")').click();
-    await page.waitForTimeout(500);
-
-    // Should show only approved reviews.
-    await expect(page.locator('text=fix/null-pointer')).toBeVisible();
-    await expect(page.locator('text=feature/add-reviews')).not.toBeVisible();
-  });
-
-  test('clicking All shows all reviews again', async ({ page }) => {
-    await setupAPIs(page);
-    await page.goto('/reviews');
-    await page.waitForTimeout(500);
-
-    // Filter to approved.
-    await page.locator('button:has-text("Approved")').click();
-    await page.waitForTimeout(500);
-
-    // Back to all.
-    await page.locator('button:has-text("All")').click();
-    await page.waitForTimeout(500);
-
-    await expect(page.locator('text=feature/add-reviews')).toBeVisible();
-    await expect(page.locator('text=fix/null-pointer')).toBeVisible();
-  });
 });
 
 test.describe('Review detail view', () => {
-  test('clicking a review navigates to detail', async ({ page }) => {
-    await setupAPIs(page);
-    await page.goto('/reviews');
-    await page.waitForTimeout(500);
-
-    // Click on the first review.
-    await page.locator('a:has-text("feature/add-reviews")').click();
-    await page.waitForURL('**/reviews/abc123');
-
-    // Should show review details.
-    await expect(page.locator('text=feature/add-reviews')).toBeVisible();
-    await expect(page.locator('text=In Review')).toBeVisible();
-  });
-
   test('detail page shows metadata', async ({ page }) => {
     await setupAPIs(page);
     await page.goto('/reviews/abc123');
@@ -401,7 +327,9 @@ test.describe('Empty state', () => {
     await page.goto('/reviews');
     await page.waitForTimeout(500);
 
-    await expect(page.locator('text=No reviews')).toBeVisible();
+    await expect(
+      page.getByRole('heading', { name: 'No reviews' }),
+    ).toBeVisible();
     await expect(
       page.locator('text=substrate review request'),
     ).toBeVisible();

@@ -44,7 +44,7 @@ test.describe('Notification display on new message', () => {
     });
 
     await page.goto('/');
-    await expect(page.locator('text=Inbox')).toBeVisible();
+    await expect(page.getByRole('link', { name: 'Inbox' })).toBeVisible();
 
     // Wait for WebSocket connection.
     await page.waitForTimeout(1000);
@@ -85,7 +85,7 @@ test.describe('Notification display on new message', () => {
     });
 
     await page.goto('/');
-    await expect(page.locator('text=Inbox')).toBeVisible();
+    await expect(page.getByRole('link', { name: 'Inbox' })).toBeVisible();
 
     await page.waitForTimeout(1000);
 
@@ -121,7 +121,7 @@ test.describe('Notification display on new message', () => {
     });
 
     await page.goto('/');
-    await expect(page.locator('text=Inbox')).toBeVisible();
+    await expect(page.getByRole('link', { name: 'Inbox' })).toBeVisible();
 
     await page.waitForTimeout(1000);
 
@@ -154,7 +154,7 @@ test.describe('Notification with permission denied', () => {
     });
 
     await page.goto('/');
-    await expect(page.locator('text=Inbox')).toBeVisible();
+    await expect(page.getByRole('link', { name: 'Inbox' })).toBeVisible();
 
     await page.waitForTimeout(1000);
 
@@ -172,7 +172,7 @@ test.describe('Notification with permission denied', () => {
     await page.waitForTimeout(500);
 
     // Page should still be functional.
-    await expect(page.locator('text=Inbox')).toBeVisible();
+    await expect(page.getByRole('link', { name: 'Inbox' })).toBeVisible();
   });
 });
 
@@ -197,7 +197,7 @@ test.describe('Notification content', () => {
     });
 
     await page.goto('/');
-    await expect(page.locator('text=Inbox')).toBeVisible();
+    await expect(page.getByRole('link', { name: 'Inbox' })).toBeVisible();
 
     await page.waitForTimeout(1000);
 
@@ -232,7 +232,7 @@ test.describe('Notification content', () => {
     });
 
     await page.goto('/');
-    await expect(page.locator('text=Inbox')).toBeVisible();
+    await expect(page.getByRole('link', { name: 'Inbox' })).toBeVisible();
 
     await page.waitForTimeout(1000);
 
@@ -253,6 +253,6 @@ test.describe('Notification content', () => {
     await page.waitForTimeout(1000);
 
     // Page should handle all messages without crashing.
-    await expect(page.locator('text=Inbox')).toBeVisible();
+    await expect(page.getByRole('link', { name: 'Inbox' })).toBeVisible();
   });
 });

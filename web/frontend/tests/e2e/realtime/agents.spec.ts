@@ -33,7 +33,7 @@ test.describe('Agent status real-time updates', () => {
     await page.goto('/agents');
 
     // Wait for agents page to load.
-    await expect(page.locator('text=Agents')).toBeVisible();
+    await expect(page.getByRole('link', { name: 'Agents' }).first()).toBeVisible();
 
     // Simulate agent status update.
     if (wsConnection) {
@@ -60,7 +60,7 @@ test.describe('Agent status real-time updates', () => {
     });
 
     await page.goto('/agents');
-    await expect(page.locator('text=Agents')).toBeVisible();
+    await expect(page.getByRole('link', { name: 'Agents' }).first()).toBeVisible();
 
     // Simulate agent going offline.
     if (wsConnection) {
@@ -86,7 +86,7 @@ test.describe('Agent status real-time updates', () => {
     });
 
     await page.goto('/agents');
-    await expect(page.locator('text=Agents')).toBeVisible();
+    await expect(page.getByRole('link', { name: 'Agents' }).first()).toBeVisible();
 
     // Simulate agent becoming active.
     if (wsConnection) {
@@ -112,7 +112,7 @@ test.describe('Agent status real-time updates', () => {
     });
 
     await page.goto('/agents');
-    await expect(page.locator('text=Agents')).toBeVisible();
+    await expect(page.getByRole('link', { name: 'Agents' }).first()).toBeVisible();
 
     // Capture initial stats if available.
     const statsCards = page.locator('[data-testid="stats-card"]');
@@ -145,7 +145,7 @@ test.describe('Agent session tracking', () => {
     });
 
     await page.goto('/agents');
-    await expect(page.locator('text=Agents')).toBeVisible();
+    await expect(page.getByRole('link', { name: 'Agents' }).first()).toBeVisible();
 
     // Simulate agent starting a session.
     if (wsConnection) {
@@ -172,7 +172,7 @@ test.describe('Agent session tracking', () => {
     });
 
     await page.goto('/agents');
-    await expect(page.locator('text=Agents')).toBeVisible();
+    await expect(page.getByRole('link', { name: 'Agents' }).first()).toBeVisible();
 
     // First set agent as busy with session.
     if (wsConnection) {

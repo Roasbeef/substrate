@@ -31,7 +31,7 @@ test.describe('Activity feed real-time updates', () => {
 
     // Navigate to agents page where activity feed is visible.
     await page.goto('/agents');
-    await expect(page.locator('text=Agents')).toBeVisible();
+    await expect(page.getByRole('link', { name: 'Agents' })).toBeVisible();
 
     // Simulate new activity.
     if (wsConnection) {
@@ -58,7 +58,7 @@ test.describe('Activity feed real-time updates', () => {
     });
 
     await page.goto('/agents');
-    await expect(page.locator('text=Agents')).toBeVisible();
+    await expect(page.getByRole('link', { name: 'Agents' })).toBeVisible();
 
     // Simulate message sent activity.
     if (wsConnection) {
@@ -82,7 +82,7 @@ test.describe('Activity feed real-time updates', () => {
     });
 
     await page.goto('/agents');
-    await expect(page.locator('text=Agents')).toBeVisible();
+    await expect(page.getByRole('link', { name: 'Agents' })).toBeVisible();
 
     // Simulate session completed activity.
     if (wsConnection) {
@@ -106,7 +106,7 @@ test.describe('Activity feed real-time updates', () => {
     });
 
     await page.goto('/agents');
-    await expect(page.locator('text=Agents')).toBeVisible();
+    await expect(page.getByRole('link', { name: 'Agents' })).toBeVisible();
 
     // Send multiple activities.
     if (wsConnection) {
@@ -152,7 +152,7 @@ test.describe('Activity feed on different pages', () => {
     });
 
     await page.goto('/');
-    await expect(page.locator('text=Inbox')).toBeVisible();
+    await expect(page.getByRole('link', { name: 'Inbox' })).toBeVisible();
 
     // Activity updates should still be received even on inbox page.
     if (wsConnection) {
@@ -175,7 +175,7 @@ test.describe('Activity feed on different pages', () => {
     });
 
     await page.goto('/agents');
-    await expect(page.locator('text=Agents')).toBeVisible();
+    await expect(page.getByRole('link', { name: 'Agents' })).toBeVisible();
 
     // Send activity.
     if (wsConnection) {
@@ -191,11 +191,11 @@ test.describe('Activity feed on different pages', () => {
 
     // Navigate away.
     await page.goto('/');
-    await expect(page.locator('text=Inbox')).toBeVisible();
+    await expect(page.getByRole('link', { name: 'Inbox' })).toBeVisible();
 
     // Navigate back.
     await page.goto('/agents');
-    await expect(page.locator('text=Agents')).toBeVisible();
+    await expect(page.getByRole('link', { name: 'Agents' })).toBeVisible();
 
     // Activity should still be visible or refetched.
     await page.waitForTimeout(500);

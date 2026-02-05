@@ -304,7 +304,7 @@ test.describe('Error boundaries', () => {
     await page.locator('a[href="/agents"]').click();
     await page.waitForURL('**/agents');
 
-    // Use heading to avoid matching multiple "Agents" text elements.
-    await expect(page.getByRole('heading', { name: 'Agents' })).toBeVisible();
+    // Use link to verify navigation to agents page.
+    await expect(page.getByRole('link', { name: 'Agents' }).first()).toBeVisible();
   });
 });

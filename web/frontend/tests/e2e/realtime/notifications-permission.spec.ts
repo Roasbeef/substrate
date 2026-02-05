@@ -13,7 +13,7 @@ test.describe('Notification permission prompt', () => {
     await context.grantPermissions([]);
 
     await page.goto('/');
-    await expect(page.locator('text=Inbox')).toBeVisible();
+    await expect(page.getByRole('link', { name: 'Inbox' })).toBeVisible();
 
     // Wait for the notification prompt to appear (2.5s delay + render time).
     await page.waitForTimeout(3000);
@@ -30,7 +30,7 @@ test.describe('Notification permission prompt', () => {
     });
 
     await page.goto('/');
-    await expect(page.locator('text=Inbox')).toBeVisible();
+    await expect(page.getByRole('link', { name: 'Inbox' })).toBeVisible();
 
     // Wait past the delay.
     await page.waitForTimeout(3000);
@@ -45,7 +45,7 @@ test.describe('Notification permission prompt', () => {
     await context.grantPermissions([]);
 
     await page.goto('/');
-    await expect(page.locator('text=Inbox')).toBeVisible();
+    await expect(page.getByRole('link', { name: 'Inbox' })).toBeVisible();
 
     // Wait for prompt.
     await page.waitForTimeout(3000);
@@ -65,7 +65,7 @@ test.describe('Notification permission prompt', () => {
     await context.grantPermissions(['notifications']);
 
     await page.goto('/');
-    await expect(page.locator('text=Inbox')).toBeVisible();
+    await expect(page.getByRole('link', { name: 'Inbox' })).toBeVisible();
 
     // Wait for prompt.
     await page.waitForTimeout(3000);
@@ -84,7 +84,7 @@ test.describe('Notification permission prompt', () => {
 test.describe('Notification settings', () => {
   test('navigates to settings page', async ({ page }) => {
     await page.goto('/');
-    await expect(page.locator('text=Inbox')).toBeVisible();
+    await expect(page.getByRole('link', { name: 'Inbox' })).toBeVisible();
 
     // Look for settings link/button.
     const settingsButton = page.locator('[aria-label*="settings"], [data-testid="settings"]').first();
@@ -98,7 +98,7 @@ test.describe('Notification settings', () => {
     await context.grantPermissions(['notifications']);
 
     await page.goto('/');
-    await expect(page.locator('text=Inbox')).toBeVisible();
+    await expect(page.getByRole('link', { name: 'Inbox' })).toBeVisible();
 
     // Navigate to settings if there's a settings page.
     // This would depend on actual UI implementation.
@@ -111,11 +111,11 @@ test.describe('Notification permission denied', () => {
     await context.clearPermissions();
 
     await page.goto('/');
-    await expect(page.locator('text=Inbox')).toBeVisible();
+    await expect(page.getByRole('link', { name: 'Inbox' })).toBeVisible();
 
     // Page should load without errors.
     await page.waitForTimeout(1000);
-    await expect(page.locator('text=Inbox')).toBeVisible();
+    await expect(page.getByRole('link', { name: 'Inbox' })).toBeVisible();
   });
 
   test('shows blocked status in settings', async ({ page, context }) => {
@@ -123,7 +123,7 @@ test.describe('Notification permission denied', () => {
     await context.clearPermissions();
 
     await page.goto('/');
-    await expect(page.locator('text=Inbox')).toBeVisible();
+    await expect(page.getByRole('link', { name: 'Inbox' })).toBeVisible();
 
     // If there's a notification status indicator, it should show blocked.
   });
