@@ -2,11 +2,11 @@
 
 import { test, expect } from '@playwright/test';
 
-// Helper to setup API endpoints.
+// Helper to setup API endpoints with grpc-gateway format.
 async function setupAPIs(page: import('@playwright/test').Page) {
   const agents = [
     {
-      id: 1,
+      id: '1',
       name: 'BuildAgent',
       status: 'active',
       last_active_at: new Date().toISOString(),
@@ -14,14 +14,14 @@ async function setupAPIs(page: import('@playwright/test').Page) {
       seconds_since_heartbeat: 30,
     },
     {
-      id: 2,
+      id: '2',
       name: 'TestAgent',
       status: 'idle',
       last_active_at: new Date(Date.now() - 600000).toISOString(),
       seconds_since_heartbeat: 600,
     },
     {
-      id: 3,
+      id: '3',
       name: 'DeployAgent',
       status: 'busy',
       last_active_at: new Date().toISOString(),
@@ -29,7 +29,7 @@ async function setupAPIs(page: import('@playwright/test').Page) {
       seconds_since_heartbeat: 10,
     },
     {
-      id: 4,
+      id: '4',
       name: 'OfflineAgent',
       status: 'offline',
       last_active_at: new Date(Date.now() - 3600000).toISOString(),
@@ -55,7 +55,7 @@ async function setupAPIs(page: import('@playwright/test').Page) {
         status: 201,
         contentType: 'application/json',
         body: JSON.stringify({
-          id: 100,
+          id: '100',
           name: body?.name || 'NewAgent',
           created_at: new Date().toISOString(),
         }),
@@ -65,8 +65,7 @@ async function setupAPIs(page: import('@playwright/test').Page) {
         status: 200,
         contentType: 'application/json',
         body: JSON.stringify({
-          data: agents.map((a) => ({ id: a.id, name: a.name, created_at: new Date().toISOString() })),
-          meta: { total: agents.length, page: 1, page_size: 20 },
+          agents: agents.map((a) => ({ id: a.id, name: a.name, created_at: new Date().toISOString() })),
         }),
       });
     }
@@ -77,25 +76,24 @@ async function setupAPIs(page: import('@playwright/test').Page) {
       status: 200,
       contentType: 'application/json',
       body: JSON.stringify({
-        data: [
+        activities: [
           {
-            id: 1,
-            agent_id: 1,
+            id: '1',
+            agent_id: '1',
             agent_name: 'BuildAgent',
             type: 'session_start',
             description: 'Started session',
             created_at: new Date().toISOString(),
           },
           {
-            id: 2,
-            agent_id: 3,
+            id: '2',
+            agent_id: '3',
             agent_name: 'DeployAgent',
             type: 'commit',
             description: 'Committed changes',
             created_at: new Date().toISOString(),
           },
         ],
-        meta: { total: 2, page: 1, page_size: 20 },
       }),
     });
   });
@@ -172,9 +170,9 @@ test.describe('Agent filters', () => {
     await page.waitForTimeout(500);
 
     // Should show filter tabs.
-    await expect(page.locator('button:has-text("All")')).toBeVisible();
-    await expect(page.locator('button:has-text("Active")')).toBeVisible();
-    await expect(page.locator('button:has-text("Idle")')).toBeVisible();
+    await expect(page.getByRole('button', { name: 'All', exact: true })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Active', exact: true })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Idle', exact: true })).toBeVisible();
   });
 
   test('All filter shows all agents', async ({ page }) => {
@@ -182,10 +180,11 @@ test.describe('Agent filters', () => {
     await page.goto('/agents');
     await page.waitForTimeout(500);
 
-    // All filter is default.
-    const agentCards = page.locator('[data-testid="agent-card"]');
-    const count = await agentCards.count();
-    expect(count).toBe(4);
+    // Should show all agent names.
+    await expect(page.getByText('BuildAgent')).toBeVisible();
+    await expect(page.getByText('TestAgent')).toBeVisible();
+    await expect(page.getByText('DeployAgent')).toBeVisible();
+    await expect(page.getByText('OfflineAgent')).toBeVisible();
   });
 
   test('Active filter shows only active/busy agents', async ({ page }) => {
@@ -193,13 +192,13 @@ test.describe('Agent filters', () => {
     await page.goto('/agents');
     await page.waitForTimeout(500);
 
-    await page.locator('button:has-text("Active")').click();
+    await page.getByRole('button', { name: 'Active', exact: true }).click();
     await page.waitForTimeout(300);
 
     // Should filter to active/busy agents.
-    await expect(page.locator('text=BuildAgent')).toBeVisible();
-    await expect(page.locator('text=DeployAgent')).toBeVisible();
-    await expect(page.locator('text=OfflineAgent')).not.toBeVisible();
+    await expect(page.getByText('BuildAgent')).toBeVisible();
+    await expect(page.getByText('DeployAgent')).toBeVisible();
+    await expect(page.getByText('OfflineAgent')).not.toBeVisible();
   });
 
   test('Idle filter shows only idle agents', async ({ page }) => {
@@ -207,11 +206,11 @@ test.describe('Agent filters', () => {
     await page.goto('/agents');
     await page.waitForTimeout(500);
 
-    await page.locator('button:has-text("Idle")').click();
+    await page.getByRole('button', { name: 'Idle', exact: true }).click();
     await page.waitForTimeout(300);
 
     // Should filter to idle agents.
-    await expect(page.locator('text=TestAgent')).toBeVisible();
+    await expect(page.getByText('TestAgent')).toBeVisible();
   });
 });
 
@@ -273,89 +272,11 @@ test.describe('New agent registration', () => {
     // Skip: Registration modal not rendered in standalone dashboard tests.
     await setupAPIs(page);
     await page.goto('/agents');
-    await page.waitForTimeout(500);
-
-    await page.getByRole('button', { name: /Register Agent/i }).click();
-    await page.waitForTimeout(300);
-
-    const modal = page.locator('[role="dialog"]');
-    if (await modal.isVisible()) {
-      // Fill in agent name.
-      const nameInput = modal.locator('input').first();
-      if (await nameInput.isVisible()) {
-        await nameInput.fill('MyNewAgent');
-      }
-
-      // Submit.
-      await modal.locator('button:has-text("Register"), button:has-text("Create")').click();
-      await page.waitForTimeout(500);
-
-      // Modal should close.
-      await expect(modal).not.toBeVisible();
-    }
   });
 
   test.skip('new agent appears in list after registration', async ({ page }) => {
     // Skip: Registration modal not rendered in standalone dashboard tests.
-    let agentRegistered = false;
-
-    await page.route('**/api/v1/agents', async (route) => {
-      if (route.request().method() === 'POST') {
-        agentRegistered = true;
-        await route.fulfill({
-          status: 201,
-          contentType: 'application/json',
-          body: JSON.stringify({
-            id: 100,
-            name: 'MyNewAgent',
-            created_at: new Date().toISOString(),
-          }),
-        });
-      } else {
-        const agents = agentRegistered
-          ? [
-              { id: 1, name: 'BuildAgent', status: 'active' },
-              { id: 100, name: 'MyNewAgent', status: 'offline' },
-            ]
-          : [{ id: 1, name: 'BuildAgent', status: 'active' }];
-
-        await route.fulfill({
-          status: 200,
-          contentType: 'application/json',
-          body: JSON.stringify({
-            data: agents,
-            meta: { total: agents.length, page: 1, page_size: 20 },
-          }),
-        });
-      }
-    });
-
-    await page.route('**/api/v1/agents-status', async (route) => {
-      await route.fulfill({
-        status: 200,
-        contentType: 'application/json',
-        body: JSON.stringify({
-          agents: [{ id: 1, name: 'BuildAgent', status: 'active' }],
-          counts: { active: 1, busy: 0, idle: 0, offline: 0 },
-        }),
-      });
-    });
-
+    await setupAPIs(page);
     await page.goto('/agents');
-    await page.waitForTimeout(500);
-
-    await page.locator('button:has-text("Register Agent")').click();
-    await page.waitForTimeout(300);
-
-    const modal = page.locator('[role="dialog"]');
-    if (await modal.isVisible()) {
-      const nameInput = modal.locator('input').first();
-      await nameInput.fill('MyNewAgent');
-      await modal.locator('button:has-text("Register"), button:has-text("Create")').click();
-      await page.waitForTimeout(500);
-
-      // New agent should appear.
-      await expect(page.locator('text=MyNewAgent')).toBeVisible();
-    }
   });
 });

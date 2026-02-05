@@ -2,7 +2,7 @@
 
 import { test, expect } from '@playwright/test';
 
-// Helper to setup API endpoints.
+// Helper to setup API endpoints with grpc-gateway format.
 async function setupAPIs(page: import('@playwright/test').Page) {
   await page.route('**/api/v1/agents-status', async (route) => {
     await route.fulfill({
@@ -11,7 +11,7 @@ async function setupAPIs(page: import('@playwright/test').Page) {
       body: JSON.stringify({
         agents: [
           {
-            id: 1,
+            id: '1',
             name: 'ActiveAgent',
             status: 'active',
             last_active_at: new Date().toISOString(),
@@ -19,7 +19,7 @@ async function setupAPIs(page: import('@playwright/test').Page) {
             seconds_since_heartbeat: 30,
           },
           {
-            id: 2,
+            id: '2',
             name: 'BusyAgent',
             status: 'busy',
             last_active_at: new Date().toISOString(),
@@ -27,14 +27,14 @@ async function setupAPIs(page: import('@playwright/test').Page) {
             seconds_since_heartbeat: 5,
           },
           {
-            id: 3,
+            id: '3',
             name: 'IdleAgent',
             status: 'idle',
             last_active_at: new Date(Date.now() - 600000).toISOString(),
             seconds_since_heartbeat: 600,
           },
           {
-            id: 4,
+            id: '4',
             name: 'OfflineAgent',
             status: 'offline',
             last_active_at: new Date(Date.now() - 3600000).toISOString(),
@@ -50,7 +50,7 @@ async function setupAPIs(page: import('@playwright/test').Page) {
     await route.fulfill({
       status: 200,
       contentType: 'application/json',
-      body: JSON.stringify({ data: [], meta: { total: 0, page: 1, page_size: 20 } }),
+      body: JSON.stringify({ activities: [] }),
     });
   });
 }
