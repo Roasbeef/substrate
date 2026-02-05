@@ -24,16 +24,11 @@ jobs:
           go-version: ${{ env.GO_VERSION }}
           cache: true
 
-      - name: Install dependencies
-        run: go mod download
-
       - name: Check go mod tidy
-        run: |
-          go mod tidy
-          git diff --exit-code go.mod go.sum
+        run: make tidy-check
 
       - name: Run go vet
-        run: go vet ./...
+        run: make vet
 
       - name: Install golangci-lint
         uses: golangci/golangci-lint-action@v7
@@ -41,20 +36,12 @@ jobs:
           version: v2.8.0
           args: --timeout=5m
 
-      - name: Run tests
-        run: |
-          export CGO_ENABLED=1
-          export CGO_CFLAGS="-DSQLITE_ENABLE_FTS5"
-          export CGO_LDFLAGS="-lm"
-          go test -v -race -count=1 ./...
+      - name: Run tests with race detector
+        run: make test-race
 
       - name: Generate coverage
         if: success()
-        run: |
-          export CGO_ENABLED=1
-          export CGO_CFLAGS="-DSQLITE_ENABLE_FTS5"
-          export CGO_LDFLAGS="-lm"
-          go test -coverprofile=coverage.out -count=1 ./... 2>/dev/null || true
+        run: make test-cover || true
 
       - name: Upload coverage
         uses: codecov/codecov-action@v4

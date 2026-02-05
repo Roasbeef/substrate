@@ -14,6 +14,16 @@ PKG := ./...
 TIMEOUT := 5m
 FRONTEND_DIR := web/frontend
 
+GOTEST := go test
+GOLIST := go list $(PKG)
+XARGS := xargs -L 1
+
+# Test commands: pipe package list through xargs to test one package at a
+# time, avoiding parallel compilation races with the race detector.
+UNIT := $(GOLIST) | $(XARGS) env $(GOTEST) -v -timeout $(TIMEOUT)
+UNIT_RACE := $(UNIT) -race
+COVER_FLAGS := -coverprofile=coverage.out -covermode=atomic
+
 # Build targets
 .PHONY: build
 build:
@@ -104,7 +114,7 @@ dev:
 
 # CI targets - used by GitHub Actions.
 .PHONY: ci-go
-ci-go: tidy-check lint test
+ci-go: tidy-check lint test-race
 	@echo "Go CI checks passed."
 
 .PHONY: ci-frontend
@@ -123,33 +133,37 @@ install: bun-install bun-build
 # Testing targets
 .PHONY: test
 test:
-	go test -v $(PKG)
+	$(UNIT)
+
+.PHONY: test-race
+test-race:
+	env GORACE="history_size=7 halt_on_errors=1" $(UNIT_RACE)
 
 .PHONY: test-cover
 test-cover:
-	go test -cover $(PKG)
+	$(GOTEST) $(COVER_FLAGS) -v $(PKG)
 
 .PHONY: test-cover-html
 test-cover-html:
-	go test -coverprofile=coverage.out $(PKG)
+	$(GOTEST) -coverprofile=coverage.out $(PKG)
 	go tool cover -html=coverage.out -o coverage.html
 	@echo "Coverage report: coverage.html"
 
-# Single package testing
+# Single package testing.
 # Usage: make unit pkg=./internal/mail case=TestService_SendMail
 .PHONY: unit
 unit:
 ifdef case
-	go test -v -timeout $(TIMEOUT) -run $(case) $(pkg)
+	$(GOTEST) -v -timeout $(TIMEOUT) -run $(case) $(pkg)
 else
-	go test -v -timeout $(TIMEOUT) $(pkg)
+	$(GOTEST) -v -timeout $(TIMEOUT) $(pkg)
 endif
 
-# Run a specific test with verbose output
+# Run a specific test with verbose output.
 # Usage: make run-test test=TestThreadFSM_UnreadToRead pkg=./internal/mail
 .PHONY: run-test
 run-test:
-	go test -v -timeout $(TIMEOUT) -run $(test) $(pkg)
+	$(GOTEST) -v -timeout $(TIMEOUT) -run $(test) $(pkg)
 
 # Code generation
 .PHONY: sqlc
@@ -300,7 +314,7 @@ test-integration-seed:
 check: fmt vet lint test
 
 .PHONY: pre-commit
-pre-commit: tidy fmt vet lint test-cover
+pre-commit: tidy fmt vet lint test-race
 	@echo "All pre-commit checks passed!"
 
 # Quick build check (just compile, no tests)
