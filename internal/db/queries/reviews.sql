@@ -112,3 +112,12 @@ WHERE review_id = ? AND status = ?;
 -- name: CountOpenIssues :one
 SELECT COUNT(*) FROM review_issues
 WHERE review_id = ? AND status = 'open';
+
+-- name: DeleteReviewIssues :exec
+DELETE FROM review_issues WHERE review_id = ?;
+
+-- name: DeleteReviewIterations :exec
+DELETE FROM review_iterations WHERE review_id = ?;
+
+-- name: DeleteReview :exec
+DELETE FROM reviews WHERE review_id = ?;

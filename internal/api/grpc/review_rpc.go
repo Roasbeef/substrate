@@ -266,6 +266,40 @@ func (s *Server) CancelReview(
 	return result, nil
 }
 
+// DeleteReview permanently removes a review and all associated data.
+func (s *Server) DeleteReview(
+	ctx context.Context, req *DeleteReviewProtoRequest,
+) (*DeleteReviewProtoResponse, error) {
+	if req.ReviewId == "" {
+		return nil, status.Error(
+			codes.InvalidArgument, "review_id is required",
+		)
+	}
+
+	resp, err := s.askReview(ctx, review.DeleteReviewMsg{
+		ReviewID: req.ReviewId,
+	})
+	if err != nil {
+		return nil, status.Errorf(
+			codes.Internal, "review actor error: %v", err,
+		)
+	}
+
+	deleteResp, ok := resp.(review.DeleteReviewResp)
+	if !ok {
+		return nil, status.Error(
+			codes.Internal, "unexpected response type",
+		)
+	}
+
+	result := &DeleteReviewProtoResponse{}
+	if deleteResp.Error != nil {
+		result.Error = deleteResp.Error.Error()
+	}
+
+	return result, nil
+}
+
 // ListReviewIssues lists issues for a specific review.
 func (s *Server) ListReviewIssues(
 	ctx context.Context, req *ListReviewIssuesRequest,

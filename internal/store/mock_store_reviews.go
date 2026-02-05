@@ -389,3 +389,22 @@ func (m *MockStore) CountOpenIssues(ctx context.Context,
 
 	return count, nil
 }
+
+// DeleteReview deletes a review and its associated data.
+func (m *MockStore) DeleteReview(ctx context.Context,
+	reviewID string,
+) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	data := getReviewData(m)
+	if _, ok := data.reviews[reviewID]; !ok {
+		return fmt.Errorf("review not found: %s", reviewID)
+	}
+
+	delete(data.reviewIssues, reviewID)
+	delete(data.reviewIters, reviewID)
+	delete(data.reviews, reviewID)
+
+	return nil
+}

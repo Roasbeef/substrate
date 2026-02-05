@@ -36,6 +36,9 @@ type Querier interface {
 	DeleteMessage(ctx context.Context, id int64) error
 	DeleteMessagesByTopicOlderThan(ctx context.Context, arg DeleteMessagesByTopicOlderThanParams) (int64, error)
 	DeleteOldActivities(ctx context.Context, createdAt int64) error
+	DeleteReview(ctx context.Context, reviewID string) error
+	DeleteReviewIssues(ctx context.Context, reviewID string) error
+	DeleteReviewIterations(ctx context.Context, reviewID string) error
 	DeleteSessionIdentity(ctx context.Context, sessionID string) error
 	DeleteSubscription(ctx context.Context, arg DeleteSubscriptionParams) error
 	DeleteTopic(ctx context.Context, id int64) error

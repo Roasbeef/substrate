@@ -571,3 +571,49 @@ func (s *txSqlcStore) CountOpenIssues(ctx context.Context,
 ) (int64, error) {
 	return s.queries.CountOpenIssues(ctx, reviewID)
 }
+
+// =============================================================================
+// DeleteReview implementations
+// =============================================================================
+
+// DeleteReview deletes a review and its associated iterations and issues.
+func (s *SqlcStore) DeleteReview(ctx context.Context,
+	reviewID string,
+) error {
+	return s.WithTx(ctx, func(
+		ctx context.Context, txStore Storage,
+	) error {
+		// Delete child records first (issues, then iterations), then
+		// the parent review.
+		if err := s.db.DeleteReviewIssues(
+			ctx, reviewID,
+		); err != nil {
+			return err
+		}
+		if err := s.db.DeleteReviewIterations(
+			ctx, reviewID,
+		); err != nil {
+			return err
+		}
+
+		return s.db.DeleteReview(ctx, reviewID)
+	})
+}
+
+// DeleteReview deletes a review within a transaction.
+func (s *txSqlcStore) DeleteReview(ctx context.Context,
+	reviewID string,
+) error {
+	if err := s.queries.DeleteReviewIssues(
+		ctx, reviewID,
+	); err != nil {
+		return err
+	}
+	if err := s.queries.DeleteReviewIterations(
+		ctx, reviewID,
+	); err != nil {
+		return err
+	}
+
+	return s.queries.DeleteReview(ctx, reviewID)
+}

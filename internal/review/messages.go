@@ -21,6 +21,7 @@ func (GetReviewMsg) isReviewRequest()    {}
 func (ListReviewsMsg) isReviewRequest()  {}
 func (ResubmitMsg) isReviewRequest()     {}
 func (CancelReviewMsg) isReviewRequest() {}
+func (DeleteReviewMsg) isReviewRequest() {}
 func (GetIssuesMsg) isReviewRequest()    {}
 func (UpdateIssueMsg) isReviewRequest()  {}
 
@@ -30,6 +31,7 @@ func (GetReviewResp) isReviewResponse()    {}
 func (ListReviewsResp) isReviewResponse()  {}
 func (ResubmitResp) isReviewResponse()     {}
 func (CancelReviewResp) isReviewResponse() {}
+func (DeleteReviewResp) isReviewResponse() {}
 func (GetIssuesResp) isReviewResponse()    {}
 func (UpdateIssueResp) isReviewResponse()  {}
 
@@ -136,6 +138,16 @@ type CancelReviewMsg struct {
 // MessageType implements actor.Message.
 func (CancelReviewMsg) MessageType() string { return "CancelReviewMsg" }
 
+// DeleteReviewMsg deletes a review and all associated data.
+type DeleteReviewMsg struct {
+	actor.BaseMessage
+
+	ReviewID string
+}
+
+// MessageType implements actor.Message.
+func (DeleteReviewMsg) MessageType() string { return "DeleteReviewMsg" }
+
 // GetIssuesMsg requests issues for a specific review.
 type GetIssuesMsg struct {
 	actor.BaseMessage
@@ -209,6 +221,11 @@ type ResubmitResp struct {
 
 // CancelReviewResp is the response for a CancelReviewMsg.
 type CancelReviewResp struct {
+	Error error
+}
+
+// DeleteReviewResp is the response for a DeleteReviewMsg.
+type DeleteReviewResp struct {
 	Error error
 }
 

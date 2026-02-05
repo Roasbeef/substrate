@@ -260,6 +260,33 @@ func (q *Queries) CreateReviewIteration(ctx context.Context, arg CreateReviewIte
 	return i, err
 }
 
+const DeleteReview = `-- name: DeleteReview :exec
+DELETE FROM reviews WHERE review_id = ?
+`
+
+func (q *Queries) DeleteReview(ctx context.Context, reviewID string) error {
+	_, err := q.db.ExecContext(ctx, DeleteReview, reviewID)
+	return err
+}
+
+const DeleteReviewIssues = `-- name: DeleteReviewIssues :exec
+DELETE FROM review_issues WHERE review_id = ?
+`
+
+func (q *Queries) DeleteReviewIssues(ctx context.Context, reviewID string) error {
+	_, err := q.db.ExecContext(ctx, DeleteReviewIssues, reviewID)
+	return err
+}
+
+const DeleteReviewIterations = `-- name: DeleteReviewIterations :exec
+DELETE FROM review_iterations WHERE review_id = ?
+`
+
+func (q *Queries) DeleteReviewIterations(ctx context.Context, reviewID string) error {
+	_, err := q.db.ExecContext(ctx, DeleteReviewIterations, reviewID)
+	return err
+}
+
 const GetLatestIteration = `-- name: GetLatestIteration :one
 SELECT id, review_id, iteration_num, reviewer_id, reviewer_session_id, decision, summary, issues_json, suggestions_json, files_reviewed, lines_analyzed, duration_ms, cost_usd, started_at, completed_at FROM review_iterations
 WHERE review_id = ?

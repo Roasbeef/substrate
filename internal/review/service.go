@@ -96,6 +96,10 @@ func (s *Service) Receive(ctx context.Context,
 		resp := s.handleCancel(ctx, m)
 		return fn.Ok[ReviewResponse](resp)
 
+	case DeleteReviewMsg:
+		resp := s.handleDelete(ctx, m)
+		return fn.Ok[ReviewResponse](resp)
+
 	case GetIssuesMsg:
 		resp := s.handleGetIssues(ctx, m)
 		return fn.Ok[ReviewResponse](resp)
@@ -327,6 +331,24 @@ func (s *Service) handleCancel(ctx context.Context,
 	s.mu.Unlock()
 
 	return CancelReviewResp{}
+}
+
+// handleDelete permanently removes a review and all associated data from
+// the database and active tracking.
+func (s *Service) handleDelete(ctx context.Context,
+	msg DeleteReviewMsg,
+) DeleteReviewResp {
+	// Remove from active tracking first.
+	s.mu.Lock()
+	delete(s.activeReviews, msg.ReviewID)
+	s.mu.Unlock()
+
+	// Delete from the database (cascades to iterations and issues).
+	if err := s.store.DeleteReview(ctx, msg.ReviewID); err != nil {
+		return DeleteReviewResp{Error: err}
+	}
+
+	return DeleteReviewResp{}
 }
 
 // handleGetIssues retrieves issues for a review.

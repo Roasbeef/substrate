@@ -154,6 +154,9 @@ service ReviewService {
     // CancelReview cancels an active review.
     rpc CancelReview (CancelReviewProtoRequest) returns (CancelReviewProtoResponse);
 
+    // DeleteReview permanently removes a review and all associated data.
+    rpc DeleteReview (DeleteReviewProtoRequest) returns (DeleteReviewProtoResponse);
+
     // ListReviewIssues lists issues for a review.
     rpc ListReviewIssues (ListReviewIssuesRequest) returns (ListReviewIssuesResponse);
 
@@ -911,6 +914,16 @@ message CancelReviewProtoRequest {
 
 // CancelReviewProtoResponse is the response for CancelReview.
 message CancelReviewProtoResponse {
+    string error = 1;
+}
+
+// DeleteReviewProtoRequest is the request for DeleteReview.
+message DeleteReviewProtoRequest {
+    string review_id = 1;
+}
+
+// DeleteReviewProtoResponse is the response for DeleteReview.
+message DeleteReviewProtoResponse {
     string error = 1;
 }
 

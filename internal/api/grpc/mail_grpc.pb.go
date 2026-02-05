@@ -1892,6 +1892,7 @@ const (
 	ReviewService_GetReview_FullMethodName         = "/subtraterpc.ReviewService/GetReview"
 	ReviewService_ResubmitReview_FullMethodName    = "/subtraterpc.ReviewService/ResubmitReview"
 	ReviewService_CancelReview_FullMethodName      = "/subtraterpc.ReviewService/CancelReview"
+	ReviewService_DeleteReview_FullMethodName      = "/subtraterpc.ReviewService/DeleteReview"
 	ReviewService_ListReviewIssues_FullMethodName  = "/subtraterpc.ReviewService/ListReviewIssues"
 	ReviewService_UpdateIssueStatus_FullMethodName = "/subtraterpc.ReviewService/UpdateIssueStatus"
 )
@@ -1912,6 +1913,8 @@ type ReviewServiceClient interface {
 	ResubmitReview(ctx context.Context, in *ResubmitReviewRequest, opts ...grpc.CallOption) (*CreateReviewResponse, error)
 	// CancelReview cancels an active review.
 	CancelReview(ctx context.Context, in *CancelReviewProtoRequest, opts ...grpc.CallOption) (*CancelReviewProtoResponse, error)
+	// DeleteReview permanently removes a review and all associated data.
+	DeleteReview(ctx context.Context, in *DeleteReviewProtoRequest, opts ...grpc.CallOption) (*DeleteReviewProtoResponse, error)
 	// ListReviewIssues lists issues for a review.
 	ListReviewIssues(ctx context.Context, in *ListReviewIssuesRequest, opts ...grpc.CallOption) (*ListReviewIssuesResponse, error)
 	// UpdateIssueStatus updates the status of a review issue.
@@ -1976,6 +1979,16 @@ func (c *reviewServiceClient) CancelReview(ctx context.Context, in *CancelReview
 	return out, nil
 }
 
+func (c *reviewServiceClient) DeleteReview(ctx context.Context, in *DeleteReviewProtoRequest, opts ...grpc.CallOption) (*DeleteReviewProtoResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(DeleteReviewProtoResponse)
+	err := c.cc.Invoke(ctx, ReviewService_DeleteReview_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 func (c *reviewServiceClient) ListReviewIssues(ctx context.Context, in *ListReviewIssuesRequest, opts ...grpc.CallOption) (*ListReviewIssuesResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(ListReviewIssuesResponse)
@@ -2012,6 +2025,8 @@ type ReviewServiceServer interface {
 	ResubmitReview(context.Context, *ResubmitReviewRequest) (*CreateReviewResponse, error)
 	// CancelReview cancels an active review.
 	CancelReview(context.Context, *CancelReviewProtoRequest) (*CancelReviewProtoResponse, error)
+	// DeleteReview permanently removes a review and all associated data.
+	DeleteReview(context.Context, *DeleteReviewProtoRequest) (*DeleteReviewProtoResponse, error)
 	// ListReviewIssues lists issues for a review.
 	ListReviewIssues(context.Context, *ListReviewIssuesRequest) (*ListReviewIssuesResponse, error)
 	// UpdateIssueStatus updates the status of a review issue.
@@ -2040,6 +2055,9 @@ func (UnimplementedReviewServiceServer) ResubmitReview(context.Context, *Resubmi
 }
 func (UnimplementedReviewServiceServer) CancelReview(context.Context, *CancelReviewProtoRequest) (*CancelReviewProtoResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method CancelReview not implemented")
+}
+func (UnimplementedReviewServiceServer) DeleteReview(context.Context, *DeleteReviewProtoRequest) (*DeleteReviewProtoResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method DeleteReview not implemented")
 }
 func (UnimplementedReviewServiceServer) ListReviewIssues(context.Context, *ListReviewIssuesRequest) (*ListReviewIssuesResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method ListReviewIssues not implemented")
@@ -2158,6 +2176,24 @@ func _ReviewService_CancelReview_Handler(srv interface{}, ctx context.Context, d
 	return interceptor(ctx, in, info, handler)
 }
 
+func _ReviewService_DeleteReview_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(DeleteReviewProtoRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ReviewServiceServer).DeleteReview(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: ReviewService_DeleteReview_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ReviewServiceServer).DeleteReview(ctx, req.(*DeleteReviewProtoRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 func _ReviewService_ListReviewIssues_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(ListReviewIssuesRequest)
 	if err := dec(in); err != nil {
@@ -2220,6 +2256,10 @@ var ReviewService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "CancelReview",
 			Handler:    _ReviewService_CancelReview_Handler,
+		},
+		{
+			MethodName: "DeleteReview",
+			Handler:    _ReviewService_DeleteReview_Handler,
 		},
 		{
 			MethodName: "ListReviewIssues",
