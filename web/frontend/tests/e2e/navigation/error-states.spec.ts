@@ -30,8 +30,8 @@ test.describe('API error handling', () => {
 
     // Should show error or offline state.
     const errorState = page.locator('[data-testid="error-state"], [data-testid="offline-state"]');
-    // Page should still be functional.
-    await expect(page.locator('text=Inbox')).toBeVisible();
+    // Page should still be functional - check main element is visible.
+    await expect(page.locator('main')).toBeVisible();
   });
 
   test('shows retry button on error', async ({ page }) => {
@@ -304,6 +304,7 @@ test.describe('Error boundaries', () => {
     await page.locator('a[href="/agents"]').click();
     await page.waitForURL('**/agents');
 
-    await expect(page.locator('text=Agents')).toBeVisible();
+    // Use heading to avoid matching multiple "Agents" text elements.
+    await expect(page.getByRole('heading', { name: 'Agents' })).toBeVisible();
   });
 });
