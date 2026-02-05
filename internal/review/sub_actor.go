@@ -311,6 +311,12 @@ func (r *reviewSubActor) Run(parentCtx context.Context) {
 		"prompt", truncateStr(prompt, 500),
 	)
 
+	// isTerminalDecision returns true for review decisions that end the
+	// review lifecycle (no further back-and-forth expected).
+	isTerminalDecision := func(decision string) bool {
+		return decision == "approve" || decision == "reject"
+	}
+
 	var (
 		lastText    string
 		response    claudeagent.ResultMessage
@@ -402,6 +408,32 @@ func (r *reviewSubActor) Run(parentCtx context.Context) {
 						ctx, result, startTime,
 					)
 					r.callback(ctx, result)
+
+					// For terminal decisions (approve/
+					// reject), kill the Claude subprocess
+					// immediately. The stop hook would
+					// otherwise keep it alive for ~9m30s
+					// polling for mail. Close() sends
+					// stdin EOF → 5s grace → SIGKILL.
+					// For request_changes, we keep the
+					// process alive so the stop hook can
+					// facilitate back-and-forth.
+					if isTerminalDecision(
+						parsed.Decision,
+					) {
+						log.InfoS(ctx,
+							"Reviewer killing "+
+								"subprocess "+
+								"after terminal "+
+								"decision",
+							"review_id",
+							r.reviewID,
+							"decision",
+							parsed.Decision,
+						)
+
+						client.Close()
+					}
 				}
 			}
 
