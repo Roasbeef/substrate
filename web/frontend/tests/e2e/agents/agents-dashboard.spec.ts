@@ -114,10 +114,10 @@ test.describe('Agents dashboard loading', () => {
     await page.goto('/agents');
     await page.waitForTimeout(500);
 
-    // Should show agent cards by name.
-    await expect(page.getByText('BuildAgent')).toBeVisible();
-    await expect(page.getByText('TestAgent')).toBeVisible();
-    await expect(page.getByText('DeployAgent')).toBeVisible();
+    // Should show agent cards by name (use heading role to avoid header switcher).
+    await expect(page.getByRole('heading', { name: 'BuildAgent' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'TestAgent' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'DeployAgent' })).toBeVisible();
   });
 
   test('shows status indicators on agent cards', async ({ page }) => {
@@ -169,10 +169,11 @@ test.describe('Agent filters', () => {
     await page.goto('/agents');
     await page.waitForTimeout(500);
 
-    // Should show filter tabs.
-    await expect(page.getByRole('button', { name: 'All', exact: true })).toBeVisible();
-    await expect(page.getByRole('button', { name: 'Active', exact: true })).toBeVisible();
-    await expect(page.getByRole('button', { name: 'Idle', exact: true })).toBeVisible();
+    // Should show filter tabs (buttons have counts appended like "Active1").
+    const filterNav = page.locator('nav[aria-label="Filter agents"]');
+    await expect(filterNav.getByRole('button', { name: 'All' })).toBeVisible();
+    await expect(filterNav.getByRole('button', { name: /^Active/ })).toBeVisible();
+    await expect(filterNav.getByRole('button', { name: /^Idle/ })).toBeVisible();
   });
 
   test('All filter shows all agents', async ({ page }) => {
@@ -180,25 +181,28 @@ test.describe('Agent filters', () => {
     await page.goto('/agents');
     await page.waitForTimeout(500);
 
-    // Should show all agent names.
-    await expect(page.getByText('BuildAgent')).toBeVisible();
-    await expect(page.getByText('TestAgent')).toBeVisible();
-    await expect(page.getByText('DeployAgent')).toBeVisible();
-    await expect(page.getByText('OfflineAgent')).toBeVisible();
+    // Should show all agent names (use heading role to avoid header switcher).
+    await expect(page.getByRole('heading', { name: 'BuildAgent' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'TestAgent' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'DeployAgent' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'OfflineAgent' })).toBeVisible();
   });
 
-  test('Active filter shows only active/busy agents', async ({ page }) => {
+  test('Active filter shows only active agents', async ({ page }) => {
     await setupAPIs(page);
     await page.goto('/agents');
     await page.waitForTimeout(500);
 
-    await page.getByRole('button', { name: 'Active', exact: true }).click();
+    // Click Active filter button (has count appended like "Active1").
+    const filterNav = page.locator('nav[aria-label="Filter agents"]');
+    await filterNav.getByRole('button', { name: /^Active/ }).click();
     await page.waitForTimeout(300);
 
-    // Should filter to active/busy agents.
-    await expect(page.getByText('BuildAgent')).toBeVisible();
-    await expect(page.getByText('DeployAgent')).toBeVisible();
-    await expect(page.getByText('OfflineAgent')).not.toBeVisible();
+    // Should filter to only active agents (busy is a separate filter).
+    await expect(page.getByRole('heading', { name: 'BuildAgent' })).toBeVisible();
+    // DeployAgent is busy, not active, so not visible with Active filter.
+    await expect(page.getByRole('heading', { name: 'DeployAgent' })).not.toBeVisible();
+    await expect(page.getByRole('heading', { name: 'OfflineAgent' })).not.toBeVisible();
   });
 
   test('Idle filter shows only idle agents', async ({ page }) => {
@@ -206,11 +210,13 @@ test.describe('Agent filters', () => {
     await page.goto('/agents');
     await page.waitForTimeout(500);
 
-    await page.getByRole('button', { name: 'Idle', exact: true }).click();
+    // Click Idle filter button (has count appended like "Idle1").
+    const filterNav = page.locator('nav[aria-label="Filter agents"]');
+    await filterNav.getByRole('button', { name: /^Idle/ }).click();
     await page.waitForTimeout(300);
 
-    // Should filter to idle agents.
-    await expect(page.getByText('TestAgent')).toBeVisible();
+    // Should filter to idle agents (use heading role to avoid header switcher).
+    await expect(page.getByRole('heading', { name: 'TestAgent' })).toBeVisible();
   });
 });
 
@@ -257,8 +263,8 @@ test.describe('New agent registration', () => {
     await page.goto('/agents');
     await page.waitForTimeout(500);
 
-    // Button text is "Register Agent".
-    const newAgentButton = page.getByRole('button', { name: /Register Agent/i });
+    // Button text is "Add Agent" in the sidebar.
+    const newAgentButton = page.getByRole('button', { name: /Add Agent/i });
     await expect(newAgentButton).toBeVisible();
   });
 

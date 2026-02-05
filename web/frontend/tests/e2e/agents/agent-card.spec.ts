@@ -61,8 +61,9 @@ test.describe('Agent card display', () => {
     await page.goto('/agents');
     await page.waitForTimeout(500);
 
-    // Agent cards are rendered with agent names visible.
-    await expect(page.getByText('ActiveAgent')).toBeVisible();
+    // Agent cards are rendered with agent names visible (use heading role to avoid
+    // matching the agent switcher in the header).
+    await expect(page.getByRole('heading', { name: 'ActiveAgent' })).toBeVisible();
   });
 
   test('shows status badge', async ({ page }) => {
@@ -164,11 +165,11 @@ test.describe('Agent card grid layout', () => {
     await page.goto('/agents');
     await page.waitForTimeout(500);
 
-    // Should have all agent names visible.
-    await expect(page.getByText('ActiveAgent')).toBeVisible();
-    await expect(page.getByText('BusyAgent')).toBeVisible();
-    await expect(page.getByText('IdleAgent')).toBeVisible();
-    await expect(page.getByText('OfflineAgent')).toBeVisible();
+    // Should have all agent names visible (use heading role to avoid header).
+    await expect(page.getByRole('heading', { name: 'ActiveAgent' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'BusyAgent' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'IdleAgent' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'OfflineAgent' })).toBeVisible();
   });
 
   test('grid is responsive', async ({ page }) => {
@@ -179,7 +180,7 @@ test.describe('Agent card grid layout', () => {
     await page.goto('/agents');
     await page.waitForTimeout(500);
 
-    // Cards should still be visible on mobile.
-    await expect(page.getByText('ActiveAgent')).toBeVisible();
+    // Cards should still be visible on mobile (use heading role to avoid header).
+    await expect(page.getByRole('heading', { name: 'ActiveAgent' })).toBeVisible();
   });
 });
