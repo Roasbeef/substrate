@@ -76,8 +76,9 @@ test.describe('Inbox message list', () => {
     await expect(page.getByRole('link', { name: 'Inbox' })).toBeVisible();
     await page.waitForTimeout(500);
 
-    // Check for message in the list.
-    await expect(page.getByText('Test Agent').first()).toBeVisible();
+    // Check for message in the list (scope to message rows to avoid hidden option elements).
+    const rows = page.locator('[data-testid="message-row"]');
+    await expect(rows.filter({ hasText: 'Test Agent' }).first()).toBeVisible();
     await expect(page.getByText('Test Message')).toBeVisible();
   });
 
@@ -109,9 +110,10 @@ test.describe('Inbox message list', () => {
     await expect(page.getByRole('link', { name: 'Inbox' })).toBeVisible();
     await page.waitForTimeout(500);
 
-    // Check for sender names.
-    await expect(page.getByText('Alice Agent').first()).toBeVisible();
-    await expect(page.getByText('Bob Agent').first()).toBeVisible();
+    // Check for sender names (scope to message rows to avoid hidden option elements).
+    const rows = page.locator('[data-testid="message-row"]');
+    await expect(rows.filter({ hasText: 'Alice Agent' }).first()).toBeVisible();
+    await expect(rows.filter({ hasText: 'Bob Agent' }).first()).toBeVisible();
 
     // Check for subjects.
     await expect(page.getByText('Important Update')).toBeVisible();
@@ -191,8 +193,9 @@ test.describe('Inbox pagination', () => {
     await expect(page.getByRole('link', { name: 'Inbox' })).toBeVisible();
     await page.waitForTimeout(500);
 
-    // Check that messages are displayed.
-    await expect(page.getByText('Agent 1').first()).toBeVisible();
+    // Check that messages are displayed (scope to message rows to avoid hidden option elements).
+    const rows = page.locator('[data-testid="message-row"]');
+    await expect(rows.filter({ hasText: 'Agent 1' }).first()).toBeVisible();
     await expect(page.getByText('Message 1')).toBeVisible();
   });
 
@@ -214,7 +217,8 @@ test.describe('Inbox pagination', () => {
     await expect(page.getByRole('link', { name: 'Inbox' })).toBeVisible();
     await page.waitForTimeout(500);
 
-    // Check messages are showing.
-    await expect(page.getByText('Agent 1').first()).toBeVisible();
+    // Check messages are showing (scope to message rows to avoid hidden option elements).
+    const rows = page.locator('[data-testid="message-row"]');
+    await expect(rows.filter({ hasText: 'Agent 1' }).first()).toBeVisible();
   });
 });

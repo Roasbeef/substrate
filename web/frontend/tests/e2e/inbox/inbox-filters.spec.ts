@@ -246,8 +246,8 @@ test.describe('Filter empty states', () => {
     await mainContent.getByRole('button', { name: 'Unread', exact: true }).click();
     await page.waitForTimeout(500);
 
-    // Should show empty state or no messages.
-    await expect(page.getByText('Read Message')).not.toBeVisible();
+    // Should show empty state or no messages (use exact match to avoid matching "unread messages" text).
+    await expect(page.locator('[data-testid="message-row"]').filter({ hasText: 'Read Message' })).not.toBeVisible();
   });
 
   test('shows empty state when no starred messages', async ({ page }) => {

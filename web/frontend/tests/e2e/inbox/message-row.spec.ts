@@ -2,39 +2,54 @@
 
 import { test, expect } from '@playwright/test';
 
-// Helper to setup API with sample messages.
+// Helper to setup API with sample messages using grpc-gateway format.
 async function setupMessagesAPI(page: import('@playwright/test').Page) {
   await page.route('**/api/v1/messages*', async (route) => {
     await route.fulfill({
       status: 200,
       contentType: 'application/json',
       body: JSON.stringify({
-        data: [
+        messages: [
           {
-            id: 1,
-            sender_id: 1,
+            id: '1',
+            sender_id: '1',
             sender_name: 'Alice Agent',
             subject: 'Important Update',
             body: 'This is the full message body with important details.',
-            priority: 'urgent',
+            priority: 'PRIORITY_URGENT',
             created_at: new Date().toISOString(),
             thread_id: 'thread-1',
-            recipients: [{ message_id: 1, agent_id: 100, state: 'unread', is_starred: false }],
+            recipients: [],
           },
           {
-            id: 2,
-            sender_id: 2,
+            id: '2',
+            sender_id: '2',
             sender_name: 'Bob Agent',
             subject: 'Quick Question',
             body: 'I have a question about the project.',
-            priority: 'normal',
+            priority: 'PRIORITY_NORMAL',
             created_at: new Date().toISOString(),
             thread_id: 'thread-2',
-            recipients: [{ message_id: 2, agent_id: 100, state: 'read', is_starred: true }],
+            recipients: [],
           },
         ],
-        meta: { total: 2, page: 1, page_size: 20 },
       }),
+    });
+  });
+
+  await page.route('**/api/v1/agents-status', async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({ agents: [], counts: {} }),
+    });
+  });
+
+  await page.route('**/api/v1/topics*', async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({ topics: [] }),
     });
   });
 }
@@ -43,18 +58,19 @@ test.describe('Message row display', () => {
   test('displays message row with sender name', async ({ page }) => {
     await setupMessagesAPI(page);
     await page.goto('/');
-    await expect(page.locator('text=Inbox')).toBeVisible();
+    await expect(page.getByRole('link', { name: 'Inbox' })).toBeVisible();
     await page.waitForTimeout(500);
 
-    // Check sender names are displayed.
-    await expect(page.locator('text=Alice Agent').first()).toBeVisible();
-    await expect(page.locator('text=Bob Agent').first()).toBeVisible();
+    // Check sender names are displayed within message rows.
+    const rows = page.locator('[data-testid="message-row"]');
+    await expect(rows.filter({ hasText: 'Alice Agent' }).first()).toBeVisible();
+    await expect(rows.filter({ hasText: 'Bob Agent' }).first()).toBeVisible();
   });
 
   test('displays message subject', async ({ page }) => {
     await setupMessagesAPI(page);
     await page.goto('/');
-    await expect(page.locator('text=Inbox')).toBeVisible();
+    await expect(page.getByRole('link', { name: 'Inbox' })).toBeVisible();
     await page.waitForTimeout(500);
 
     // Check subjects are displayed.
@@ -65,7 +81,7 @@ test.describe('Message row display', () => {
   test('displays priority badge for urgent messages', async ({ page }) => {
     await setupMessagesAPI(page);
     await page.goto('/');
-    await expect(page.locator('text=Inbox')).toBeVisible();
+    await expect(page.getByRole('link', { name: 'Inbox' })).toBeVisible();
     await page.waitForTimeout(500);
 
     // Check for priority badge.
@@ -78,7 +94,7 @@ test.describe('Message row display', () => {
   test('shows unread indicator for unread messages', async ({ page }) => {
     await setupMessagesAPI(page);
     await page.goto('/');
-    await expect(page.locator('text=Inbox')).toBeVisible();
+    await expect(page.getByRole('link', { name: 'Inbox' })).toBeVisible();
     await page.waitForTimeout(500);
 
     // Unread messages should have visual indicator.
@@ -98,7 +114,7 @@ test.describe('Message row checkbox', () => {
   test('displays checkbox for selection', async ({ page }) => {
     await setupMessagesAPI(page);
     await page.goto('/');
-    await expect(page.locator('text=Inbox')).toBeVisible();
+    await expect(page.getByRole('link', { name: 'Inbox' })).toBeVisible();
     await page.waitForTimeout(500);
 
     // Check for checkboxes.
@@ -113,7 +129,7 @@ test.describe('Message row checkbox', () => {
   test('clicking checkbox toggles selection', async ({ page }) => {
     await setupMessagesAPI(page);
     await page.goto('/');
-    await expect(page.locator('text=Inbox')).toBeVisible();
+    await expect(page.getByRole('link', { name: 'Inbox' })).toBeVisible();
     await page.waitForTimeout(500);
 
     // Find and click a checkbox.
@@ -132,7 +148,7 @@ test.describe('Message row checkbox', () => {
   test('selecting message shows bulk actions', async ({ page }) => {
     await setupMessagesAPI(page);
     await page.goto('/');
-    await expect(page.locator('text=Inbox')).toBeVisible();
+    await expect(page.getByRole('link', { name: 'Inbox' })).toBeVisible();
     await page.waitForTimeout(500);
 
     // Select a message.
@@ -180,7 +196,7 @@ test.describe('Message row click to open', () => {
     });
 
     await page.goto('/');
-    await expect(page.locator('text=Inbox')).toBeVisible();
+    await expect(page.getByRole('link', { name: 'Inbox' })).toBeVisible();
     await page.waitForTimeout(500);
 
     // Click on a message row (but not the checkbox).
@@ -198,7 +214,7 @@ test.describe('Message row click to open', () => {
   test('clicking checkbox does not open thread view', async ({ page }) => {
     await setupMessagesAPI(page);
     await page.goto('/');
-    await expect(page.locator('text=Inbox')).toBeVisible();
+    await expect(page.getByRole('link', { name: 'Inbox' })).toBeVisible();
     await page.waitForTimeout(500);
 
     // Click on checkbox specifically.
@@ -219,7 +235,7 @@ test.describe('Message row hover effects', () => {
   test('row shows hover state', async ({ page }) => {
     await setupMessagesAPI(page);
     await page.goto('/');
-    await expect(page.locator('text=Inbox')).toBeVisible();
+    await expect(page.getByRole('link', { name: 'Inbox' })).toBeVisible();
     await page.waitForTimeout(500);
 
     // Hover over a message row.
@@ -236,7 +252,7 @@ test.describe('Message row hover effects', () => {
   test('hover reveals action buttons', async ({ page }) => {
     await setupMessagesAPI(page);
     await page.goto('/');
-    await expect(page.locator('text=Inbox')).toBeVisible();
+    await expect(page.getByRole('link', { name: 'Inbox' })).toBeVisible();
     await page.waitForTimeout(500);
 
     // Hover over a message row.
@@ -256,7 +272,7 @@ test.describe('Message row accessibility', () => {
   test('message rows are keyboard navigable', async ({ page }) => {
     await setupMessagesAPI(page);
     await page.goto('/');
-    await expect(page.locator('text=Inbox')).toBeVisible();
+    await expect(page.getByRole('link', { name: 'Inbox' })).toBeVisible();
     await page.waitForTimeout(500);
 
     // Tab to first message.
@@ -271,7 +287,7 @@ test.describe('Message row accessibility', () => {
   test('Enter key opens selected message', async ({ page }) => {
     await setupMessagesAPI(page);
     await page.goto('/');
-    await expect(page.locator('text=Inbox')).toBeVisible();
+    await expect(page.getByRole('link', { name: 'Inbox' })).toBeVisible();
     await page.waitForTimeout(500);
 
     // Focus a message row.
