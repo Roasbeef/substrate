@@ -312,10 +312,11 @@ func (r *reviewSubActor) Run(parentCtx context.Context) {
 	)
 
 	var (
-		lastText  string
-		response  claudeagent.ResultMessage
-		gotResult bool
-		msgCount  int
+		lastText    string
+		response    claudeagent.ResultMessage
+		gotResult   bool
+		earlyResult bool
+		msgCount    int
 	)
 
 	for msg := range client.Query(ctx, prompt) {
@@ -365,6 +366,44 @@ func (r *reviewSubActor) Run(parentCtx context.Context) {
 				}
 			}
 			result.SessionID = m.SessionID
+
+			// Early detection: if the assistant text
+			// contains a valid YAML review result, persist
+			// it and invoke the callback immediately so the
+			// FSM transitions without waiting for the
+			// subprocess to exit (the stop hook may keep it
+			// alive for follow-up messages). We continue
+			// reading the stream for potential back-and-
+			// forth conversation.
+			if text != "" && !earlyResult {
+				if parsed, pErr := ParseReviewerResponse(
+					text,
+				); pErr == nil && parsed.Decision != "" {
+
+					log.InfoS(ctx,
+						"Reviewer detected YAML "+
+							"result in assistant "+
+							"text, persisting now",
+						"review_id", r.reviewID,
+						"decision", parsed.Decision,
+						"issues",
+						len(parsed.Issues),
+					)
+
+					result.Result = parsed
+					result.Duration = time.Since(
+						startTime,
+					)
+					earlyResult = true
+
+					// Persist and notify the FSM
+					// immediately.
+					r.persistResults(
+						ctx, result, startTime,
+					)
+					r.callback(ctx, result)
+				}
+			}
 
 		case claudeagent.ResultMessage:
 			response = m
@@ -449,9 +488,16 @@ func (r *reviewSubActor) Run(parentCtx context.Context) {
 		"review_id", r.reviewID,
 		"total_messages", msgCount,
 		"got_result", gotResult,
+		"early_result", earlyResult,
 		"ctx_err", fmt.Sprintf("%v", ctx.Err()),
 		"elapsed", time.Since(startTime).String(),
 	)
+
+	// If we already detected and persisted the YAML result during the
+	// message loop, nothing more to do.
+	if earlyResult {
+		return
+	}
 
 	if !gotResult {
 		result.Error = fmt.Errorf("no result message received")
