@@ -15,13 +15,6 @@
         "type": "command",
         "command": "substrate poll --format context --quiet 2>/dev/null || true"
       }]
-    }],
-    "Stop": [{
-      "matcher": "",
-      "hooks": [{
-        "type": "command",
-        "command": "./scripts/check-tasks-complete.sh"
-      }]
     }]
   }
 }
