@@ -94,8 +94,9 @@ describe('useAgentsStatus', () => {
   });
 
   it('handles fetch error', async () => {
+    // Mock the grpc-gateway endpoint (uses hyphen, not slash).
     server.use(
-      http.get('/api/v1/agents/status', () => {
+      http.get('/api/v1/agents-status', () => {
         return HttpResponse.json(
           { error: { code: 'server_error', message: 'Internal error' } },
           { status: 500 },
@@ -483,7 +484,7 @@ describe('useAgentCounts', () => {
 
   it('handles fetch error', async () => {
     server.use(
-      http.get('/api/v1/agents/status', () => {
+      http.get('/api/v1/agents-status', () => {
         return HttpResponse.json(
           { error: { code: 'server_error', message: 'Internal error' } },
           { status: 500 },
@@ -517,7 +518,7 @@ describe('useAgentCount', () => {
 
   it('calculates total from all statuses', async () => {
     server.use(
-      http.get('/api/v1/agents/status', () => {
+      http.get('/api/v1/agents-status', () => {
         return HttpResponse.json({
           agents: [],
           counts: { active: 2, busy: 1, idle: 3, offline: 4 },

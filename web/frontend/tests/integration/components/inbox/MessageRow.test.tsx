@@ -66,11 +66,11 @@ describe('MessageRow', () => {
     ).toBeInTheDocument();
   });
 
-  it('renders avatar', () => {
+  it('renders sender display', () => {
     render(<MessageRow message={mockMessage} />);
 
-    // Avatar shows initials.
-    expect(screen.getByText('TS')).toBeInTheDocument();
+    // MessageRow shows sender name directly (no Avatar initials).
+    expect(screen.getByText('Test Sender')).toBeInTheDocument();
   });
 
   it('shows checkbox when showCheckbox is true', () => {
@@ -206,7 +206,8 @@ describe('MessageRow', () => {
       <MessageRow message={mockMessage} isSelected />,
     );
 
-    expect(container.firstChild).toHaveClass('bg-blue-100');
+    // Selected state uses bg-blue-50.
+    expect(container.firstChild).toHaveClass('bg-blue-50');
   });
 
   it('renders unread state', () => {
@@ -224,7 +225,9 @@ describe('MessageRow', () => {
     });
     const { container } = render(<MessageRow message={unreadMessage} />);
 
-    expect(container.firstChild).toHaveClass('bg-blue-50/50');
+    // Unread messages have font-medium styling and show blue dot indicator.
+    expect(container.firstChild).toHaveClass('font-medium');
+    expect(screen.getByLabelText('Unread message')).toBeInTheDocument();
   });
 
   it('renders priority badge for urgent messages', () => {

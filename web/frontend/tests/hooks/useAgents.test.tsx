@@ -78,8 +78,9 @@ describe('useAgentsStatus', () => {
   });
 
   it('handles fetch error', async () => {
+    // Mock the grpc-gateway endpoint (uses hyphen, not slash).
     server.use(
-      http.get('/api/v1/agents/status', () => {
+      http.get('/api/v1/agents-status', () => {
         return HttpResponse.json(
           { error: { code: 'server_error', message: 'Internal error' } },
           { status: 500 },

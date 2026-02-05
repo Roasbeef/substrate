@@ -42,11 +42,38 @@ function createWrapper() {
   };
 }
 
-// Mock activity data generator.
+// Mock activity data generator for grpc-gateway format (used by MSW handlers).
+function createGatewayActivities(count: number, startId = 1) {
+  return Array.from({ length: count }, (_, i) => ({
+    id: String(startId + i),
+    type: 'ACTIVITY_TYPE_MESSAGE_SENT',
+    agent_id: '1',
+    agent_name: 'Agent1',
+    description: `Activity ${startId + i}`,
+    created_at: new Date(Date.now() - i * 60000).toISOString(),
+  }));
+}
+
+// Format activities response in grpc-gateway format.
+function formatActivitiesResponse(
+  activities: ReturnType<typeof createGatewayActivities>,
+  total: number,
+  page: number,
+  pageSize: number,
+) {
+  return {
+    activities,
+    total: String(total),
+    page,
+    page_size: pageSize,
+  };
+}
+
+// Mock activity data generator for frontend format (used by unit tests).
 function createMockActivities(count: number, startId = 1) {
   return Array.from({ length: count }, (_, i) => ({
     id: startId + i,
-    type: 'message_sent',
+    type: 'message_sent' as const,
     agent_id: 1,
     agent_name: 'Agent1',
     description: `Activity ${startId + i}`,
@@ -136,18 +163,17 @@ describe('useInfiniteActivities', () => {
         const pageSize = Number(url.searchParams.get('page_size')) || 20;
 
         const totalItems = 45;
-        const totalPages = Math.ceil(totalItems / pageSize);
         const startId = (page - 1) * pageSize + 1;
         const itemsThisPage = Math.min(pageSize, totalItems - (page - 1) * pageSize);
 
-        return HttpResponse.json({
-          data: createMockActivities(itemsThisPage, startId),
-          meta: {
-            total: totalItems,
+        return HttpResponse.json(
+          formatActivitiesResponse(
+            createGatewayActivities(itemsThisPage, startId),
+            totalItems,
             page,
-            page_size: pageSize,
-          },
-        });
+            pageSize,
+          ),
+        );
       }),
     );
   });
@@ -196,14 +222,9 @@ describe('useInfiniteActivities', () => {
         const url = new URL(request.url);
         const pageSize = Number(url.searchParams.get('page_size')) || 20;
 
-        return HttpResponse.json({
-          data: createMockActivities(5),
-          meta: {
-            total: 5,
-            page: 1,
-            page_size: pageSize,
-          },
-        });
+        return HttpResponse.json(
+          formatActivitiesResponse(createGatewayActivities(5), 5, 1, pageSize),
+        );
       }),
     );
 
@@ -225,10 +246,9 @@ describe('useInfiniteActivities', () => {
         const url = new URL(request.url);
         receivedPageSize = Number(url.searchParams.get('page_size'));
 
-        return HttpResponse.json({
-          data: createMockActivities(10),
-          meta: { total: 10, page: 1, page_size: receivedPageSize },
-        });
+        return HttpResponse.json(
+          formatActivitiesResponse(createGatewayActivities(10), 10, 1, receivedPageSize || 20),
+        );
       }),
     );
 
@@ -254,20 +274,15 @@ describe('useAgentActivities', () => {
         const agentId = url.searchParams.get('agent_id');
 
         if (agentId) {
-          return HttpResponse.json({
-            data: createMockActivities(5).map((a) => ({
-              ...a,
-              agent_id: Number(agentId),
-              agent_name: `Agent${agentId}`,
-            })),
-            meta: { total: 5, page: 1, page_size: 20 },
-          });
+          const activities = createGatewayActivities(5).map((a) => ({
+            ...a,
+            agent_id: agentId,
+            agent_name: `Agent${agentId}`,
+          }));
+          return HttpResponse.json(formatActivitiesResponse(activities, 5, 1, 20));
         }
 
-        return HttpResponse.json({
-          data: [],
-          meta: { total: 0, page: 1, page_size: 20 },
-        });
+        return HttpResponse.json(formatActivitiesResponse([], 0, 1, 20));
       }),
     );
   });
@@ -302,10 +317,7 @@ describe('useAgentActivities', () => {
     server.use(
       http.get('/api/v1/activities', ({ request }) => {
         receivedUrl = request.url;
-        return HttpResponse.json({
-          data: [],
-          meta: { total: 0, page: 2, page_size: 10 },
-        });
+        return HttpResponse.json(formatActivitiesResponse([], 0, 2, 10));
       }),
     );
 
@@ -335,28 +347,22 @@ describe('useInfiniteAgentActivities', () => {
         const pageSize = Number(url.searchParams.get('page_size')) || 20;
 
         if (!agentId) {
-          return HttpResponse.json({
-            data: [],
-            meta: { total: 0, page: 1, page_size: pageSize },
-          });
+          return HttpResponse.json(formatActivitiesResponse([], 0, 1, pageSize));
         }
 
         const totalItems = 25;
         const startId = (page - 1) * pageSize + 1;
         const itemsThisPage = Math.min(pageSize, totalItems - (page - 1) * pageSize);
 
-        return HttpResponse.json({
-          data: createMockActivities(Math.max(0, itemsThisPage), startId).map((a) => ({
-            ...a,
-            agent_id: Number(agentId),
-            agent_name: `Agent${agentId}`,
-          })),
-          meta: {
-            total: totalItems,
-            page,
-            page_size: pageSize,
-          },
-        });
+        const activities = createGatewayActivities(Math.max(0, itemsThisPage), startId).map((a) => ({
+          ...a,
+          agent_id: agentId,
+          agent_name: `Agent${agentId}`,
+        }));
+
+        return HttpResponse.json(
+          formatActivitiesResponse(activities, totalItems, page, pageSize),
+        );
       }),
     );
   });

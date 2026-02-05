@@ -46,10 +46,11 @@ describe('AgentSwitcher', () => {
     vi.clearAllMocks();
   });
 
-  it('renders with placeholder when no agent selected', () => {
+  it('renders with Global when no agent selected', () => {
     render(<AgentSwitcher {...defaultProps} />);
 
-    expect(screen.getByText('Select agent...')).toBeInTheDocument();
+    // When no agent is selected, the button shows "Global".
+    expect(screen.getByText('Global')).toBeInTheDocument();
   });
 
   it('renders selected agent name', () => {
@@ -158,7 +159,9 @@ describe('AgentSwitcher', () => {
     await user.click(screen.getByRole('button'));
 
     // Global option is always available even with empty agents list.
-    expect(screen.getByText('Global')).toBeInTheDocument();
+    // Use getAllByText since "Global" appears in both button and dropdown.
+    const globalElements = screen.getAllByText('Global');
+    expect(globalElements.length).toBeGreaterThanOrEqual(1);
     expect(screen.getByText('All agents')).toBeInTheDocument();
   });
 });
@@ -261,10 +264,13 @@ describe('AgentSwitcher search', () => {
 
 describe('ConnectedAgentSwitcher', () => {
   beforeEach(() => {
-    // Reset auth store.
+    // Reset auth store with all fields including new aggregate/global support.
     useAuthStore.setState({
       currentAgent: null,
       currentAgentStatus: null,
+      selectedAgentIds: [],
+      selectedAggregate: null,
+      isGlobalExplicit: false,
       isAuthenticated: false,
       isLoading: false,
       availableAgents: [],

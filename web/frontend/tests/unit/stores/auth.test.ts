@@ -23,6 +23,9 @@ describe('useAuthStore', () => {
     useAuthStore.setState({
       currentAgent: null,
       currentAgentStatus: null,
+      selectedAgentIds: [],
+      selectedAggregate: null,
+      isGlobalExplicit: false,
       isAuthenticated: false,
       isLoading: true,
       availableAgents: [],
@@ -153,6 +156,85 @@ describe('useAuthStore', () => {
 
       store.setLoading(true);
       expect(useAuthStore.getState().isLoading).toBe(true);
+    });
+  });
+
+  describe('selectAggregate', () => {
+    it('should set aggregate selection with multiple agent IDs', () => {
+      const store = useAuthStore.getState();
+      store.selectAggregate({
+        name: 'CodeReviewer',
+        agentIds: [1, 2, 3],
+      });
+
+      const state = useAuthStore.getState();
+      expect(state.selectedAggregate).toBe('CodeReviewer');
+      expect(state.selectedAgentIds).toEqual([1, 2, 3]);
+      expect(state.currentAgent).toBeNull();
+      expect(state.isAuthenticated).toBe(true);
+    });
+
+    it('should clear isGlobalExplicit when selecting aggregate', () => {
+      const store = useAuthStore.getState();
+      store.clearSelection(); // Sets isGlobalExplicit to true.
+      store.selectAggregate({
+        name: 'CodeReviewer',
+        agentIds: [1, 2],
+      });
+
+      expect(useAuthStore.getState().isGlobalExplicit).toBe(false);
+    });
+  });
+
+  describe('clearSelection', () => {
+    it('should clear selection and set isGlobalExplicit', () => {
+      const store = useAuthStore.getState();
+      store.setCurrentAgent(mockAgent);
+      store.clearSelection();
+
+      const state = useAuthStore.getState();
+      expect(state.currentAgent).toBeNull();
+      expect(state.selectedAgentIds).toEqual([]);
+      expect(state.selectedAggregate).toBeNull();
+      expect(state.isGlobalExplicit).toBe(true);
+    });
+  });
+
+  describe('setAvailableAgents with User default', () => {
+    const userAgent: Agent = {
+      id: 999,
+      name: 'User',
+      createdAt: '2025-01-01T00:00:00Z',
+      lastActiveAt: '2025-01-31T12:00:00Z',
+    };
+
+    it('should auto-select User agent on fresh load', () => {
+      const store = useAuthStore.getState();
+      store.setAvailableAgents([mockAgent, userAgent]);
+
+      const state = useAuthStore.getState();
+      expect(state.currentAgent?.name).toBe('User');
+      expect(state.selectedAgentIds).toEqual([999]);
+      expect(state.isAuthenticated).toBe(true);
+    });
+
+    it('should not auto-select User if agent already selected', () => {
+      const store = useAuthStore.getState();
+      store.setCurrentAgent(mockAgent);
+      store.setAvailableAgents([mockAgent, userAgent]);
+
+      const state = useAuthStore.getState();
+      expect(state.currentAgent?.name).toBe('TestAgent');
+    });
+
+    it('should not auto-select User if isGlobalExplicit is true', () => {
+      const store = useAuthStore.getState();
+      store.clearSelection(); // Sets isGlobalExplicit to true.
+      store.setAvailableAgents([mockAgent, userAgent]);
+
+      const state = useAuthStore.getState();
+      expect(state.currentAgent).toBeNull();
+      expect(state.isGlobalExplicit).toBe(true);
     });
   });
 });

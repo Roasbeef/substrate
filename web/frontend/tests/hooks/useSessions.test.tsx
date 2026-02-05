@@ -83,8 +83,9 @@ describe('useActiveSessions', () => {
   });
 
   it('handles fetch error', async () => {
+    // API uses /sessions?active_only=true for active sessions.
     server.use(
-      http.get('/api/v1/sessions/active', () => {
+      http.get('/api/v1/sessions', () => {
         return HttpResponse.json(
           { error: { code: 'server_error', message: 'Internal error' } },
           { status: 500 },

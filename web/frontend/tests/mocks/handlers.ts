@@ -343,17 +343,24 @@ export const handlers = [
   }),
 
   // Sessions.
-  http.get(`${API_BASE}/sessions/active`, () => {
+  // Note: API uses /sessions?active_only=true for active sessions.
+  http.get(`${API_BASE}/sessions`, ({ request }) => {
+    const url = new URL(request.url);
+    const activeOnly = url.searchParams.get('active_only') === 'true';
+    const sessions = activeOnly
+      ? mockSessions.filter((s) => s.status === 'active')
+      : mockSessions;
+    // Return in grpc-gateway format.
     return HttpResponse.json({
-      data: mockSessions.filter((s) => s.status === 'active'),
-      meta: { total: 1, page: 1, page_size: 20 },
-    });
-  }),
-
-  http.get(`${API_BASE}/sessions`, () => {
-    return HttpResponse.json({
-      data: mockSessions,
-      meta: { total: mockSessions.length, page: 1, page_size: 20 },
+      sessions: sessions.map((s) => ({
+        id: String(s.id),
+        agent_id: String(s.agent_id),
+        agent_name: s.agent_name,
+        project: s.project,
+        branch: s.branch,
+        started_at: s.started_at,
+        status: s.status?.toUpperCase(),
+      })),
     });
   }),
 
@@ -365,7 +372,18 @@ export const handlers = [
     });
     newSession.project = String(body.project ?? '');
     newSession.branch = String(body.branch ?? '');
-    return HttpResponse.json(newSession, { status: 201 });
+    // Return in grpc-gateway format.
+    return HttpResponse.json({
+      session: {
+        id: String(newSession.id),
+        agent_id: String(newSession.agent_id),
+        agent_name: newSession.agent_name,
+        project: newSession.project,
+        branch: newSession.branch,
+        started_at: newSession.started_at,
+        status: newSession.status?.toUpperCase(),
+      },
+    }, { status: 201 });
   }),
 
   http.get(`${API_BASE}/sessions/:id`, ({ params }) => {
@@ -377,24 +395,51 @@ export const handlers = [
         { status: 404 },
       );
     }
-    return HttpResponse.json(session);
+    // Return in grpc-gateway format.
+    return HttpResponse.json({
+      session: {
+        id: String(session.id),
+        agent_id: String(session.agent_id),
+        agent_name: session.agent_name,
+        project: session.project,
+        branch: session.branch,
+        started_at: session.started_at,
+        status: session.status?.toUpperCase(),
+      },
+    });
   }),
 
   http.post(`${API_BASE}/sessions/:id/complete`, () => {
     return new HttpResponse(null, { status: 204 });
   }),
 
-  // Threads.
+  // Threads - returns messages in grpc-gateway format.
   http.get(`${API_BASE}/threads/:id`, ({ params }) => {
-    const id = Number(params.id);
+    const id = String(params.id);
+    // Return in grpc-gateway format - subject comes from first message.
     return HttpResponse.json({
-      id,
-      subject: 'Test Thread',
-      created_at: new Date().toISOString(),
-      last_message_at: new Date().toISOString(),
-      message_count: 2,
-      participant_count: 2,
-      messages: mockMessages,
+      messages: [
+        {
+          id: '1',
+          thread_id: id,
+          sender_id: '1',
+          sender_name: 'SenderAgent',
+          subject: 'Test Thread',
+          body: 'First message body',
+          priority: 'PRIORITY_NORMAL',
+          created_at: new Date().toISOString(),
+        },
+        {
+          id: '2',
+          thread_id: id,
+          sender_id: '2',
+          sender_name: 'RecipientAgent',
+          subject: 'Re: Test Thread',
+          body: 'Reply body',
+          priority: 'PRIORITY_NORMAL',
+          created_at: new Date().toISOString(),
+        },
+      ],
     });
   }),
 
@@ -428,38 +473,40 @@ export const handlers = [
     return new HttpResponse(null, { status: 204 });
   }),
 
-  // Search.
+  // Search - returns InboxMessage objects in grpc-gateway format.
   http.get(`${API_BASE}/search`, ({ request }) => {
     const url = new URL(request.url);
-    const query = url.searchParams.get('q') ?? '';
+    const query = url.searchParams.get('query') ?? '';
     const results = mockMessages
       .filter((m) =>
         m.subject.toLowerCase().includes(query.toLowerCase()),
       )
       .map((m) => ({
-        type: 'message' as const,
-        id: m.id,
-        title: m.subject,
-        snippet: m.body.substring(0, 100),
+        id: String(m.id),
+        thread_id: `thread-${m.id}`,
+        subject: m.subject,
+        body: m.body,
+        priority: `PRIORITY_${m.priority.toUpperCase()}`,
         created_at: m.created_at,
+        sender_name: m.sender_name,
       }));
-    return HttpResponse.json({ data: results });
+    return HttpResponse.json({ results });
   }),
 
-  // Autocomplete.
+  // Autocomplete - returns recipients in grpc-gateway format.
   http.get(`${API_BASE}/autocomplete/recipients`, ({ request }) => {
     const url = new URL(request.url);
-    const query = url.searchParams.get('q') ?? '';
-    const results = mockAgentsStatus.agents
+    const query = url.searchParams.get('query') ?? '';
+    const recipients = mockAgentsStatus.agents
       .filter((a) =>
         a.name.toLowerCase().includes(query.toLowerCase()),
       )
       .map((a) => ({
-        id: a.id,
+        id: String(a.id),
         name: a.name,
-        status: a.status,
+        status: `AGENT_STATUS_${a.status.toUpperCase()}`,
       }));
-    return HttpResponse.json(results);
+    return HttpResponse.json({ recipients });
   }),
 
   // Activities.

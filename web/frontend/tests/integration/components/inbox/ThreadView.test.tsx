@@ -183,7 +183,7 @@ describe('ThreadView', () => {
 
     render(<ThreadView {...defaultProps} onClose={onClose} thread={mockThread} />);
 
-    await user.click(screen.getByLabelText('Back to inbox'));
+    await user.click(screen.getByRole('button', { name: /back to inbox/i }));
 
     expect(onClose).toHaveBeenCalled();
   });
