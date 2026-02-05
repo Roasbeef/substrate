@@ -2,48 +2,48 @@
 
 import { test, expect } from '@playwright/test';
 
-// Helper to setup API endpoints.
+// Helper to setup API endpoints with grpc-gateway format.
 async function setupAPIs(page: import('@playwright/test').Page) {
   const messages = [
     {
-      id: 1,
-      sender_id: 1,
+      id: '1',
+      sender_id: '1',
       sender_name: 'Alice Agent',
       subject: 'Test Thread',
       body: 'Initial message in thread.',
-      priority: 'normal',
+      priority: 'PRIORITY_NORMAL',
       created_at: new Date().toISOString(),
       thread_id: 'thread-1',
-      recipients: [{ message_id: 1, agent_id: 100, state: 'unread' }],
+      recipients: [{ message_id: '1', agent_id: '100', state: 'unread' }],
     },
   ];
 
   const threadMessages = [
     {
-      id: 1,
-      sender_id: 1,
+      id: '1',
+      sender_id: '1',
       sender_name: 'Alice Agent',
       subject: 'Test Thread',
       body: 'Initial message in thread.',
-      priority: 'normal',
+      priority: 'PRIORITY_NORMAL',
       created_at: new Date('2024-01-01T10:00:00Z').toISOString(),
     },
     {
-      id: 10,
-      sender_id: 100,
+      id: '10',
+      sender_id: '100',
       sender_name: 'Me',
       subject: 'Re: Test Thread',
       body: 'My reply to the thread.',
-      priority: 'normal',
+      priority: 'PRIORITY_NORMAL',
       created_at: new Date('2024-01-01T11:00:00Z').toISOString(),
     },
     {
-      id: 11,
-      sender_id: 1,
+      id: '11',
+      sender_id: '1',
       sender_name: 'Alice Agent',
       subject: 'Re: Test Thread',
       body: 'Follow-up message.',
-      priority: 'normal',
+      priority: 'PRIORITY_NORMAL',
       created_at: new Date('2024-01-01T12:00:00Z').toISOString(),
     },
   ];
@@ -53,8 +53,7 @@ async function setupAPIs(page: import('@playwright/test').Page) {
       status: 200,
       contentType: 'application/json',
       body: JSON.stringify({
-        data: messages,
-        meta: { total: messages.length, page: 1, page_size: 20 },
+        messages: messages,
       }),
     });
   });
@@ -77,66 +76,66 @@ test.describe('Thread view opening', () => {
   test('clicking message row opens thread view', async ({ page }) => {
     await setupAPIs(page);
     await page.goto('/');
-    await expect(page.locator('text=Inbox')).toBeVisible();
+    await expect(page.locator('.grid')).toBeVisible();
     await page.waitForTimeout(500);
 
     // Click on message subject to open thread.
-    await page.locator('text=Test Thread').click();
+    await page.getByText('Test Thread').click();
     await page.waitForTimeout(500);
 
-    // Thread view modal should open.
-    const threadView = page.locator('[data-testid="thread-view"], [role="dialog"]');
-    await expect(threadView).toBeVisible();
+    // Thread view modal should open - look for dialog content.
+    // Use heading within log role to confirm thread view opened.
+    await expect(page.getByRole('log', { name: 'Thread messages' })).toBeVisible();
   });
 
   test('thread view shows message subject', async ({ page }) => {
     await setupAPIs(page);
     await page.goto('/');
-    await expect(page.locator('text=Inbox')).toBeVisible();
+    await expect(page.locator('.grid')).toBeVisible();
     await page.waitForTimeout(500);
 
-    await page.locator('text=Test Thread').click();
+    await page.getByText('Test Thread').click();
     await page.waitForTimeout(500);
 
     // Should display subject in thread header.
-    const threadView = page.locator('[data-testid="thread-view"], [role="dialog"]');
+    const threadView = page.locator('[role="dialog"]');
     if (await threadView.isVisible()) {
-      await expect(threadView.locator('text=Test Thread')).toBeVisible();
+      await expect(threadView.getByText('Test Thread')).toBeVisible();
     }
   });
 
   test('thread view loads all messages in thread', async ({ page }) => {
     await setupAPIs(page);
     await page.goto('/');
-    await expect(page.locator('text=Inbox')).toBeVisible();
+    await expect(page.locator('.grid')).toBeVisible();
     await page.waitForTimeout(500);
 
-    await page.locator('text=Test Thread').click();
+    await page.getByText('Test Thread').click();
     await page.waitForTimeout(500);
 
-    const threadView = page.locator('[data-testid="thread-view"], [role="dialog"]');
+    const threadView = page.locator('[role="dialog"]');
     if (await threadView.isVisible()) {
       // Should show all thread messages.
-      await expect(threadView.locator('text=Initial message in thread.')).toBeVisible();
-      await expect(threadView.locator('text=My reply to the thread.')).toBeVisible();
-      await expect(threadView.locator('text=Follow-up message.')).toBeVisible();
+      await expect(threadView.getByText('Initial message in thread.')).toBeVisible();
+      await expect(threadView.getByText('My reply to the thread.')).toBeVisible();
+      await expect(threadView.getByText('Follow-up message.')).toBeVisible();
     }
   });
 
   test('thread view shows sender avatars', async ({ page }) => {
     await setupAPIs(page);
     await page.goto('/');
-    await expect(page.locator('text=Inbox')).toBeVisible();
+    await expect(page.locator('.grid')).toBeVisible();
     await page.waitForTimeout(500);
 
-    await page.locator('text=Test Thread').click();
+    await page.getByText('Test Thread').click();
     await page.waitForTimeout(500);
 
-    const threadView = page.locator('[data-testid="thread-view"], [role="dialog"]');
+    const threadView = page.locator('[role="dialog"]');
     if (await threadView.isVisible()) {
       // Should show sender names.
-      await expect(threadView.locator('text=Alice Agent').first()).toBeVisible();
-      await expect(threadView.locator('text=Me')).toBeVisible();
+      await expect(threadView.getByText('Alice Agent').first()).toBeVisible();
+      await expect(threadView.getByText('Me')).toBeVisible();
     }
   });
 
@@ -150,10 +149,10 @@ test.describe('Thread view opening', () => {
     });
 
     await page.goto('/');
-    await expect(page.locator('text=Inbox')).toBeVisible();
+    await expect(page.locator('.grid')).toBeVisible();
     await page.waitForTimeout(500);
 
-    await page.locator('text=Test Thread').click();
+    await page.getByText('Test Thread').click();
     await page.waitForTimeout(500);
 
     // Opening thread should mark as read.
@@ -168,20 +167,19 @@ test.describe('Thread view loading states', () => {
         status: 200,
         contentType: 'application/json',
         body: JSON.stringify({
-          data: [
+          messages: [
             {
-              id: 1,
-              sender_id: 1,
+              id: '1',
+              sender_id: '1',
               sender_name: 'Agent',
-              subject: 'Test',
+              subject: 'Loading State Message',
               body: 'Body',
-              priority: 'normal',
+              priority: 'PRIORITY_NORMAL',
               created_at: new Date().toISOString(),
               thread_id: 'thread-1',
               recipients: [],
             },
           ],
-          meta: { total: 1, page: 1, page_size: 20 },
         }),
       });
     });
@@ -200,13 +198,13 @@ test.describe('Thread view loading states', () => {
     });
 
     await page.goto('/');
-    await expect(page.locator('text=Inbox')).toBeVisible();
+    await expect(page.locator('.grid')).toBeVisible();
     await page.waitForTimeout(500);
 
-    await page.locator('text=Test').click();
+    await page.getByText('Loading State Message').click();
 
     // Should show loading indicator.
-    const loading = page.locator('[data-testid="loading"], [role="progressbar"], text=/loading/i');
+    const loading = page.locator('[role="progressbar"]');
     // Loading may be visible briefly.
   });
 
@@ -216,20 +214,19 @@ test.describe('Thread view loading states', () => {
         status: 200,
         contentType: 'application/json',
         body: JSON.stringify({
-          data: [
+          messages: [
             {
-              id: 1,
-              sender_id: 1,
+              id: '1',
+              sender_id: '1',
               sender_name: 'Agent',
-              subject: 'Test',
+              subject: 'Error Handling Message',
               body: 'Body',
-              priority: 'normal',
+              priority: 'PRIORITY_NORMAL',
               created_at: new Date().toISOString(),
               thread_id: 'thread-1',
               recipients: [],
             },
           ],
-          meta: { total: 1, page: 1, page_size: 20 },
         }),
       });
     });
@@ -239,10 +236,10 @@ test.describe('Thread view loading states', () => {
     });
 
     await page.goto('/');
-    await expect(page.locator('text=Inbox')).toBeVisible();
+    await expect(page.locator('.grid')).toBeVisible();
     await page.waitForTimeout(500);
 
-    await page.locator('text=Test').click();
+    await page.getByText('Error Handling Message').click();
     await page.waitForTimeout(500);
 
     // Should handle error gracefully.
@@ -255,16 +252,16 @@ test.describe('Thread view close', () => {
   test('close button closes thread view', async ({ page }) => {
     await setupAPIs(page);
     await page.goto('/');
-    await expect(page.locator('text=Inbox')).toBeVisible();
+    await expect(page.locator('.grid')).toBeVisible();
     await page.waitForTimeout(500);
 
-    await page.locator('text=Test Thread').click();
+    await page.getByText('Test Thread').click();
     await page.waitForTimeout(500);
 
-    const threadView = page.locator('[data-testid="thread-view"], [role="dialog"]');
+    const threadView = page.locator('[role="dialog"]');
     if (await threadView.isVisible()) {
       // Click close button.
-      const closeButton = threadView.locator('button[aria-label*="close" i], button:has-text("×"), [data-testid="close-button"]');
+      const closeButton = threadView.locator('button[aria-label*="close" i], button:has-text("×")');
       if (await closeButton.isVisible()) {
         await closeButton.click();
         await page.waitForTimeout(300);
@@ -278,16 +275,16 @@ test.describe('Thread view close', () => {
   test('clicking outside closes thread view', async ({ page }) => {
     await setupAPIs(page);
     await page.goto('/');
-    await expect(page.locator('text=Inbox')).toBeVisible();
+    await expect(page.locator('.grid')).toBeVisible();
     await page.waitForTimeout(500);
 
-    await page.locator('text=Test Thread').click();
+    await page.getByText('Test Thread').click();
     await page.waitForTimeout(500);
 
-    const threadView = page.locator('[data-testid="thread-view"], [role="dialog"]');
+    const threadView = page.locator('[role="dialog"]');
     if (await threadView.isVisible()) {
       // Click overlay/backdrop.
-      const overlay = page.locator('[data-testid="modal-overlay"], .fixed.inset-0');
+      const overlay = page.locator('.fixed.inset-0');
       if (await overlay.isVisible()) {
         await overlay.click({ position: { x: 10, y: 10 } });
         await page.waitForTimeout(300);
@@ -301,13 +298,13 @@ test.describe('Thread view close', () => {
   test('Escape key closes thread view', async ({ page }) => {
     await setupAPIs(page);
     await page.goto('/');
-    await expect(page.locator('text=Inbox')).toBeVisible();
+    await expect(page.locator('.grid')).toBeVisible();
     await page.waitForTimeout(500);
 
-    await page.locator('text=Test Thread').click();
+    await page.getByText('Test Thread').click();
     await page.waitForTimeout(500);
 
-    const threadView = page.locator('[data-testid="thread-view"], [role="dialog"]');
+    const threadView = page.locator('[role="dialog"]');
     if (await threadView.isVisible()) {
       await page.keyboard.press('Escape');
       await page.waitForTimeout(300);
