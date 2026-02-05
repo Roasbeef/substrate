@@ -8,6 +8,7 @@
 # Export these so all go commands in this Makefile use them.
 export CGO_ENABLED := 1
 export CGO_CFLAGS := -DSQLITE_ENABLE_FTS5
+export CGO_LDFLAGS := -lm
 
 # Variables
 PKG := ./...
