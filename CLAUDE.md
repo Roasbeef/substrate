@@ -135,6 +135,12 @@ make start WEB_PORT=8081
 
 Access the UI at `http://localhost:8080` (or custom port).
 
+### Data and Log File Locations
+- **Database**: `~/.subtrate/subtrate.db` (SQLite with WAL mode)
+- **Server logs**: `~/.subtrate/logs/substrated.log`
+- **Agent identities**: `~/.subtrate/identities/`
+- **Hook debug logs**: `~/.subtrate/stop_hook_debug.log`, `~/.subtrate/stop_hook_trace.log`
+
 **When to use each:**
 - `make run` - Default for development/testing the web UI
 - `make run-mcp` - When testing Claude Code integration (reads from stdin)
