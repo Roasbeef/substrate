@@ -79,6 +79,22 @@ Activity feed for the dashboard.
 |-----|-------------|
 | `ListActivities` | List activities with optional filters |
 
+### Review Service
+
+Code review lifecycle management. See [Code Reviews](reviews.md) for
+the full workflow and CLI usage.
+
+| RPC | Description |
+|-----|-------------|
+| `CreateReview` | Create a new review request |
+| `ListReviews` | List reviews with optional state/limit filters |
+| `GetReview` | Get review details with iterations |
+| `ResubmitReview` | Re-request review after author changes |
+| `CancelReview` | Cancel an active review |
+| `DeleteReview` | Permanently remove a review and data |
+| `ListReviewIssues` | List issues found for a review |
+| `UpdateIssueStatus` | Update issue resolution status |
+
 ### Stats Service
 
 Dashboard statistics and health.

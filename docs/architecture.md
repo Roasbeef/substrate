@@ -19,10 +19,12 @@ graph TB
     WEB --> WS[WebSocket /ws]
 
     GRPC --> MA[Mail Actor]
+    GRPC --> RA[Review Actor]
     GRPC --> NH[NotificationHub Actor]
     GRPC --> AA[Activity Actor]
 
     MA --> DB[(SQLite + FTS5)]
+    RA --> DB
     AA --> DB
     NH --> WS
 ```
@@ -59,6 +61,8 @@ Each actor runs in its own goroutine with a buffered mailbox channel.
 graph LR
     MA[Mail Actor] -->|Notify| NH[NotificationHub]
     MA -->|Log| AA[Activity Actor]
+    RA[Review Actor] -->|Spawn| SDK[Claude Agent SDK]
+    RA -->|Log| AA
     NH -->|Deliver| WS[WebSocket Clients]
     NH -->|Deliver| SUB[gRPC Stream Subscribers]
     Pool[Actor Pool] --> W1[Worker 1]
@@ -70,6 +74,12 @@ graph LR
 
 Handles all message operations: send, receive, reply, state changes.
 Processes messages sequentially to avoid race conditions on shared state.
+
+### Review Actor
+
+Orchestrates code reviews via an FSM. Creates review records, spawns
+isolated Claude Agent SDK reviewer agents, processes results, and
+tracks issues. See [Code Reviews](reviews.md) for details.
 
 ### NotificationHub Actor
 
@@ -96,78 +106,22 @@ Key features:
 
 ## Data Model
 
+The database has 12 tables across 4 migrations. The core relationships:
+
 ```mermaid
 erDiagram
     agents ||--o{ messages : sends
     agents ||--o{ message_recipients : receives
+    agents ||--o{ reviews : requests
     messages ||--o{ message_recipients : "delivered to"
-    messages ||--o{ messages : "thread replies"
-    topics ||--o{ topic_subscribers : has
-    agents ||--o{ topic_subscribers : subscribes
-    agents ||--o{ session_identities : maps
-
-    agents {
-        int id PK
-        string name UK
-        string project_key
-        string git_branch
-        int last_active_at
-        string current_session_id
-    }
-
-    messages {
-        int id PK
-        int sender_id FK
-        string subject
-        string body
-        string priority
-        string thread_id
-        int parent_id FK
-        int deadline_at
-        int created_at
-    }
-
-    message_recipients {
-        int id PK
-        int message_id FK
-        int agent_id FK
-        string state
-        int read_at
-        int acked_at
-        int snoozed_until
-        bool starred
-    }
-
-    topics {
-        int id PK
-        string name UK
-        string description
-    }
-
-    session_identities {
-        int id PK
-        string session_id UK
-        int agent_id FK
-        string project_key
-        string git_branch
-    }
+    messages }o--|| topics : "published to"
+    topics ||--o{ subscriptions : has
+    reviews ||--o{ review_iterations : "reviewed in"
+    reviews ||--o{ review_issues : produces
 ```
 
-### Message States
-
-Messages have per-recipient state tracked in `message_recipients`:
-
-- **inbox** — Default state, visible in inbox
-- **archived** — Moved to archive
-- **trash** — Moved to trash
-
-Additional flags: `starred`, `read_at`, `acked_at`, `snoozed_until`.
-
-### Thread Model
-
-Messages are grouped into threads via `thread_id` (UUID). The first
-message in a thread establishes the thread; replies reference it with
-`parent_id` pointing to the previous message.
+For complete column-level detail, ER diagram, review state machine,
+and queue lifecycle diagrams, see [Database Schema](schema.md).
 
 ## Real-Time Updates
 
@@ -210,12 +164,13 @@ Stop) and by CLI commands (inbox, poll, status).
 
 ## gRPC Services
 
-Five gRPC services handle different domains:
+Six gRPC services handle different domains:
 
 | Service | RPCs | Purpose |
 |---------|------|---------|
 | **Mail** | 18 | Message CRUD, threads, search, pub/sub |
 | **Agent** | 8 | Registration, status, heartbeat, identity |
+| **ReviewService** | 8 | Code review lifecycle, issues, iterations |
 | **Session** | 4 | Session lifecycle management |
 | **Activity** | 1 | Activity feed queries |
 | **Stats** | 2 | Dashboard statistics, health check |
@@ -239,30 +194,37 @@ subtrate/
 ├── cmd/
 │   ├── substrate/          # CLI binary
 │   │   └── commands/       # Cobra command implementations
-│   └── substrated/         # Daemon binary
+│   ├── substrated/         # Daemon binary
+│   └── merge-sql-schemas/  # Schema merge tool for sqlc
 ├── internal/
-│   ├── agent/              # Agent registry, heartbeat, spawner
+│   ├── activity/           # Activity tracking service
+│   ├── actorutil/          # Actor pool and AskAwait helper
+│   ├── agent/              # Agent registry, heartbeat, identity
 │   ├── api/grpc/           # Proto definitions, gRPC server
-│   ├── actorutil/          # Actor pool utility
-│   ├── baselib/actor/      # Core actor system (mailbox, router)
+│   ├── baselib/actor/      # Core actor system (mailbox, futures)
+│   ├── build/              # Build info and log handler setup
 │   ├── db/                 # Database layer
-│   │   ├── migrations/     # SQL migrations
+│   │   ├── migrations/     # SQL migrations (000001-000004)
 │   │   ├── queries/        # sqlc query files
-│   │   └── sqlc/           # Generated code
-│   ├── hooks/              # Hook scripts and installer
+│   │   └── sqlc/           # Generated code (do not edit)
+│   ├── hooks/              # Hook scripts and skill installer
 │   ├── mail/               # Mail service, notification hub
+│   ├── mailclient/         # Mail client library
 │   ├── mcp/                # MCP server integration
+│   ├── pubsub/             # Pub/sub infrastructure
+│   ├── queue/              # Store-and-forward local queue
+│   ├── review/             # Code review system (FSM + Claude SDK)
 │   ├── store/              # Storage interfaces and implementations
-│   └── web/                # HTTP handlers, WebSocket hub
-├── web/frontend/           # React + TypeScript SPA
+│   └── web/                # JSON API, WebSocket hub, embedded SPA
+├── web/frontend/           # React + TypeScript SPA (Vite + bun)
 │   ├── src/
-│   │   ├── api/            # API client, WebSocket client
-│   │   ├── components/     # React components
+│   │   ├── api/            # Typed API client, WebSocket client
+│   │   ├── components/     # React components (inbox, reviews, agents)
 │   │   ├── hooks/          # Custom React hooks
 │   │   ├── pages/          # Page components
 │   │   ├── stores/         # Zustand stores
 │   │   └── types/          # TypeScript types
-│   └── tests/              # Frontend tests
+│   └── tests/              # Unit, integration, and E2E tests
 ├── docs/                   # Documentation
-└── tests/integration/      # Integration tests
+└── tests/integration/      # Go integration tests
 ```
