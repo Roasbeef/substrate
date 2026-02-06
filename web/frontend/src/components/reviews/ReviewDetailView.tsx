@@ -1,11 +1,14 @@
 // ReviewDetailView component - shows full review details with issues list.
 
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { clsx } from 'clsx';
 import { twMerge } from 'tailwind-merge';
-import type { IssueStatus, ReviewDetail, ReviewIterationDetail } from '@/types/api.js';
+import { marked } from 'marked';
+import DOMPurify from 'dompurify';
+import type { IssueStatus, Message, ReviewDetail, ReviewIterationDetail } from '@/types/api.js';
 import { useReviewIssues, useReviewDiff, useUpdateIssueStatus, useCancelReview } from '@/hooks/useReviews.js';
+import { useThread } from '@/hooks/useThreads.js';
 import { ReviewStateBadge } from './ReviewStateBadge.js';
 import { ReviewIssueCard } from './ReviewIssueCard.js';
 import { DiffViewer } from './DiffViewer.js';
@@ -60,6 +63,12 @@ export function ReviewDetailView({ review }: ReviewDetailViewProps) {
     review.review_id,
   );
   const [showDiff, setShowDiff] = useState(false);
+
+  // Fetch the review thread to get the reviewer's full mail messages.
+  const { data: threadData } = useThread(
+    review.thread_id,
+    !!review.thread_id,
+  );
 
   const handleStatusChange = (issueId: number, status: IssueStatus) => {
     updateStatus.mutate({
@@ -202,7 +211,11 @@ export function ReviewDetailView({ review }: ReviewDetailViewProps) {
           </h3>
           <div className="space-y-3">
             {review.iteration_details.map((iter) => (
-              <IterationCard key={iter.iteration_num} iteration={iter} />
+              <IterationCard
+                key={iter.iteration_num}
+                iteration={iter}
+                threadMessages={threadData?.messages}
+              />
             ))}
           </div>
         </div>
@@ -289,15 +302,71 @@ export function ReviewDetailView({ review }: ReviewDetailViewProps) {
   );
 }
 
+// Render markdown safely using marked and DOMPurify.
+function renderMarkdown(text: string): string {
+  const rawHtml = marked.parse(text, { async: false }) as string;
+  return DOMPurify.sanitize(rawHtml, {
+    ALLOWED_TAGS: [
+      'p', 'br', 'strong', 'em', 'code', 'pre', 'ul', 'ol', 'li',
+      'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'a', 'blockquote', 'hr',
+    ],
+    ALLOWED_ATTR: ['href', 'target', 'rel'],
+  });
+}
+
+// Match a thread message to an iteration by reviewer name and timing.
+function findIterationMessage(
+  messages: Message[] | undefined,
+  iteration: ReviewIterationDetail,
+): Message | undefined {
+  if (!messages || messages.length === 0) return undefined;
+
+  // Filter to messages from reviewer agents (sender name contains "reviewer").
+  const reviewerMessages = messages.filter(
+    (m) => m.sender_name.startsWith('reviewer-'),
+  );
+
+  // If only one reviewer message, return it for the first iteration.
+  if (reviewerMessages.length === 1 && iteration.iteration_num === 1) {
+    return reviewerMessages[0];
+  }
+
+  // For multiple iterations, match by order (iteration N = Nth reviewer message).
+  if (iteration.iteration_num <= reviewerMessages.length) {
+    return reviewerMessages[iteration.iteration_num - 1];
+  }
+
+  return undefined;
+}
+
 // IterationCard displays details for a single review iteration.
-function IterationCard({ iteration }: { iteration: ReviewIterationDetail }) {
+function IterationCard({
+  iteration,
+  threadMessages,
+}: {
+  iteration: ReviewIterationDetail;
+  threadMessages?: Message[] | undefined;
+}) {
   const [expanded, setExpanded] = useState(false);
+  const [showReview, setShowReview] = useState(false);
 
   const decisionLabel = iteration.decision
     .replace(/_/g, ' ')
     .replace(/\b\w/g, (c) => c.toUpperCase());
 
   const badgeStyle = decisionStyles[iteration.decision] ?? 'bg-gray-100 text-gray-600';
+
+  // Find the reviewer's mail message for this iteration.
+  const reviewMessage = useMemo(
+    () => findIterationMessage(threadMessages, iteration),
+    [threadMessages, iteration],
+  );
+
+  // Render the review message body as HTML.
+  const renderedReviewBody = useMemo(
+    () => (reviewMessage ? renderMarkdown(reviewMessage.body) : ''),
+    [reviewMessage],
+  );
 
   return (
     <div className="rounded-lg border border-gray-200 bg-white p-4">
@@ -351,24 +420,73 @@ function IterationCard({ iteration }: { iteration: ReviewIterationDetail }) {
         </div>
       </div>
 
-      {/* Summary toggle. */}
-      {iteration.summary ? (
-        <>
+      {/* Action buttons row. */}
+      <div className="mt-3 flex items-center gap-3">
+        {/* Summary toggle. */}
+        {iteration.summary ? (
           <button
             type="button"
             onClick={() => setExpanded(!expanded)}
-            className="mt-3 text-xs font-medium text-gray-500 hover:text-gray-700"
+            className="text-xs font-medium text-gray-500 hover:text-gray-700"
           >
             {expanded ? 'Hide summary' : 'Show summary'}
           </button>
-          {expanded ? (
-            <div className="mt-2 rounded bg-gray-50 p-3">
-              <p className="text-sm text-gray-700 whitespace-pre-wrap">
-                {iteration.summary}
-              </p>
-            </div>
-          ) : null}
-        </>
+        ) : null}
+
+        {/* Full review toggle. */}
+        {reviewMessage ? (
+          <button
+            type="button"
+            onClick={() => setShowReview(!showReview)}
+            className={cn(
+              'text-xs font-medium transition-colors',
+              showReview
+                ? 'text-blue-600 hover:text-blue-800'
+                : 'text-blue-500 hover:text-blue-700',
+            )}
+          >
+            {showReview ? 'Hide full review' : 'View full review'}
+          </button>
+        ) : null}
+      </div>
+
+      {/* Summary content. */}
+      {expanded && iteration.summary ? (
+        <div className="mt-2 rounded bg-gray-50 p-3">
+          <p className="text-sm text-gray-700 whitespace-pre-wrap">
+            {iteration.summary}
+          </p>
+        </div>
+      ) : null}
+
+      {/* Full review mail content. */}
+      {showReview && reviewMessage ? (
+        <div className="mt-2 rounded-lg border border-blue-100 bg-blue-50/30 p-4">
+          <div className="mb-2 flex items-center gap-2 text-xs text-gray-500">
+            <svg
+              className="h-3.5 w-3.5"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"
+              />
+            </svg>
+            <span>
+              From <span className="font-medium text-gray-700">{reviewMessage.sender_name}</span>
+              {' — '}
+              {reviewMessage.subject}
+            </span>
+          </div>
+          <div
+            className="prose prose-sm max-w-none text-gray-700"
+            dangerouslySetInnerHTML={{ __html: renderedReviewBody }}
+          />
+        </div>
       ) : null}
 
       {/* Timestamps. */}
