@@ -9,6 +9,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/roasbeef/subtrate/internal/agent"
 	"github.com/roasbeef/subtrate/internal/db"
 	"github.com/roasbeef/subtrate/internal/mail"
 )
@@ -45,12 +46,19 @@ func getStore() (*db.Store, error) {
 }
 
 // getCurrentAgentWithClient returns the current agent ID using the Client
-// interface. It supports both gRPC and direct database access.
+// interface. It supports gRPC, direct database access, and queue mode.
 func getCurrentAgentWithClient(ctx context.Context, client *Client) (int64,
 	string, error,
 ) {
 	// If agent name is specified directly, use it.
 	if agentName != "" {
+		// In queue mode, we can't resolve names to IDs — return
+		// zero ID with the name so the caller can use the name
+		// for queue payloads.
+		if client.mode == ModeQueued {
+			return 0, agentName, nil
+		}
+
 		ag, err := client.GetAgentByName(ctx, agentName)
 		if err != nil {
 			return 0, "", fmt.Errorf("agent %q not found: %w",
@@ -75,11 +83,39 @@ func getCurrentAgentWithClient(ctx context.Context, client *Client) (int64,
 			"--session-id, or set CLAUDE_SESSION_ID")
 	}
 
+	// In queue mode, use cached identity from the filesystem.
+	if client.mode == ModeQueued {
+		return resolveQueuedIdentity(sessID)
+	}
+
 	// Use identity resolution via client.
 	gitBranch := getGitBranch()
 	identity, err := client.EnsureIdentity(ctx, sessID, projDir, gitBranch)
 	if err != nil {
 		return 0, "", fmt.Errorf("failed to resolve identity: %w", err)
+	}
+
+	return identity.AgentID, identity.AgentName, nil
+}
+
+// resolveQueuedIdentity loads a cached identity file for queue mode where
+// the database is unavailable. The agent name is used in queue payloads
+// and resolved to an ID at drain time.
+func resolveQueuedIdentity(sessID string) (int64, string, error) {
+	if sessID == "" {
+		return 0, "", fmt.Errorf(
+			"queue mode requires --session-id or " +
+				"CLAUDE_SESSION_ID for identity resolution",
+		)
+	}
+
+	identity, err := agent.LoadCachedIdentity(sessID)
+	if err != nil {
+		return 0, "", fmt.Errorf(
+			"no cached identity for session %q (agent must have "+
+				"been online at least once): %w",
+			sessID, err,
+		)
 	}
 
 	return identity.AgentID, identity.AgentName, nil

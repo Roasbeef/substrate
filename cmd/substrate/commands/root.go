@@ -25,6 +25,12 @@ var (
 
 	// verbose enables verbose output.
 	verbose bool
+
+	// noQueue disables the offline queue fallback.
+	noQueue bool
+
+	// queueOnly forces all write operations to go through the local queue.
+	queueOnly bool
 )
 
 // rootCmd is the base command for the CLI.
@@ -72,6 +78,14 @@ func init() {
 		&verbose, "verbose", "v", false,
 		"Enable verbose output",
 	)
+	rootCmd.PersistentFlags().BoolVar(
+		&noQueue, "no-queue", false,
+		"Disable offline queue fallback",
+	)
+	rootCmd.PersistentFlags().BoolVar(
+		&queueOnly, "queue-only", false,
+		"Force all write operations through the local queue",
+	)
 
 	// Add subcommands.
 	rootCmd.AddCommand(inboxCmd)
@@ -93,4 +107,5 @@ func init() {
 	rootCmd.AddCommand(statusUpdateCmd)
 	rootCmd.AddCommand(reviewCmd)
 	rootCmd.AddCommand(sendDiffCmd)
+	rootCmd.AddCommand(queueCmd)
 }

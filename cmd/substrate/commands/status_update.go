@@ -3,8 +3,10 @@ package commands
 import (
 	"context"
 	"fmt"
+	"time"
 
 	"github.com/roasbeef/subtrate/internal/mail"
+	"github.com/roasbeef/subtrate/internal/queue"
 	"github.com/spf13/cobra"
 )
 
@@ -49,9 +51,30 @@ func runStatusUpdate(cmd *cobra.Command, args []string) error {
 	}
 	defer client.Close()
 
-	agentID, agentName, err := getCurrentAgentWithClient(ctx, client)
+	agentID, agentNameResolved, err := getCurrentAgentWithClient(ctx, client)
 	if err != nil {
 		return err
+	}
+
+	// Build subject and body early so they can be reused for queueing.
+	statusSubject := fmt.Sprintf("[Status] %s", agentNameResolved)
+	statusBody := ""
+	if statusSummary != "" {
+		statusBody += statusSummary + "\n\n"
+	}
+	if statusWaitingFor != "" {
+		statusBody += "Waiting for: " + statusWaitingFor
+	}
+	if statusBody == "" {
+		statusBody = "Status update (no details provided)"
+	}
+
+	// In queue mode, enqueue the status update for later delivery.
+	if client.Mode() == ModeQueued {
+		return enqueueStatusUpdate(
+			ctx, client, agentNameResolved,
+			statusSubject, statusBody,
+		)
 	}
 
 	// Resolve recipient agent ID for deduplication check.
@@ -86,26 +109,11 @@ func runStatusUpdate(cmd *cobra.Command, args []string) error {
 		}
 	}
 
-	// Build subject with [Status] prefix for deduplication detection.
-	subject := fmt.Sprintf("[Status] %s", agentName)
-
-	// Build body.
-	body := ""
-	if statusSummary != "" {
-		body += statusSummary + "\n\n"
-	}
-	if statusWaitingFor != "" {
-		body += "Waiting for: " + statusWaitingFor
-	}
-	if body == "" {
-		body = "Status update (no details provided)"
-	}
-
 	req := mail.SendMailRequest{
 		SenderID:       agentID,
 		RecipientNames: []string{statusTo},
-		Subject:        subject,
-		Body:           body,
+		Subject:        statusSubject,
+		Body:           statusBody,
 		Priority:       mail.PriorityNormal,
 	}
 
@@ -123,6 +131,52 @@ func runStatusUpdate(cmd *cobra.Command, args []string) error {
 		})
 	default:
 		fmt.Printf("Status update sent! ID: %d\n", msgID)
+	}
+
+	return nil
+}
+
+// enqueueStatusUpdate stores a status update operation in the local queue.
+func enqueueStatusUpdate(
+	ctx context.Context, client *Client, senderName,
+	subject, body string,
+) error {
+	key := newIdempotencyKey()
+	payload := queue.StatusUpdatePayload{
+		SenderName:     senderName,
+		RecipientNames: []string{statusTo},
+		Subject:        subject,
+		Body:           body,
+	}
+
+	payloadJSON, err := queue.MarshalPayload(payload)
+	if err != nil {
+		return fmt.Errorf("marshal payload: %w", err)
+	}
+
+	now := time.Now()
+	op := queue.PendingOperation{
+		IdempotencyKey: key,
+		OperationType:  queue.OpStatusUpdate,
+		PayloadJSON:    payloadJSON,
+		AgentName:      senderName,
+		SessionID:      sessionID,
+		CreatedAt:      now,
+		ExpiresAt:      now.Add(client.queueCfg.DefaultTTL),
+	}
+
+	if err := client.queueStore.Enqueue(ctx, op); err != nil {
+		return fmt.Errorf("enqueue status update: %w", err)
+	}
+
+	switch outputFormat {
+	case "json", "hook":
+		return outputJSON(map[string]any{
+			"queued":          true,
+			"idempotency_key": key,
+		})
+	default:
+		fmt.Println("Status update queued (offline)")
 	}
 
 	return nil
