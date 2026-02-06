@@ -15,27 +15,34 @@ with Subtrate integration fragments.
 The plugin approach lets Claude Code discover Subtrate's hooks and skills
 automatically from the repository directory.
 
-### Step 1: Install the substrate CLI
+### Step 1: Install the substrate CLI and daemon
 
-The plugin provides hooks and skills, but the `substrate` binary must be in
-your PATH since the hook scripts call it directly.
+The plugin provides hooks and skills, but the `substrate` and `substrated`
+binaries must be installed since the hook scripts call the CLI directly. Build
+from source to embed the frontend into the daemon binary:
 
 ```bash
-go install github.com/roasbeef/subtrate/cmd/substrate@latest
+git clone https://github.com/roasbeef/subtrate.git
+cd subtrate
+make install
 ```
 
-Verify it's available:
+This builds the frontend, then runs `go install` for both `substrate` and
+`substrated`. Binaries are placed in `$(go env GOPATH)/bin/`. Ensure that
+directory is in your PATH.
+
+Verify:
 
 ```bash
 substrate --help
+substrated --help
 ```
 
 ### Step 2: Load the plugin
 
-Clone the repository and point Claude Code at it:
+Point Claude Code at the cloned repository:
 
 ```bash
-git clone https://github.com/roasbeef/subtrate.git
 claude --plugin-dir /path/to/subtrate
 ```
 
@@ -48,17 +55,14 @@ scope from a marketplace or add it to your settings manually.
 ### Step 3: Start the daemon
 
 The `substrated` daemon provides the web UI, messaging backend, and API that
-the CLI and hooks communicate with.
+the CLI and hooks communicate with. By default it runs in web+gRPC mode (no
+MCP stdio).
 
 ```bash
-# Install the daemon
-go install github.com/roasbeef/subtrate/cmd/substrated@latest
-
 # Start in the background
 substrated &
 
-# Or if building from source:
-cd /path/to/subtrate
+# Or from the source directory:
 make start
 ```
 
@@ -71,19 +75,15 @@ registers them in `~/.claude/settings.json`.
 
 ### Step 1: Install binaries
 
-```bash
-go install github.com/roasbeef/subtrate/cmd/substrate@latest
-go install github.com/roasbeef/subtrate/cmd/substrated@latest
-```
-
-Or build from source:
+Build from source (required to embed the frontend into the daemon):
 
 ```bash
 git clone https://github.com/roasbeef/subtrate.git
 cd subtrate
-make build-all
-# Binaries are in the current directory — move them to your PATH
+make install
 ```
+
+Ensure `$(go env GOPATH)/bin/` is in your PATH.
 
 ### Step 2: Install hooks and skill
 
@@ -149,10 +149,16 @@ make stop         # Stop background daemon
 make restart      # Restart
 ```
 
-Default port is 8080. Override with `--web-port`:
+Default port is 8080. Override with `--web`:
 
 ```bash
-substrated --web-port 8081
+substrated --web :8081
+```
+
+To enable MCP stdio transport (for direct Claude Code integration via stdin):
+
+```bash
+substrated --mcp
 ```
 
 ## Configuring CLAUDE.md

@@ -17,6 +17,10 @@ Access the Subtrate mail system for agent-to-agent and user-to-agent communicati
 | Reply | `substrate send --to <agent> --thread <id> --body "..."` |
 | Search | `substrate search "query"` |
 | Status | `substrate status` |
+| Send diff | `substrate send-diff --to User --base main` |
+| Request review | `substrate review request` |
+| Review status | `substrate review status <id>` |
+| Review issues | `substrate review issues <id>` |
 | Web UI | Open http://localhost:8080 |
 
 ## Identity Management
@@ -83,6 +87,44 @@ Open http://localhost:8080 to:
 - Send messages between agents
 - See agent status (active/idle/offline)
 - Manage topics and subscriptions
+
+## Sending Diffs
+
+After making commits, send a diff to the User so they can review code changes
+in the web UI with syntax highlighting:
+
+```bash
+substrate send-diff --to User --base main
+```
+
+The command auto-detects the current branch and computes a diff against the
+base branch.
+
+## Code Reviews
+
+Request a code review to spawn Claude reviewer agents that analyze your diff:
+
+```bash
+# General review (default)
+substrate review request
+
+# Security-focused review
+substrate review request --type security
+
+# Architecture review
+substrate review request --type architecture
+
+# Check review status
+substrate review status <id>
+
+# View issues found
+substrate review issues <id>
+
+# Cancel a review
+substrate review cancel <id>
+```
+
+Review types: `full` (default), `security`, `performance`, `architecture`.
 
 ## When to Check Mail
 

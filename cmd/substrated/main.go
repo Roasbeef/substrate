@@ -32,7 +32,7 @@ func main() {
 		dbPath         = flag.String("db", "~/.subtrate/subtrate.db", "Path to SQLite database")
 		webAddr        = flag.String("web", ":8080", "Web server address (empty to disable)")
 		grpcAddr       = flag.String("grpc", "localhost:10009", "gRPC server address (empty to disable)")
-		webOnly        = flag.Bool("web-only", false, "Run web + gRPC servers only (no MCP stdio)")
+		enableMCP      = flag.Bool("mcp", false, "Enable MCP stdio transport (default: web + gRPC only)")
 		logDir         = flag.String("log-dir", "~/.subtrate/logs", "Directory for log files (empty to disable file logging)")
 		maxLogFiles    = flag.Int("max-log-files", build.DefaultMaxLogFiles, "Maximum number of rotated log files to keep")
 		maxLogFileSize = flag.Int("max-log-file-size", build.DefaultMaxLogFileSize, "Maximum log file size in MB before rotation")
@@ -226,9 +226,9 @@ func main() {
 		reviewSvc.ActiveReviewCount(),
 	)
 
-	// Create the MCP server (unless web-only mode).
+	// Create the MCP server if MCP stdio mode is enabled.
 	var mcpServer *mcp.Server
-	if !*webOnly {
+	if *enableMCP {
 		mcpServer = mcp.NewServer(dbStore)
 	}
 
@@ -298,15 +298,16 @@ func main() {
 		}()
 	}
 
-	// Run the MCP server on stdio transport, unless web-only mode.
-	if *webOnly {
-		log.Println("Running in web+gRPC mode (no MCP stdio)")
-		// Block until signal received.
-		<-ctx.Done()
-	} else {
+	// Run the MCP server on stdio transport if enabled, otherwise
+	// block until signal.
+	if *enableMCP {
 		log.Println("Starting substrated MCP server...")
 		if err := mcpServer.Run(ctx, &sdkmcp.StdioTransport{}); err != nil {
 			log.Fatalf("Server error: %v", err)
 		}
+	} else {
+		log.Println("Running in web+gRPC mode (no MCP stdio)")
+		// Block until signal received.
+		<-ctx.Done()
 	}
 }
