@@ -1384,5 +1384,98 @@ func TestBuildSystemPrompt_SubstrateSection(t *testing.T) {
 	require.Contains(t, prompt, actor.reviewerAgentName())
 }
 
+// TestIsAuthError verifies auth error pattern detection in assistant text.
+func TestIsAuthError(t *testing.T) {
+	tests := []struct {
+		name   string
+		text   string
+		expect bool
+	}{
+		{
+			name:   "exact invalid API key",
+			text:   "Invalid API key · Please run /login",
+			expect: true,
+		},
+		{
+			name:   "lowercase unauthorized",
+			text:   "Error: Unauthorized access",
+			expect: true,
+		},
+		{
+			name:   "expired token",
+			text:   "Authentication failed: expired token",
+			expect: true,
+		},
+		{
+			name:   "invalid_api_key code",
+			text:   "error code: invalid_api_key",
+			expect: true,
+		},
+		{
+			name:   "normal assistant text",
+			text:   "I'll review this code now.",
+			expect: false,
+		},
+		{
+			name:   "empty string",
+			text:   "",
+			expect: false,
+		},
+		{
+			name:   "partial match not auth",
+			text:   "The API key rotation feature looks good.",
+			expect: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			require.Equal(t, tt.expect, isAuthError(tt.text))
+		})
+	}
+}
+
+// TestHandleSubActorResult_AuthError tests that auth errors auto-cancel
+// the review instead of leaving it stuck in under_review.
+func TestHandleSubActorResult_AuthError(t *testing.T) {
+	ctx := context.Background()
+	st, cleanup := testDB(t)
+	defer cleanup()
+
+	agent := createTestAgent(t, st, "AuthErrorTest")
+	svc := NewService(ServiceConfig{
+		Store:       st,
+		ActorSystem: newTestActorSystem(t),
+	})
+
+	createResp := svc.handleCreateReview(ctx, CreateReviewMsg{
+		RequesterID: agent.ID,
+		Branch:      "test-branch",
+		BaseBranch:  "main",
+		CommitSHA:   "abc123",
+		RepoPath:    "/tmp/repo",
+		ReviewType:  "full",
+	})
+	require.NoError(t, createResp.Error)
+	reviewID := createResp.ReviewID
+
+	svc.mu.RLock()
+	fsm := svc.activeReviews[reviewID]
+	svc.mu.RUnlock()
+	require.Equal(t, "under_review", fsm.CurrentState())
+
+	// Simulate an auth error result.
+	svc.handleSubActorResult(ctx, &SubActorResult{
+		ReviewID: reviewID,
+		Error: fmt.Errorf(
+			"auth error: Invalid API key · " +
+				"Please run /login",
+		),
+	})
+
+	// The review should have been auto-cancelled.
+	require.Equal(t, "cancelled", fsm.CurrentState())
+}
+
 // fmt is used in TestHandleSubActorResult_Error.
 var _ = fmt.Errorf

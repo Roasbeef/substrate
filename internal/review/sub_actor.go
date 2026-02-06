@@ -323,6 +323,7 @@ func (r *reviewSubActor) Run(parentCtx context.Context) {
 		gotResult   bool
 		earlyResult bool
 		msgCount    int
+		authErr     error
 	)
 
 	for msg := range client.Query(ctx, prompt) {
@@ -346,6 +347,24 @@ func (r *reviewSubActor) Run(parentCtx context.Context) {
 					"text_preview",
 					truncateStr(text, 500),
 				)
+
+				// Detect auth errors returned as
+				// assistant text. The CLI surfaces auth
+				// failures as plain text messages rather
+				// than error results.
+				if isAuthError(text) {
+					authErr = fmt.Errorf(
+						"auth error: %s",
+						strings.TrimSpace(text),
+					)
+					log.ErrorS(ctx,
+						"Reviewer detected auth "+
+							"error in assistant "+
+							"text, aborting",
+						authErr,
+						"review_id", r.reviewID,
+					)
+				}
 			}
 
 			// Log each content block for debugging,
@@ -521,9 +540,19 @@ func (r *reviewSubActor) Run(parentCtx context.Context) {
 		"total_messages", msgCount,
 		"got_result", gotResult,
 		"early_result", earlyResult,
+		"auth_error", authErr != nil,
 		"ctx_err", fmt.Sprintf("%v", ctx.Err()),
 		"elapsed", time.Since(startTime).String(),
 	)
+
+	// Auth errors take priority — the review cannot proceed.
+	if authErr != nil {
+		result.Error = authErr
+		result.Duration = time.Since(startTime)
+		r.callback(ctx, result)
+
+		return
+	}
 
 	// If we already detected and persisted the YAML result during the
 	// message loop, nothing more to do.
@@ -1714,7 +1743,6 @@ func (r *reviewSubActor) persistResults(
 		"iteration_num", iterNum,
 		"issues_persisted", len(parsed.Issues),
 	)
-
 }
 
 // ParseReviewerResponse extracts the YAML frontmatter block from a reviewer's
@@ -1798,6 +1826,32 @@ func normalizeIssueType(issueType string) string {
 	return "other"
 }
 
+// authErrorPatterns are substrings in CLI assistant text that indicate an
+// authentication failure. When detected, the review should be cancelled
+// immediately since the reviewer cannot proceed without valid credentials.
+var authErrorPatterns = []string{
+	"Invalid API key",
+	"Please run /login",
+	"authentication failed",
+	"unauthorized",
+	"invalid_api_key",
+	"expired token",
+}
+
+// isAuthError returns true if the text contains a known authentication
+// error pattern. The CLI surfaces auth failures as plain assistant text
+// rather than structured error results.
+func isAuthError(text string) bool {
+	lower := strings.ToLower(text)
+	for _, pattern := range authErrorPatterns {
+		if strings.Contains(lower, strings.ToLower(pattern)) {
+			return true
+		}
+	}
+
+	return false
+}
+
 // truncateStr truncates a string to maxLen characters, appending "..." if
 // the string was shortened.
 func truncateStr(s string, maxLen int) string {
@@ -1873,7 +1927,6 @@ const reviewWriteDir = "/tmp/substrate_reviews"
 func makeReviewerPermissionPolicy(
 	_ string,
 ) claudeagent.CanUseToolFunc {
-
 	// Resolve the canonical write prefix, handling macOS /tmp →
 	// /private/tmp symlink. We accept both the symlink and the
 	// resolved path so writes work regardless of whether

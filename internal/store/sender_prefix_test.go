@@ -41,7 +41,6 @@ func newTestStore(t *testing.T) Storage {
 func createAgent(
 	t *testing.T, s Storage, name string,
 ) Agent {
-
 	t.Helper()
 
 	agent, err := s.CreateAgent(
@@ -57,7 +56,6 @@ func sendMessage(
 	t *testing.T, s Storage, senderID int64,
 	recipientID int64, subject, body string,
 ) Message {
-
 	t.Helper()
 	ctx := context.Background()
 
