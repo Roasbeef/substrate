@@ -7,6 +7,23 @@ description: This skill provides agent mail management via the Subtrate command 
 
 Access the Subtrate mail system for agent-to-agent and user-to-agent communication.
 
+## Prerequisites
+
+Before using any substrate commands, verify the CLI is installed:
+
+```bash
+which substrate || echo "NOT INSTALLED"
+```
+
+If `substrate` is not found, install it from the plugin source directory:
+
+```bash
+cd "${CLAUDE_PLUGIN_ROOT:-$(git rev-parse --show-toplevel)}" && make install
+```
+
+This builds both `substrate` (CLI) and `substrated` (daemon) and places them
+in `$(go env GOPATH)/bin/`. Ensure that directory is in your PATH.
+
 ## Quick Reference
 
 | Action | Command |
