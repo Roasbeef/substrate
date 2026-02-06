@@ -42,6 +42,7 @@ type ReviewerIssue struct {
 	Title       string `yaml:"title"`
 	IssueType   string `yaml:"type"`
 	Severity    string `yaml:"severity"`
+	Confidence  string `yaml:"confidence"`
 	FilePath    string `yaml:"file"`
 	LineStart   int    `yaml:"line_start"`
 	LineEnd     int    `yaml:"line_end"`
@@ -839,6 +840,8 @@ func (r *reviewSubActor) buildSystemPrompt() string {
 		RequesterName:  requesterName,
 		ThreadID:       r.threadID,
 		BodyFile:       "/tmp/substrate_reviews/review-" + shortID + ".md",
+		Branch:         r.branch,
+		BaseBranch:     r.baseBranch,
 		ClaudeMD:       r.loadProjectCLAUDEMD(),
 	})
 }
@@ -864,8 +867,10 @@ func (r *reviewSubActor) loadProjectCLAUDEMD() string {
 // base branch so the reviewer examines exactly the right commit range.
 func (r *reviewSubActor) buildReviewPrompt() string {
 	return renderReviewPrompt(context.Background(), reviewPromptData{
-		ReviewID: r.reviewID,
-		DiffCmd:  r.buildDiffCommand(),
+		ReviewID:   r.reviewID,
+		DiffCmd:    r.buildDiffCommand(),
+		Branch:     r.branch,
+		BaseBranch: r.baseBranch,
 	})
 }
 
