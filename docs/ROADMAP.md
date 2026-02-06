@@ -11,8 +11,8 @@ This document outlines future improvements and the current status of Subtrate.
 - [x] MCP server (`substrated`) for Claude Code integration
 - [x] Thread state machine with ProtoFSM
 - [x] Agent identity persistence across sessions
-- [x] HTMX web frontend with Gmail-inspired design
-- [x] SSE real-time updates (agents, activity, inbox)
+- [x] React + TypeScript SPA with inbox, agents, sessions, reviews
+- [x] WebSocket real-time updates (agents, activity, inbox, new messages)
 - [x] Activity feed with database schema
 - [x] Search, settings, topic view pages
 - [x] Message actions (star, archive, snooze, delete)
@@ -61,14 +61,14 @@ Target 85%+ meaningful coverage with property-based testing:
   - Generate test reports with screenshots
   - Could use Playwright MCP for browser automation
 
-### v0.2.0 - Enhanced Agent Integration & Real-time
-- [ ] **Stop hook long-polling**: Use Claude Code Stop hooks to implement mail checking
-  - Agent checks inbox before stopping (configurable timeout)
-  - If new mail: prompt agent to process before exiting
-  - Doubles as heartbeat mechanism (agent alive while hook runs)
-- [ ] **Heartbeat via hooks**: Automatic heartbeat on SessionStart, UserPromptSubmit, Stop
-  - Track agent liveness status (active, idle, offline)
-  - Heartbeat failures trigger agent status change
+### v0.2.0 - Enhanced Agent Integration & Real-time (Complete)
+- [x] **Stop hook long-polling**: 9m30s long-poll with always-block behavior
+- [x] **Heartbeat via hooks**: Automatic heartbeat on SessionStart, UserPromptSubmit, Stop
+- [x] **Code review system**: FSM-based reviews with Claude Agent SDK reviewers
+- [x] **Diff viewer**: `send-diff` command with syntax-highlighted web UI rendering
+- [x] **Store-and-forward queue**: 3-tier fallback (gRPC → direct DB → local queue)
+- [x] **gRPC server**: 6 services (Mail, Agent, Review, Session, Activity, Stats)
+- [x] **REST gateway**: grpc-gateway at `/api/v1/`
 - [ ] **AskUserQuestion via Substrate replies**: Enable async question/answer flow through mail
   - Agent sends question message with `question_type: ask` metadata
   - Recipient (human or agent) replies via Substrate mail
@@ -76,8 +76,8 @@ Target 85%+ meaningful coverage with property-based testing:
   - Enables async collaboration without blocking on immediate response
   - Hook integration: poll for answer before stopping if pending questions
   - Question timeout with optional escalation to other agents
-- [ ] React inbox components (for complex interactions)
-- [ ] WebSocket support for bi-directional updates
+- [x] React inbox components (for complex interactions)
+- [x] WebSocket support for bi-directional updates
 - [ ] Improved thread view with message grouping
 - [ ] Bulk message operations
 - [ ] Keyboard shortcuts
