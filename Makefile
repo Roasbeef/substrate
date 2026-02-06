@@ -169,10 +169,19 @@ run-test:
 # Code generation
 .PHONY: sqlc
 sqlc:
+	go run ./cmd/merge-sql-schemas
 	sqlc generate
+
+.PHONY: sqlc-check
+sqlc-check: sqlc
+	@if [ ! -f internal/db/sqlc/schemas/generated_schema.sql ]; then \
+		echo "Missing: generated_schema.sql"; exit 1; fi
+	@if test -n "$$(git diff --name-only 'internal/db/sqlc/*.go')"; then \
+		echo "SQL models not properly generated!"; exit 1; fi
 
 .PHONY: sqlc-docker
 sqlc-docker:
+	go run ./cmd/merge-sql-schemas
 	docker run --rm -v $$(pwd):/src -w /src sqlc/sqlc generate
 
 .PHONY: proto
