@@ -195,7 +195,9 @@ func computeDiffStats(patch string) diffStats {
 			// Extract file name from "diff --git a/foo b/foo".
 			parts := strings.Fields(line)
 			if len(parts) >= 4 {
-				files[parts[3]] = true
+				files[strings.TrimPrefix(
+					parts[3], "b/",
+				)] = true
 			}
 		} else if strings.HasPrefix(line, "+") &&
 			!strings.HasPrefix(line, "+++") {

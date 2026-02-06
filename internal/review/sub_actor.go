@@ -1524,21 +1524,24 @@ func (r *reviewSubActor) hookStop(
 			)
 		}
 
-		// Check for unread messages.
+		// Check for unread messages. On transient DB errors, log
+		// and retry on the next poll iteration rather than
+		// immediately approving exit (which could cut a review
+		// short if the database is momentarily busy).
 		msgs, err := r.store.GetUnreadMessages(
 			ctx, r.agentID, 10,
 		)
 		if err != nil {
 			log.ErrorS(ctx,
 				"Reviewer substrate hook: mail check "+
-					"failed",
+					"failed, will retry",
 				err,
 				"agent_name", agentName,
 			)
 
-			return claudeagent.HookResult{
-				Decision: "approve",
-			}, nil
+			time.Sleep(stopPollInterval)
+
+			continue
 		}
 
 		if len(msgs) > 0 {
@@ -1839,6 +1842,22 @@ var bashDangerousPrefixes = []string{
 	"curl ", "wget ",
 	"pip ", "npm ", "go install",
 	"make ",
+	// Block environment variable enumeration to prevent leaking
+	// forwarded auth tokens (CLAUDE_CODE_OAUTH_TOKEN, etc.).
+	"env ", "env\t",
+	"printenv ", "printenv\t",
+	"export ", "export\t",
+	"set ", "set\t",
+}
+
+// bashDangerousExact lists commands that should be blocked even when
+// invoked with no arguments (bare command). For example, "env" with no
+// args dumps the full environment including auth tokens.
+var bashDangerousExact = map[string]bool{
+	"env":      true,
+	"printenv": true,
+	"set":      true,
+	"export":   true,
 }
 
 // reviewWriteDir is the directory where reviewers are allowed to write
@@ -2061,6 +2080,19 @@ func checkBashCommand(
 		sub = strings.TrimSpace(sub)
 		if sub == "" {
 			continue
+		}
+
+		// Check for exact bare-command matches (e.g., "env" with
+		// no arguments) that would dump sensitive info.
+		if bashDangerousExact[sub] {
+			return claudeagent.PermissionDeny{
+				Reason: fmt.Sprintf(
+					"bash command %q is not "+
+						"allowed in read-only"+
+						" review mode",
+					sub,
+				),
+			}
 		}
 
 		// Check against dangerous command prefixes.
