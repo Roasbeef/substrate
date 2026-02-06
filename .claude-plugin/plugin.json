@@ -1,0 +1,21 @@
+{
+  "name": "substrate",
+  "version": "1.0.0",
+  "description": "Agent command center for orchestrating Claude Code agents with mail, messaging, code reviews, and persistent agent lifecycle hooks.",
+  "author": {
+    "name": "Roasbeef",
+    "url": "https://github.com/roasbeef"
+  },
+  "homepage": "https://github.com/roasbeef/subtrate",
+  "repository": "https://github.com/roasbeef/subtrate",
+  "license": "MIT",
+  "keywords": [
+    "agents",
+    "mail",
+    "messaging",
+    "code-review",
+    "multi-agent",
+    "orchestration",
+    "hooks"
+  ]
+}

@@ -250,15 +250,15 @@ clean:
 # Server execution
 WEB_PORT ?= 8080
 
-# Default run target: web-only mode (no MCP/stdio)
+# Default run target: web + gRPC mode (no MCP/stdio)
 .PHONY: run
 run: build-daemon
-	./substrated --web-only --web :$(WEB_PORT)
+	./substrated --web :$(WEB_PORT)
 
 # Run with MCP support (for Claude Code integration via stdio)
 .PHONY: run-mcp
 run-mcp: build-daemon
-	./substrated --web :$(WEB_PORT)
+	./substrated --mcp --web :$(WEB_PORT)
 
 # Aliases for backwards compatibility
 .PHONY: run-web
@@ -266,13 +266,13 @@ run-web: run
 
 .PHONY: run-web-dev
 run-web-dev:
-	go run ./cmd/substrated --web-only --web :$(WEB_PORT)
+	go run ./cmd/substrated --web :$(WEB_PORT)
 
-# Start web server in background (via substrated in web-only mode).
+# Start web server in background.
 .PHONY: start
 start: build-daemon
 	@echo "Starting Substrate web server on port $(WEB_PORT)..."
-	@./substrated -web-only -web :$(WEB_PORT) &
+	@./substrated -web :$(WEB_PORT) &
 	@sleep 1
 	@echo "Server started. PID: $$(lsof -ti :$(WEB_PORT))"
 
@@ -289,7 +289,7 @@ stop:
 .PHONY: restart
 restart: stop build-daemon
 	@echo "Starting Substrate web server on port $(WEB_PORT)..."
-	@./substrated -web-only -web :$(WEB_PORT) &
+	@./substrated -web :$(WEB_PORT) &
 	@sleep 1
 	@echo "Server restarted. PID: $$(lsof -ti :$(WEB_PORT))"
 
@@ -380,9 +380,9 @@ help:
 	@echo "  tidy-check     Check if go mod tidy would change anything"
 	@echo ""
 	@echo "Server execution:"
-	@echo "  run            Build and run in web-only mode (default, port 8080)"
-	@echo "  run-mcp        Build and run with MCP support (for Claude Code)"
-	@echo "  run-web-dev    Run in web-only mode without building (for dev)"
+	@echo "  run            Build and run in web+gRPC mode (default, port 8080)"
+	@echo "  run-mcp        Build and run with MCP stdio support (for Claude Code)"
+	@echo "  run-web-dev    Run in web+gRPC mode without building (for dev)"
 	@echo "  start          Build and start in background"
 	@echo "  stop           Stop running server"
 	@echo "  restart        Stop, rebuild, and start server"
