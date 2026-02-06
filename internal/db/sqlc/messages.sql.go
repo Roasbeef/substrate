@@ -727,10 +727,16 @@ func (q *Queries) GetMessageRecipientsWithAgentsBulk(ctx context.Context, messag
 }
 
 const GetMessagesBySenderNamePrefix = `-- name: GetMessagesBySenderNamePrefix :many
-SELECT m.id, m.thread_id, m.topic_id, m.log_offset, m.sender_id, m.subject, m.body_md, m.priority, m.deadline_at, m.attachments, m.created_at, m.deleted_by_sender, m.metadata, a.name as sender_name, a.project_key as sender_project_key, a.git_branch as sender_git_branch
+SELECT m.id, m.thread_id, m.topic_id, m.log_offset, m.sender_id, m.subject, m.body_md, m.priority, m.deadline_at, m.attachments, m.created_at, m.deleted_by_sender, m.metadata, mr.state, mr.snoozed_until, mr.read_at, mr.acked_at,
+       mr.agent_id as recipient_agent_id,
+       a.name as sender_name, a.project_key as sender_project_key,
+       a.git_branch as sender_git_branch
 FROM messages m
+JOIN message_recipients mr ON m.id = mr.message_id
 JOIN agents a ON m.sender_id = a.id
-WHERE a.name LIKE ?1 || '%' AND m.deleted_by_sender = 0
+WHERE a.name LIKE ?1 || '%'
+    AND m.deleted_by_sender = 0
+    AND mr.state NOT IN ('archived', 'trash')
 ORDER BY m.created_at DESC
 LIMIT ?2
 `
@@ -754,6 +760,11 @@ type GetMessagesBySenderNamePrefixRow struct {
 	CreatedAt        int64
 	DeletedBySender  int64
 	Metadata         sql.NullString
+	State            string
+	SnoozedUntil     sql.NullInt64
+	ReadAt           sql.NullInt64
+	AckedAt          sql.NullInt64
+	RecipientAgentID int64
 	SenderName       string
 	SenderProjectKey sql.NullString
 	SenderGitBranch  sql.NullString
@@ -761,6 +772,7 @@ type GetMessagesBySenderNamePrefixRow struct {
 
 // Get messages from agents whose name starts with a given prefix.
 // Used for aggregate views like CodeReviewer (all reviewer-* agents).
+// Joins message_recipients to return per-recipient read state.
 func (q *Queries) GetMessagesBySenderNamePrefix(ctx context.Context, arg GetMessagesBySenderNamePrefixParams) ([]GetMessagesBySenderNamePrefixRow, error) {
 	rows, err := q.db.QueryContext(ctx, GetMessagesBySenderNamePrefix, arg.Prefix, arg.Limit)
 	if err != nil {
@@ -784,6 +796,11 @@ func (q *Queries) GetMessagesBySenderNamePrefix(ctx context.Context, arg GetMess
 			&i.CreatedAt,
 			&i.DeletedBySender,
 			&i.Metadata,
+			&i.State,
+			&i.SnoozedUntil,
+			&i.ReadAt,
+			&i.AckedAt,
+			&i.RecipientAgentID,
 			&i.SenderName,
 			&i.SenderProjectKey,
 			&i.SenderGitBranch,

@@ -198,10 +198,17 @@ LIMIT ?;
 -- name: GetMessagesBySenderNamePrefix :many
 -- Get messages from agents whose name starts with a given prefix.
 -- Used for aggregate views like CodeReviewer (all reviewer-* agents).
-SELECT m.*, a.name as sender_name, a.project_key as sender_project_key, a.git_branch as sender_git_branch
+-- Joins message_recipients to return per-recipient read state.
+SELECT m.*, mr.state, mr.snoozed_until, mr.read_at, mr.acked_at,
+       mr.agent_id as recipient_agent_id,
+       a.name as sender_name, a.project_key as sender_project_key,
+       a.git_branch as sender_git_branch
 FROM messages m
+JOIN message_recipients mr ON m.id = mr.message_id
 JOIN agents a ON m.sender_id = a.id
-WHERE a.name LIKE sqlc.arg(prefix) || '%' AND m.deleted_by_sender = 0
+WHERE a.name LIKE sqlc.arg(prefix) || '%'
+    AND m.deleted_by_sender = 0
+    AND mr.state NOT IN ('archived', 'trash')
 ORDER BY m.created_at DESC
 LIMIT sqlc.arg(limit);
 

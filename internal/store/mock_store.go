@@ -713,12 +713,40 @@ func (m *MockStore) GetMessagesBySenderNamePrefix(
 
 		// Check if sender name starts with prefix.
 		if len(senderName) >= len(prefix) && senderName[:len(prefix)] == prefix {
-			results = append(results, InboxMessage{
+			// Look up recipient state — skip messages where
+			// all recipients are archived or trashed.
+			var found bool
+
+			inbox := InboxMessage{
 				Message:          msg,
 				SenderName:       senderName,
 				SenderProjectKey: senderProjectKey,
 				SenderGitBranch:  senderGitBranch,
-			})
+			}
+
+			if recipients, ok := m.messageRecipients[msg.ID]; ok {
+				for _, recip := range recipients {
+					if recip.State == "archived" ||
+						recip.State == "trash" {
+
+						continue
+					}
+
+					inbox.State = recip.State
+					inbox.ReadAt = recip.ReadAt
+					inbox.AckedAt = recip.AckedAt
+					inbox.SnoozedUntil = recip.SnoozedUntil
+					found = true
+
+					break
+				}
+			}
+
+			if !found {
+				continue
+			}
+
+			results = append(results, inbox)
 
 			if len(results) >= limit {
 				break
