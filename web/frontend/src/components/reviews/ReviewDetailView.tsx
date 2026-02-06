@@ -65,7 +65,7 @@ export function ReviewDetailView({ review }: ReviewDetailViewProps) {
   const [showDiff, setShowDiff] = useState(false);
 
   // Fetch the review thread to get the reviewer's full mail messages.
-  const { data: threadData } = useThread(
+  const { data: threadData, isLoading: threadLoading } = useThread(
     review.thread_id,
     !!review.thread_id,
   );
@@ -215,6 +215,7 @@ export function ReviewDetailView({ review }: ReviewDetailViewProps) {
                 key={iter.iteration_num}
                 iteration={iter}
                 threadMessages={threadData?.messages}
+                threadLoading={threadLoading}
               />
             ))}
           </div>
@@ -343,9 +344,11 @@ function findIterationMessage(
 function IterationCard({
   iteration,
   threadMessages,
+  threadLoading,
 }: {
   iteration: ReviewIterationDetail;
   threadMessages?: Message[] | undefined;
+  threadLoading?: boolean | undefined;
 }) {
   const [expanded, setExpanded] = useState(false);
   const [showReview, setShowReview] = useState(false);
@@ -434,7 +437,9 @@ function IterationCard({
         ) : null}
 
         {/* Full review toggle. */}
-        {reviewMessage ? (
+        {threadLoading ? (
+          <span className="text-xs text-gray-400">Loading review...</span>
+        ) : reviewMessage ? (
           <button
             type="button"
             onClick={() => setShowReview(!showReview)}
