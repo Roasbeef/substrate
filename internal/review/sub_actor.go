@@ -678,6 +678,25 @@ func (r *reviewSubActor) buildClientOptions() ([]claudeagent.Option, string) {
 		claudeagent.WithHooks(r.buildSubstrateHooks()),
 	}
 
+	// Explicitly forward authentication tokens to the subprocess.
+	// When substrated is started without these in its environment
+	// (e.g., launched from a non-interactive shell), the reviewer
+	// subprocess inherits an empty env and fails with "Invalid API
+	// key". Reading from the current environment ensures the token
+	// is always available if set anywhere in the process tree.
+	authEnv := make(map[string]string)
+	for _, key := range []string{
+		"CLAUDE_CODE_OAUTH_TOKEN",
+		"ANTHROPIC_API_KEY",
+	} {
+		if val := os.Getenv(key); val != "" {
+			authEnv[key] = val
+		}
+	}
+	if len(authEnv) > 0 {
+		opts = append(opts, claudeagent.WithEnv(authEnv))
+	}
+
 	// Isolate from user config if we have a temp dir.
 	if configDir != "" {
 		opts = append(
