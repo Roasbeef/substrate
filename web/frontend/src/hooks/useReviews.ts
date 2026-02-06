@@ -5,6 +5,7 @@ import {
   fetchReviews,
   fetchReview,
   fetchReviewIssues,
+  fetchReviewDiff,
   createReview,
   resubmitReview,
   cancelReview,
@@ -23,6 +24,8 @@ export const reviewKeys = {
   detail: (id: string) => [...reviewKeys.details(), id] as const,
   issues: (reviewId: string) =>
     [...reviewKeys.all, 'issues', reviewId] as const,
+  diff: (reviewId: string) =>
+    [...reviewKeys.all, 'diff', reviewId] as const,
 };
 
 // Hook for fetching a list of reviews.
@@ -102,6 +105,19 @@ export function useCancelReview() {
       });
       void queryClient.invalidateQueries({ queryKey: reviewKeys.lists() });
     },
+  });
+}
+
+// Hook for fetching the git diff for a review.
+export function useReviewDiff(reviewId: string, enabled = true) {
+  return useQuery({
+    queryKey: reviewKeys.diff(reviewId),
+    queryFn: async ({ signal }) => {
+      return fetchReviewDiff(reviewId, signal);
+    },
+    enabled: enabled && reviewId !== '',
+    // Diffs don't change once a review is complete, cache aggressively.
+    staleTime: 5 * 60 * 1000,
   });
 }
 

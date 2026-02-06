@@ -154,11 +154,17 @@ service ReviewService {
     // CancelReview cancels an active review.
     rpc CancelReview (CancelReviewProtoRequest) returns (CancelReviewProtoResponse);
 
+    // DeleteReview permanently removes a review and all associated data.
+    rpc DeleteReview (DeleteReviewProtoRequest) returns (DeleteReviewProtoResponse);
+
     // ListReviewIssues lists issues for a review.
     rpc ListReviewIssues (ListReviewIssuesRequest) returns (ListReviewIssuesResponse);
 
     // UpdateIssueStatus updates the status of a review issue.
     rpc UpdateIssueStatus (UpdateIssueStatusRequest) returns (UpdateIssueStatusResponse);
+
+    // GetReviewDiff returns the git diff for a review's branch.
+    rpc GetReviewDiff (GetReviewDiffRequest) returns (GetReviewDiffResponse);
 }
 
 // Priority represents message priority levels.
@@ -895,6 +901,22 @@ message ReviewDetailResponse {
     int32 iterations = 7;
     int64 open_issues = 8;
     string error = 9;
+    // Iteration details for displaying review history.
+    repeated ReviewIterationProto iteration_details = 10;
+}
+
+// ReviewIterationProto represents a single review iteration with results.
+message ReviewIterationProto {
+    int32 iteration_num = 1;
+    string reviewer_id = 2;
+    string decision = 3;
+    string summary = 4;
+    int32 files_reviewed = 5;
+    int32 lines_analyzed = 6;
+    int64 duration_ms = 7;
+    double cost_usd = 8;
+    int64 started_at = 9;
+    int64 completed_at = 10;
 }
 
 // ResubmitReviewRequest is the request for ResubmitReview.
@@ -911,6 +933,16 @@ message CancelReviewProtoRequest {
 
 // CancelReviewProtoResponse is the response for CancelReview.
 message CancelReviewProtoResponse {
+    string error = 1;
+}
+
+// DeleteReviewProtoRequest is the request for DeleteReview.
+message DeleteReviewProtoRequest {
+    string review_id = 1;
+}
+
+// DeleteReviewProtoResponse is the response for DeleteReview.
+message DeleteReviewProtoResponse {
     string error = 1;
 }
 
@@ -952,4 +984,18 @@ message UpdateIssueStatusRequest {
 // UpdateIssueStatusResponse is the response for UpdateIssueStatus.
 message UpdateIssueStatusResponse {
     string error = 1;
+}
+
+// GetReviewDiffRequest is the request for GetReviewDiff.
+message GetReviewDiffRequest {
+    string review_id = 1;
+}
+
+// GetReviewDiffResponse is the response for GetReviewDiff.
+message GetReviewDiffResponse {
+    // The raw unified diff output from git diff.
+    string patch = 1;
+    // The git command that was run to produce the diff.
+    string command = 2;
+    string error = 3;
 }

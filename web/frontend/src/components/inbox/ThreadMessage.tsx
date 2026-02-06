@@ -1,14 +1,22 @@
 // ThreadMessage component - a single message within a thread view.
 
-import { useMemo } from 'react';
+import { useMemo, useState, lazy, Suspense } from 'react';
 import { clsx } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 import { marked } from 'marked';
 import DOMPurify from 'dompurify';
 import { Avatar } from '@/components/ui/Avatar.js';
 import { PriorityBadge } from '@/components/ui/Badge.js';
+import { Spinner } from '@/components/ui/Spinner.js';
 import type { Message, MessageWithRecipients } from '@/types/api.js';
 import { formatAgentDisplayName, getAgentContext } from '@/lib/utils.js';
+
+// Lazy-load DiffViewer to avoid bundling Shiki grammars in inbox chunk.
+const DiffViewer = lazy(
+  () => import('@/components/reviews/DiffViewer.js').then(
+    (m) => ({ default: m.DiffViewer }),
+  ),
+);
 
 // Convert message sender to AgentLike format for display formatting.
 function getSenderAsAgent(message: Message) {
@@ -62,6 +70,22 @@ function formatMessageDate(dateString: string): string {
   });
 }
 
+// Diff marker used by `substrate send-diff` to embed patches in messages.
+const DIFF_MARKER = '<!-- substrate:diff -->';
+
+// Split message body into markdown text and optional diff patch.
+function splitBodyAndDiff(body: string): { text: string; patch: string | null } {
+  const idx = body.indexOf(DIFF_MARKER);
+  if (idx === -1) {
+    return { text: body, patch: null };
+  }
+
+  return {
+    text: body.slice(0, idx).trimEnd(),
+    patch: body.slice(idx + DIFF_MARKER.length).trim(),
+  };
+}
+
 // Render markdown text safely using marked and DOMPurify.
 function renderMarkdownToHtml(text: string): string {
   // Parse markdown to HTML.
@@ -99,11 +123,20 @@ export function ThreadMessage({
   isFocused = false,
   className,
 }: ThreadMessageProps) {
-  // Memoize the rendered markdown to avoid re-parsing on every render.
-  const renderedBody = useMemo(
-    () => renderMarkdownToHtml(message.body),
+  // Split body into markdown text and optional diff patch.
+  const { text: bodyText, patch } = useMemo(
+    () => splitBodyAndDiff(message.body),
     [message.body],
   );
+
+  // Memoize the rendered markdown to avoid re-parsing on every render.
+  const renderedBody = useMemo(
+    () => renderMarkdownToHtml(bodyText),
+    [bodyText],
+  );
+
+  // Track whether the diff section is expanded.
+  const [diffExpanded, setDiffExpanded] = useState(false);
 
   return (
     <div
@@ -167,6 +200,42 @@ export function ThreadMessage({
         className="prose prose-sm mt-3 max-w-none text-gray-700"
         dangerouslySetInnerHTML={{ __html: renderedBody }}
       />
+
+      {/* Embedded diff section (from substrate send-diff). */}
+      {patch ? (
+        <div className="mt-4 border-t border-gray-100 pt-3">
+          <button
+            type="button"
+            onClick={() => setDiffExpanded(!diffExpanded)}
+            className={cn(
+              'rounded-lg border px-3 py-1.5 text-sm font-medium transition-colors',
+              diffExpanded
+                ? 'border-blue-200 bg-blue-50 text-blue-700'
+                : 'border-gray-200 text-gray-600 hover:bg-gray-50',
+            )}
+          >
+            {diffExpanded ? 'Hide diff' : 'Show diff'}
+          </button>
+
+          {diffExpanded ? (
+            <div className="mt-3">
+              <Suspense
+                fallback={
+                  <div className="flex justify-center py-8">
+                    <Spinner
+                      size="md"
+                      variant="primary"
+                      label="Loading diff viewer..."
+                    />
+                  </div>
+                }
+              >
+                <DiffViewer patch={patch} />
+              </Suspense>
+            </div>
+          ) : null}
+        </div>
+      ) : null}
     </div>
   );
 }

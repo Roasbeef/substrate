@@ -1070,6 +1070,11 @@ func TestReviewerPermissionPolicy_BashReadOnly(t *testing.T) {
 		{"chained git push via semicolon", `{"command":"echo hi; git push origin main"}`, false},
 		{"chained make via &&", `{"command":"git diff && make build"}`, false},
 		{"multiple safe chained", `{"command":"git diff 2>&1"}`, true},
+		{"env denied", `{"command":"env | grep TOKEN"}`, false},
+		{"printenv denied", `{"command":"printenv CLAUDE_CODE_OAUTH_TOKEN"}`, false},
+		{"export denied", `{"command":"export -p"}`, false},
+		{"set denied", `{"command":"set | grep API"}`, false},
+		{"chained env via semicolon", `{"command":"git log; env"}`, false},
 	}
 
 	for _, tt := range tests {

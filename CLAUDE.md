@@ -8,9 +8,11 @@ Subtrate is a central command center for managing Claude Code agents with mail/m
 
 **Key Components:**
 - **substrated** (`cmd/substrated`) - MCP daemon server with integrated web UI
-- **substrate** (`cmd/substrate`) - Command-line interface for mail operations
+- **substrate** (`cmd/substrate`) - Command-line interface for mail and review operations
 - **Mail Service** (`internal/mail`) - Core messaging with actor pattern
+- **Review Service** (`internal/review`) - Code review with Claude Agent SDK and FSM
 - **Agent Registry** (`internal/agent`) - Agent identity and registration
+- **Actor System** (`internal/baselib/actor`) - Actor framework (system, refs, futures, mailbox)
 - **Web API** (`internal/web`) - JSON API and embedded React frontend
 - **React Frontend** (`web/frontend`) - React + TypeScript SPA with Vite
 
@@ -21,9 +23,14 @@ Subtrate is a central command center for managing Claude Code agents with mail/m
 - `make build-all` - Build CLI and MCP binaries
 - `make build-production` - Build daemon with embedded frontend (production)
 - `make test` - Run all tests (includes FTS5 CGO flags)
+- `make test-race` - Run tests with race detector
 - `make test-cover` - Run tests with coverage summary
+- `make test-all` - Run all tests (Go + frontend)
 - `make lint` - Run the linter (must pass before committing)
+- `make lint-all` - Run all linting (Go + frontend)
 - `make fmt` - Format all Go source files
+- `make ci` - Full CI pipeline (ci-go + ci-frontend)
+- `make quick` - Quick compile check
 - `make clean` - Remove build artifacts
 
 ### Frontend Commands
@@ -59,9 +66,15 @@ make unit pkg=./internal/mcp case=TestNewServer
 
 **Other test commands:**
 - `make test` - Run all tests
+- `make test-race` - Run tests with race detector
 - `make test-cover` - Run tests with coverage summary
 - `make test-cover-html` - Generate HTML coverage report
+- `make test-integration` - Run all integration tests
 - `make test-integration-e2e` - Run e2e backend tests (no external deps)
+- `make test-integration-sdk` - SDK integration tests (requires claude CLI)
+- `make test-integration-short` - Short integration tests (no API calls)
+- `make test-integration-seed` - Seed test database with fixtures
+- `make run-test` - Run specific test: `make run-test test=TestFoo pkg=./internal/review`
 
 ### Pre-commit
 - `make pre-commit` - Run all checks (tidy, fmt, vet, lint, test)
@@ -122,6 +135,12 @@ make start WEB_PORT=8081
 
 Access the UI at `http://localhost:8080` (or custom port).
 
+### Data and Log File Locations
+- **Database**: `~/.subtrate/subtrate.db` (SQLite with WAL mode)
+- **Server logs**: `~/.subtrate/logs/substrated.log`
+- **Agent identities**: `~/.subtrate/identities/`
+- **Hook debug logs**: `~/.subtrate/stop_hook_debug.log`, `~/.subtrate/stop_hook_trace.log`
+
 **When to use each:**
 - `make run` - Default for development/testing the web UI
 - `make run-mcp` - When testing Claude Code integration (reads from stdin)
@@ -152,10 +171,13 @@ if err != nil {
 **Never use** `GetErr()` or `GetOk()` - these don't exist.
 
 ### Actor System Patterns
-The mail service uses actor patterns from darepo-client:
+The actor system is in `internal/baselib/actor/` (internalized). Both the
+mail service and review service use it:
 - `BaseMessage` embedding for message types
-- Sealed interfaces via `messageMarker()` method
+- Sealed interfaces via unexported marker methods (`messageMarker()`, etc.)
 - `Receive()` returns `fn.Result` type
+- `ActorSystem` for lifecycle, `ServiceKey` for typed lookup
+- `AskAwait` in `internal/actorutil/` for synchronous ask-and-unpack
 
 ## Database Conventions
 
@@ -181,6 +203,8 @@ When adding a new migration:
 - `internal/db/queries/agents.sql` - Agent and session queries
 - `internal/db/queries/topics.sql` - Topic and subscription queries
 - `internal/db/queries/messages.sql` - Message and recipient queries
+- `internal/db/queries/activities.sql` - Activity feed queries
+- `internal/db/queries/reviews.sql` - Review, iteration, and issue queries
 
 ### Storage Interface Architecture
 
@@ -207,6 +231,7 @@ The database layer follows a clean architecture with three tiers:
 - `AgentStore` - Agent management
 - `TopicStore` - Topics and subscriptions
 - `ActivityStore` - Activity feed
+- `ReviewStore` - Review CRUD, iterations, issue tracking
 - `SessionStore` - Session identity mapping
 - `Storage` - Combines all above + `WithTx()` + `Close()`
 
@@ -432,13 +457,17 @@ Prefer small, atomic commits that build independently:
 ## Testing Philosophy
 
 ### Coverage Requirements
-Target **80%+ test coverage** for each package.
+Target **80%+ test coverage** for each package. Run `make test-cover` for
+current coverage numbers.
 
-### Current Coverage
-- `internal/agent`: 79.7%
-- `internal/db`: 73.4%
-- `internal/mail`: 68.7%
-- `internal/mcp`: Not tested (wiring only)
+### Packages Under Test
+- `internal/agent` - Agent registry
+- `internal/db` - Database operations
+- `internal/mail` - Mail service
+- `internal/review` - Review service and FSM
+- `internal/baselib/actor` - Actor system
+- `internal/actorutil` - Actor utilities
+- `internal/store` - Storage layer
 
 ### Test Patterns
 Tests use temporary SQLite databases with migrations:
@@ -452,16 +481,29 @@ defer cleanup()
 ```
 subtrate/
 ├── cmd/
-│   ├── substrate/        # CLI tool
-│   └── substrated/       # MCP daemon server
+│   ├── substrate/          # CLI tool (mail, review, hooks commands)
+│   └── substrated/         # MCP daemon server
 ├── internal/
-│   ├── agent/            # Agent registry and identity
-│   ├── db/               # Database layer
-│   │   ├── migrations/   # SQL migrations
-│   │   ├── queries/      # sqlc query files
-│   │   └── sqlc/         # Generated code (DO NOT EDIT)
-│   ├── mail/             # Mail service with actor pattern
-│   └── mcp/              # MCP server and tools
+│   ├── activity/           # Activity tracking service
+│   ├── actorutil/          # Actor pool and helpers (AskAwait)
+│   ├── agent/              # Agent registry and identity
+│   ├── api/grpc/           # Proto definitions and gRPC server
+│   ├── baselib/actor/      # Actor system framework
+│   ├── build/              # Build info and log handler setup
+│   ├── db/                 # Database layer
+│   │   ├── migrations/     # SQL migrations (000001-000003)
+│   │   ├── queries/        # sqlc query files
+│   │   └── sqlc/           # Generated code (DO NOT EDIT)
+│   ├── hooks/              # Hook management and skill templates
+│   ├── mail/               # Mail service with actor pattern
+│   ├── mailclient/         # Mail client library
+│   ├── mcp/                # MCP server and tools
+│   ├── pubsub/             # Pub/sub infrastructure
+│   ├── review/             # Code review system (FSM + Claude Agent SDK)
+│   ├── store/              # Storage interfaces and implementations
+│   └── web/                # JSON API and embedded React frontend
+├── tests/integration/      # Integration tests (e2e, fixtures)
+├── web/frontend/           # React + TypeScript SPA
 ├── go.mod
 ├── sqlc.yaml
 └── Makefile
@@ -480,8 +522,17 @@ subtrate/
 
 ### Proto Definitions
 - Location: `internal/api/grpc/mail.proto`
-- Services: `Mail` (messaging), `Agent` (identity management)
+- Services: `Mail` (messaging), `Agent` (identity), `Session`, `Activity`, `Stats`, `ReviewService` (code reviews)
 - Generate code: `make proto`
+
+### ReviewService RPCs
+- `CreateReview` - Create a new review request
+- `ListReviews` - List reviews with filters
+- `GetReview` - Get review details with iterations
+- `ResubmitReview` - Re-request review after author changes
+- `CancelReview` - Cancel an active review
+- `ListReviewIssues` - List issues for a review
+- `UpdateIssueStatus` - Update issue resolution status
 
 ### Proto Workflow
 1. Edit `internal/api/grpc/mail.proto`
@@ -518,9 +569,11 @@ server.Start()
 
 ### Key Dependencies
 - `github.com/modelcontextprotocol/go-sdk/mcp` - MCP protocol SDK
-- `github.com/lightninglabs/darepo-client` - Actor system (local)
+- `github.com/roasbeef/claude-agent-sdk-go` - Claude Agent SDK for spawning reviewer agents
 - `github.com/lightningnetwork/lnd/fn/v2` - Result type
 - `github.com/mattn/go-sqlite3` - SQLite driver with CGO
+- `github.com/spf13/cobra` - CLI framework
+- `pgregory.net/rapid` - Property-based testing
 
 ## React Frontend Development
 
@@ -546,6 +599,7 @@ web/frontend/
 │   │   ├── layout/    # Layout components
 │   │   ├── inbox/     # Inbox feature
 │   │   ├── agents/    # Agents feature
+│   │   ├── reviews/   # Review list, detail, issues views
 │   │   └── sessions/  # Sessions feature
 │   ├── hooks/         # Custom React hooks
 │   ├── stores/        # Zustand stores
@@ -628,16 +682,6 @@ make build-production
 
 # The built files are embedded via //go:embed in web/frontend_embed.go
 ```
-
----
-
-## HTMX Frontend Development (Legacy)
-
-> **Note**: The HTMX frontend is being replaced by React. This section is kept for reference.
-
-### References
-- **Documentation**: https://htmx.org/docs/
-- **Attribute Reference**: https://htmx.org/reference/
 
 ## Agent Heartbeat System
 
@@ -747,12 +791,67 @@ bun add <package>
 
 ## Claude Agent SDK
 
-For agent messaging and session kickoff, use the Claude Agent Go SDK:
-```
-github.com/Roasbeef/claude-agent-sdk-go
-```
+Dependency: `github.com/roasbeef/claude-agent-sdk-go` v1.0.5
 
-This SDK enables spawning and communicating with Claude Code agents programmatically.
+Used by the review system (`internal/review/sub_actor.go`) to spawn isolated
+reviewer agents. Key SDK options:
+
+- `WithModel(model)` - Set Claude model (sonnet for standard, opus for security/architecture)
+- `WithCanUseTool(policy)` - Fine-grained tool permission policy
+- `WithHooks(hooks)` - Go-native hook callbacks (not shell scripts)
+- `WithConfigDir(dir)` - Isolated config dir to prevent user hook interference
+- `WithCwd(path)` - Set working directory to repo being reviewed
+- `WithSystemPrompt(prompt)` - Inject reviewer persona prompt
+- `WithMaxTurns(n)` - Limit conversation turns (default: 20)
+- `WithStderr(w)` - Capture CLI subprocess stderr for logging
+- `WithNoSessionPersistence()` - Disable session saving for ephemeral reviewers
+- `WithSettingSources(nil)` - Prevent loading user settings/hooks
+- `WithSkillsDisabled()` - No skills in reviewer agents
+
+**Isolation pattern:** Reviewer agents use a temporary config dir combined
+with `WithSettingSources(nil)` and `WithSkillsDisabled()` to prevent the
+user's own Claude hooks from running inside reviewer sessions.
+
+## Code Review System
+
+Native code review via `internal/review/` — spawns Claude Agent SDK reviewer
+agents that analyze diffs and return structured YAML results.
+
+### Review CLI Commands
+- `substrate review request` — Request review (auto-detects branch/commit/remote)
+  - Flags: `--branch`, `--base`, `--commit`, `--type`, `--priority`, `--pr`, `--description`
+- `substrate review status <id>` — Show review status and details
+- `substrate review list` — List reviews (`--state`, `--limit` filters)
+- `substrate review cancel <id>` — Cancel active review (`--reason`)
+- `substrate review issues <id>` — List issues found
+
+### Review Types
+- `full` (default) — General review (Sonnet, 10m timeout)
+- `security` — Injection, auth, crypto (Opus, 15m timeout)
+- `performance` — N+1 queries, memory, allocations (Sonnet, 10m timeout)
+- `architecture` — Design, interfaces, testability (Opus, 15m timeout)
+
+### Review States
+`new` → `pending_review` → `under_review` → `changes_requested` → `re_review` → `approved`/`rejected`/`cancelled`
+
+### Architecture
+- `internal/review/service.go` — Service actor (orchestrates reviews)
+- `internal/review/sub_actor.go` — Spawns isolated Claude SDK reviewer agents
+- `internal/review/review_fsm.go` — FSM state machine (ProcessEvent pattern)
+- `internal/review/review_states.go` — State handlers with outbox events
+- `internal/review/config.go` — Reviewer persona configurations
+- `internal/review/messages.go` — Sealed message types
+
+### Database (migration 000003)
+- `reviews` — Review records with FSM state
+- `review_iterations` — Per-round results (cost, duration, metrics)
+- `review_issues` — Individual issues (severity, file, line range, status)
+
+### Reviewer Agent Isolation
+Each reviewer uses a temp config dir + SDK options to prevent user hook
+interference: `WithConfigDir`, `WithSettingSources(nil)`, `WithSkillsDisabled`,
+`WithNoSessionPersistence`. Reviewer has read-only tool access enforced via
+`WithCanUseTool` permission policy.
 
 ## Session Management
 

@@ -59,6 +59,14 @@ var reviewIssuesCmd = &cobra.Command{
 	RunE:  runReviewIssues,
 }
 
+// reviewDeleteCmd deletes a review and all associated data.
+var reviewDeleteCmd = &cobra.Command{
+	Use:   "delete <review-id>",
+	Short: "Delete a review and all associated data",
+	Args:  cobra.ExactArgs(1),
+	RunE:  runReviewDelete,
+}
+
 // Review command flags.
 var (
 	reviewBranch     string
@@ -140,6 +148,7 @@ func init() {
 	reviewCmd.AddCommand(reviewListCmd)
 	reviewCmd.AddCommand(reviewCancelCmd)
 	reviewCmd.AddCommand(reviewIssuesCmd)
+	reviewCmd.AddCommand(reviewDeleteCmd)
 }
 
 // runReviewRequest handles the `substrate review request` command.
@@ -412,6 +421,29 @@ func runReviewIssues(cmd *cobra.Command, args []string) error {
 		}
 	}
 
+	return nil
+}
+
+// runReviewDelete handles the `substrate review delete <id>` command.
+func runReviewDelete(cmd *cobra.Command, args []string) error {
+	ctx := context.Background()
+	reviewID := args[0]
+
+	client, err := getClient()
+	if err != nil {
+		return err
+	}
+	defer client.Close()
+
+	resp, err := client.DeleteReview(ctx, reviewID)
+	if err != nil {
+		return fmt.Errorf("delete review: %w", err)
+	}
+	if resp.Error != "" {
+		return fmt.Errorf("delete error: %s", resp.Error)
+	}
+
+	fmt.Printf("Review %s deleted.\n", reviewID)
 	return nil
 }
 

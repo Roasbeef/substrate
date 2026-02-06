@@ -1,8 +1,11 @@
 package review
 
 import (
+	"bytes"
 	"context"
 	"fmt"
+	"os/exec"
+	"strings"
 	"sync"
 
 	"github.com/google/uuid"
@@ -96,12 +99,20 @@ func (s *Service) Receive(ctx context.Context,
 		resp := s.handleCancel(ctx, m)
 		return fn.Ok[ReviewResponse](resp)
 
+	case DeleteReviewMsg:
+		resp := s.handleDelete(ctx, m)
+		return fn.Ok[ReviewResponse](resp)
+
 	case GetIssuesMsg:
 		resp := s.handleGetIssues(ctx, m)
 		return fn.Ok[ReviewResponse](resp)
 
 	case UpdateIssueMsg:
 		resp := s.handleUpdateIssue(ctx, m)
+		return fn.Ok[ReviewResponse](resp)
+
+	case GetReviewDiffMsg:
+		resp := s.handleGetDiff(ctx, m)
 		return fn.Ok[ReviewResponse](resp)
 
 	default:
@@ -194,15 +205,37 @@ func (s *Service) handleGetReview(ctx context.Context,
 		return GetReviewResp{Error: err}
 	}
 
+	// Build iteration details for the response.
+	iterDetails := make([]IterationDetail, len(iters))
+	for i, iter := range iters {
+		var completedAt int64
+		if iter.CompletedAt != nil {
+			completedAt = iter.CompletedAt.Unix()
+		}
+		iterDetails[i] = IterationDetail{
+			IterationNum:  iter.IterationNum,
+			ReviewerID:    iter.ReviewerID,
+			Decision:      iter.Decision,
+			Summary:       iter.Summary,
+			FilesReviewed: iter.FilesReviewed,
+			LinesAnalyzed: iter.LinesAnalyzed,
+			DurationMS:    iter.DurationMS,
+			CostUSD:       iter.CostUSD,
+			StartedAt:     iter.StartedAt.Unix(),
+			CompletedAt:   completedAt,
+		}
+	}
+
 	return GetReviewResp{
-		ReviewID:   review.ReviewID,
-		ThreadID:   review.ThreadID,
-		State:      review.State,
-		Branch:     review.Branch,
-		BaseBranch: review.BaseBranch,
-		ReviewType: review.ReviewType,
-		Iterations: len(iters),
-		OpenIssues: openIssues,
+		ReviewID:         review.ReviewID,
+		ThreadID:         review.ThreadID,
+		State:            review.State,
+		Branch:           review.Branch,
+		BaseBranch:       review.BaseBranch,
+		ReviewType:       review.ReviewType,
+		Iterations:       len(iters),
+		OpenIssues:       openIssues,
+		IterationDetails: iterDetails,
 	}
 }
 
@@ -327,6 +360,102 @@ func (s *Service) handleCancel(ctx context.Context,
 	s.mu.Unlock()
 
 	return CancelReviewResp{}
+}
+
+// handleDelete permanently removes a review and all associated data from
+// the database and active tracking.
+func (s *Service) handleDelete(ctx context.Context,
+	msg DeleteReviewMsg,
+) DeleteReviewResp {
+	// Remove from active tracking first.
+	s.mu.Lock()
+	delete(s.activeReviews, msg.ReviewID)
+	s.mu.Unlock()
+
+	// Delete from the database (cascades to iterations and issues).
+	if err := s.store.DeleteReview(ctx, msg.ReviewID); err != nil {
+		return DeleteReviewResp{Error: err}
+	}
+
+	return DeleteReviewResp{}
+}
+
+// handleGetDiff runs git diff for a review's branch and returns the
+// unified diff output. The diff command is constructed from the review's
+// branch and base_branch fields stored in the database.
+func (s *Service) handleGetDiff(
+	ctx context.Context, msg GetReviewDiffMsg,
+) GetReviewDiffResp {
+	// Look up the review to get repo path and branch info.
+	rev, err := s.store.GetReview(ctx, msg.ReviewID)
+	if err != nil {
+		return GetReviewDiffResp{
+			Error: fmt.Errorf("get review: %w", err),
+		}
+	}
+
+	if rev.RepoPath == "" {
+		return GetReviewDiffResp{
+			Error: fmt.Errorf("review has no repo_path"),
+		}
+	}
+
+	// Build the diff command matching the sub-actor's logic.
+	var args []string
+	var cmdStr string
+
+	switch {
+	case rev.BaseBranch != "" && rev.Branch != "":
+		args = []string{
+			"diff", rev.BaseBranch + "..." + rev.Branch,
+		}
+		cmdStr = fmt.Sprintf(
+			"git diff %s...%s",
+			rev.BaseBranch, rev.Branch,
+		)
+
+	case rev.BaseBranch != "":
+		args = []string{
+			"diff", rev.BaseBranch + "...HEAD",
+		}
+		cmdStr = fmt.Sprintf(
+			"git diff %s...HEAD", rev.BaseBranch,
+		)
+
+	case rev.CommitSHA != "":
+		args = []string{"show", rev.CommitSHA}
+		cmdStr = fmt.Sprintf(
+			"git show %s", rev.CommitSHA,
+		)
+
+	default:
+		args = []string{"diff", "HEAD~1"}
+		cmdStr = "git diff HEAD~1"
+	}
+
+	// Execute git diff in the review's repo directory.
+	cmd := exec.CommandContext(ctx, "git", args...)
+	cmd.Dir = rev.RepoPath
+
+	var stdout, stderr bytes.Buffer
+	cmd.Stdout = &stdout
+	cmd.Stderr = &stderr
+
+	if err := cmd.Run(); err != nil {
+		errMsg := strings.TrimSpace(stderr.String())
+		if errMsg == "" {
+			errMsg = err.Error()
+		}
+		return GetReviewDiffResp{
+			Command: cmdStr,
+			Error:   fmt.Errorf("git diff: %s", errMsg),
+		}
+	}
+
+	return GetReviewDiffResp{
+		Patch:   stdout.String(),
+		Command: cmdStr,
+	}
 }
 
 // handleGetIssues retrieves issues for a review.

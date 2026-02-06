@@ -171,15 +171,35 @@ func (s *Server) GetReview(
 		)
 	}
 
+	// Convert iteration details to proto.
+	iterProtos := make(
+		[]*ReviewIterationProto, len(getResp.IterationDetails),
+	)
+	for i, iter := range getResp.IterationDetails {
+		iterProtos[i] = &ReviewIterationProto{
+			IterationNum:  int32(iter.IterationNum),
+			ReviewerId:    iter.ReviewerID,
+			Decision:      iter.Decision,
+			Summary:       iter.Summary,
+			FilesReviewed: int32(iter.FilesReviewed),
+			LinesAnalyzed: int32(iter.LinesAnalyzed),
+			DurationMs:    iter.DurationMS,
+			CostUsd:       iter.CostUSD,
+			StartedAt:     iter.StartedAt,
+			CompletedAt:   iter.CompletedAt,
+		}
+	}
+
 	result := &ReviewDetailResponse{
-		ReviewId:   getResp.ReviewID,
-		ThreadId:   getResp.ThreadID,
-		State:      getResp.State,
-		Branch:     getResp.Branch,
-		BaseBranch: getResp.BaseBranch,
-		ReviewType: getResp.ReviewType,
-		Iterations: int32(getResp.Iterations),
-		OpenIssues: getResp.OpenIssues,
+		ReviewId:         getResp.ReviewID,
+		ThreadId:         getResp.ThreadID,
+		State:            getResp.State,
+		Branch:           getResp.Branch,
+		BaseBranch:       getResp.BaseBranch,
+		ReviewType:       getResp.ReviewType,
+		Iterations:       int32(getResp.Iterations),
+		OpenIssues:       getResp.OpenIssues,
+		IterationDetails: iterProtos,
 	}
 	if getResp.Error != nil {
 		result.Error = getResp.Error.Error()
@@ -261,6 +281,40 @@ func (s *Server) CancelReview(
 	result := &CancelReviewProtoResponse{}
 	if cancelResp.Error != nil {
 		result.Error = cancelResp.Error.Error()
+	}
+
+	return result, nil
+}
+
+// DeleteReview permanently removes a review and all associated data.
+func (s *Server) DeleteReview(
+	ctx context.Context, req *DeleteReviewProtoRequest,
+) (*DeleteReviewProtoResponse, error) {
+	if req.ReviewId == "" {
+		return nil, status.Error(
+			codes.InvalidArgument, "review_id is required",
+		)
+	}
+
+	resp, err := s.askReview(ctx, review.DeleteReviewMsg{
+		ReviewID: req.ReviewId,
+	})
+	if err != nil {
+		return nil, status.Errorf(
+			codes.Internal, "review actor error: %v", err,
+		)
+	}
+
+	deleteResp, ok := resp.(review.DeleteReviewResp)
+	if !ok {
+		return nil, status.Error(
+			codes.Internal, "unexpected response type",
+		)
+	}
+
+	result := &DeleteReviewProtoResponse{}
+	if deleteResp.Error != nil {
+		result.Error = deleteResp.Error.Error()
 	}
 
 	return result, nil
@@ -357,6 +411,43 @@ func (s *Server) UpdateIssueStatus(
 	result := &UpdateIssueStatusResponse{}
 	if updateResp.Error != nil {
 		result.Error = updateResp.Error.Error()
+	}
+
+	return result, nil
+}
+
+// GetReviewDiff returns the git diff for a review's branch.
+func (s *Server) GetReviewDiff(
+	ctx context.Context, req *GetReviewDiffRequest,
+) (*GetReviewDiffResponse, error) {
+	if req.ReviewId == "" {
+		return nil, status.Error(
+			codes.InvalidArgument, "review_id is required",
+		)
+	}
+
+	resp, err := s.askReview(ctx, review.GetReviewDiffMsg{
+		ReviewID: req.ReviewId,
+	})
+	if err != nil {
+		return nil, status.Errorf(
+			codes.Internal, "review actor error: %v", err,
+		)
+	}
+
+	diffResp, ok := resp.(review.GetReviewDiffResp)
+	if !ok {
+		return nil, status.Error(
+			codes.Internal, "unexpected response type",
+		)
+	}
+
+	result := &GetReviewDiffResponse{
+		Patch:   diffResp.Patch,
+		Command: diffResp.Command,
+	}
+	if diffResp.Error != nil {
+		result.Error = diffResp.Error.Error()
 	}
 
 	return result, nil

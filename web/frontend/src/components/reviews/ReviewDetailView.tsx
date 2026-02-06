@@ -1,17 +1,51 @@
 // ReviewDetailView component - shows full review details with issues list.
 
+import { useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { clsx } from 'clsx';
 import { twMerge } from 'tailwind-merge';
-import type { IssueStatus, ReviewDetail } from '@/types/api.js';
-import { useReviewIssues, useUpdateIssueStatus, useCancelReview } from '@/hooks/useReviews.js';
+import { marked } from 'marked';
+import DOMPurify from 'dompurify';
+import type { IssueStatus, Message, ReviewDetail, ReviewIterationDetail } from '@/types/api.js';
+import { useReviewIssues, useReviewDiff, useUpdateIssueStatus, useCancelReview } from '@/hooks/useReviews.js';
+import { useThread } from '@/hooks/useThreads.js';
 import { ReviewStateBadge } from './ReviewStateBadge.js';
 import { ReviewIssueCard } from './ReviewIssueCard.js';
+import { DiffViewer } from './DiffViewer.js';
 import { Spinner } from '@/components/ui/Spinner.js';
 import { routes } from '@/lib/routes.js';
 
 function cn(...inputs: (string | undefined | null | false)[]) {
   return twMerge(clsx(inputs));
+}
+
+// Decision badge styles.
+const decisionStyles: Record<string, string> = {
+  approved: 'bg-green-100 text-green-800',
+  rejected: 'bg-red-100 text-red-800',
+  changes_requested: 'bg-orange-100 text-orange-800',
+};
+
+// Format milliseconds into human-readable duration.
+function formatDuration(ms: number): string {
+  if (ms < 1000) return `${ms}ms`;
+  const seconds = Math.floor(ms / 1000);
+  if (seconds < 60) return `${seconds}s`;
+  const minutes = Math.floor(seconds / 60);
+  const remainingSeconds = seconds % 60;
+  return remainingSeconds > 0 ? `${minutes}m ${remainingSeconds}s` : `${minutes}m`;
+}
+
+// Format unix timestamp to locale string.
+function formatTimestamp(ts: number): string {
+  if (ts === 0) return '--';
+  return new Date(ts * 1000).toLocaleString();
+}
+
+// Format cost in USD.
+function formatCost(usd: number): string {
+  if (usd === 0) return '--';
+  return `$${usd.toFixed(4)}`;
 }
 
 export interface ReviewDetailViewProps {
@@ -25,6 +59,16 @@ export function ReviewDetailView({ review }: ReviewDetailViewProps) {
   );
   const updateStatus = useUpdateIssueStatus();
   const cancelMutation = useCancelReview();
+  const { data: diffData, isLoading: diffLoading } = useReviewDiff(
+    review.review_id,
+  );
+  const [showDiff, setShowDiff] = useState(false);
+
+  // Fetch the review thread to get the reviewer's full mail messages.
+  const { data: threadData, isLoading: threadLoading } = useThread(
+    review.thread_id,
+    !!review.thread_id,
+  );
 
   const handleStatusChange = (issueId: number, status: IssueStatus) => {
     updateStatus.mutate({
@@ -159,6 +203,71 @@ export function ReviewDetailView({ review }: ReviewDetailViewProps) {
         ) : null}
       </div>
 
+      {/* Iterations section. */}
+      {review.iteration_details && review.iteration_details.length > 0 ? (
+        <div>
+          <h3 className="mb-3 text-base font-semibold text-gray-900">
+            Iterations ({review.iteration_details.length})
+          </h3>
+          <div className="space-y-3">
+            {review.iteration_details.map((iter) => (
+              <IterationCard
+                key={iter.iteration_num}
+                iteration={iter}
+                threadMessages={threadData?.messages}
+                threadLoading={threadLoading}
+              />
+            ))}
+          </div>
+        </div>
+      ) : null}
+
+      {/* Diff section. */}
+      <div>
+        <div className="mb-3 flex items-center justify-between">
+          <h3 className="text-base font-semibold text-gray-900">
+            Changes
+          </h3>
+          <button
+            type="button"
+            onClick={() => setShowDiff(!showDiff)}
+            className={cn(
+              'rounded-lg border px-3 py-1.5 text-sm font-medium transition-colors',
+              showDiff
+                ? 'border-blue-200 bg-blue-50 text-blue-700'
+                : 'border-gray-200 text-gray-600 hover:bg-gray-50',
+            )}
+          >
+            {showDiff ? 'Hide diff' : 'Show diff'}
+          </button>
+        </div>
+
+        {showDiff ? (
+          diffLoading ? (
+            <div className="flex justify-center py-8">
+              <Spinner size="md" variant="primary" label="Loading diff..." />
+            </div>
+          ) : diffData?.error ? (
+            <div className="rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-700">
+              {diffData.error}
+            </div>
+          ) : diffData?.patch ? (
+            <div>
+              {diffData.command ? (
+                <p className="mb-2 text-xs text-gray-400">
+                  <code>{diffData.command}</code>
+                </p>
+              ) : null}
+              <DiffViewer patch={diffData.patch} />
+            </div>
+          ) : (
+            <div className="rounded-lg border border-gray-200 bg-white p-8 text-center">
+              <p className="text-sm text-gray-500">No diff available.</p>
+            </div>
+          )
+        ) : null}
+      </div>
+
       {/* Issues section. */}
       <div>
         <h3 className="mb-3 text-base font-semibold text-gray-900">
@@ -190,6 +299,216 @@ export function ReviewDetailView({ review }: ReviewDetailViewProps) {
           </div>
         )}
       </div>
+    </div>
+  );
+}
+
+// Render markdown safely using marked and DOMPurify.
+function renderMarkdown(text: string): string {
+  const rawHtml = marked.parse(text, { async: false }) as string;
+  return DOMPurify.sanitize(rawHtml, {
+    ALLOWED_TAGS: [
+      'p', 'br', 'strong', 'em', 'code', 'pre', 'ul', 'ol', 'li',
+      'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'a', 'blockquote', 'hr',
+    ],
+    ALLOWED_ATTR: ['href', 'target', 'rel'],
+  });
+}
+
+// Match a thread message to an iteration by reviewer name and timing.
+function findIterationMessage(
+  messages: Message[] | undefined,
+  iteration: ReviewIterationDetail,
+): Message | undefined {
+  if (!messages || messages.length === 0) return undefined;
+
+  // Filter to messages from reviewer agents (sender name contains "reviewer").
+  const reviewerMessages = messages.filter(
+    (m) => m.sender_name.startsWith('reviewer-'),
+  );
+
+  // If only one reviewer message, return it for the first iteration.
+  if (reviewerMessages.length === 1 && iteration.iteration_num === 1) {
+    return reviewerMessages[0];
+  }
+
+  // For multiple iterations, match by order (iteration N = Nth reviewer message).
+  if (iteration.iteration_num <= reviewerMessages.length) {
+    return reviewerMessages[iteration.iteration_num - 1];
+  }
+
+  return undefined;
+}
+
+// IterationCard displays details for a single review iteration.
+function IterationCard({
+  iteration,
+  threadMessages,
+  threadLoading,
+}: {
+  iteration: ReviewIterationDetail;
+  threadMessages?: Message[] | undefined;
+  threadLoading?: boolean | undefined;
+}) {
+  const [expanded, setExpanded] = useState(false);
+  const [showReview, setShowReview] = useState(false);
+
+  const decisionLabel = iteration.decision
+    .replace(/_/g, ' ')
+    .replace(/\b\w/g, (c) => c.toUpperCase());
+
+  const badgeStyle = decisionStyles[iteration.decision] ?? 'bg-gray-100 text-gray-600';
+
+  // Find the reviewer's mail message for this iteration.
+  const reviewMessage = useMemo(
+    () => findIterationMessage(threadMessages, iteration),
+    [threadMessages, iteration],
+  );
+
+  // Render the review message body as HTML.
+  const renderedReviewBody = useMemo(
+    () => (reviewMessage ? renderMarkdown(reviewMessage.body) : ''),
+    [reviewMessage],
+  );
+
+  return (
+    <div className="rounded-lg border border-gray-200 bg-white p-4">
+      {/* Iteration header. */}
+      <div className="flex items-start justify-between">
+        <div className="flex items-center gap-3">
+          <span className="text-sm font-semibold text-gray-900">
+            Iteration {iteration.iteration_num}
+          </span>
+          <span
+            className={cn(
+              'inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium',
+              badgeStyle,
+            )}
+          >
+            {decisionLabel}
+          </span>
+        </div>
+        {iteration.reviewer_id ? (
+          <span className="text-xs text-gray-500">
+            by {iteration.reviewer_id}
+          </span>
+        ) : null}
+      </div>
+
+      {/* Metrics row. */}
+      <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-4">
+        <div>
+          <dt className="text-xs text-gray-500">Files</dt>
+          <dd className="text-sm font-medium text-gray-900">
+            {iteration.files_reviewed}
+          </dd>
+        </div>
+        <div>
+          <dt className="text-xs text-gray-500">Lines</dt>
+          <dd className="text-sm font-medium text-gray-900">
+            {iteration.lines_analyzed.toLocaleString()}
+          </dd>
+        </div>
+        <div>
+          <dt className="text-xs text-gray-500">Duration</dt>
+          <dd className="text-sm font-medium text-gray-900">
+            {formatDuration(iteration.duration_ms)}
+          </dd>
+        </div>
+        <div>
+          <dt className="text-xs text-gray-500">Cost</dt>
+          <dd className="text-sm font-medium text-gray-900">
+            {formatCost(iteration.cost_usd)}
+          </dd>
+        </div>
+      </div>
+
+      {/* Action buttons row. */}
+      <div className="mt-3 flex items-center gap-3">
+        {/* Summary toggle. */}
+        {iteration.summary ? (
+          <button
+            type="button"
+            onClick={() => setExpanded(!expanded)}
+            className="text-xs font-medium text-gray-500 hover:text-gray-700"
+          >
+            {expanded ? 'Hide summary' : 'Show summary'}
+          </button>
+        ) : null}
+
+        {/* Full review toggle. */}
+        {threadLoading ? (
+          <span className="text-xs text-gray-400">Loading review...</span>
+        ) : reviewMessage ? (
+          <button
+            type="button"
+            onClick={() => setShowReview(!showReview)}
+            className={cn(
+              'text-xs font-medium transition-colors',
+              showReview
+                ? 'text-blue-600 hover:text-blue-800'
+                : 'text-blue-500 hover:text-blue-700',
+            )}
+          >
+            {showReview ? 'Hide full review' : 'View full review'}
+          </button>
+        ) : null}
+      </div>
+
+      {/* Summary content. */}
+      {expanded && iteration.summary ? (
+        <div className="mt-2 rounded bg-gray-50 p-3">
+          <p className="text-sm text-gray-700 whitespace-pre-wrap">
+            {iteration.summary}
+          </p>
+        </div>
+      ) : null}
+
+      {/* Full review mail content. */}
+      {showReview && reviewMessage ? (
+        <div className="mt-2 rounded-lg border border-blue-100 bg-blue-50/30 p-4">
+          <div className="mb-2 flex items-center gap-2 text-xs text-gray-500">
+            <svg
+              className="h-3.5 w-3.5"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"
+              />
+            </svg>
+            <span>
+              From <span className="font-medium text-gray-700">{reviewMessage.sender_name}</span>
+              {' — '}
+              {reviewMessage.subject}
+            </span>
+          </div>
+          <div
+            className="prose prose-sm max-w-none text-gray-700"
+            dangerouslySetInnerHTML={{ __html: renderedReviewBody }}
+          />
+        </div>
+      ) : null}
+
+      {/* Timestamps. */}
+      {iteration.started_at > 0 || iteration.completed_at > 0 ? (
+        <div className="mt-3 flex gap-4 border-t border-gray-100 pt-2">
+          {iteration.started_at > 0 ? (
+            <span className="text-xs text-gray-400">
+              Started: {formatTimestamp(iteration.started_at)}
+            </span>
+          ) : null}
+          {iteration.completed_at > 0 ? (
+            <span className="text-xs text-gray-400">
+              Completed: {formatTimestamp(iteration.completed_at)}
+            </span>
+          ) : null}
+        </div>
+      ) : null}
     </div>
   );
 }

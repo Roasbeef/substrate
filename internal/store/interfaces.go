@@ -323,6 +323,10 @@ type ReviewStore interface {
 
 	// CountOpenIssues counts open issues for a review.
 	CountOpenIssues(ctx context.Context, reviewID string) (int64, error)
+
+	// DeleteReview deletes a review and its associated iterations and
+	// issues.
+	DeleteReview(ctx context.Context, reviewID string) error
 }
 
 // Storage combines all store interfaces for unified access.

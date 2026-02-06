@@ -1059,6 +1059,21 @@ func (c *Client) CancelReview(
 	)
 }
 
+// DeleteReview permanently removes a review and all associated data.
+func (c *Client) DeleteReview(
+	ctx context.Context, reviewID string,
+) (*subtraterpc.DeleteReviewProtoResponse, error) {
+	if err := c.requireGRPC(); err != nil {
+		return nil, err
+	}
+
+	return c.reviewClient.DeleteReview(
+		ctx, &subtraterpc.DeleteReviewProtoRequest{
+			ReviewId: reviewID,
+		},
+	)
+}
+
 // ListReviewIssues lists issues for a specific review.
 func (c *Client) ListReviewIssues(
 	ctx context.Context, reviewID string,

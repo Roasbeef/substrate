@@ -311,11 +311,18 @@ func (r *reviewSubActor) Run(parentCtx context.Context) {
 		"prompt", truncateStr(prompt, 500),
 	)
 
+	// isTerminalDecision returns true for review decisions that end the
+	// review lifecycle (no further back-and-forth expected).
+	isTerminalDecision := func(decision string) bool {
+		return decision == "approve" || decision == "reject"
+	}
+
 	var (
-		lastText  string
-		response  claudeagent.ResultMessage
-		gotResult bool
-		msgCount  int
+		lastText    string
+		response    claudeagent.ResultMessage
+		gotResult   bool
+		earlyResult bool
+		msgCount    int
 	)
 
 	for msg := range client.Query(ctx, prompt) {
@@ -365,6 +372,70 @@ func (r *reviewSubActor) Run(parentCtx context.Context) {
 				}
 			}
 			result.SessionID = m.SessionID
+
+			// Early detection: if the assistant text
+			// contains a valid YAML review result, persist
+			// it and invoke the callback immediately so the
+			// FSM transitions without waiting for the
+			// subprocess to exit (the stop hook may keep it
+			// alive for follow-up messages). We continue
+			// reading the stream for potential back-and-
+			// forth conversation.
+			if text != "" && !earlyResult {
+				if parsed, pErr := ParseReviewerResponse(
+					text,
+				); pErr == nil && parsed.Decision != "" {
+
+					log.InfoS(ctx,
+						"Reviewer detected YAML "+
+							"result in assistant "+
+							"text, persisting now",
+						"review_id", r.reviewID,
+						"decision", parsed.Decision,
+						"issues",
+						len(parsed.Issues),
+					)
+
+					result.Result = parsed
+					result.Duration = time.Since(
+						startTime,
+					)
+					earlyResult = true
+
+					// Persist and notify the FSM
+					// immediately.
+					r.persistResults(
+						ctx, result, startTime,
+					)
+					r.callback(ctx, result)
+
+					// For terminal decisions (approve/
+					// reject), kill the Claude subprocess
+					// immediately. The stop hook would
+					// otherwise keep it alive for ~9m30s
+					// polling for mail. Close() sends
+					// stdin EOF → 5s grace → SIGKILL.
+					// For request_changes, we keep the
+					// process alive so the stop hook can
+					// facilitate back-and-forth.
+					if isTerminalDecision(
+						parsed.Decision,
+					) {
+						log.InfoS(ctx,
+							"Reviewer killing "+
+								"subprocess "+
+								"after terminal "+
+								"decision",
+							"review_id",
+							r.reviewID,
+							"decision",
+							parsed.Decision,
+						)
+
+						client.Close()
+					}
+				}
+			}
 
 		case claudeagent.ResultMessage:
 			response = m
@@ -449,9 +520,16 @@ func (r *reviewSubActor) Run(parentCtx context.Context) {
 		"review_id", r.reviewID,
 		"total_messages", msgCount,
 		"got_result", gotResult,
+		"early_result", earlyResult,
 		"ctx_err", fmt.Sprintf("%v", ctx.Err()),
 		"elapsed", time.Since(startTime).String(),
 	)
+
+	// If we already detected and persisted the YAML result during the
+	// message loop, nothing more to do.
+	if earlyResult {
+		return
+	}
 
 	if !gotResult {
 		result.Error = fmt.Errorf("no result message received")
@@ -600,6 +678,25 @@ func (r *reviewSubActor) buildClientOptions() ([]claudeagent.Option, string) {
 		claudeagent.WithHooks(r.buildSubstrateHooks()),
 	}
 
+	// Explicitly forward authentication tokens to the subprocess.
+	// When substrated is started without these in its environment
+	// (e.g., launched from a non-interactive shell), the reviewer
+	// subprocess inherits an empty env and fails with "Invalid API
+	// key". Reading from the current environment ensures the token
+	// is always available if set anywhere in the process tree.
+	authEnv := make(map[string]string)
+	for _, key := range []string{
+		"CLAUDE_CODE_OAUTH_TOKEN",
+		"ANTHROPIC_API_KEY",
+	} {
+		if val := os.Getenv(key); val != "" {
+			authEnv[key] = val
+		}
+	}
+	if len(authEnv) > 0 {
+		opts = append(opts, claudeagent.WithEnv(authEnv))
+	}
+
 	// Isolate from user config if we have a temp dir.
 	if configDir != "" {
 		opts = append(
@@ -642,7 +739,9 @@ func (r *reviewSubActor) buildClientOptions() ([]claudeagent.Option, string) {
 }
 
 // buildSystemPrompt constructs the system prompt for the reviewer agent based
-// on the ReviewerConfig persona.
+// on the ReviewerConfig persona. The prompt follows patterns from Anthropic's
+// code-review plugin: explicit exclusion lists, signal-to-noise criteria,
+// per-review-type focus guidance, and severity-ordered output.
 func (r *reviewSubActor) buildSystemPrompt() string {
 	if r.config.SystemPrompt != "" {
 		return r.config.SystemPrompt
@@ -651,22 +750,120 @@ func (r *reviewSubActor) buildSystemPrompt() string {
 	var sb strings.Builder
 
 	sb.WriteString(fmt.Sprintf(
-		"You are %s, a code reviewer for the Subtrate project.\n\n",
+		"You are %s, a code reviewer.\n\n",
 		r.config.Name,
 	))
 
+	// Role section — varies by review type.
 	sb.WriteString("## Your Role\n")
 	sb.WriteString(
 		"Review the code changes on the current branch " +
 			"compared to the base branch. ",
 	)
+
+	switch r.config.Name {
+	case "SecurityReviewer":
+		sb.WriteString(
+			"You are an elite security code reviewer. " +
+				"Your primary mission is identifying " +
+				"and preventing vulnerabilities before " +
+				"they reach production.\n\n",
+		)
+	case "PerformanceReviewer":
+		sb.WriteString(
+			"You are a performance engineering " +
+				"specialist. Focus on efficiency across " +
+				"algorithmic, data access, and resource " +
+				"management layers.\n\n",
+		)
+	case "ArchitectureReviewer":
+		sb.WriteString(
+			"You are an architecture reviewer. Focus " +
+				"on design patterns, interface contracts, " +
+				"separation of concerns, and long-term " +
+				"maintainability.\n\n",
+		)
+	default:
+		sb.WriteString(
+			"Identify bugs, security issues, logic " +
+				"errors, and CLAUDE.md violations.\n\n",
+		)
+	}
+
+	// Per-type detailed guidance.
+	r.writeReviewTypeGuidance(&sb)
+
+	// Explicit exclusion list — critical for signal-to-noise.
+	sb.WriteString("## What NOT to Flag\n")
 	sb.WriteString(
-		"Identify bugs, security issues, logic errors, " +
-			"and style violations.\n\n",
+		"Do NOT report any of the following. These are " +
+			"explicitly excluded to keep the review " +
+			"high-signal:\n\n",
+	)
+	sb.WriteString(
+		"- **Style preferences** — formatting, naming " +
+			"conventions, comment style (unless violating " +
+			"explicit CLAUDE.md rules)\n",
+	)
+	sb.WriteString(
+		"- **Linter-catchable issues** — unused imports, " +
+			"unreachable code, simple type errors (these " +
+			"are caught by `make lint`)\n",
+	)
+	sb.WriteString(
+		"- **Pre-existing issues** — problems in code that " +
+			"was NOT modified in this diff\n",
+	)
+	sb.WriteString(
+		"- **Subjective suggestions** — \"consider using X " +
+			"instead\" without a concrete bug or violation\n",
+	)
+	sb.WriteString(
+		"- **Pedantic nitpicks** — minor wording in " +
+			"comments, import ordering preferences\n",
+	)
+	sb.WriteString(
+		"- **Hypothetical issues** — problems that require " +
+			"specific unusual inputs to trigger and are not " +
+			"realistic in the codebase's context\n\n",
 	)
 
+	// Signal criteria.
+	sb.WriteString("## High-Signal Findings (What TO Flag)\n")
+	sb.WriteString(
+		"Focus on findings that are **definitively " +
+			"wrong**, not just potentially suboptimal:\n\n",
+	)
+	sb.WriteString(
+		"- **Compilation/parse failures** — syntax errors, " +
+			"type errors, missing imports, unresolved " +
+			"references\n",
+	)
+	sb.WriteString(
+		"- **Definitive logic failures** — code that will " +
+			"produce incorrect results for normal inputs\n",
+	)
+	sb.WriteString(
+		"- **Security vulnerabilities** — injection, auth " +
+			"bypass, data exposure, race conditions\n",
+	)
+	sb.WriteString(
+		"- **Resource leaks** — unclosed connections, " +
+			"goroutine leaks, missing defers\n",
+	)
+	sb.WriteString(
+		"- **CLAUDE.md violations** — explicit, quotable " +
+			"rule violations (include the rule text in " +
+			"claude_md_ref)\n",
+	)
+	sb.WriteString(
+		"- **Missing error handling** — errors silently " +
+			"discarded or not propagated at boundaries\n\n",
+	)
+
+	// Focus areas from config.
 	if len(r.config.FocusAreas) > 0 {
-		sb.WriteString("## Focus Areas\n")
+		sb.WriteString("## Additional Focus Areas\n")
 		for _, area := range r.config.FocusAreas {
 			sb.WriteString(fmt.Sprintf("- %s\n", area))
 		}
@@ -684,6 +881,36 @@ func (r *reviewSubActor) buildSystemPrompt() string {
 		sb.WriteString("\n")
 	}
 
+	// Review process.
+	sb.WriteString("## Review Process\n")
+	sb.WriteString(
+		"1. **Read the diff** using the provided git " +
+			"command\n",
+	)
+	sb.WriteString(
+		"2. **Produce a change summary** — briefly " +
+			"describe what the diff modifies (2-3 " +
+			"sentences)\n",
+	)
+	sb.WriteString(
+		"3. **Detailed analysis** — examine each file " +
+			"for issues from the high-signal list\n",
+	)
+	sb.WriteString(
+		"4. **Positive observations** — note what was " +
+			"done well (good patterns, thorough tests, " +
+			"clean interfaces)\n",
+	)
+	sb.WriteString(
+		"5. **Prioritize by impact-to-effort ratio** — " +
+			"recommend high-ROI fixes first\n",
+	)
+	sb.WriteString(
+		"6. **Emit YAML result** with your decision " +
+			"and issues\n\n",
+	)
+
+	// Output format.
 	sb.WriteString("## Output Format\n")
 	sb.WriteString(
 		"You MUST include a YAML frontmatter block at the " +
@@ -709,8 +936,26 @@ func (r *reviewSubActor) buildSystemPrompt() string {
 	sb.WriteString("    line_start: 42\n")
 	sb.WriteString("    line_end: 50\n")
 	sb.WriteString("    description: \"Detailed description\"\n")
-	sb.WriteString("    suggestion: \"Suggested fix\"\n")
+	sb.WriteString("    code_snippet: \"the problematic code\"\n")
+	sb.WriteString("    suggestion: \"Suggested fix or code example\"\n")
+	sb.WriteString("    claude_md_ref: \"Quoted CLAUDE.md rule, " +
+		"if applicable\"\n")
 	sb.WriteString("```\n\n")
+	sb.WriteString(
+		"**Decision guidelines:**\n",
+	)
+	sb.WriteString(
+		"- `approve` — No issues, or only minor/suggestion " +
+			"level findings\n",
+	)
+	sb.WriteString(
+		"- `request_changes` — Issues found that should be " +
+			"fixed before merging\n",
+	)
+	sb.WriteString(
+		"- `reject` — Critical issues or fundamental " +
+			"design problems\n\n",
+	)
 	sb.WriteString(
 		"If the code looks good and you approve, set " +
 			"decision to 'approve' with an empty issues list.\n",
@@ -847,6 +1092,203 @@ func (r *reviewSubActor) buildSystemPrompt() string {
 	}
 
 	return sb.String()
+}
+
+// writeReviewTypeGuidance appends per-review-type detailed guidance to the
+// system prompt. These match the specialized reviewer personas from Anthropic's
+// code-review agents (security, performance, architecture).
+func (r *reviewSubActor) writeReviewTypeGuidance(sb *strings.Builder) {
+	switch r.config.Name {
+	case "SecurityReviewer":
+		sb.WriteString("## Security Review Checklist\n\n")
+		sb.WriteString(
+			"### Vulnerability Assessment\n",
+		)
+		sb.WriteString(
+			"- OWASP Top 10: injection, broken auth, " +
+				"sensitive data exposure, XXE, broken " +
+				"access control, misconfiguration, XSS, " +
+				"insecure deserialization\n",
+		)
+		sb.WriteString(
+			"- SQL/NoSQL/command injection vectors\n",
+		)
+		sb.WriteString(
+			"- Race conditions and TOCTOU " +
+				"vulnerabilities\n",
+		)
+		sb.WriteString(
+			"- Cryptographic implementation issues\n\n",
+		)
+		sb.WriteString(
+			"### Input Validation\n",
+		)
+		sb.WriteString(
+			"- User input validated against expected " +
+				"formats/ranges\n",
+		)
+		sb.WriteString(
+			"- Server-side validation as primary " +
+				"control\n",
+		)
+		sb.WriteString(
+			"- File upload restrictions (type, size, " +
+				"content)\n",
+		)
+		sb.WriteString(
+			"- Path traversal and directory escape " +
+				"risks\n\n",
+		)
+		sb.WriteString(
+			"### Auth and Authorization\n",
+		)
+		sb.WriteString(
+			"- Session management correctness\n",
+		)
+		sb.WriteString(
+			"- Privilege escalation vectors\n",
+		)
+		sb.WriteString(
+			"- IDOR (insecure direct object " +
+				"references)\n",
+		)
+		sb.WriteString(
+			"- Access control at every protected " +
+				"endpoint\n\n",
+		)
+
+	case "PerformanceReviewer":
+		sb.WriteString("## Performance Review Checklist\n\n")
+		sb.WriteString(
+			"### Algorithmic Efficiency\n",
+		)
+		sb.WriteString(
+			"- O(n^2) or worse operations on " +
+				"potentially large inputs\n",
+		)
+		sb.WriteString(
+			"- Redundant calculations that could be " +
+				"cached\n",
+		)
+		sb.WriteString(
+			"- Blocking calls that should be async\n",
+		)
+		sb.WriteString(
+			"- Nested loops over the same data\n\n",
+		)
+		sb.WriteString(
+			"### Database and Network\n",
+		)
+		sb.WriteString(
+			"- N+1 query patterns and missing " +
+				"indexes\n",
+		)
+		sb.WriteString(
+			"- API batching opportunities and " +
+				"unnecessary round-trips\n",
+		)
+		sb.WriteString(
+			"- Missing pagination, filtering, or " +
+				"projection\n",
+		)
+		sb.WriteString(
+			"- Connection pooling patterns\n\n",
+		)
+		sb.WriteString(
+			"### Resource Management\n",
+		)
+		sb.WriteString(
+			"- Memory leaks from unclosed connections " +
+				"or listeners\n",
+		)
+		sb.WriteString(
+			"- Excessive allocations in loops\n",
+		)
+		sb.WriteString(
+			"- Missing cleanup in defers or finally " +
+				"blocks\n",
+		)
+		sb.WriteString(
+			"- Goroutine leaks from unjoined " +
+				"goroutines\n\n",
+		)
+		sb.WriteString(
+			"For each finding, estimate performance " +
+				"impact with complexity notation and " +
+				"prioritize by impact-to-effort ratio.\n\n",
+		)
+
+	case "ArchitectureReviewer":
+		sb.WriteString("## Architecture Review Checklist\n\n")
+		sb.WriteString(
+			"- Separation of concerns between layers\n",
+		)
+		sb.WriteString(
+			"- Interface contracts and abstraction " +
+				"boundaries\n",
+		)
+		sb.WriteString(
+			"- Dependency direction (inward, not " +
+				"outward)\n",
+		)
+		sb.WriteString(
+			"- Testability (can components be tested " +
+				"in isolation?)\n",
+		)
+		sb.WriteString(
+			"- SOLID principle adherence\n",
+		)
+		sb.WriteString(
+			"- Appropriate design pattern usage\n\n",
+		)
+
+	default:
+		// Default (full) review — general guidance.
+		sb.WriteString("## Review Dimensions\n\n")
+		sb.WriteString(
+			"### Code Correctness\n",
+		)
+		sb.WriteString(
+			"- Logic errors producing wrong results\n",
+		)
+		sb.WriteString(
+			"- Missing error handling at failure " +
+				"points\n",
+		)
+		sb.WriteString(
+			"- Edge cases and boundary conditions\n",
+		)
+		sb.WriteString(
+			"- Null/nil handling and zero-value " +
+				"assumptions\n\n",
+		)
+		sb.WriteString(
+			"### Security\n",
+		)
+		sb.WriteString(
+			"- Input validation at system boundaries\n",
+		)
+		sb.WriteString(
+			"- Authorization checks on protected " +
+				"operations\n",
+		)
+		sb.WriteString(
+			"- Sensitive data in logs or error " +
+				"messages\n\n",
+		)
+		sb.WriteString(
+			"### CLAUDE.md Compliance\n",
+		)
+		sb.WriteString(
+			"- Check changes against project " +
+				"CLAUDE.md rules (appended below)\n",
+		)
+		sb.WriteString(
+			"- When flagging a violation, quote the " +
+				"specific rule in the claude_md_ref " +
+				"field\n\n",
+		)
+	}
 }
 
 // loadProjectCLAUDEMD reads the CLAUDE.md file from the repo root. Returns
@@ -1082,21 +1524,24 @@ func (r *reviewSubActor) hookStop(
 			)
 		}
 
-		// Check for unread messages.
+		// Check for unread messages. On transient DB errors, log
+		// and retry on the next poll iteration rather than
+		// immediately approving exit (which could cut a review
+		// short if the database is momentarily busy).
 		msgs, err := r.store.GetUnreadMessages(
 			ctx, r.agentID, 10,
 		)
 		if err != nil {
 			log.ErrorS(ctx,
 				"Reviewer substrate hook: mail check "+
-					"failed",
+					"failed, will retry",
 				err,
 				"agent_name", agentName,
 			)
 
-			return claudeagent.HookResult{
-				Decision: "approve",
-			}, nil
+			time.Sleep(stopPollInterval)
+
+			continue
 		}
 
 		if len(msgs) > 0 {
@@ -1397,6 +1842,22 @@ var bashDangerousPrefixes = []string{
 	"curl ", "wget ",
 	"pip ", "npm ", "go install",
 	"make ",
+	// Block environment variable enumeration to prevent leaking
+	// forwarded auth tokens (CLAUDE_CODE_OAUTH_TOKEN, etc.).
+	"env ", "env\t",
+	"printenv ", "printenv\t",
+	"export ", "export\t",
+	"set ", "set\t",
+}
+
+// bashDangerousExact lists commands that should be blocked even when
+// invoked with no arguments (bare command). For example, "env" with no
+// args dumps the full environment including auth tokens.
+var bashDangerousExact = map[string]bool{
+	"env":      true,
+	"printenv": true,
+	"set":      true,
+	"export":   true,
 }
 
 // reviewWriteDir is the directory where reviewers are allowed to write
@@ -1619,6 +2080,19 @@ func checkBashCommand(
 		sub = strings.TrimSpace(sub)
 		if sub == "" {
 			continue
+		}
+
+		// Check for exact bare-command matches (e.g., "env" with
+		// no arguments) that would dump sensitive info.
+		if bashDangerousExact[sub] {
+			return claudeagent.PermissionDeny{
+				Reason: fmt.Sprintf(
+					"bash command %q is not "+
+						"allowed in read-only"+
+						" review mode",
+					sub,
+				),
+			}
 		}
 
 		// Check against dangerous command prefixes.

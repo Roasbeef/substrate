@@ -225,6 +225,15 @@ type QueryStore interface {
 	CountOpenIssues(
 		ctx context.Context, reviewID string,
 	) (int64, error)
+	DeleteReviewIssues(
+		ctx context.Context, reviewID string,
+	) error
+	DeleteReviewIterations(
+		ctx context.Context, reviewID string,
+	) error
+	DeleteReview(
+		ctx context.Context, reviewID string,
+	) error
 }
 
 // BatchedQueryStore is a version of QueryStore that's capable of batched

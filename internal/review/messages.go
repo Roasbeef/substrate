@@ -16,22 +16,26 @@ type ReviewResponse interface {
 }
 
 // Ensure all request types implement ReviewRequest.
-func (CreateReviewMsg) isReviewRequest() {}
-func (GetReviewMsg) isReviewRequest()    {}
-func (ListReviewsMsg) isReviewRequest()  {}
-func (ResubmitMsg) isReviewRequest()     {}
-func (CancelReviewMsg) isReviewRequest() {}
-func (GetIssuesMsg) isReviewRequest()    {}
-func (UpdateIssueMsg) isReviewRequest()  {}
+func (CreateReviewMsg) isReviewRequest()  {}
+func (GetReviewMsg) isReviewRequest()     {}
+func (ListReviewsMsg) isReviewRequest()   {}
+func (ResubmitMsg) isReviewRequest()      {}
+func (CancelReviewMsg) isReviewRequest()  {}
+func (DeleteReviewMsg) isReviewRequest()  {}
+func (GetIssuesMsg) isReviewRequest()     {}
+func (UpdateIssueMsg) isReviewRequest()   {}
+func (GetReviewDiffMsg) isReviewRequest() {}
 
 // Ensure all response types implement ReviewResponse.
-func (CreateReviewResp) isReviewResponse() {}
-func (GetReviewResp) isReviewResponse()    {}
-func (ListReviewsResp) isReviewResponse()  {}
-func (ResubmitResp) isReviewResponse()     {}
-func (CancelReviewResp) isReviewResponse() {}
-func (GetIssuesResp) isReviewResponse()    {}
-func (UpdateIssueResp) isReviewResponse()  {}
+func (CreateReviewResp) isReviewResponse()  {}
+func (GetReviewResp) isReviewResponse()     {}
+func (ListReviewsResp) isReviewResponse()   {}
+func (ResubmitResp) isReviewResponse()      {}
+func (CancelReviewResp) isReviewResponse()  {}
+func (DeleteReviewResp) isReviewResponse()  {}
+func (GetIssuesResp) isReviewResponse()     {}
+func (UpdateIssueResp) isReviewResponse()   {}
+func (GetReviewDiffResp) isReviewResponse() {}
 
 // =============================================================================
 // Reviewer sub-actor messages
@@ -136,6 +140,16 @@ type CancelReviewMsg struct {
 // MessageType implements actor.Message.
 func (CancelReviewMsg) MessageType() string { return "CancelReviewMsg" }
 
+// DeleteReviewMsg deletes a review and all associated data.
+type DeleteReviewMsg struct {
+	actor.BaseMessage
+
+	ReviewID string
+}
+
+// MessageType implements actor.Message.
+func (DeleteReviewMsg) MessageType() string { return "DeleteReviewMsg" }
+
 // GetIssuesMsg requests issues for a specific review.
 type GetIssuesMsg struct {
 	actor.BaseMessage
@@ -172,15 +186,30 @@ type CreateReviewResp struct {
 
 // GetReviewResp is the response for a GetReviewMsg.
 type GetReviewResp struct {
-	ReviewID   string
-	ThreadID   string
-	State      string
-	Branch     string
-	BaseBranch string
-	ReviewType string
-	Iterations int
-	OpenIssues int64
-	Error      error
+	ReviewID         string
+	ThreadID         string
+	State            string
+	Branch           string
+	BaseBranch       string
+	ReviewType       string
+	Iterations       int
+	OpenIssues       int64
+	IterationDetails []IterationDetail
+	Error            error
+}
+
+// IterationDetail contains the full details of a review iteration.
+type IterationDetail struct {
+	IterationNum  int
+	ReviewerID    string
+	Decision      string
+	Summary       string
+	FilesReviewed int
+	LinesAnalyzed int
+	DurationMS    int64
+	CostUSD       float64
+	StartedAt     int64
+	CompletedAt   int64
 }
 
 // ListReviewsResp is the response for a ListReviewsMsg.
@@ -212,6 +241,11 @@ type CancelReviewResp struct {
 	Error error
 }
 
+// DeleteReviewResp is the response for a DeleteReviewMsg.
+type DeleteReviewResp struct {
+	Error error
+}
+
 // GetIssuesResp is the response for a GetIssuesMsg.
 type GetIssuesResp struct {
 	Issues []IssueSummary
@@ -234,4 +268,23 @@ type IssueSummary struct {
 // UpdateIssueResp is the response for an UpdateIssueMsg.
 type UpdateIssueResp struct {
 	Error error
+}
+
+// GetReviewDiffMsg requests the git diff for a review's branch.
+type GetReviewDiffMsg struct {
+	actor.BaseMessage
+
+	ReviewID string
+}
+
+// MessageType implements actor.Message.
+func (GetReviewDiffMsg) MessageType() string { return "GetReviewDiffMsg" }
+
+// GetReviewDiffResp is the response for a GetReviewDiffMsg.
+type GetReviewDiffResp struct {
+	// Patch is the raw unified diff output.
+	Patch string
+	// Command is the git command that was executed.
+	Command string
+	Error   error
 }
