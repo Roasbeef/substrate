@@ -133,6 +133,7 @@ func (m *MockStore) CreateMessage(
 		Attachments:     params.Attachments,
 		CreatedAt:       time.Now(),
 		DeletedBySender: false,
+		IdempotencyKey:  params.IdempotencyKey,
 	}
 
 	m.nextMessageID++
@@ -763,6 +764,23 @@ func contains(s, substr string) bool {
 			(len(s) > 0 && len(substr) > 0 &&
 				(s[0:len(substr)] == substr ||
 					contains(s[1:], substr))))
+}
+
+// GetMessageByIdempotencyKey retrieves a message by its idempotency key.
+// Returns sql.ErrNoRows if no matching message is found.
+func (m *MockStore) GetMessageByIdempotencyKey(
+	ctx context.Context, key string,
+) (Message, error) {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+
+	for _, msg := range m.messages {
+		if msg.IdempotencyKey == key {
+			return msg, nil
+		}
+	}
+
+	return Message{}, sql.ErrNoRows
 }
 
 // AgentStore implementation.

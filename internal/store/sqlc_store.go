@@ -79,6 +79,9 @@ type QueryStore interface {
 		ctx context.Context, arg sqlc.SearchMessagesParams,
 	) ([]sqlc.SearchMessagesRow, error)
 	GetMessagesByTopic(ctx context.Context, topicID int64) ([]sqlc.Message, error)
+	GetMessageByIdempotencyKey(
+		ctx context.Context, idempotencyKey sql.NullString,
+	) (sqlc.Message, error)
 
 	// Agent operations.
 	CreateAgent(
@@ -379,16 +382,17 @@ func (s *SqlcStore) CreateMessage(ctx context.Context,
 	params CreateMessageParams,
 ) (Message, error) {
 	msg, err := s.db.CreateMessage(ctx, sqlc.CreateMessageParams{
-		ThreadID:    params.ThreadID,
-		TopicID:     params.TopicID,
-		LogOffset:   params.LogOffset,
-		SenderID:    params.SenderID,
-		Subject:     params.Subject,
-		BodyMd:      params.Body,
-		Priority:    params.Priority,
-		DeadlineAt:  ToSqlcNullInt64(params.DeadlineAt),
-		Attachments: ToSqlcNullString(params.Attachments),
-		CreatedAt:   time.Now().Unix(),
+		ThreadID:       params.ThreadID,
+		TopicID:        params.TopicID,
+		LogOffset:      params.LogOffset,
+		SenderID:       params.SenderID,
+		Subject:        params.Subject,
+		BodyMd:         params.Body,
+		Priority:       params.Priority,
+		DeadlineAt:     ToSqlcNullInt64(params.DeadlineAt),
+		Attachments:    ToSqlcNullString(params.Attachments),
+		CreatedAt:      time.Now().Unix(),
+		IdempotencyKey: ToSqlcNullString(params.IdempotencyKey),
 	})
 	if err != nil {
 		return Message{}, err
@@ -936,6 +940,20 @@ func (s *SqlcStore) GetMessagesBySenderNamePrefix(ctx context.Context,
 	return messages, nil
 }
 
+// GetMessageByIdempotencyKey retrieves a message by its idempotency key.
+// Returns sql.ErrNoRows if no matching message is found.
+func (s *SqlcStore) GetMessageByIdempotencyKey(ctx context.Context,
+	key string,
+) (Message, error) {
+	msg, err := s.db.GetMessageByIdempotencyKey(
+		ctx, ToSqlcNullString(key),
+	)
+	if err != nil {
+		return Message{}, err
+	}
+	return MessageFromSqlc(msg), nil
+}
+
 // =============================================================================
 // AgentStore implementation
 // =============================================================================
@@ -1348,16 +1366,17 @@ func (s *txSqlcStore) CreateMessage(ctx context.Context,
 	params CreateMessageParams,
 ) (Message, error) {
 	msg, err := s.queries.CreateMessage(ctx, sqlc.CreateMessageParams{
-		ThreadID:    params.ThreadID,
-		TopicID:     params.TopicID,
-		LogOffset:   params.LogOffset,
-		SenderID:    params.SenderID,
-		Subject:     params.Subject,
-		BodyMd:      params.Body,
-		Priority:    params.Priority,
-		DeadlineAt:  ToSqlcNullInt64(params.DeadlineAt),
-		Attachments: ToSqlcNullString(params.Attachments),
-		CreatedAt:   time.Now().Unix(),
+		ThreadID:       params.ThreadID,
+		TopicID:        params.TopicID,
+		LogOffset:      params.LogOffset,
+		SenderID:       params.SenderID,
+		Subject:        params.Subject,
+		BodyMd:         params.Body,
+		Priority:       params.Priority,
+		DeadlineAt:     ToSqlcNullInt64(params.DeadlineAt),
+		Attachments:    ToSqlcNullString(params.Attachments),
+		CreatedAt:      time.Now().Unix(),
+		IdempotencyKey: ToSqlcNullString(params.IdempotencyKey),
 	})
 	if err != nil {
 		return Message{}, err
@@ -2288,6 +2307,20 @@ func (s *txSqlcStore) UpdateAgentName(ctx context.Context, id int64,
 		Name: name,
 		ID:   id,
 	})
+}
+
+// GetMessageByIdempotencyKey retrieves a message by its idempotency key.
+// Returns sql.ErrNoRows if no matching message is found.
+func (s *txSqlcStore) GetMessageByIdempotencyKey(ctx context.Context,
+	key string,
+) (Message, error) {
+	msg, err := s.queries.GetMessageByIdempotencyKey(
+		ctx, ToSqlcNullString(key),
+	)
+	if err != nil {
+		return Message{}, err
+	}
+	return MessageFromSqlc(msg), nil
 }
 
 // =============================================================================

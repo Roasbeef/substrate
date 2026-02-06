@@ -123,6 +123,12 @@ type MessageStore interface {
 	GetMessagesBySenderNamePrefix(
 		ctx context.Context, prefix string, limit int,
 	) ([]InboxMessage, error)
+
+	// GetMessageByIdempotencyKey retrieves a message by its idempotency key.
+	// Returns sql.ErrNoRows if no matching message is found.
+	GetMessageByIdempotencyKey(
+		ctx context.Context, key string,
+	) (Message, error)
 }
 
 // AgentStore handles agent persistence operations.
@@ -365,6 +371,7 @@ type Message struct {
 	Attachments     string
 	CreatedAt       time.Time
 	DeletedBySender bool
+	IdempotencyKey  string
 }
 
 // MessageRecipient represents a message recipient's state.
@@ -440,15 +447,16 @@ type SessionIdentity struct {
 
 // CreateMessageParams contains parameters for creating a message.
 type CreateMessageParams struct {
-	ThreadID    string
-	TopicID     int64
-	LogOffset   int64
-	SenderID    int64
-	Subject     string
-	Body        string
-	Priority    string
-	DeadlineAt  *time.Time
-	Attachments string
+	ThreadID       string
+	TopicID        int64
+	LogOffset      int64
+	SenderID       int64
+	Subject        string
+	Body           string
+	Priority       string
+	DeadlineAt     *time.Time
+	Attachments    string
+	IdempotencyKey string
 }
 
 // CreateAgentParams contains parameters for creating an agent.
@@ -504,6 +512,9 @@ func MessageFromSqlc(m sqlc.Message) Message {
 	}
 	if m.Attachments.Valid {
 		msg.Attachments = m.Attachments.String
+	}
+	if m.IdempotencyKey.Valid {
+		msg.IdempotencyKey = m.IdempotencyKey.String
 	}
 	return msg
 }

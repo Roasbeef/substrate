@@ -219,6 +219,7 @@ message SendMailRequest {
     Priority priority = 7;
     google.protobuf.Timestamp deadline_at = 8;  // Optional deadline
     string attachments_json = 9;    // JSON string of attachments
+    string idempotency_key = 10;    // Optional key for deduplication
 }
 
 // SendMailResponse is the response for SendMail.
@@ -329,6 +330,7 @@ message PublishRequest {
     string subject = 3;
     string body = 4;
     Priority priority = 5;
+    string idempotency_key = 6;     // Optional key for deduplication
 }
 
 // PublishResponse is the response for Publish.

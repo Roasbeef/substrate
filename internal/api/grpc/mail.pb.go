@@ -487,6 +487,7 @@ type SendMailRequest struct {
 	Priority        Priority               `protobuf:"varint,7,opt,name=priority,proto3,enum=subtraterpc.Priority" json:"priority,omitempty"`
 	DeadlineAt      *timestamppb.Timestamp `protobuf:"bytes,8,opt,name=deadline_at,json=deadlineAt,proto3" json:"deadline_at,omitempty"`                // Optional deadline
 	AttachmentsJson string                 `protobuf:"bytes,9,opt,name=attachments_json,json=attachmentsJson,proto3" json:"attachments_json,omitempty"` // JSON string of attachments
+	IdempotencyKey  string                 `protobuf:"bytes,10,opt,name=idempotency_key,json=idempotencyKey,proto3" json:"idempotency_key,omitempty"`   // Optional key for deduplication
 	unknownFields   protoimpl.UnknownFields
 	sizeCache       protoimpl.SizeCache
 }
@@ -580,6 +581,13 @@ func (x *SendMailRequest) GetDeadlineAt() *timestamppb.Timestamp {
 func (x *SendMailRequest) GetAttachmentsJson() string {
 	if x != nil {
 		return x.AttachmentsJson
+	}
+	return ""
+}
+
+func (x *SendMailRequest) GetIdempotencyKey() string {
+	if x != nil {
+		return x.IdempotencyKey
 	}
 	return ""
 }
@@ -1460,14 +1468,15 @@ func (x *SubscribeInboxRequest) GetAgentId() int64 {
 
 // PublishRequest is the request for Publish.
 type PublishRequest struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	SenderId      int64                  `protobuf:"varint,1,opt,name=sender_id,json=senderId,proto3" json:"sender_id,omitempty"`
-	TopicName     string                 `protobuf:"bytes,2,opt,name=topic_name,json=topicName,proto3" json:"topic_name,omitempty"`
-	Subject       string                 `protobuf:"bytes,3,opt,name=subject,proto3" json:"subject,omitempty"`
-	Body          string                 `protobuf:"bytes,4,opt,name=body,proto3" json:"body,omitempty"`
-	Priority      Priority               `protobuf:"varint,5,opt,name=priority,proto3,enum=subtraterpc.Priority" json:"priority,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	state          protoimpl.MessageState `protogen:"open.v1"`
+	SenderId       int64                  `protobuf:"varint,1,opt,name=sender_id,json=senderId,proto3" json:"sender_id,omitempty"`
+	TopicName      string                 `protobuf:"bytes,2,opt,name=topic_name,json=topicName,proto3" json:"topic_name,omitempty"`
+	Subject        string                 `protobuf:"bytes,3,opt,name=subject,proto3" json:"subject,omitempty"`
+	Body           string                 `protobuf:"bytes,4,opt,name=body,proto3" json:"body,omitempty"`
+	Priority       Priority               `protobuf:"varint,5,opt,name=priority,proto3,enum=subtraterpc.Priority" json:"priority,omitempty"`
+	IdempotencyKey string                 `protobuf:"bytes,6,opt,name=idempotency_key,json=idempotencyKey,proto3" json:"idempotency_key,omitempty"` // Optional key for deduplication
+	unknownFields  protoimpl.UnknownFields
+	sizeCache      protoimpl.SizeCache
 }
 
 func (x *PublishRequest) Reset() {
@@ -1533,6 +1542,13 @@ func (x *PublishRequest) GetPriority() Priority {
 		return x.Priority
 	}
 	return Priority_PRIORITY_UNSPECIFIED
+}
+
+func (x *PublishRequest) GetIdempotencyKey() string {
+	if x != nil {
+		return x.IdempotencyKey
+	}
+	return ""
 }
 
 // PublishResponse is the response for Publish.
@@ -6793,7 +6809,7 @@ const file_mail_proto_rawDesc = "" +
 	"deadlineAt\x12?\n" +
 	"\rsnoozed_until\x18\f \x01(\v2\x1a.google.protobuf.TimestampR\fsnoozedUntil\x123\n" +
 	"\aread_at\x18\r \x01(\v2\x1a.google.protobuf.TimestampR\x06readAt\x12C\n" +
-	"\x0facknowledged_at\x18\x0e \x01(\v2\x1a.google.protobuf.TimestampR\x0eacknowledgedAt\"\xdc\x02\n" +
+	"\x0facknowledged_at\x18\x0e \x01(\v2\x1a.google.protobuf.TimestampR\x0eacknowledgedAt\"\x85\x03\n" +
 	"\x0fSendMailRequest\x12\x1b\n" +
 	"\tsender_id\x18\x01 \x01(\x03R\bsenderId\x12'\n" +
 	"\x0frecipient_names\x18\x02 \x03(\tR\x0erecipientNames\x12\x1d\n" +
@@ -6805,7 +6821,9 @@ const file_mail_proto_rawDesc = "" +
 	"\bpriority\x18\a \x01(\x0e2\x15.subtraterpc.PriorityR\bpriority\x12;\n" +
 	"\vdeadline_at\x18\b \x01(\v2\x1a.google.protobuf.TimestampR\n" +
 	"deadlineAt\x12)\n" +
-	"\x10attachments_json\x18\t \x01(\tR\x0fattachmentsJson\"N\n" +
+	"\x10attachments_json\x18\t \x01(\tR\x0fattachmentsJson\x12'\n" +
+	"\x0fidempotency_key\x18\n" +
+	" \x01(\tR\x0eidempotencyKey\"N\n" +
 	"\x10SendMailResponse\x12\x1d\n" +
 	"\n" +
 	"message_id\x18\x01 \x01(\x03R\tmessageId\x12\x1b\n" +
@@ -6869,14 +6887,15 @@ const file_mail_proto_rawDesc = "" +
 	"\x03key\x18\x01 \x01(\x03R\x03key\x12\x14\n" +
 	"\x05value\x18\x02 \x01(\x03R\x05value:\x028\x01\"2\n" +
 	"\x15SubscribeInboxRequest\x12\x19\n" +
-	"\bagent_id\x18\x01 \x01(\x03R\aagentId\"\xad\x01\n" +
+	"\bagent_id\x18\x01 \x01(\x03R\aagentId\"\xd6\x01\n" +
 	"\x0ePublishRequest\x12\x1b\n" +
 	"\tsender_id\x18\x01 \x01(\x03R\bsenderId\x12\x1d\n" +
 	"\n" +
 	"topic_name\x18\x02 \x01(\tR\ttopicName\x12\x18\n" +
 	"\asubject\x18\x03 \x01(\tR\asubject\x12\x12\n" +
 	"\x04body\x18\x04 \x01(\tR\x04body\x121\n" +
-	"\bpriority\x18\x05 \x01(\x0e2\x15.subtraterpc.PriorityR\bpriority\"[\n" +
+	"\bpriority\x18\x05 \x01(\x0e2\x15.subtraterpc.PriorityR\bpriority\x12'\n" +
+	"\x0fidempotency_key\x18\x06 \x01(\tR\x0eidempotencyKey\"[\n" +
 	"\x0fPublishResponse\x12\x1d\n" +
 	"\n" +
 	"message_id\x18\x01 \x01(\x03R\tmessageId\x12)\n" +
