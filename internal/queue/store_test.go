@@ -11,26 +11,25 @@ import (
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
 	"pgregory.net/rapid"
-
-	"github.com/roasbeef/subtrate/internal/db"
 )
 
 // newTestQueueStore creates a QueueStore backed by a real SQLite database
 // in a temporary directory. The database is automatically cleaned up when
-// the test finishes.
+// the test finishes. It uses db.NewSqliteStore with the full migration
+// system, matching production behavior.
 func newTestQueueStore(t *testing.T) *QueueStore {
 	t.Helper()
 
-	dbPath := filepath.Join(t.TempDir(), "queue.db")
-	sqlDB, err := db.OpenSQLite(dbPath)
+	dir := t.TempDir()
+	subDir := filepath.Join(dir, ".substrate")
+	dbPath := filepath.Join(subDir, "queue.db")
+
+	store, err := OpenQueueStore(dbPath, DefaultQueueConfig())
 	require.NoError(t, err)
 
 	t.Cleanup(func() {
-		sqlDB.Close()
+		store.Close()
 	})
-
-	store, err := NewQueueStore(sqlDB, DefaultQueueConfig())
-	require.NoError(t, err)
 
 	return store
 }
@@ -41,21 +40,15 @@ func newTestQueueStore(t *testing.T) *QueueStore {
 func newRapidQueueStore(t *testing.T) *QueueStore {
 	t.Helper()
 
-	// Use a unique subdirectory per call to avoid SQLite lock conflicts
-	// between rapid iterations.
 	dir := t.TempDir()
-	dbPath := filepath.Join(dir, "queue.db")
-	sqlDB, err := db.OpenSQLite(dbPath)
+	subDir := filepath.Join(dir, ".substrate")
+	dbPath := filepath.Join(subDir, "queue.db")
+
+	store, err := OpenQueueStore(dbPath, DefaultQueueConfig())
 	require.NoError(t, err)
 
-	store, err := NewQueueStore(sqlDB, DefaultQueueConfig())
-	require.NoError(t, err)
-
-	// Note: we don't add a Cleanup since t.TempDir handles removal,
-	// and the rapid callback runs many iterations under one *testing.T.
-	// Each iteration gets its own dir, so this is safe.
 	t.Cleanup(func() {
-		sqlDB.Close()
+		store.Close()
 	})
 
 	return store

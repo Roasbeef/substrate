@@ -2,64 +2,26 @@ package queue
 
 import (
 	"context"
-	"database/sql"
 	"fmt"
+	"log/slog"
 	"time"
 
 	"github.com/roasbeef/subtrate/internal/db"
 	"github.com/roasbeef/subtrate/internal/db/sqlc"
 )
 
-// queueDDL is the schema for the queue database. This is a subset of the
-// full migration schema, applied via CREATE TABLE IF NOT EXISTS so that
-// queue.db can be initialized independently of the main migration system.
-const queueDDL = `
-CREATE TABLE IF NOT EXISTS pending_operations (
-    id INTEGER PRIMARY KEY,
-    idempotency_key TEXT UNIQUE NOT NULL,
-    operation_type TEXT NOT NULL,
-    payload_json TEXT NOT NULL,
-    agent_name TEXT NOT NULL,
-    session_id TEXT,
-    created_at INTEGER NOT NULL,
-    expires_at INTEGER NOT NULL,
-    attempts INTEGER NOT NULL DEFAULT 0,
-    last_error TEXT,
-    status TEXT NOT NULL DEFAULT 'pending'
-);
-
-CREATE INDEX IF NOT EXISTS idx_pending_status
-    ON pending_operations(status);
-CREATE INDEX IF NOT EXISTS idx_pending_expires
-    ON pending_operations(expires_at);
-`
-
 // QueueStore provides access to the local offline operation queue. It wraps
-// a db.Store which in turn uses db.TransactionExecutor with the same sqlc
-// generated queries as the main store.
+// a db.SqliteStore which uses the standard migration system to initialize
+// the database schema, including the pending_operations table from migration
+// 000004.
 type QueueStore struct {
-	sqlDB   *sql.DB
-	dbStore *db.Store
-	cfg     QueueConfig
+	sqliteStore *db.SqliteStore
+	cfg         QueueConfig
 }
 
-// NewQueueStore creates a new QueueStore wrapping an existing database
-// connection.
-func NewQueueStore(sqlDB *sql.DB, cfg QueueConfig) (*QueueStore, error) {
-	// Apply the queue schema to this database.
-	if _, err := sqlDB.Exec(queueDDL); err != nil {
-		return nil, fmt.Errorf("apply queue schema: %w", err)
-	}
-
-	return &QueueStore{
-		sqlDB:   sqlDB,
-		dbStore: db.NewStore(sqlDB),
-		cfg:     cfg,
-	}, nil
-}
-
-// OpenQueueStore opens a queue database at the given path and initializes
-// the schema. It uses db.OpenSQLite for consistent connection settings.
+// OpenQueueStore opens a queue database at the given path and runs
+// migrations to ensure the schema is up to date. It uses db.NewSqliteStore
+// for consistent connection settings and migration handling.
 func OpenQueueStore(dbPath string, cfg QueueConfig) (*QueueStore, error) {
 	if err := EnsureQueueDir(
 		// The queue.db lives inside .substrate/, so we need the
@@ -69,18 +31,18 @@ func OpenQueueStore(dbPath string, cfg QueueConfig) (*QueueStore, error) {
 		return nil, fmt.Errorf("ensure queue dir: %w", err)
 	}
 
-	sqlDB, err := db.OpenSQLite(dbPath)
+	sqliteStore, err := db.NewSqliteStore(&db.SqliteConfig{
+		DatabaseFileName:      dbPath,
+		SkipMigrationDBBackup: true,
+	}, slog.Default())
 	if err != nil {
 		return nil, fmt.Errorf("open queue db: %w", err)
 	}
 
-	store, err := NewQueueStore(sqlDB, cfg)
-	if err != nil {
-		sqlDB.Close()
-		return nil, err
-	}
-
-	return store, nil
+	return &QueueStore{
+		sqliteStore: sqliteStore,
+		cfg:         cfg,
+	}, nil
 }
 
 // Enqueue adds a new operation to the queue. It returns ErrQueueFull if the
@@ -89,7 +51,7 @@ func (s *QueueStore) Enqueue(
 	ctx context.Context, op PendingOperation,
 ) error {
 
-	return s.dbStore.WithTx(ctx, func(
+	return s.sqliteStore.WithTx(ctx, func(
 		ctx context.Context, q *sqlc.Queries,
 	) error {
 		// Check current count against the configured maximum.
@@ -123,7 +85,7 @@ func (s *QueueStore) Enqueue(
 func (s *QueueStore) List(ctx context.Context) ([]PendingOperation, error) {
 	var ops []PendingOperation
 
-	err := s.dbStore.WithReadTx(ctx, func(
+	err := s.sqliteStore.WithReadTx(ctx, func(
 		ctx context.Context, q *sqlc.Queries,
 	) error {
 		rows, err := q.ListPendingOperations(ctx)
@@ -147,7 +109,7 @@ func (s *QueueStore) List(ctx context.Context) ([]PendingOperation, error) {
 func (s *QueueStore) Drain(ctx context.Context) ([]PendingOperation, error) {
 	var ops []PendingOperation
 
-	err := s.dbStore.WithTx(ctx, func(
+	err := s.sqliteStore.WithTx(ctx, func(
 		ctx context.Context, q *sqlc.Queries,
 	) error {
 		rows, err := q.DrainPendingOperations(ctx)
@@ -168,7 +130,7 @@ func (s *QueueStore) Drain(ctx context.Context) ([]PendingOperation, error) {
 
 // MarkDelivered marks an operation as successfully delivered.
 func (s *QueueStore) MarkDelivered(ctx context.Context, id int64) error {
-	return s.dbStore.WithTx(ctx, func(
+	return s.sqliteStore.WithTx(ctx, func(
 		ctx context.Context, q *sqlc.Queries,
 	) error {
 		return q.MarkOperationDelivered(ctx, id)
@@ -182,7 +144,7 @@ func (s *QueueStore) MarkFailed(
 	ctx context.Context, id int64, errMsg string,
 ) error {
 
-	return s.dbStore.WithTx(ctx, func(
+	return s.sqliteStore.WithTx(ctx, func(
 		ctx context.Context, q *sqlc.Queries,
 	) error {
 		return q.MarkOperationFailed(ctx, sqlc.MarkOperationFailedParams{
@@ -194,7 +156,7 @@ func (s *QueueStore) MarkFailed(
 
 // Clear deletes all operations from the queue regardless of status.
 func (s *QueueStore) Clear(ctx context.Context) error {
-	return s.dbStore.WithTx(ctx, func(
+	return s.sqliteStore.WithTx(ctx, func(
 		ctx context.Context, q *sqlc.Queries,
 	) error {
 		return q.ClearAllOperations(ctx)
@@ -206,7 +168,7 @@ func (s *QueueStore) Clear(ctx context.Context) error {
 func (s *QueueStore) PurgeExpired(ctx context.Context) (int64, error) {
 	var purged int64
 
-	err := s.dbStore.WithTx(ctx, func(
+	err := s.sqliteStore.WithTx(ctx, func(
 		ctx context.Context, q *sqlc.Queries,
 	) error {
 		var err error
@@ -223,7 +185,7 @@ func (s *QueueStore) PurgeExpired(ctx context.Context) (int64, error) {
 func (s *QueueStore) Stats(ctx context.Context) (QueueStats, error) {
 	var stats QueueStats
 
-	err := s.dbStore.WithReadTx(ctx, func(
+	err := s.sqliteStore.WithReadTx(ctx, func(
 		ctx context.Context, q *sqlc.Queries,
 	) error {
 		row, err := q.GetQueueStats(ctx)
@@ -243,7 +205,7 @@ func (s *QueueStore) Stats(ctx context.Context) (QueueStats, error) {
 func (s *QueueStore) Count(ctx context.Context) (int64, error) {
 	var count int64
 
-	err := s.dbStore.WithReadTx(ctx, func(
+	err := s.sqliteStore.WithReadTx(ctx, func(
 		ctx context.Context, q *sqlc.Queries,
 	) error {
 		var err error
@@ -256,5 +218,5 @@ func (s *QueueStore) Count(ctx context.Context) (int64, error) {
 
 // Close closes the underlying database connection.
 func (s *QueueStore) Close() error {
-	return s.sqlDB.Close()
+	return s.sqliteStore.DB().Close()
 }
