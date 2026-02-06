@@ -311,323 +311,43 @@ func (r *reviewSubActor) Run(parentCtx context.Context) {
 		"prompt", truncateStr(prompt, 500),
 	)
 
-	// isTerminalDecision returns true for review decisions that end the
-	// review lifecycle (no further back-and-forth expected).
-	isTerminalDecision := func(decision string) bool {
-		return decision == "approve" || decision == "reject"
-	}
-
-	var (
-		lastText    string
-		response    claudeagent.ResultMessage
-		gotResult   bool
-		earlyResult bool
-		msgCount    int
-		authErr     error
-	)
+	state := &messageLoopState{}
 
 	for msg := range client.Query(ctx, prompt) {
-		msgCount++
+		state.msgCount++
 
 		log.InfoS(ctx, "Reviewer received message from CLI",
 			"review_id", r.reviewID,
-			"msg_num", msgCount,
+			"msg_num", state.msgCount,
 			"msg_type", fmt.Sprintf("%T", msg),
 		)
 
 		switch m := msg.(type) {
 		case claudeagent.AssistantMessage:
-			text := m.ContentText()
-			if text != "" {
-				lastText = text
-				log.InfoS(ctx, "Reviewer assistant text",
-					"review_id", r.reviewID,
-					"msg_num", msgCount,
-					"text_len", len(text),
-					"text_preview",
-					truncateStr(text, 500),
-				)
-
-				// Detect auth errors returned as
-				// assistant text. The CLI surfaces auth
-				// failures as plain text messages rather
-				// than error results.
-				if isAuthError(text) {
-					authErr = fmt.Errorf(
-						"auth error: %s",
-						strings.TrimSpace(text),
-					)
-					log.ErrorS(ctx,
-						"Reviewer detected auth "+
-							"error in assistant "+
-							"text, aborting",
-						authErr,
-						"review_id", r.reviewID,
-					)
-				}
-			}
-
-			// Log each content block for debugging,
-			// including tool arguments for tool_use blocks.
-			if m.Message.Content != nil {
-				for i, block := range m.Message.Content {
-					args := ""
-					if block.Type == "tool_use" &&
-						len(block.Input) > 0 {
-
-						args = truncateStr(
-							string(block.Input), 500,
-						)
-					}
-					log.InfoS(ctx,
-						"Reviewer content block",
-						"review_id", r.reviewID,
-						"msg_num", msgCount,
-						"block_idx", i,
-						"block_type", block.Type,
-						"block_name", block.Name,
-						"tool_args", args,
-					)
-				}
-			}
-			result.SessionID = m.SessionID
-
-			// Early detection: if the assistant text
-			// contains a valid YAML review result, persist
-			// it and invoke the callback immediately so the
-			// FSM transitions without waiting for the
-			// subprocess to exit (the stop hook may keep it
-			// alive for follow-up messages). We continue
-			// reading the stream for potential back-and-
-			// forth conversation.
-			if text != "" && !earlyResult {
-				if parsed, pErr := ParseReviewerResponse(
-					text,
-				); pErr == nil && parsed.Decision != "" {
-
-					log.InfoS(ctx,
-						"Reviewer detected YAML "+
-							"result in assistant "+
-							"text, persisting now",
-						"review_id", r.reviewID,
-						"decision", parsed.Decision,
-						"issues",
-						len(parsed.Issues),
-					)
-
-					result.Result = parsed
-					result.Duration = time.Since(
-						startTime,
-					)
-					earlyResult = true
-
-					// Persist and notify the FSM
-					// immediately.
-					r.persistResults(
-						ctx, result, startTime,
-					)
-					r.callback(ctx, result)
-
-					// For terminal decisions (approve/
-					// reject), kill the Claude subprocess
-					// immediately. The stop hook would
-					// otherwise keep it alive for ~9m30s
-					// polling for mail. Close() sends
-					// stdin EOF → 5s grace → SIGKILL.
-					// For request_changes, we keep the
-					// process alive so the stop hook can
-					// facilitate back-and-forth.
-					if isTerminalDecision(
-						parsed.Decision,
-					) {
-						log.InfoS(ctx,
-							"Reviewer killing "+
-								"subprocess "+
-								"after terminal "+
-								"decision",
-							"review_id",
-							r.reviewID,
-							"decision",
-							parsed.Decision,
-						)
-
-						client.Close()
-					}
-				}
-			}
+			r.handleAssistantMsg(
+				ctx, m, state, result,
+				startTime, client,
+			)
 
 		case claudeagent.ResultMessage:
-			response = m
-			gotResult = true
-			result.SessionID = m.SessionID
-			result.CostUSD = m.TotalCostUSD
-			result.Duration = time.Duration(
-				m.DurationMs,
-			) * time.Millisecond
-
-			log.InfoS(ctx, "Reviewer received ResultMessage",
-				"review_id", r.reviewID,
-				"session_id", m.SessionID,
-				"is_error", m.IsError,
-				"cost_usd", m.TotalCostUSD,
-				"duration_ms", m.DurationMs,
-				"result_len", len(m.Result),
-				"num_errors", len(m.Errors),
-			)
+			r.handleResultMsg(ctx, m, state, result)
 
 		case claudeagent.UserMessage:
-			// Log tool result content for diagnostics.
-			// The UserMessage following a tool_use contains
-			// the Bash output, which is critical for debugging
-			// substrate CLI failures.
-			var parentToolID string
-			if m.ParentToolUseID != nil {
-				parentToolID = *m.ParentToolUseID
-			}
-
-			// Log each content block with its type so we
-			// can see what the CLI actually returned (the
-			// Text field may be empty for non-text types).
-			for i, cb := range m.Message.Content {
-				log.InfoS(ctx,
-					"Reviewer tool result block",
-					"review_id", r.reviewID,
-					"msg_num", msgCount,
-					"block_idx", i,
-					"block_type", cb.Type,
-					"text_len", len(cb.Text),
-					"text_preview",
-					truncateStr(cb.Text, 500),
-				)
-			}
-
-			// Also log the raw ToolUseResult field which
-			// may contain the tool output when the content
-			// blocks are empty.
-			if m.ToolUseResult != nil {
-				raw, _ := json.Marshal(m.ToolUseResult)
-				log.InfoS(ctx,
-					"Reviewer tool use result",
-					"review_id", r.reviewID,
-					"msg_num", msgCount,
-					"parent_tool_use_id",
-					parentToolID,
-					"raw_result",
-					truncateStr(string(raw), 1000),
-				)
-			}
-
-			log.InfoS(ctx, "Reviewer tool result",
-				"review_id", r.reviewID,
-				"msg_num", msgCount,
-				"parent_tool_use_id", parentToolID,
-				"content_blocks",
-				len(m.Message.Content),
-			)
+			r.handleToolResultMsg(ctx, m, state)
 
 		default:
-			log.InfoS(ctx, "Reviewer received other message type",
+			log.InfoS(ctx,
+				"Reviewer received other message type",
 				"review_id", r.reviewID,
-				"msg_num", msgCount,
+				"msg_num", state.msgCount,
 				"type", fmt.Sprintf("%T", msg),
 			)
 		}
 	}
 
-	// Log why the loop exited.
-	log.InfoS(ctx, "Reviewer query loop exited",
-		"review_id", r.reviewID,
-		"total_messages", msgCount,
-		"got_result", gotResult,
-		"early_result", earlyResult,
-		"auth_error", authErr != nil,
-		"ctx_err", fmt.Sprintf("%v", ctx.Err()),
-		"elapsed", time.Since(startTime).String(),
-	)
-
-	// Auth errors take priority — the review cannot proceed.
-	if authErr != nil {
-		result.Error = authErr
-		result.Duration = time.Since(startTime)
-		r.callback(ctx, result)
-
-		return
-	}
-
-	// If we already detected and persisted the YAML result during the
-	// message loop, nothing more to do.
-	if earlyResult {
-		return
-	}
-
-	if !gotResult {
-		result.Error = fmt.Errorf("no result message received")
-		result.Duration = time.Since(startTime)
-		log.ErrorS(ctx, "Reviewer received no result message",
-			result.Error,
-			"review_id", r.reviewID,
-			"total_messages", msgCount,
-			"last_text_preview",
-			truncateStr(lastText, 300),
-			"duration", result.Duration.String(),
-		)
-		r.callback(ctx, result)
-		return
-	}
-
-	if response.IsError {
-		errMsg := "review failed"
-		if len(response.Errors) > 0 {
-			errMsg = response.Errors[0]
-		}
-		result.Error = fmt.Errorf("reviewer error: %s", errMsg)
-		result.Duration = time.Since(startTime)
-		log.ErrorS(ctx, "Reviewer returned error result",
-			result.Error,
-			"review_id", r.reviewID,
-			"duration", result.Duration.String(),
-		)
-		r.callback(ctx, result)
-		return
-	}
-
-	// Parse the review result from the response text.
-	responseText := response.Result
-	if responseText == "" {
-		responseText = lastText
-	}
-
-	parsed, err := ParseReviewerResponse(responseText)
-	if err != nil {
-		result.Error = fmt.Errorf("parse reviewer response: %w", err)
-		result.Duration = time.Since(startTime)
-		log.ErrorS(ctx, "Reviewer failed to parse response YAML",
-			err,
-			"review_id", r.reviewID,
-			"duration", result.Duration.String(),
-		)
-		r.callback(ctx, result)
-		return
-	}
-
-	result.Result = parsed
-
-	log.InfoS(ctx, "Reviewer completed review",
-		"review_id", r.reviewID,
-		"decision", parsed.Decision,
-		"issues_found", len(parsed.Issues),
-		"files_reviewed", parsed.FilesReviewed,
-		"lines_analyzed", parsed.LinesAnalyzed,
-		"session_id", result.SessionID,
-		"cost_usd", result.CostUSD,
-		"duration", result.Duration.String(),
-	)
-
-	// Persist the iteration and issues to the database.
-	r.persistResults(ctx, result, startTime)
-
-	// Invoke the callback so the service can update the FSM.
-	r.callback(ctx, result)
+	// Process the final result from the loop, unless it was already
+	// handled eagerly from an AssistantMessage YAML block.
+	r.processPostLoop(ctx, state, result, startTime)
 }
 
 // Stop cancels the sub-actor's context, triggering Claude CLI subprocess
@@ -639,6 +359,323 @@ func (r *reviewSubActor) Stop() {
 		)
 		r.cancel()
 	}
+}
+
+// messageLoopState tracks mutable state accumulated while processing the
+// stream of messages from the Claude Agent SDK query loop.
+type messageLoopState struct {
+	// lastText is the most recent non-empty assistant text, used as a
+	// fallback when the ResultMessage has an empty Result field.
+	lastText string
+
+	// response is the final ResultMessage from the CLI subprocess.
+	response claudeagent.ResultMessage
+
+	// gotResult is true once a ResultMessage has been received.
+	gotResult bool
+
+	// earlyResult is true if the review YAML was already parsed and
+	// the callback fired during the message loop (eager path). When
+	// set, the post-loop processing is skipped to avoid double-
+	// persisting and double-calling the callback.
+	earlyResult bool
+
+	// msgCount is the total number of messages received so far.
+	msgCount int
+
+	// authErr is set when an authentication error is detected in
+	// assistant text. Auth errors take priority over all other
+	// processing since the reviewer cannot proceed without valid
+	// credentials.
+	authErr error
+}
+
+// isTerminalDecision returns true for review decisions that end the
+// review lifecycle (no further back-and-forth expected).
+func isTerminalDecision(decision string) bool {
+	return decision == "approve" || decision == "reject"
+}
+
+// handleAssistantMsg processes an AssistantMessage from the CLI. It logs
+// the text content, detects auth errors, eagerly parses YAML review
+// results, and logs individual content blocks for diagnostics.
+func (r *reviewSubActor) handleAssistantMsg(
+	ctx context.Context, m claudeagent.AssistantMessage,
+	state *messageLoopState, result *SubActorResult,
+	startTime time.Time, client *claudeagent.Client,
+) {
+	text := m.ContentText()
+	if text != "" {
+		state.lastText = text
+		log.InfoS(ctx, "Reviewer assistant text",
+			"review_id", r.reviewID, "msg_num", state.msgCount,
+			"text_len", len(text), "text_preview", truncateStr(text, 500),
+		)
+
+		// Detect auth errors returned as assistant text. The
+		// CLI surfaces auth failures as plain text messages
+		// rather than error results.
+		if isAuthError(text) {
+			state.authErr = fmt.Errorf(
+				"auth error: %s", strings.TrimSpace(text),
+			)
+			log.ErrorS(ctx,
+				"Reviewer detected auth error, aborting",
+				state.authErr, "review_id", r.reviewID,
+			)
+		}
+	}
+
+	// Log each content block for debugging.
+	r.logContentBlocks(ctx, m, state.msgCount)
+	result.SessionID = m.SessionID
+
+	// Eagerly parse YAML review results from assistant text. The
+	// stop hook keeps the CLI alive for follow-up messages, so the
+	// ResultMessage may not arrive for minutes.
+	if text != "" {
+		r.tryParseReviewYAML(
+			ctx, text, state, result, startTime, client,
+		)
+	}
+}
+
+// tryParseReviewYAML attempts to parse a YAML review result from
+// assistant text. If a valid YAML block is found (and we haven't
+// already processed a result), the result is persisted to the database
+// and the callback is fired immediately. For terminal decisions
+// (approve/reject), the subprocess is killed to avoid the 9m30s stop
+// hook timeout. For request_changes, the process stays alive so the
+// stop hook can facilitate back-and-forth conversation.
+func (r *reviewSubActor) tryParseReviewYAML(
+	ctx context.Context, text string, state *messageLoopState,
+	result *SubActorResult, startTime time.Time,
+	client *claudeagent.Client,
+) {
+	if state.earlyResult {
+		return
+	}
+
+	parsed, err := ParseReviewerResponse(text)
+	if err != nil || parsed.Decision == "" {
+		return
+	}
+
+	log.InfoS(ctx, "Reviewer detected YAML result, persisting",
+		"review_id", r.reviewID, "decision", parsed.Decision,
+		"issues", len(parsed.Issues),
+	)
+
+	result.Result = parsed
+	result.Duration = time.Since(startTime)
+	state.earlyResult = true
+
+	// Persist and notify the FSM immediately.
+	r.persistResults(ctx, result, startTime)
+	r.callback(ctx, result)
+
+	// For terminal decisions, kill the Claude subprocess
+	// immediately. The stop hook would otherwise keep it alive
+	// for ~9m30s polling for mail. Close() sends stdin EOF → 5s
+	// grace → SIGKILL. For request_changes, we keep the process
+	// alive so the stop hook can facilitate back-and-forth.
+	if isTerminalDecision(parsed.Decision) {
+		log.InfoS(ctx, "Reviewer killing subprocess",
+			"review_id", r.reviewID, "decision", parsed.Decision,
+		)
+		client.Close()
+	}
+}
+
+// logContentBlocks logs each content block in an AssistantMessage for
+// debugging. Tool use blocks include a truncated preview of their
+// arguments.
+func (r *reviewSubActor) logContentBlocks(
+	ctx context.Context, m claudeagent.AssistantMessage, msgNum int,
+) {
+	if m.Message.Content == nil {
+		return
+	}
+
+	for i, block := range m.Message.Content {
+		args := ""
+		if block.Type == "tool_use" && len(block.Input) > 0 {
+			args = truncateStr(string(block.Input), 500)
+		}
+		log.InfoS(ctx, "Reviewer content block",
+			"review_id", r.reviewID, "msg_num", msgNum,
+			"block_idx", i, "block_type", block.Type,
+			"block_name", block.Name, "tool_args", args,
+		)
+	}
+}
+
+// handleResultMsg processes the final ResultMessage from the CLI. This
+// message contains cost, duration, and optionally the final response
+// text. It may arrive long after the actual review output if the stop
+// hook keeps the CLI alive for follow-up messages.
+func (r *reviewSubActor) handleResultMsg(
+	ctx context.Context, m claudeagent.ResultMessage,
+	state *messageLoopState, result *SubActorResult,
+) {
+	state.response = m
+	state.gotResult = true
+	result.SessionID = m.SessionID
+	result.CostUSD = m.TotalCostUSD
+	result.Duration = time.Duration(
+		m.DurationMs,
+	) * time.Millisecond
+
+	log.InfoS(ctx, "Reviewer received ResultMessage",
+		"review_id", r.reviewID, "session_id", m.SessionID,
+		"is_error", m.IsError, "cost_usd", m.TotalCostUSD,
+		"duration_ms", m.DurationMs, "result_len", len(m.Result),
+		"num_errors", len(m.Errors),
+	)
+}
+
+// handleToolResultMsg processes a UserMessage (tool result) from the
+// CLI. These messages follow tool_use blocks and contain the tool output
+// (e.g., Bash stdout). They are logged for diagnostics but do not
+// affect the review result.
+func (r *reviewSubActor) handleToolResultMsg(
+	ctx context.Context, m claudeagent.UserMessage,
+	state *messageLoopState,
+) {
+	var parentToolID string
+	if m.ParentToolUseID != nil {
+		parentToolID = *m.ParentToolUseID
+	}
+
+	// Log each content block with its type so we can see what
+	// the CLI actually returned.
+	for i, cb := range m.Message.Content {
+		log.InfoS(ctx, "Reviewer tool result block",
+			"review_id", r.reviewID, "msg_num", state.msgCount,
+			"block_idx", i, "block_type", cb.Type,
+			"text_len", len(cb.Text), "text_preview", truncateStr(cb.Text, 500),
+		)
+	}
+
+	// Log the raw ToolUseResult field which may contain the tool
+	// output when the content blocks are empty.
+	if m.ToolUseResult != nil {
+		raw, _ := json.Marshal(m.ToolUseResult)
+		log.InfoS(ctx, "Reviewer tool use result",
+			"review_id", r.reviewID, "msg_num", state.msgCount,
+			"parent_tool_use_id", parentToolID, "raw_result", truncateStr(string(raw), 1000),
+		)
+	}
+
+	log.InfoS(ctx, "Reviewer tool result",
+		"review_id", r.reviewID, "msg_num", state.msgCount,
+		"parent_tool_use_id", parentToolID, "content_blocks", len(m.Message.Content),
+	)
+}
+
+// processPostLoop handles the final result processing after the query
+// loop exits. If the YAML result was already parsed eagerly from an
+// AssistantMessage (earlyResult == true), this only updates cost
+// metadata from the ResultMessage without re-persisting or re-calling
+// the callback. Otherwise it performs the standard post-loop processing:
+// auth error reporting, ResultMessage parsing, and callback invocation.
+func (r *reviewSubActor) processPostLoop(
+	ctx context.Context, state *messageLoopState,
+	result *SubActorResult, startTime time.Time,
+) {
+	log.InfoS(ctx, "Reviewer query loop exited",
+		"review_id", r.reviewID, "total_messages", state.msgCount,
+		"got_result", state.gotResult, "early_result", state.earlyResult,
+		"auth_error", state.authErr != nil, "ctx_err", fmt.Sprintf("%v", ctx.Err()),
+		"elapsed", time.Since(startTime).String(),
+	)
+
+	// Auth errors take priority — the review cannot proceed.
+	if state.authErr != nil {
+		result.Error = state.authErr
+		result.Duration = time.Since(startTime)
+		r.callback(ctx, result)
+
+		return
+	}
+
+	// If we already detected and persisted the YAML result during
+	// the message loop, update cost metadata from the ResultMessage
+	// (if we got one) and return.
+	if state.earlyResult {
+		if state.gotResult {
+			result.CostUSD = state.response.TotalCostUSD
+			result.Duration = time.Duration(
+				state.response.DurationMs,
+			) * time.Millisecond
+		}
+
+		return
+	}
+
+	if !state.gotResult {
+		result.Error = fmt.Errorf("no result message received")
+		result.Duration = time.Since(startTime)
+		log.ErrorS(ctx, "Reviewer received no result message",
+			result.Error, "review_id", r.reviewID,
+			"total_messages", state.msgCount,
+			"last_text_preview", truncateStr(state.lastText, 300),
+			"duration", result.Duration.String(),
+		)
+		r.callback(ctx, result)
+
+		return
+	}
+
+	if state.response.IsError {
+		errMsg := "review failed"
+		if len(state.response.Errors) > 0 {
+			errMsg = state.response.Errors[0]
+		}
+		result.Error = fmt.Errorf("reviewer error: %s", errMsg)
+		result.Duration = time.Since(startTime)
+		log.ErrorS(ctx, "Reviewer returned error result",
+			result.Error, "review_id", r.reviewID, "duration", result.Duration.String(),
+		)
+		r.callback(ctx, result)
+
+		return
+	}
+
+	// Parse the review result from the response text.
+	responseText := state.response.Result
+	if responseText == "" {
+		responseText = state.lastText
+	}
+
+	parsed, err := ParseReviewerResponse(responseText)
+	if err != nil {
+		result.Error = fmt.Errorf(
+			"parse reviewer response: %w", err,
+		)
+		result.Duration = time.Since(startTime)
+		log.ErrorS(ctx, "Reviewer failed to parse response YAML",
+			err, "review_id", r.reviewID, "duration", result.Duration.String(),
+		)
+		r.callback(ctx, result)
+
+		return
+	}
+
+	result.Result = parsed
+
+	log.InfoS(ctx, "Reviewer completed review",
+		"review_id", r.reviewID, "decision", parsed.Decision,
+		"issues_found", len(parsed.Issues), "files_reviewed", parsed.FilesReviewed,
+		"lines_analyzed", parsed.LinesAnalyzed, "session_id", result.SessionID,
+		"cost_usd", result.CostUSD, "duration", result.Duration.String(),
+	)
+
+	// Persist the iteration and issues to the database.
+	r.persistResults(ctx, result, startTime)
+
+	// Invoke the callback so the service can update the FSM.
+	r.callback(ctx, result)
 }
 
 // buildClientOptions constructs SDK options from the reviewer and spawn
