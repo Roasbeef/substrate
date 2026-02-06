@@ -311,294 +311,43 @@ func (r *reviewSubActor) Run(parentCtx context.Context) {
 		"prompt", truncateStr(prompt, 500),
 	)
 
-	// isTerminalDecision returns true for review decisions that end the
-	// review lifecycle (no further back-and-forth expected).
-	isTerminalDecision := func(decision string) bool {
-		return decision == "approve" || decision == "reject"
-	}
-
-	var (
-		lastText    string
-		response    claudeagent.ResultMessage
-		gotResult   bool
-		earlyResult bool
-		msgCount    int
-	)
+	state := &messageLoopState{}
 
 	for msg := range client.Query(ctx, prompt) {
-		msgCount++
+		state.msgCount++
 
 		log.InfoS(ctx, "Reviewer received message from CLI",
 			"review_id", r.reviewID,
-			"msg_num", msgCount,
+			"msg_num", state.msgCount,
 			"msg_type", fmt.Sprintf("%T", msg),
 		)
 
 		switch m := msg.(type) {
 		case claudeagent.AssistantMessage:
-			text := m.ContentText()
-			if text != "" {
-				lastText = text
-				log.InfoS(ctx, "Reviewer assistant text",
-					"review_id", r.reviewID,
-					"msg_num", msgCount,
-					"text_len", len(text),
-					"text_preview",
-					truncateStr(text, 500),
-				)
-			}
-
-			// Log each content block for debugging,
-			// including tool arguments for tool_use blocks.
-			if m.Message.Content != nil {
-				for i, block := range m.Message.Content {
-					args := ""
-					if block.Type == "tool_use" &&
-						len(block.Input) > 0 {
-
-						args = truncateStr(
-							string(block.Input), 500,
-						)
-					}
-					log.InfoS(ctx,
-						"Reviewer content block",
-						"review_id", r.reviewID,
-						"msg_num", msgCount,
-						"block_idx", i,
-						"block_type", block.Type,
-						"block_name", block.Name,
-						"tool_args", args,
-					)
-				}
-			}
-			result.SessionID = m.SessionID
-
-			// Early detection: if the assistant text
-			// contains a valid YAML review result, persist
-			// it and invoke the callback immediately so the
-			// FSM transitions without waiting for the
-			// subprocess to exit (the stop hook may keep it
-			// alive for follow-up messages). We continue
-			// reading the stream for potential back-and-
-			// forth conversation.
-			if text != "" && !earlyResult {
-				if parsed, pErr := ParseReviewerResponse(
-					text,
-				); pErr == nil && parsed.Decision != "" {
-
-					log.InfoS(ctx,
-						"Reviewer detected YAML "+
-							"result in assistant "+
-							"text, persisting now",
-						"review_id", r.reviewID,
-						"decision", parsed.Decision,
-						"issues",
-						len(parsed.Issues),
-					)
-
-					result.Result = parsed
-					result.Duration = time.Since(
-						startTime,
-					)
-					earlyResult = true
-
-					// Persist and notify the FSM
-					// immediately.
-					r.persistResults(
-						ctx, result, startTime,
-					)
-					r.callback(ctx, result)
-
-					// For terminal decisions (approve/
-					// reject), kill the Claude subprocess
-					// immediately. The stop hook would
-					// otherwise keep it alive for ~9m30s
-					// polling for mail. Close() sends
-					// stdin EOF → 5s grace → SIGKILL.
-					// For request_changes, we keep the
-					// process alive so the stop hook can
-					// facilitate back-and-forth.
-					if isTerminalDecision(
-						parsed.Decision,
-					) {
-						log.InfoS(ctx,
-							"Reviewer killing "+
-								"subprocess "+
-								"after terminal "+
-								"decision",
-							"review_id",
-							r.reviewID,
-							"decision",
-							parsed.Decision,
-						)
-
-						client.Close()
-					}
-				}
-			}
+			r.handleAssistantMsg(
+				ctx, m, state, result,
+				startTime, client,
+			)
 
 		case claudeagent.ResultMessage:
-			response = m
-			gotResult = true
-			result.SessionID = m.SessionID
-			result.CostUSD = m.TotalCostUSD
-			result.Duration = time.Duration(
-				m.DurationMs,
-			) * time.Millisecond
-
-			log.InfoS(ctx, "Reviewer received ResultMessage",
-				"review_id", r.reviewID,
-				"session_id", m.SessionID,
-				"is_error", m.IsError,
-				"cost_usd", m.TotalCostUSD,
-				"duration_ms", m.DurationMs,
-				"result_len", len(m.Result),
-				"num_errors", len(m.Errors),
-			)
+			r.handleResultMsg(ctx, m, state, result)
 
 		case claudeagent.UserMessage:
-			// Log tool result content for diagnostics.
-			// The UserMessage following a tool_use contains
-			// the Bash output, which is critical for debugging
-			// substrate CLI failures.
-			var parentToolID string
-			if m.ParentToolUseID != nil {
-				parentToolID = *m.ParentToolUseID
-			}
-
-			// Log each content block with its type so we
-			// can see what the CLI actually returned (the
-			// Text field may be empty for non-text types).
-			for i, cb := range m.Message.Content {
-				log.InfoS(ctx,
-					"Reviewer tool result block",
-					"review_id", r.reviewID,
-					"msg_num", msgCount,
-					"block_idx", i,
-					"block_type", cb.Type,
-					"text_len", len(cb.Text),
-					"text_preview",
-					truncateStr(cb.Text, 500),
-				)
-			}
-
-			// Also log the raw ToolUseResult field which
-			// may contain the tool output when the content
-			// blocks are empty.
-			if m.ToolUseResult != nil {
-				raw, _ := json.Marshal(m.ToolUseResult)
-				log.InfoS(ctx,
-					"Reviewer tool use result",
-					"review_id", r.reviewID,
-					"msg_num", msgCount,
-					"parent_tool_use_id",
-					parentToolID,
-					"raw_result",
-					truncateStr(string(raw), 1000),
-				)
-			}
-
-			log.InfoS(ctx, "Reviewer tool result",
-				"review_id", r.reviewID,
-				"msg_num", msgCount,
-				"parent_tool_use_id", parentToolID,
-				"content_blocks",
-				len(m.Message.Content),
-			)
+			r.handleToolResultMsg(ctx, m, state)
 
 		default:
-			log.InfoS(ctx, "Reviewer received other message type",
+			log.InfoS(ctx,
+				"Reviewer received other message type",
 				"review_id", r.reviewID,
-				"msg_num", msgCount,
+				"msg_num", state.msgCount,
 				"type", fmt.Sprintf("%T", msg),
 			)
 		}
 	}
 
-	// Log why the loop exited.
-	log.InfoS(ctx, "Reviewer query loop exited",
-		"review_id", r.reviewID,
-		"total_messages", msgCount,
-		"got_result", gotResult,
-		"early_result", earlyResult,
-		"ctx_err", fmt.Sprintf("%v", ctx.Err()),
-		"elapsed", time.Since(startTime).String(),
-	)
-
-	// If we already detected and persisted the YAML result during the
-	// message loop, nothing more to do.
-	if earlyResult {
-		return
-	}
-
-	if !gotResult {
-		result.Error = fmt.Errorf("no result message received")
-		result.Duration = time.Since(startTime)
-		log.ErrorS(ctx, "Reviewer received no result message",
-			result.Error,
-			"review_id", r.reviewID,
-			"total_messages", msgCount,
-			"last_text_preview",
-			truncateStr(lastText, 300),
-			"duration", result.Duration.String(),
-		)
-		r.callback(ctx, result)
-		return
-	}
-
-	if response.IsError {
-		errMsg := "review failed"
-		if len(response.Errors) > 0 {
-			errMsg = response.Errors[0]
-		}
-		result.Error = fmt.Errorf("reviewer error: %s", errMsg)
-		result.Duration = time.Since(startTime)
-		log.ErrorS(ctx, "Reviewer returned error result",
-			result.Error,
-			"review_id", r.reviewID,
-			"duration", result.Duration.String(),
-		)
-		r.callback(ctx, result)
-		return
-	}
-
-	// Parse the review result from the response text.
-	responseText := response.Result
-	if responseText == "" {
-		responseText = lastText
-	}
-
-	parsed, err := ParseReviewerResponse(responseText)
-	if err != nil {
-		result.Error = fmt.Errorf("parse reviewer response: %w", err)
-		result.Duration = time.Since(startTime)
-		log.ErrorS(ctx, "Reviewer failed to parse response YAML",
-			err,
-			"review_id", r.reviewID,
-			"duration", result.Duration.String(),
-		)
-		r.callback(ctx, result)
-		return
-	}
-
-	result.Result = parsed
-
-	log.InfoS(ctx, "Reviewer completed review",
-		"review_id", r.reviewID,
-		"decision", parsed.Decision,
-		"issues_found", len(parsed.Issues),
-		"files_reviewed", parsed.FilesReviewed,
-		"lines_analyzed", parsed.LinesAnalyzed,
-		"session_id", result.SessionID,
-		"cost_usd", result.CostUSD,
-		"duration", result.Duration.String(),
-	)
-
-	// Persist the iteration and issues to the database.
-	r.persistResults(ctx, result, startTime)
-
-	// Invoke the callback so the service can update the FSM.
-	r.callback(ctx, result)
+	// Process the final result from the loop, unless it was already
+	// handled eagerly from an AssistantMessage YAML block.
+	r.processPostLoop(ctx, state, result, startTime)
 }
 
 // Stop cancels the sub-actor's context, triggering Claude CLI subprocess
@@ -610,6 +359,323 @@ func (r *reviewSubActor) Stop() {
 		)
 		r.cancel()
 	}
+}
+
+// messageLoopState tracks mutable state accumulated while processing the
+// stream of messages from the Claude Agent SDK query loop.
+type messageLoopState struct {
+	// lastText is the most recent non-empty assistant text, used as a
+	// fallback when the ResultMessage has an empty Result field.
+	lastText string
+
+	// response is the final ResultMessage from the CLI subprocess.
+	response claudeagent.ResultMessage
+
+	// gotResult is true once a ResultMessage has been received.
+	gotResult bool
+
+	// earlyResult is true if the review YAML was already parsed and
+	// the callback fired during the message loop (eager path). When
+	// set, the post-loop processing is skipped to avoid double-
+	// persisting and double-calling the callback.
+	earlyResult bool
+
+	// msgCount is the total number of messages received so far.
+	msgCount int
+
+	// authErr is set when an authentication error is detected in
+	// assistant text. Auth errors take priority over all other
+	// processing since the reviewer cannot proceed without valid
+	// credentials.
+	authErr error
+}
+
+// isTerminalDecision returns true for review decisions that end the
+// review lifecycle (no further back-and-forth expected).
+func isTerminalDecision(decision string) bool {
+	return decision == "approve" || decision == "reject"
+}
+
+// handleAssistantMsg processes an AssistantMessage from the CLI. It logs
+// the text content, detects auth errors, eagerly parses YAML review
+// results, and logs individual content blocks for diagnostics.
+func (r *reviewSubActor) handleAssistantMsg(
+	ctx context.Context, m claudeagent.AssistantMessage,
+	state *messageLoopState, result *SubActorResult,
+	startTime time.Time, client *claudeagent.Client,
+) {
+	text := m.ContentText()
+	if text != "" {
+		state.lastText = text
+		log.InfoS(ctx, "Reviewer assistant text",
+			"review_id", r.reviewID, "msg_num", state.msgCount,
+			"text_len", len(text), "text_preview", truncateStr(text, 500),
+		)
+
+		// Detect auth errors returned as assistant text. The
+		// CLI surfaces auth failures as plain text messages
+		// rather than error results.
+		if isAuthError(text) {
+			state.authErr = fmt.Errorf(
+				"auth error: %s", strings.TrimSpace(text),
+			)
+			log.ErrorS(ctx,
+				"Reviewer detected auth error, aborting",
+				state.authErr, "review_id", r.reviewID,
+			)
+		}
+	}
+
+	// Log each content block for debugging.
+	r.logContentBlocks(ctx, m, state.msgCount)
+	result.SessionID = m.SessionID
+
+	// Eagerly parse YAML review results from assistant text. The
+	// stop hook keeps the CLI alive for follow-up messages, so the
+	// ResultMessage may not arrive for minutes.
+	if text != "" {
+		r.tryParseReviewYAML(
+			ctx, text, state, result, startTime, client,
+		)
+	}
+}
+
+// tryParseReviewYAML attempts to parse a YAML review result from
+// assistant text. If a valid YAML block is found (and we haven't
+// already processed a result), the result is persisted to the database
+// and the callback is fired immediately. For terminal decisions
+// (approve/reject), the subprocess is killed to avoid the 9m30s stop
+// hook timeout. For request_changes, the process stays alive so the
+// stop hook can facilitate back-and-forth conversation.
+func (r *reviewSubActor) tryParseReviewYAML(
+	ctx context.Context, text string, state *messageLoopState,
+	result *SubActorResult, startTime time.Time,
+	client *claudeagent.Client,
+) {
+	if state.earlyResult {
+		return
+	}
+
+	parsed, err := ParseReviewerResponse(text)
+	if err != nil || parsed.Decision == "" {
+		return
+	}
+
+	log.InfoS(ctx, "Reviewer detected YAML result, persisting",
+		"review_id", r.reviewID, "decision", parsed.Decision,
+		"issues", len(parsed.Issues),
+	)
+
+	result.Result = parsed
+	result.Duration = time.Since(startTime)
+	state.earlyResult = true
+
+	// Persist and notify the FSM immediately.
+	r.persistResults(ctx, result, startTime)
+	r.callback(ctx, result)
+
+	// For terminal decisions, kill the Claude subprocess
+	// immediately. The stop hook would otherwise keep it alive
+	// for ~9m30s polling for mail. Close() sends stdin EOF → 5s
+	// grace → SIGKILL. For request_changes, we keep the process
+	// alive so the stop hook can facilitate back-and-forth.
+	if isTerminalDecision(parsed.Decision) {
+		log.InfoS(ctx, "Reviewer killing subprocess",
+			"review_id", r.reviewID, "decision", parsed.Decision,
+		)
+		client.Close()
+	}
+}
+
+// logContentBlocks logs each content block in an AssistantMessage for
+// debugging. Tool use blocks include a truncated preview of their
+// arguments.
+func (r *reviewSubActor) logContentBlocks(
+	ctx context.Context, m claudeagent.AssistantMessage, msgNum int,
+) {
+	if m.Message.Content == nil {
+		return
+	}
+
+	for i, block := range m.Message.Content {
+		args := ""
+		if block.Type == "tool_use" && len(block.Input) > 0 {
+			args = truncateStr(string(block.Input), 500)
+		}
+		log.InfoS(ctx, "Reviewer content block",
+			"review_id", r.reviewID, "msg_num", msgNum,
+			"block_idx", i, "block_type", block.Type,
+			"block_name", block.Name, "tool_args", args,
+		)
+	}
+}
+
+// handleResultMsg processes the final ResultMessage from the CLI. This
+// message contains cost, duration, and optionally the final response
+// text. It may arrive long after the actual review output if the stop
+// hook keeps the CLI alive for follow-up messages.
+func (r *reviewSubActor) handleResultMsg(
+	ctx context.Context, m claudeagent.ResultMessage,
+	state *messageLoopState, result *SubActorResult,
+) {
+	state.response = m
+	state.gotResult = true
+	result.SessionID = m.SessionID
+	result.CostUSD = m.TotalCostUSD
+	result.Duration = time.Duration(
+		m.DurationMs,
+	) * time.Millisecond
+
+	log.InfoS(ctx, "Reviewer received ResultMessage",
+		"review_id", r.reviewID, "session_id", m.SessionID,
+		"is_error", m.IsError, "cost_usd", m.TotalCostUSD,
+		"duration_ms", m.DurationMs, "result_len", len(m.Result),
+		"num_errors", len(m.Errors),
+	)
+}
+
+// handleToolResultMsg processes a UserMessage (tool result) from the
+// CLI. These messages follow tool_use blocks and contain the tool output
+// (e.g., Bash stdout). They are logged for diagnostics but do not
+// affect the review result.
+func (r *reviewSubActor) handleToolResultMsg(
+	ctx context.Context, m claudeagent.UserMessage,
+	state *messageLoopState,
+) {
+	var parentToolID string
+	if m.ParentToolUseID != nil {
+		parentToolID = *m.ParentToolUseID
+	}
+
+	// Log each content block with its type so we can see what
+	// the CLI actually returned.
+	for i, cb := range m.Message.Content {
+		log.InfoS(ctx, "Reviewer tool result block",
+			"review_id", r.reviewID, "msg_num", state.msgCount,
+			"block_idx", i, "block_type", cb.Type,
+			"text_len", len(cb.Text), "text_preview", truncateStr(cb.Text, 500),
+		)
+	}
+
+	// Log the raw ToolUseResult field which may contain the tool
+	// output when the content blocks are empty.
+	if m.ToolUseResult != nil {
+		raw, _ := json.Marshal(m.ToolUseResult)
+		log.InfoS(ctx, "Reviewer tool use result",
+			"review_id", r.reviewID, "msg_num", state.msgCount,
+			"parent_tool_use_id", parentToolID, "raw_result", truncateStr(string(raw), 1000),
+		)
+	}
+
+	log.InfoS(ctx, "Reviewer tool result",
+		"review_id", r.reviewID, "msg_num", state.msgCount,
+		"parent_tool_use_id", parentToolID, "content_blocks", len(m.Message.Content),
+	)
+}
+
+// processPostLoop handles the final result processing after the query
+// loop exits. If the YAML result was already parsed eagerly from an
+// AssistantMessage (earlyResult == true), this only updates cost
+// metadata from the ResultMessage without re-persisting or re-calling
+// the callback. Otherwise it performs the standard post-loop processing:
+// auth error reporting, ResultMessage parsing, and callback invocation.
+func (r *reviewSubActor) processPostLoop(
+	ctx context.Context, state *messageLoopState,
+	result *SubActorResult, startTime time.Time,
+) {
+	log.InfoS(ctx, "Reviewer query loop exited",
+		"review_id", r.reviewID, "total_messages", state.msgCount,
+		"got_result", state.gotResult, "early_result", state.earlyResult,
+		"auth_error", state.authErr != nil, "ctx_err", fmt.Sprintf("%v", ctx.Err()),
+		"elapsed", time.Since(startTime).String(),
+	)
+
+	// Auth errors take priority — the review cannot proceed.
+	if state.authErr != nil {
+		result.Error = state.authErr
+		result.Duration = time.Since(startTime)
+		r.callback(ctx, result)
+
+		return
+	}
+
+	// If we already detected and persisted the YAML result during
+	// the message loop, update cost metadata from the ResultMessage
+	// (if we got one) and return.
+	if state.earlyResult {
+		if state.gotResult {
+			result.CostUSD = state.response.TotalCostUSD
+			result.Duration = time.Duration(
+				state.response.DurationMs,
+			) * time.Millisecond
+		}
+
+		return
+	}
+
+	if !state.gotResult {
+		result.Error = fmt.Errorf("no result message received")
+		result.Duration = time.Since(startTime)
+		log.ErrorS(ctx, "Reviewer received no result message",
+			result.Error, "review_id", r.reviewID,
+			"total_messages", state.msgCount,
+			"last_text_preview", truncateStr(state.lastText, 300),
+			"duration", result.Duration.String(),
+		)
+		r.callback(ctx, result)
+
+		return
+	}
+
+	if state.response.IsError {
+		errMsg := "review failed"
+		if len(state.response.Errors) > 0 {
+			errMsg = state.response.Errors[0]
+		}
+		result.Error = fmt.Errorf("reviewer error: %s", errMsg)
+		result.Duration = time.Since(startTime)
+		log.ErrorS(ctx, "Reviewer returned error result",
+			result.Error, "review_id", r.reviewID, "duration", result.Duration.String(),
+		)
+		r.callback(ctx, result)
+
+		return
+	}
+
+	// Parse the review result from the response text.
+	responseText := state.response.Result
+	if responseText == "" {
+		responseText = state.lastText
+	}
+
+	parsed, err := ParseReviewerResponse(responseText)
+	if err != nil {
+		result.Error = fmt.Errorf(
+			"parse reviewer response: %w", err,
+		)
+		result.Duration = time.Since(startTime)
+		log.ErrorS(ctx, "Reviewer failed to parse response YAML",
+			err, "review_id", r.reviewID, "duration", result.Duration.String(),
+		)
+		r.callback(ctx, result)
+
+		return
+	}
+
+	result.Result = parsed
+
+	log.InfoS(ctx, "Reviewer completed review",
+		"review_id", r.reviewID, "decision", parsed.Decision,
+		"issues_found", len(parsed.Issues), "files_reviewed", parsed.FilesReviewed,
+		"lines_analyzed", parsed.LinesAnalyzed, "session_id", result.SessionID,
+		"cost_usd", result.CostUSD, "duration", result.Duration.String(),
+	)
+
+	// Persist the iteration and issues to the database.
+	r.persistResults(ctx, result, startTime)
+
+	// Invoke the callback so the service can update the FSM.
+	r.callback(ctx, result)
 }
 
 // buildClientOptions constructs SDK options from the reviewer and spawn
@@ -747,232 +813,6 @@ func (r *reviewSubActor) buildSystemPrompt() string {
 		return r.config.SystemPrompt
 	}
 
-	var sb strings.Builder
-
-	sb.WriteString(fmt.Sprintf(
-		"You are %s, a code reviewer.\n\n",
-		r.config.Name,
-	))
-
-	// Role section — varies by review type.
-	sb.WriteString("## Your Role\n")
-	sb.WriteString(
-		"Review the code changes on the current branch " +
-			"compared to the base branch. ",
-	)
-
-	switch r.config.Name {
-	case "SecurityReviewer":
-		sb.WriteString(
-			"You are an elite security code reviewer. " +
-				"Your primary mission is identifying " +
-				"and preventing vulnerabilities before " +
-				"they reach production.\n\n",
-		)
-	case "PerformanceReviewer":
-		sb.WriteString(
-			"You are a performance engineering " +
-				"specialist. Focus on efficiency across " +
-				"algorithmic, data access, and resource " +
-				"management layers.\n\n",
-		)
-	case "ArchitectureReviewer":
-		sb.WriteString(
-			"You are an architecture reviewer. Focus " +
-				"on design patterns, interface contracts, " +
-				"separation of concerns, and long-term " +
-				"maintainability.\n\n",
-		)
-	default:
-		sb.WriteString(
-			"Identify bugs, security issues, logic " +
-				"errors, and CLAUDE.md violations.\n\n",
-		)
-	}
-
-	// Per-type detailed guidance.
-	r.writeReviewTypeGuidance(&sb)
-
-	// Explicit exclusion list — critical for signal-to-noise.
-	sb.WriteString("## What NOT to Flag\n")
-	sb.WriteString(
-		"Do NOT report any of the following. These are " +
-			"explicitly excluded to keep the review " +
-			"high-signal:\n\n",
-	)
-	sb.WriteString(
-		"- **Style preferences** — formatting, naming " +
-			"conventions, comment style (unless violating " +
-			"explicit CLAUDE.md rules)\n",
-	)
-	sb.WriteString(
-		"- **Linter-catchable issues** — unused imports, " +
-			"unreachable code, simple type errors (these " +
-			"are caught by `make lint`)\n",
-	)
-	sb.WriteString(
-		"- **Pre-existing issues** — problems in code that " +
-			"was NOT modified in this diff\n",
-	)
-	sb.WriteString(
-		"- **Subjective suggestions** — \"consider using X " +
-			"instead\" without a concrete bug or violation\n",
-	)
-	sb.WriteString(
-		"- **Pedantic nitpicks** — minor wording in " +
-			"comments, import ordering preferences\n",
-	)
-	sb.WriteString(
-		"- **Hypothetical issues** — problems that require " +
-			"specific unusual inputs to trigger and are not " +
-			"realistic in the codebase's context\n\n",
-	)
-
-	// Signal criteria.
-	sb.WriteString("## High-Signal Findings (What TO Flag)\n")
-	sb.WriteString(
-		"Focus on findings that are **definitively " +
-			"wrong**, not just potentially suboptimal:\n\n",
-	)
-	sb.WriteString(
-		"- **Compilation/parse failures** — syntax errors, " +
-			"type errors, missing imports, unresolved " +
-			"references\n",
-	)
-	sb.WriteString(
-		"- **Definitive logic failures** — code that will " +
-			"produce incorrect results for normal inputs\n",
-	)
-	sb.WriteString(
-		"- **Security vulnerabilities** — injection, auth " +
-			"bypass, data exposure, race conditions\n",
-	)
-	sb.WriteString(
-		"- **Resource leaks** — unclosed connections, " +
-			"goroutine leaks, missing defers\n",
-	)
-	sb.WriteString(
-		"- **CLAUDE.md violations** — explicit, quotable " +
-			"rule violations (include the rule text in " +
-			"claude_md_ref)\n",
-	)
-	sb.WriteString(
-		"- **Missing error handling** — errors silently " +
-			"discarded or not propagated at boundaries\n\n",
-	)
-
-	// Focus areas from config.
-	if len(r.config.FocusAreas) > 0 {
-		sb.WriteString("## Additional Focus Areas\n")
-		for _, area := range r.config.FocusAreas {
-			sb.WriteString(fmt.Sprintf("- %s\n", area))
-		}
-		sb.WriteString("\n")
-	}
-
-	if len(r.config.IgnorePatterns) > 0 {
-		sb.WriteString("## Ignore Patterns\n")
-		sb.WriteString(
-			"Skip the following files/patterns:\n",
-		)
-		for _, pat := range r.config.IgnorePatterns {
-			sb.WriteString(fmt.Sprintf("- %s\n", pat))
-		}
-		sb.WriteString("\n")
-	}
-
-	// Review process.
-	sb.WriteString("## Review Process\n")
-	sb.WriteString(
-		"1. **Read the diff** using the provided git " +
-			"command\n",
-	)
-	sb.WriteString(
-		"2. **Produce a change summary** — briefly " +
-			"describe what the diff modifies (2-3 " +
-			"sentences)\n",
-	)
-	sb.WriteString(
-		"3. **Detailed analysis** — examine each file " +
-			"for issues from the high-signal list\n",
-	)
-	sb.WriteString(
-		"4. **Positive observations** — note what was " +
-			"done well (good patterns, thorough tests, " +
-			"clean interfaces)\n",
-	)
-	sb.WriteString(
-		"5. **Prioritize by impact-to-effort ratio** — " +
-			"recommend high-ROI fixes first\n",
-	)
-	sb.WriteString(
-		"6. **Emit YAML result** with your decision " +
-			"and issues\n\n",
-	)
-
-	// Output format.
-	sb.WriteString("## Output Format\n")
-	sb.WriteString(
-		"You MUST include a YAML frontmatter block at the " +
-			"END of your response.\n",
-	)
-	sb.WriteString(
-		"The block must be delimited by ```yaml and ``` " +
-			"markers.\n",
-	)
-	sb.WriteString("Use this exact schema:\n\n")
-	sb.WriteString("```yaml\n")
-	sb.WriteString("decision: approve | request_changes | reject\n")
-	sb.WriteString("summary: \"Brief summary of findings\"\n")
-	sb.WriteString("files_reviewed: 5\n")
-	sb.WriteString("lines_analyzed: 500\n")
-	sb.WriteString("issues:\n")
-	sb.WriteString("  - title: \"Issue title\"\n")
-	sb.WriteString("    type: bug | security | logic_error | ")
-	sb.WriteString("performance | style | documentation | ")
-	sb.WriteString("claude_md_violation | other\n")
-	sb.WriteString("    severity: critical | high | medium | low\n")
-	sb.WriteString("    file: \"path/to/file.go\"\n")
-	sb.WriteString("    line_start: 42\n")
-	sb.WriteString("    line_end: 50\n")
-	sb.WriteString("    description: \"Detailed description\"\n")
-	sb.WriteString("    code_snippet: \"the problematic code\"\n")
-	sb.WriteString("    suggestion: \"Suggested fix or code example\"\n")
-	sb.WriteString("    claude_md_ref: \"Quoted CLAUDE.md rule, " +
-		"if applicable\"\n")
-	sb.WriteString("```\n\n")
-	sb.WriteString(
-		"**Decision guidelines:**\n",
-	)
-	sb.WriteString(
-		"- `approve` — No issues, or only minor/suggestion " +
-			"level findings\n",
-	)
-	sb.WriteString(
-		"- `request_changes` — Issues found that should be " +
-			"fixed before merging\n",
-	)
-	sb.WriteString(
-		"- `reject` — Critical issues or fundamental " +
-			"design problems\n\n",
-	)
-	sb.WriteString(
-		"If the code looks good and you approve, set " +
-			"decision to 'approve' with an empty issues list.\n",
-	)
-
-	// Add substrate messaging instructions so the agent can
-	// communicate its review results via the substrate system.
-	sb.WriteString("## Substrate Messaging\n")
-	sb.WriteString(
-		"You are a substrate agent. After completing your " +
-			"review, send a **detailed** review mail to the " +
-			"requesting agent with your full findings.\n\n",
-	)
-	sb.WriteString("**Your agent name**: " +
-		r.reviewerAgentName() + "\n\n",
-	)
-
 	// Look up requester name so we can template it into the
 	// substrate send command (avoids the agent guessing).
 	requesterName := "User"
@@ -985,310 +825,22 @@ func (r *reviewSubActor) buildSystemPrompt() string {
 		}
 	}
 
-	sb.WriteString(fmt.Sprintf(
-		"**Requester agent**: %s\n\n", requesterName,
-	))
-
-	agentName := r.reviewerAgentName()
-
-	// Explain the two-step send process: write body to a file in
-	// /tmp/substrate_reviews/, then send with --body-file. This
-	// avoids shell quoting issues with multi-line markdown.
-	sb.WriteString("### How to Send Your Review\n\n")
-	sb.WriteString(
-		"Use a two-step process to send rich review content:\n\n",
-	)
-
 	shortID := r.reviewID
 	if len(shortID) > 8 {
 		shortID = shortID[:8]
 	}
-	bodyFile := "/tmp/substrate_reviews/review-" + shortID + ".md"
 
-	sb.WriteString(
-		"1. First, create the reviews directory: " +
-			"`mkdir -p /tmp/substrate_reviews`\n\n",
-	)
-
-	sb.WriteString(
-		"2. **Write** your full review to `" + bodyFile +
-			"` using the Write tool. " +
-			"Use full markdown with headers, code blocks, " +
-			"etc.\n\n",
-	)
-
-	sb.WriteString(
-		"3. **Send** the review using `substrate send` " +
-			"with `--body-file`:\n",
-	)
-	sb.WriteString("```bash\n")
-	sb.WriteString(
-		"substrate send" +
-			" --agent " + agentName +
-			" --to " + requesterName +
-			" --thread " + r.threadID +
-			" --subject \"Review: <decision>\"" +
-			" --body-file " + bodyFile + "\n",
-	)
-	sb.WriteString("```\n\n")
-
-	// Instruct the agent on what to include in the mail body.
-	sb.WriteString("### Mail Body Format\n")
-	sb.WriteString(
-		"The review file must contain a **full, rich " +
-			"review** in markdown format (similar to a " +
-			"GitHub PR review). Include ALL of:\n\n",
-	)
-	sb.WriteString(
-		"1. **Decision** (approve/request_changes/reject) " +
-			"and a brief summary paragraph\n",
-	)
-	sb.WriteString(
-		"2. **Per-issue details** for every issue found:\n",
-	)
-	sb.WriteString(
-		"   - Severity (critical/high/medium/low)\n",
-	)
-	sb.WriteString(
-		"   - File path and line numbers\n",
-	)
-	sb.WriteString(
-		"   - Description of the problem\n",
-	)
-	sb.WriteString(
-		"   - Code snippet showing the problematic code\n",
-	)
-	sb.WriteString(
-		"   - Suggested fix with code example\n",
-	)
-	sb.WriteString(
-		"3. **Positive observations** — what was done well\n",
-	)
-	sb.WriteString(
-		"4. **Stats** — files reviewed, lines analyzed\n\n",
-	)
-	sb.WriteString(
-		"Use markdown headers, code blocks, and formatting " +
-			"for readability.\n\n",
-	)
-
-	sb.WriteString(
-		"If you receive messages (injected by the stop hook), " +
-			"process them and respond. For re-review requests, " +
-			"run the diff command again and provide an updated " +
-			"review.\n\n",
-	)
-
-	// Append project CLAUDE.md if available, giving the reviewer
-	// project-specific style guidelines and conventions.
-	if claudeMD := r.loadProjectCLAUDEMD(); claudeMD != "" {
-		sb.WriteString("\n## Project Guidelines (from CLAUDE.md)\n")
-		sb.WriteString(
-			"The following are the project's coding guidelines. " +
-				"Use these to inform your review:\n\n",
-		)
-		sb.WriteString(claudeMD)
-		sb.WriteString("\n")
-	}
-
-	return sb.String()
-}
-
-// writeReviewTypeGuidance appends per-review-type detailed guidance to the
-// system prompt. These match the specialized reviewer personas from Anthropic's
-// code-review agents (security, performance, architecture).
-func (r *reviewSubActor) writeReviewTypeGuidance(sb *strings.Builder) {
-	switch r.config.Name {
-	case "SecurityReviewer":
-		sb.WriteString("## Security Review Checklist\n\n")
-		sb.WriteString(
-			"### Vulnerability Assessment\n",
-		)
-		sb.WriteString(
-			"- OWASP Top 10: injection, broken auth, " +
-				"sensitive data exposure, XXE, broken " +
-				"access control, misconfiguration, XSS, " +
-				"insecure deserialization\n",
-		)
-		sb.WriteString(
-			"- SQL/NoSQL/command injection vectors\n",
-		)
-		sb.WriteString(
-			"- Race conditions and TOCTOU " +
-				"vulnerabilities\n",
-		)
-		sb.WriteString(
-			"- Cryptographic implementation issues\n\n",
-		)
-		sb.WriteString(
-			"### Input Validation\n",
-		)
-		sb.WriteString(
-			"- User input validated against expected " +
-				"formats/ranges\n",
-		)
-		sb.WriteString(
-			"- Server-side validation as primary " +
-				"control\n",
-		)
-		sb.WriteString(
-			"- File upload restrictions (type, size, " +
-				"content)\n",
-		)
-		sb.WriteString(
-			"- Path traversal and directory escape " +
-				"risks\n\n",
-		)
-		sb.WriteString(
-			"### Auth and Authorization\n",
-		)
-		sb.WriteString(
-			"- Session management correctness\n",
-		)
-		sb.WriteString(
-			"- Privilege escalation vectors\n",
-		)
-		sb.WriteString(
-			"- IDOR (insecure direct object " +
-				"references)\n",
-		)
-		sb.WriteString(
-			"- Access control at every protected " +
-				"endpoint\n\n",
-		)
-
-	case "PerformanceReviewer":
-		sb.WriteString("## Performance Review Checklist\n\n")
-		sb.WriteString(
-			"### Algorithmic Efficiency\n",
-		)
-		sb.WriteString(
-			"- O(n^2) or worse operations on " +
-				"potentially large inputs\n",
-		)
-		sb.WriteString(
-			"- Redundant calculations that could be " +
-				"cached\n",
-		)
-		sb.WriteString(
-			"- Blocking calls that should be async\n",
-		)
-		sb.WriteString(
-			"- Nested loops over the same data\n\n",
-		)
-		sb.WriteString(
-			"### Database and Network\n",
-		)
-		sb.WriteString(
-			"- N+1 query patterns and missing " +
-				"indexes\n",
-		)
-		sb.WriteString(
-			"- API batching opportunities and " +
-				"unnecessary round-trips\n",
-		)
-		sb.WriteString(
-			"- Missing pagination, filtering, or " +
-				"projection\n",
-		)
-		sb.WriteString(
-			"- Connection pooling patterns\n\n",
-		)
-		sb.WriteString(
-			"### Resource Management\n",
-		)
-		sb.WriteString(
-			"- Memory leaks from unclosed connections " +
-				"or listeners\n",
-		)
-		sb.WriteString(
-			"- Excessive allocations in loops\n",
-		)
-		sb.WriteString(
-			"- Missing cleanup in defers or finally " +
-				"blocks\n",
-		)
-		sb.WriteString(
-			"- Goroutine leaks from unjoined " +
-				"goroutines\n\n",
-		)
-		sb.WriteString(
-			"For each finding, estimate performance " +
-				"impact with complexity notation and " +
-				"prioritize by impact-to-effort ratio.\n\n",
-		)
-
-	case "ArchitectureReviewer":
-		sb.WriteString("## Architecture Review Checklist\n\n")
-		sb.WriteString(
-			"- Separation of concerns between layers\n",
-		)
-		sb.WriteString(
-			"- Interface contracts and abstraction " +
-				"boundaries\n",
-		)
-		sb.WriteString(
-			"- Dependency direction (inward, not " +
-				"outward)\n",
-		)
-		sb.WriteString(
-			"- Testability (can components be tested " +
-				"in isolation?)\n",
-		)
-		sb.WriteString(
-			"- SOLID principle adherence\n",
-		)
-		sb.WriteString(
-			"- Appropriate design pattern usage\n\n",
-		)
-
-	default:
-		// Default (full) review — general guidance.
-		sb.WriteString("## Review Dimensions\n\n")
-		sb.WriteString(
-			"### Code Correctness\n",
-		)
-		sb.WriteString(
-			"- Logic errors producing wrong results\n",
-		)
-		sb.WriteString(
-			"- Missing error handling at failure " +
-				"points\n",
-		)
-		sb.WriteString(
-			"- Edge cases and boundary conditions\n",
-		)
-		sb.WriteString(
-			"- Null/nil handling and zero-value " +
-				"assumptions\n\n",
-		)
-		sb.WriteString(
-			"### Security\n",
-		)
-		sb.WriteString(
-			"- Input validation at system boundaries\n",
-		)
-		sb.WriteString(
-			"- Authorization checks on protected " +
-				"operations\n",
-		)
-		sb.WriteString(
-			"- Sensitive data in logs or error " +
-				"messages\n\n",
-		)
-		sb.WriteString(
-			"### CLAUDE.md Compliance\n",
-		)
-		sb.WriteString(
-			"- Check changes against project " +
-				"CLAUDE.md rules (appended below)\n",
-		)
-		sb.WriteString(
-			"- When flagging a violation, quote the " +
-				"specific rule in the claude_md_ref " +
-				"field\n\n",
-		)
-	}
+	return renderSystemPrompt(context.Background(), systemPromptData{
+		Name:           r.config.Name,
+		ReviewerType:   r.config.Name,
+		FocusAreas:     r.config.FocusAreas,
+		IgnorePatterns: r.config.IgnorePatterns,
+		AgentName:      r.reviewerAgentName(),
+		RequesterName:  requesterName,
+		ThreadID:       r.threadID,
+		BodyFile:       "/tmp/substrate_reviews/review-" + shortID + ".md",
+		ClaudeMD:       r.loadProjectCLAUDEMD(),
+	})
 }
 
 // loadProjectCLAUDEMD reads the CLAUDE.md file from the repo root. Returns
@@ -1311,30 +863,10 @@ func (r *reviewSubActor) loadProjectCLAUDEMD() string {
 // The prompt templates the git diff command from the review's branch and
 // base branch so the reviewer examines exactly the right commit range.
 func (r *reviewSubActor) buildReviewPrompt() string {
-	var sb strings.Builder
-
-	sb.WriteString(fmt.Sprintf(
-		"Review the code changes for review ID: %s\n\n",
-		r.reviewID,
-	))
-
-	// Template the diff command based on available branch info.
-	diffCmd := r.buildDiffCommand()
-
-	sb.WriteString(fmt.Sprintf(
-		"Please examine the diff using:\n```\n%s\n```\n\n",
-		diffCmd,
-	))
-	sb.WriteString(
-		"Review each modified file for bugs, security issues, " +
-			"logic errors, and style violations.\n\n",
-	)
-	sb.WriteString(
-		"After your analysis, include the YAML frontmatter " +
-			"block with your decision and any issues found.\n",
-	)
-
-	return sb.String()
+	return renderReviewPrompt(context.Background(), reviewPromptData{
+		ReviewID: r.reviewID,
+		DiffCmd:  r.buildDiffCommand(),
+	})
 }
 
 // buildDiffCommand constructs the appropriate git diff command based on the
@@ -1714,7 +1246,6 @@ func (r *reviewSubActor) persistResults(
 		"iteration_num", iterNum,
 		"issues_persisted", len(parsed.Issues),
 	)
-
 }
 
 // ParseReviewerResponse extracts the YAML frontmatter block from a reviewer's
@@ -1798,6 +1329,32 @@ func normalizeIssueType(issueType string) string {
 	return "other"
 }
 
+// authErrorPatterns are substrings in CLI assistant text that indicate an
+// authentication failure. When detected, the review should be cancelled
+// immediately since the reviewer cannot proceed without valid credentials.
+var authErrorPatterns = []string{
+	"Invalid API key",
+	"Please run /login",
+	"authentication failed",
+	"unauthorized",
+	"invalid_api_key",
+	"expired token",
+}
+
+// isAuthError returns true if the text contains a known authentication
+// error pattern. The CLI surfaces auth failures as plain assistant text
+// rather than structured error results.
+func isAuthError(text string) bool {
+	lower := strings.ToLower(text)
+	for _, pattern := range authErrorPatterns {
+		if strings.Contains(lower, strings.ToLower(pattern)) {
+			return true
+		}
+	}
+
+	return false
+}
+
 // truncateStr truncates a string to maxLen characters, appending "..." if
 // the string was shortened.
 func truncateStr(s string, maxLen int) string {
@@ -1873,7 +1430,6 @@ const reviewWriteDir = "/tmp/substrate_reviews"
 func makeReviewerPermissionPolicy(
 	_ string,
 ) claudeagent.CanUseToolFunc {
-
 	// Resolve the canonical write prefix, handling macOS /tmp →
 	// /private/tmp symlink. We accept both the symlink and the
 	// resolved path so writes work regardless of whether

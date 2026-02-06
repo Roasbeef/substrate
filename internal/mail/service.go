@@ -477,6 +477,18 @@ func (s *Service) handleUpdateState(ctx context.Context,
 			response.Error = fmt.Errorf("failed to snooze: %w", err)
 			return response
 		}
+	} else if req.NewState == StateReadStr.String() {
+		// Use MarkMessageRead for read transitions so the
+		// read_at timestamp is properly set in the DB.
+		err := s.store.MarkMessageRead(
+			ctx, req.MessageID, req.AgentID,
+		)
+		if err != nil {
+			response.Error = fmt.Errorf(
+				"failed to mark read: %w", err,
+			)
+			return response
+		}
 	} else {
 		err := s.store.UpdateRecipientState(
 			ctx, req.MessageID, req.AgentID, req.NewState,

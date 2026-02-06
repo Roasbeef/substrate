@@ -882,6 +882,67 @@ func TestService_UpdateState_Trash(t *testing.T) {
 	require.True(t, trashResp.Success)
 }
 
+// TestService_UpdateState_ReadSetsReadAt verifies that transitioning a
+// message to "read" via UpdateState properly sets the read_at timestamp.
+// This is a regression test for a bug where UpdateRecipientState was used
+// instead of MarkMessageRead, leaving read_at as NULL.
+func TestService_UpdateState_ReadSetsReadAt(t *testing.T) {
+	t.Parallel()
+
+	storage, cleanup := testDB(t)
+	defer cleanup()
+
+	svc := NewServiceWithStore(storage)
+	ctx := context.Background()
+
+	sender := createTestAgent(t, storage, "Sender")
+	recipient := createTestAgent(t, storage, "Recipient")
+
+	// Send a message.
+	sendReq := SendMailRequest{
+		SenderID:       sender.ID,
+		RecipientNames: []string{recipient.Name},
+		Subject:        "ReadAt Test",
+		Body:           "Body",
+		Priority:       PriorityNormal,
+	}
+
+	result := svc.Receive(ctx, sendReq)
+	val, err := result.Unpack()
+	require.NoError(t, err)
+	sendResp := val.(SendMailResponse)
+
+	// Mark as read via UpdateState (the path the UI PATCH takes).
+	readReq := UpdateStateRequest{
+		AgentID:   recipient.ID,
+		MessageID: sendResp.MessageID,
+		NewState:  "read",
+	}
+
+	result = svc.Receive(ctx, readReq)
+	val, err = result.Unpack()
+	require.NoError(t, err)
+
+	readResp := val.(UpdateStateResponse)
+	require.NoError(t, readResp.Error)
+	require.True(t, readResp.Success)
+
+	// Verify the message state is read and read_at is set.
+	msgResult := svc.Receive(ctx, ReadMessageRequest{
+		AgentID:   recipient.ID,
+		MessageID: sendResp.MessageID,
+	})
+	msgVal, err := msgResult.Unpack()
+	require.NoError(t, err)
+
+	msgResp := msgVal.(ReadMessageResponse)
+	require.NoError(t, msgResp.Error)
+	require.Equal(t, "read", msgResp.Message.State)
+	require.NotNil(t, msgResp.Message.ReadAt,
+		"read_at should be set after UpdateState to 'read'",
+	)
+}
+
 // TestService_FetchInbox_SenderContext verifies that sender context
 // (project_key and git_branch) is properly returned in inbox messages.
 func TestService_FetchInbox_SenderContext(t *testing.T) {

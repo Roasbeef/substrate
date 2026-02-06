@@ -217,17 +217,28 @@ func (s *Server) ReadThread(ctx context.Context, req *ReadThreadRequest) (*ReadT
 func (s *Server) UpdateState(ctx context.Context, req *UpdateStateRequest) (*UpdateStateResponse, error) {
 	agentID := req.AgentId
 	if agentID == 0 {
-		// Use the default "User" agent for web UI state changes.
-		userAgent, err := s.store.Queries().GetAgentByName(
-			ctx, "User",
+		// No agent specified — look up the actual recipient for
+		// this message. This handles the CodeReviewer aggregate
+		// view where the UI sends requests without an agent ID.
+		recipients, err := s.store.Queries().GetMessageRecipients(
+			ctx, req.MessageId,
 		)
-		if err != nil {
-			return nil, status.Error(
-				codes.Internal,
-				"failed to get User agent",
+		if err != nil || len(recipients) == 0 {
+			// Fallback to "User" agent if recipient lookup
+			// fails (e.g., message not found yet).
+			userAgent, lookupErr := s.store.Queries().GetAgentByName(
+				ctx, "User",
 			)
+			if lookupErr != nil {
+				return nil, status.Error(
+					codes.Internal,
+					"failed to get User agent",
+				)
+			}
+			agentID = userAgent.ID
+		} else {
+			agentID = recipients[0].AgentID
 		}
-		agentID = userAgent.ID
 	}
 	if req.MessageId == 0 {
 		return nil, status.Error(codes.InvalidArgument, "message_id is required")

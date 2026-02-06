@@ -625,8 +625,38 @@ func (s *Service) handleSubActorResult(ctx context.Context,
 			"review_id", result.ReviewID,
 			"duration", result.Duration.String(),
 		)
-		// On error, we don't transition the FSM - the review stays
-		// in under_review and can be retried or cancelled.
+
+		// Auto-cancel on auth errors since the review cannot
+		// proceed without valid credentials. Other errors (CLI
+		// not found, connection failures) leave the review in
+		// under_review for retry or manual cancel.
+		if isAuthError(result.Error.Error()) {
+			s.mu.RLock()
+			fsm, ok := s.activeReviews[result.ReviewID]
+			s.mu.RUnlock()
+
+			if ok {
+				outbox, fsmErr := fsm.ProcessEvent(
+					ctx, CancelEvent{
+						Reason: result.Error.Error(),
+					},
+				)
+				if fsmErr != nil {
+					log.ErrorS(ctx,
+						"Review service: "+
+							"failed to "+
+							"auto-cancel "+
+							"review",
+						fsmErr,
+						"review_id",
+						result.ReviewID,
+					)
+				} else {
+					s.processOutbox(ctx, outbox)
+				}
+			}
+		}
+
 		return
 	}
 

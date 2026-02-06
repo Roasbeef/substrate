@@ -158,6 +158,7 @@ Access the UI at `http://localhost:8080` (or custom port).
 - 80-character line limit (best effort)
 - Organize code into logical stanzas separated by blank lines
 - When wrapping function calls, put closing paren on its own line with all args on new lines
+- **Pack arguments densely** — when wrapping, fit multiple arguments per line up to the 80-char limit rather than putting each argument on its own line. This applies to function parameters, log key-value pairs, and struct literals alike
 
 ### Result Type API (CRITICAL)
 This project uses `lnd/fn/v2` Result type. **Always use:**

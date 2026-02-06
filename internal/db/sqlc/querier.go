@@ -65,6 +65,7 @@ type Querier interface {
 	GetMessageRecipientsWithAgentsBulk(ctx context.Context, messageIds []int64) ([]GetMessageRecipientsWithAgentsBulkRow, error)
 	// Get messages from agents whose name starts with a given prefix.
 	// Used for aggregate views like CodeReviewer (all reviewer-* agents).
+	// Joins message_recipients to return per-recipient read state.
 	GetMessagesBySenderNamePrefix(ctx context.Context, arg GetMessagesBySenderNamePrefixParams) ([]GetMessagesBySenderNamePrefixRow, error)
 	GetMessagesByThread(ctx context.Context, threadID string) ([]Message, error)
 	// Get messages in a thread with sender information (name, project, branch).

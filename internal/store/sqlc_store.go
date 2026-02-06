@@ -927,6 +927,10 @@ func (s *SqlcStore) GetMessagesBySenderNamePrefix(ctx context.Context,
 			SenderName:       row.SenderName,
 			SenderProjectKey: row.SenderProjectKey.String,
 			SenderGitBranch:  row.SenderGitBranch.String,
+			State:            row.State,
+			SnoozedUntil:     nullInt64ToTime(row.SnoozedUntil),
+			ReadAt:           nullInt64ToTime(row.ReadAt),
+			AckedAt:          nullInt64ToTime(row.AckedAt),
 		})
 	}
 	return messages, nil
@@ -2267,6 +2271,10 @@ func (s *txSqlcStore) GetMessagesBySenderNamePrefix(ctx context.Context,
 			SenderName:       row.SenderName,
 			SenderProjectKey: row.SenderProjectKey.String,
 			SenderGitBranch:  row.SenderGitBranch.String,
+			State:            row.State,
+			SnoozedUntil:     nullInt64ToTime(row.SnoozedUntil),
+			ReadAt:           nullInt64ToTime(row.ReadAt),
+			AckedAt:          nullInt64ToTime(row.AckedAt),
 		})
 	}
 	return messages, nil
