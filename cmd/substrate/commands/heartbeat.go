@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/roasbeef/subtrate/internal/queue"
 	"github.com/spf13/cobra"
 )
 
@@ -57,6 +58,11 @@ func runHeartbeat(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
+	// In queue mode, enqueue the heartbeat for later delivery.
+	if client.Mode() == ModeQueued {
+		return enqueueHeartbeat(ctx, client, agentNameStr)
+	}
+
 	// Record the heartbeat.
 	if err := client.UpdateHeartbeat(ctx, agentID); err != nil {
 		return fmt.Errorf("failed to record heartbeat: %w", err)
@@ -100,6 +106,51 @@ func runHeartbeat(cmd *cobra.Command, args []string) error {
 		if sessInfo != nil {
 			fmt.Printf("Session started: %s\n", sessInfo.SessionID)
 		}
+	}
+
+	return nil
+}
+
+// enqueueHeartbeat stores a heartbeat operation in the local queue.
+func enqueueHeartbeat(
+	ctx context.Context, client *Client, agentNameStr string,
+) error {
+	key := newIdempotencyKey()
+	payload := queue.HeartbeatPayload{
+		AgentName:    agentNameStr,
+		SessionStart: heartbeatSessionStart,
+	}
+
+	payloadJSON, err := queue.MarshalPayload(payload)
+	if err != nil {
+		return fmt.Errorf("marshal payload: %w", err)
+	}
+
+	now := time.Now()
+	op := queue.PendingOperation{
+		IdempotencyKey: key,
+		OperationType:  queue.OpHeartbeat,
+		PayloadJSON:    payloadJSON,
+		AgentName:      agentNameStr,
+		SessionID:      sessionID,
+		CreatedAt:      now,
+		ExpiresAt:      now.Add(client.queueCfg.DefaultTTL),
+	}
+
+	if err := client.queueStore.Enqueue(ctx, op); err != nil {
+		return fmt.Errorf("enqueue heartbeat: %w", err)
+	}
+
+	switch outputFormat {
+	case "json":
+		return outputJSON(map[string]any{
+			"queued":          true,
+			"idempotency_key": key,
+		})
+	case "context":
+		return nil
+	default:
+		fmt.Println("Heartbeat queued (offline)")
 	}
 
 	return nil

@@ -6,6 +6,7 @@ import (
 	"os"
 	"time"
 
+	"github.com/google/uuid"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/protobuf/types/known/timestamppb"
@@ -15,6 +16,7 @@ import (
 	"github.com/roasbeef/subtrate/internal/db"
 	"github.com/roasbeef/subtrate/internal/db/sqlc"
 	"github.com/roasbeef/subtrate/internal/mail"
+	"github.com/roasbeef/subtrate/internal/queue"
 	"github.com/roasbeef/subtrate/internal/store"
 )
 
@@ -41,6 +43,10 @@ type Client struct {
 	registry    *agent.Registry
 	identityMgr *agent.IdentityManager
 
+	// When using queue mode.
+	queueStore *queue.QueueStore
+	queueCfg   queue.QueueConfig
+
 	// mode indicates the connection mode.
 	mode ClientMode
 
@@ -57,6 +63,10 @@ const (
 
 	// ModeDirect indicates the client is using direct database access.
 	ModeDirect
+
+	// ModeQueued indicates the client is storing operations in a local
+	// queue for later delivery when connectivity is restored.
+	ModeQueued
 )
 
 // String returns a human-readable string for the client mode.
@@ -66,15 +76,28 @@ func (m ClientMode) String() string {
 		return "gRPC"
 	case ModeDirect:
 		return "direct"
+	case ModeQueued:
+		return "queued"
 	default:
 		return "unknown"
 	}
 }
 
-// getClient returns a Client that tries to connect to the daemon via gRPC
-// first, then falls back to direct database access if the daemon is not
-// running.
+// getClient returns a Client using a 3-tier fallback strategy:
+//  1. If --queue-only is set, go straight to queue mode.
+//  2. Try gRPC connection to the daemon.
+//  3. Try direct database access.
+//  4. If --no-queue is set and both failed, return error.
+//  5. Fall back to local queue mode.
+//
+// When gRPC or direct succeeds, any pending queued operations are drained
+// and delivered automatically.
 func getClient() (*Client, error) {
+	// If --queue-only is set, skip connectivity attempts entirely.
+	if queueOnly {
+		return getQueuedClient()
+	}
+
 	addr := grpcAddr
 	if addr == "" {
 		addr = defaultGRPCAddr
@@ -83,15 +106,241 @@ func getClient() (*Client, error) {
 	// Try gRPC connection first.
 	client, err := tryGRPCConnection(addr)
 	if err == nil {
+		drainQueueOnConnect(client)
 		return client, nil
 	}
 
 	// If gRPC failed, fall back to direct database access.
 	if verbose {
-		fmt.Fprintf(os.Stderr, "Note: daemon not running at %s, using direct database access\n", addr)
+		fmt.Fprintf(os.Stderr,
+			"Note: daemon not running at %s, "+
+				"trying direct database access\n", addr,
+		)
 	}
 
-	return getDirectClient()
+	client, err = getDirectClient()
+	if err == nil {
+		drainQueueOnConnect(client)
+		return client, nil
+	}
+
+	// Both connectivity methods failed.
+	if noQueue {
+		return nil, fmt.Errorf(
+			"no connectivity: daemon not running, " +
+				"database unavailable, and --no-queue set",
+		)
+	}
+
+	// Fall back to queue mode.
+	if verbose {
+		fmt.Fprintf(os.Stderr,
+			"Note: no connectivity, using local queue\n",
+		)
+	}
+
+	return getQueuedClient()
+}
+
+// getQueuedClient creates a client that stores operations in a local
+// queue for later delivery.
+func getQueuedClient() (*Client, error) {
+	root, err := queue.FindProjectRoot(projectDir)
+	if err != nil {
+		return nil, fmt.Errorf("find project root: %w", err)
+	}
+
+	cfg := queue.DefaultQueueConfig()
+	qs, err := queue.OpenQueueStore(queue.QueueDBPath(root), cfg)
+	if err != nil {
+		return nil, fmt.Errorf("open queue store: %w", err)
+	}
+
+	return &Client{
+		queueStore: qs,
+		queueCfg:   cfg,
+		mode:       ModeQueued,
+	}, nil
+}
+
+// drainQueueOnConnect checks for a local queue.db and delivers any
+// pending operations through the given connected client. Errors are
+// reported to stderr but do not fail the overall operation.
+func drainQueueOnConnect(client *Client) {
+	root, err := queue.FindProjectRoot(projectDir)
+	if err != nil {
+		return
+	}
+
+	dbPath := queue.QueueDBPath(root)
+	if _, err := os.Stat(dbPath); os.IsNotExist(err) {
+		return
+	}
+
+	cfg := queue.DefaultQueueConfig()
+	qs, err := queue.OpenQueueStore(dbPath, cfg)
+	if err != nil {
+		if verbose {
+			fmt.Fprintf(os.Stderr,
+				"Warning: failed to open queue: %v\n", err,
+			)
+		}
+		return
+	}
+	defer qs.Close()
+
+	ctx := context.Background()
+
+	// Purge expired operations first.
+	purged, err := qs.PurgeExpired(ctx)
+	if err == nil && purged > 0 && verbose {
+		fmt.Fprintf(os.Stderr,
+			"Purged %d expired queued operation(s)\n", purged,
+		)
+	}
+
+	// Drain all pending operations.
+	ops, err := qs.Drain(ctx)
+	if err != nil {
+		if verbose {
+			fmt.Fprintf(os.Stderr,
+				"Warning: failed to drain queue: %v\n", err,
+			)
+		}
+		return
+	}
+
+	if len(ops) == 0 {
+		return
+	}
+
+	delivered := 0
+	for _, op := range ops {
+		err := deliverOperation(ctx, client, op)
+		if err != nil {
+			// Mark as failed so it will be retried next time.
+			_ = qs.MarkFailed(ctx, op.ID, err.Error())
+
+			if verbose {
+				fmt.Fprintf(os.Stderr,
+					"Warning: failed to deliver queued "+
+						"op %s: %v\n",
+					op.IdempotencyKey, err,
+				)
+			}
+
+			continue
+		}
+
+		_ = qs.MarkDelivered(ctx, op.ID)
+		delivered++
+	}
+
+	if delivered > 0 {
+		fmt.Fprintf(os.Stderr,
+			"Delivered %d queued operation(s)\n", delivered,
+		)
+	}
+}
+
+// deliverOperation delivers a single queued operation through a connected
+// client. It deserializes the payload, resolves agent names to IDs, and
+// dispatches the appropriate request with the original idempotency key.
+func deliverOperation(
+	ctx context.Context, client *Client, op queue.PendingOperation,
+) error {
+	payload, err := queue.UnmarshalPayload(
+		op.OperationType, op.PayloadJSON,
+	)
+	if err != nil {
+		return fmt.Errorf("unmarshal payload: %w", err)
+	}
+
+	switch p := payload.(type) {
+	case *queue.SendPayload:
+		// Resolve sender name to ID.
+		sender, err := client.GetAgentByName(ctx, p.SenderName)
+		if err != nil {
+			return fmt.Errorf("resolve sender %q: %w",
+				p.SenderName, err,
+			)
+		}
+
+		req := mail.SendMailRequest{
+			SenderID:       sender.ID,
+			RecipientNames: p.RecipientNames,
+			Subject:        p.Subject,
+			Body:           p.Body,
+			Priority:       mail.Priority(p.Priority),
+			TopicName:      p.TopicName,
+			ThreadID:       p.ThreadID,
+			Attachments:    p.Attachments,
+			IdempotencyKey: op.IdempotencyKey,
+		}
+		if p.DeadlineAt != nil {
+			req.Deadline = p.DeadlineAt
+		}
+
+		_, _, err = client.SendMail(ctx, req)
+		return err
+
+	case *queue.PublishPayload:
+		sender, err := client.GetAgentByName(ctx, p.SenderName)
+		if err != nil {
+			return fmt.Errorf("resolve sender %q: %w",
+				p.SenderName, err,
+			)
+		}
+
+		_, _, err = client.Publish(
+			ctx, sender.ID, p.TopicName, p.Subject, p.Body,
+			mail.Priority(p.Priority),
+		)
+		return err
+
+	case *queue.HeartbeatPayload:
+		ag, err := client.GetAgentByName(ctx, p.AgentName)
+		if err != nil {
+			return fmt.Errorf("resolve agent %q: %w",
+				p.AgentName, err,
+			)
+		}
+		return client.UpdateHeartbeat(ctx, ag.ID)
+
+	case *queue.StatusUpdatePayload:
+		sender, err := client.GetAgentByName(ctx, p.SenderName)
+		if err != nil {
+			return fmt.Errorf("resolve sender %q: %w",
+				p.SenderName, err,
+			)
+		}
+
+		req := mail.SendMailRequest{
+			SenderID:       sender.ID,
+			RecipientNames: p.RecipientNames,
+			Subject:        p.Subject,
+			Body:           p.Body,
+			Priority:       mail.PriorityNormal,
+			IdempotencyKey: op.IdempotencyKey,
+		}
+
+		_, _, err = client.SendMail(ctx, req)
+		return err
+
+	default:
+		return fmt.Errorf("unknown payload type: %T", payload)
+	}
+}
+
+// newIdempotencyKey generates a new UUIDv7 idempotency key. UUIDv7 provides
+// time-ordered, globally unique keys suitable for deduplication.
+func newIdempotencyKey() string {
+	id, err := uuid.NewV7()
+	if err != nil {
+		// Fall back to v4 if v7 fails (should not happen).
+		return uuid.New().String()
+	}
+	return id.String()
 }
 
 // tryGRPCConnection attempts to connect to the daemon via gRPC.
@@ -160,6 +409,9 @@ func (c *Client) Close() error {
 	}
 	if c.store != nil {
 		return c.store.Close()
+	}
+	if c.queueStore != nil {
+		return c.queueStore.Close()
 	}
 	return nil
 }

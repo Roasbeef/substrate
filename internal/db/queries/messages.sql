@@ -1,8 +1,8 @@
 -- name: CreateMessage :one
 INSERT INTO messages (
     thread_id, topic_id, log_offset, sender_id, subject, body_md,
-    priority, deadline_at, attachments, created_at
-) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    priority, deadline_at, attachments, created_at, idempotency_key
+) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 RETURNING *;
 
 -- name: GetMessage :one
@@ -265,6 +265,9 @@ LEFT JOIN agents a ON m.sender_id = a.id
 WHERE m.subject LIKE ? OR m.body_md LIKE ?
 ORDER BY m.created_at DESC
 LIMIT 50;
+
+-- name: GetMessageByIdempotencyKey :one
+SELECT * FROM messages WHERE idempotency_key = ? LIMIT 1;
 
 -- Note: Full-text search queries using FTS5 are handled manually in Go code
 -- since sqlc doesn't fully support FTS5 virtual tables.

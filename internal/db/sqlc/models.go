@@ -48,6 +48,7 @@ type Message struct {
 	CreatedAt       int64
 	DeletedBySender int64
 	Metadata        sql.NullString
+	IdempotencyKey  sql.NullString
 }
 
 type MessageRecipient struct {
@@ -62,6 +63,20 @@ type MessageRecipient struct {
 type MessagesFt struct {
 	Subject string
 	BodyMd  string
+}
+
+type PendingOperation struct {
+	ID             int64
+	IdempotencyKey string
+	OperationType  string
+	PayloadJson    string
+	AgentName      string
+	SessionID      sql.NullString
+	CreatedAt      int64
+	ExpiresAt      int64
+	Attempts       int64
+	LastError      sql.NullString
+	Status         string
 }
 
 type Review struct {

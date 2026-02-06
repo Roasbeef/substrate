@@ -53,6 +53,7 @@ func (s *Server) SendMail(ctx context.Context, req *SendMailRequest) (*SendMailR
 		Priority:       priority,
 		Deadline:       deadline,
 		Attachments:    req.AttachmentsJson,
+		IdempotencyKey: req.IdempotencyKey,
 	}
 
 	// Send via the shared mail client (actor system).
@@ -418,11 +419,12 @@ func (s *Server) Publish(ctx context.Context, req *PublishRequest) (*PublishResp
 	}
 
 	pubReq := mail.PublishRequest{
-		SenderID:  req.SenderId,
-		TopicName: req.TopicName,
-		Subject:   req.Subject,
-		Body:      req.Body,
-		Priority:  priority,
+		SenderID:       req.SenderId,
+		TopicName:      req.TopicName,
+		Subject:        req.Subject,
+		Body:           req.Body,
+		Priority:       priority,
+		IdempotencyKey: req.IdempotencyKey,
 	}
 
 	// Publish via the shared mail client (actor system).

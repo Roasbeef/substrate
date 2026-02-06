@@ -135,6 +135,20 @@ func (s *Service) handleSendMail(ctx context.Context,
 ) SendMailResponse {
 	var response SendMailResponse
 
+	// Idempotency check: if a key is provided and a message with that
+	// key already exists, return the original response immediately.
+	if req.IdempotencyKey != "" {
+		existing, err := s.store.GetMessageByIdempotencyKey(
+			ctx, req.IdempotencyKey,
+		)
+		if err == nil {
+			return SendMailResponse{
+				MessageID: existing.ID,
+				ThreadID:  existing.ThreadID,
+			}
+		}
+	}
+
 	// Variables to capture data for notification after successful transaction.
 	var recipientIDs []int64
 	var senderName string
@@ -204,15 +218,16 @@ func (s *Service) handleSendMail(ctx context.Context,
 
 		// Create the message.
 		msg, err := txStore.CreateMessage(ctx, store.CreateMessageParams{
-			ThreadID:    threadID,
-			TopicID:     topicID,
-			LogOffset:   logOffset,
-			SenderID:    sender.ID,
-			Subject:     req.Subject,
-			Body:        req.Body,
-			Priority:    string(req.Priority),
-			DeadlineAt:  req.Deadline,
-			Attachments: req.Attachments,
+			ThreadID:       threadID,
+			TopicID:        topicID,
+			LogOffset:      logOffset,
+			SenderID:       sender.ID,
+			Subject:        req.Subject,
+			Body:           req.Body,
+			Priority:       string(req.Priority),
+			DeadlineAt:     req.Deadline,
+			Attachments:    req.Attachments,
+			IdempotencyKey: req.IdempotencyKey,
 		})
 		if err != nil {
 			return fmt.Errorf("failed to create message: %w", err)
@@ -691,6 +706,19 @@ func (s *Service) handlePublish(ctx context.Context,
 ) PublishResponse {
 	var response PublishResponse
 
+	// Idempotency check: if a key is provided and a message with that
+	// key already exists, return the original response immediately.
+	if req.IdempotencyKey != "" {
+		existing, err := s.store.GetMessageByIdempotencyKey(
+			ctx, req.IdempotencyKey,
+		)
+		if err == nil {
+			return PublishResponse{
+				MessageID: existing.ID,
+			}
+		}
+	}
+
 	err := s.store.WithTx(ctx, func(ctx context.Context,
 		txStore store.Storage,
 	) error {
@@ -712,13 +740,14 @@ func (s *Service) handlePublish(ctx context.Context,
 
 		// Create the message.
 		msg, err := txStore.CreateMessage(ctx, store.CreateMessageParams{
-			ThreadID:  threadID,
-			TopicID:   topic.ID,
-			LogOffset: logOffset,
-			SenderID:  req.SenderID,
-			Subject:   req.Subject,
-			Body:      req.Body,
-			Priority:  string(req.Priority),
+			ThreadID:       threadID,
+			TopicID:        topic.ID,
+			LogOffset:      logOffset,
+			SenderID:       req.SenderID,
+			Subject:        req.Subject,
+			Body:           req.Body,
+			Priority:       string(req.Priority),
+			IdempotencyKey: req.IdempotencyKey,
 		})
 		if err != nil {
 			return fmt.Errorf("failed to create message: %w", err)

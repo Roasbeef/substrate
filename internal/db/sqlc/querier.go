@@ -10,9 +10,11 @@ import (
 )
 
 type Querier interface {
+	ClearAllOperations(ctx context.Context) error
 	CountActivitiesByAgentToday(ctx context.Context, arg CountActivitiesByAgentTodayParams) (int64, error)
 	CountArchivedByAgent(ctx context.Context, agentID int64) (int64, error)
 	CountOpenIssues(ctx context.Context, reviewID string) (int64, error)
+	CountPendingOperations(ctx context.Context) (int64, error)
 	CountReviewIssuesByStatus(ctx context.Context, arg CountReviewIssuesByStatusParams) (int64, error)
 	CountReviewsByRequester(ctx context.Context, requesterID int64) (int64, error)
 	CountReviewsByState(ctx context.Context, state string) (int64, error)
@@ -42,6 +44,8 @@ type Querier interface {
 	DeleteSessionIdentity(ctx context.Context, sessionID string) error
 	DeleteSubscription(ctx context.Context, arg DeleteSubscriptionParams) error
 	DeleteTopic(ctx context.Context, id int64) error
+	DrainPendingOperations(ctx context.Context) ([]PendingOperation, error)
+	EnqueueOperation(ctx context.Context, arg EnqueueOperationParams) (PendingOperation, error)
 	GetActivity(ctx context.Context, id int64) (Activity, error)
 	GetAgent(ctx context.Context, id int64) (Agent, error)
 	GetAgentByName(ctx context.Context, name string) (Agent, error)
@@ -58,6 +62,7 @@ type Querier interface {
 	GetLatestIteration(ctx context.Context, reviewID string) (ReviewIteration, error)
 	GetMaxLogOffset(ctx context.Context, topicID int64) (interface{}, error)
 	GetMessage(ctx context.Context, id int64) (Message, error)
+	GetMessageByIdempotencyKey(ctx context.Context, idempotencyKey sql.NullString) (Message, error)
 	GetMessageRecipient(ctx context.Context, arg GetMessageRecipientParams) (MessageRecipient, error)
 	GetMessageRecipients(ctx context.Context, messageID int64) ([]MessageRecipient, error)
 	// Fetch recipients for multiple messages at once with agent names.
@@ -75,6 +80,7 @@ type Querier interface {
 	GetOpenReviewIssues(ctx context.Context, reviewID string) ([]ReviewIssue, error)
 	GetOrCreateAgentInboxTopic(ctx context.Context, arg GetOrCreateAgentInboxTopicParams) (Topic, error)
 	GetOrCreateTopic(ctx context.Context, arg GetOrCreateTopicParams) (Topic, error)
+	GetQueueStats(ctx context.Context) (GetQueueStatsRow, error)
 	GetReview(ctx context.Context, reviewID string) (Review, error)
 	GetReviewByID(ctx context.Context, id int64) (Review, error)
 	GetReviewIssue(ctx context.Context, id int64) (ReviewIssue, error)
@@ -106,6 +112,7 @@ type Querier interface {
 	ListAgentsByProject(ctx context.Context, projectKey sql.NullString) ([]Agent, error)
 	ListConsumerOffsetsByAgent(ctx context.Context, agentID int64) ([]ListConsumerOffsetsByAgentRow, error)
 	ListMessagesByPriority(ctx context.Context, arg ListMessagesByPriorityParams) ([]Message, error)
+	ListPendingOperations(ctx context.Context) ([]PendingOperation, error)
 	ListRecentActivities(ctx context.Context, limit int64) ([]Activity, error)
 	ListReviews(ctx context.Context, arg ListReviewsParams) ([]Review, error)
 	ListReviewsByRequester(ctx context.Context, arg ListReviewsByRequesterParams) ([]Review, error)
@@ -117,6 +124,9 @@ type Querier interface {
 	ListTopicsByType(ctx context.Context, topicType string) ([]Topic, error)
 	ListTopicsWithMessageCount(ctx context.Context) ([]ListTopicsWithMessageCountRow, error)
 	MarkMessageDeletedBySender(ctx context.Context, arg MarkMessageDeletedBySenderParams) error
+	MarkOperationDelivered(ctx context.Context, id int64) error
+	MarkOperationFailed(ctx context.Context, arg MarkOperationFailedParams) error
+	PurgeExpiredOperations(ctx context.Context, expiresAt int64) (int64, error)
 	// Simple LIKE-based search on subject and body. FTS5 is available but this
 	// covers basic cases. The search term should be passed with wildcards.
 	SearchMessages(ctx context.Context, arg SearchMessagesParams) ([]SearchMessagesRow, error)

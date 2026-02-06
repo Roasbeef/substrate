@@ -549,6 +549,34 @@ func (m *IdentityManager) updateAgentContext(ctx context.Context,
 	return nil
 }
 
+// LoadCachedIdentity reads a cached identity file for the given session ID
+// without verifying against the database. This is used in queue mode when
+// the database is unavailable — the agent name from the cached file is used
+// to construct queued operations that will be resolved at drain time.
+func LoadCachedIdentity(sessionID string) (*IdentityFile, error) {
+	home, err := os.UserHomeDir()
+	if err != nil {
+		return nil, fmt.Errorf("get home directory: %w", err)
+	}
+
+	filePath := filepath.Join(
+		home, ".subtrate", "identities",
+		"by-session", sessionID+".json",
+	)
+
+	data, err := os.ReadFile(filePath)
+	if err != nil {
+		return nil, fmt.Errorf("read identity file: %w", err)
+	}
+
+	var identity IdentityFile
+	if err := json.Unmarshal(data, &identity); err != nil {
+		return nil, fmt.Errorf("parse identity file: %w", err)
+	}
+
+	return &identity, nil
+}
+
 // hashProjectKey creates a filesystem-safe hash of a project path.
 func hashProjectKey(projectKey string) string {
 	// Simple hash for filesystem safety.

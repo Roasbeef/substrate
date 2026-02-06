@@ -133,6 +133,11 @@ type SendMailRequest struct {
 
 	// Attachments is optional JSON-encoded attachment data.
 	Attachments string
+
+	// IdempotencyKey is an optional key for deduplication. If a message
+	// with the same key already exists, the original response is returned
+	// instead of creating a duplicate.
+	IdempotencyKey string
 }
 
 // MessageType implements actor.Message.
@@ -343,6 +348,11 @@ type PublishRequest struct {
 
 	// Priority indicates the urgency of the message.
 	Priority Priority
+
+	// IdempotencyKey is an optional key for deduplication. If a message
+	// with the same key already exists, the original response is returned
+	// instead of creating a duplicate.
+	IdempotencyKey string
 }
 
 // MessageType implements actor.Message.

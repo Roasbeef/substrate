@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/roasbeef/subtrate/internal/mail"
+	"github.com/roasbeef/subtrate/internal/queue"
 	"github.com/spf13/cobra"
 )
 
@@ -62,7 +63,7 @@ func runSend(cmd *cobra.Command, args []string) error {
 	}
 	defer client.Close()
 
-	agentID, _, err := getCurrentAgentWithClient(ctx, client)
+	agentID, agentNameStr, err := getCurrentAgentWithClient(ctx, client)
 	if err != nil {
 		return err
 	}
@@ -100,6 +101,14 @@ func runSend(cmd *cobra.Command, args []string) error {
 			return fmt.Errorf("invalid deadline: %w", err)
 		}
 		deadline = &d
+	}
+
+	// In queue mode, enqueue the operation for later delivery.
+	if client.Mode() == ModeQueued {
+		return enqueueSend(
+			ctx, client, agentNameStr, body,
+			string(priority), deadline,
+		)
 	}
 
 	req := mail.SendMailRequest{
@@ -154,4 +163,54 @@ func parseDuration(s string) (time.Time, error) {
 	return time.Time{}, fmt.Errorf(
 		"cannot parse %q as duration or timestamp", s,
 	)
+}
+
+// enqueueSend stores a send operation in the local queue for later delivery.
+func enqueueSend(
+	ctx context.Context, client *Client, senderName, body,
+	priority string, deadline *time.Time,
+) error {
+	key := newIdempotencyKey()
+	payload := queue.SendPayload{
+		SenderName:     senderName,
+		RecipientNames: []string{sendTo},
+		Subject:        sendSubject,
+		Body:           body,
+		Priority:       priority,
+		TopicName:      "",
+		ThreadID:       sendThreadID,
+		DeadlineAt:     deadline,
+	}
+
+	payloadJSON, err := queue.MarshalPayload(payload)
+	if err != nil {
+		return fmt.Errorf("marshal payload: %w", err)
+	}
+
+	now := time.Now()
+	op := queue.PendingOperation{
+		IdempotencyKey: key,
+		OperationType:  queue.OpSend,
+		PayloadJSON:    payloadJSON,
+		AgentName:      senderName,
+		SessionID:      sessionID,
+		CreatedAt:      now,
+		ExpiresAt:      now.Add(client.queueCfg.DefaultTTL),
+	}
+
+	if err := client.queueStore.Enqueue(ctx, op); err != nil {
+		return fmt.Errorf("enqueue send: %w", err)
+	}
+
+	switch outputFormat {
+	case "json":
+		return outputJSON(map[string]any{
+			"queued":          true,
+			"idempotency_key": key,
+		})
+	default:
+		fmt.Println("Message queued (offline)")
+	}
+
+	return nil
 }
