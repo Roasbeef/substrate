@@ -351,7 +351,7 @@ func TestBuildReviewPrompt(t *testing.T) {
 			prompt := a.buildReviewPrompt()
 			require.Contains(t, prompt, "abc-123")
 			require.Contains(t, prompt, tt.expected)
-			require.Contains(t, prompt, "YAML frontmatter")
+			require.Contains(t, prompt, "YAML block")
 		})
 	}
 }

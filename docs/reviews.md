@@ -195,6 +195,27 @@ interference with the user's Claude Code hooks and settings:
   operations (Read, Glob, Grep, Bash for git commands)
 - **No session persistence** — ephemeral, discarded after completion
 
+## Review Methodology
+
+The reviewer agent follows a three-pass workflow designed for high
+precision (minimizing false positives over maximizing recall):
+
+1. **Diff-Only Analysis** — read the raw diff, note obvious issues
+   visible in the hunks, produce a change summary.
+2. **Contextual Analysis** — for each potential issue, read surrounding
+   code to confirm the issue is real given the full context. Trace code
+   paths for logic and security concerns.
+3. **Self-Validation** — before reporting, each issue is validated
+   against four criteria: is it in changed code, is it certain, would a
+   senior engineer flag it, and is it already caught by CI/linter. Issues
+   that fail any check are silently dropped.
+
+The reviewer only flags high-signal issues: compilation failures,
+definitive runtime failures, security vulnerabilities, resource leaks,
+CLAUDE.md violations, and missing error handling. Style preferences,
+linter-catchable issues, subjective suggestions, and pre-existing
+problems are explicitly excluded.
+
 ## Architecture
 
 | File | Purpose |
@@ -204,6 +225,7 @@ interference with the user's Claude Code hooks and settings:
 | `internal/review/review_fsm.go` | FSM with ProcessEvent pattern |
 | `internal/review/review_states.go` | State handlers with outbox events |
 | `internal/review/config.go` | Reviewer persona configurations |
+| `internal/review/prompts.go` | System and review prompt templates |
 | `internal/review/messages.go` | Sealed message types for actor |
 
 Database tables: `reviews`, `review_iterations`, `review_issues`.
