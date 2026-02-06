@@ -2,6 +2,8 @@
 
 Subtrate is a command center for orchestrating multiple Claude Code agents. It provides the messaging infrastructure that allows agents to communicate, coordinate, and persist across context compactions, turning isolated coding assistants into a collaborative workforce.
 
+![Subtrate Inbox](docs/images/inbox.png)
+
 ## The Problem
 
 When you run multiple Claude Code agents (perhaps one reviewing code while another implements features), they operate in complete isolation. They can't ask each other questions, share discoveries, or coordinate their work. Each agent is also ephemeral: when its context window fills up and compacts, it loses track of what it was doing.
@@ -22,21 +24,75 @@ flowchart TB
 
     subgraph Subtrate["Subtrate"]
         CLI["substrate CLI"]
-        MCP["substrated MCP Server"]
+        GRPC["gRPC Server :10009"]
+        REST["REST Gateway /api/v1/"]
         Mail["Mail Service<br/>(Actor Pattern)"]
+        Review["Review Service<br/>(FSM + Claude SDK)"]
+        Queue["Local Queue<br/>(Store-and-Forward)"]
         DB[(SQLite<br/>WAL + FTS5)]
     end
 
+    subgraph Web["Web UI :8080"]
+        WEB["React SPA"]
+        WS["WebSocket /ws"]
+    end
+
     A1 <--> CLI
-    A2 <--> MCP
+    A2 <--> CLI
     A3 <--> CLI
 
-    CLI --> Mail
-    MCP --> Mail
+    CLI -->|online| GRPC
+    CLI -.->|offline| Queue
+    Queue -.->|reconnect| GRPC
+    GRPC --> Mail
+    GRPC --> Review
+    REST --> GRPC
+    WEB --> REST
+    WEB --> WS
     Mail --> DB
+    Review --> DB
 ```
 
-The architecture is straightforward: agents communicate via either the `substrate` CLI or MCP tools. Messages flow through an actor-based mail service into a SQLite database. The hook system ensures agents stay responsive and messages get delivered.
+The architecture is straightforward: agents communicate via the `substrate` CLI with a 3-tier fallback (gRPC → direct DB → local queue). Messages flow through an actor-based mail service into a SQLite database. The hook system ensures agents stay responsive and messages get delivered even when the daemon is unavailable.
+
+## Features
+
+### Code Reviews
+
+Subtrate includes a native code review system that spawns isolated Claude Agent SDK reviewer agents to analyze diffs and return structured feedback.
+
+![Reviews list](docs/images/reviews-page.png)
+
+- 4 review types: full, security, performance, architecture
+- FSM-based workflow with iteration tracking
+- Structured issue tracking with severity, file path, and line ranges
+- Web UI for browsing reviews, iterations, and issues
+
+See [Code Reviews](docs/reviews.md) for the full workflow and CLI usage.
+
+### Diff Viewer
+
+Send git diffs as messages with syntax highlighting in the web UI. Supports unified/split modes and fullscreen navigation with file sidebar.
+
+![Diff inline in message](docs/images/diff-in-message.png)
+
+```bash
+substrate send-diff --session-id "$CLAUDE_SESSION_ID" --to User --base main
+```
+
+### Store-and-Forward Queue
+
+The CLI uses a 3-tier connection fallback so agents can operate even when the daemon is unavailable:
+
+1. **gRPC** — Connects to the `substrated` daemon (preferred)
+2. **Direct DB** — Opens the SQLite database directly
+3. **Local Queue** — Stores operations offline with automatic delivery on reconnect
+
+Queued operations include idempotency keys to prevent duplicates and TTL-based expiry.
+
+### Web UI
+
+A React + TypeScript SPA with real-time WebSocket updates for inbox, agent status, sessions, reviews, and activity feed.
 
 ## Quick Start
 
@@ -68,6 +124,12 @@ substrate send --to SilverWolf --subject "Need API review" --body "Can you look 
 # Read a specific message
 substrate read 42
 
+# Request a code review
+substrate review request --session-id "$CLAUDE_SESSION_ID"
+
+# Send a diff to the User
+substrate send-diff --session-id "$CLAUDE_SESSION_ID" --to User
+
 # Check overall status
 substrate status
 ```
@@ -78,7 +140,7 @@ substrate status
 make run    # Starts substrated with web UI on http://localhost:8080
 ```
 
-The web UI provides a visual inbox, agent status dashboard, and message composition. It's useful for monitoring what your agents are doing.
+The web UI provides a visual inbox, agent status dashboard, review browser, and message composition with diff rendering.
 
 ## Message Flow
 
@@ -112,10 +174,14 @@ The Stop hook is the key mechanism. Instead of letting agents exit when idle, it
 
 | Document | Description |
 |----------|-------------|
+| [Architecture](docs/architecture.md) | System overview, actor model, data model |
+| [Database Schema](docs/schema.md) | ER diagrams, state machines, migration history |
+| [Code Reviews](docs/reviews.md) | Review system workflow, CLI, diff viewer |
+| [CLI Reference](docs/cli-reference.md) | Complete command reference with all flags |
+| [API Reference](docs/api-reference.md) | gRPC services, REST gateway, WebSocket protocol |
 | [Hooks System](docs/HOOKS.md) | How Subtrate integrates with Claude Code hooks |
 | [Message Delivery](docs/delivery.md) | Data model and message state management |
 | [Status Updates](docs/status-updates.md) | Automated status reporting to the User agent |
-| [Development Guidelines](docs/development_guidelines.md) | Coding standards and patterns |
 | [Roadmap](docs/ROADMAP.md) | Planned features and improvements |
 
 ## Agent Identity
@@ -136,12 +202,13 @@ This makes it easy to identify which agent is working on what, especially when y
 
 - Go 1.22+
 - CGO enabled (for SQLite FTS5)
-- SQLite 3
+- bun (for frontend)
 
 ### Common Commands
 
 ```bash
 make build          # Build all packages
+make build-production # Build with embedded frontend
 make test           # Run tests
 make lint           # Run linter
 make sqlc           # Regenerate database code
@@ -155,23 +222,32 @@ make help           # Show all targets
 ```
 subtrate/
 ├── cmd/
-│   ├── substrate/      # CLI tool
-│   └── substrated/     # MCP daemon + web server
+│   ├── substrate/          # CLI tool
+│   │   └── commands/       # Cobra command implementations
+│   ├── substrated/         # Daemon (gRPC + web + optional MCP)
+│   └── merge-sql-schemas/  # Schema merge tool for sqlc
 ├── internal/
-│   ├── agent/          # Agent registry and identity
-│   ├── db/             # Database layer (sqlc generated)
-│   ├── mail/           # Mail service with actor pattern
-│   ├── mcp/            # MCP protocol server
-│   └── web/            # HTMX web UI
-├── docs/               # Documentation
-└── CLAUDE.md           # AI assistant guidelines
+│   ├── activity/           # Activity tracking service
+│   ├── actorutil/          # Actor pool and AskAwait helper
+│   ├── agent/              # Agent registry, heartbeat, identity
+│   ├── api/grpc/           # Proto definitions, gRPC server
+│   ├── baselib/actor/      # Core actor system (mailbox, futures)
+│   ├── db/                 # Database layer (sqlc generated)
+│   ├── mail/               # Mail service, notification hub
+│   ├── queue/              # Store-and-forward local queue
+│   ├── review/             # Code review system (FSM + Claude SDK)
+│   ├── store/              # Storage interfaces and implementations
+│   └── web/                # JSON API, WebSocket hub, embedded SPA
+├── web/frontend/           # React + TypeScript SPA (Vite + bun)
+├── docs/                   # Documentation
+└── CLAUDE.md               # AI assistant guidelines
 ```
 
 ### Architecture Notes
 
 The mail service uses an actor pattern (based on patterns from [lnd](https://github.com/lightningnetwork/lnd)) where each service runs in its own goroutine and communicates via channels. This provides clean concurrency without shared mutable state.
 
-SQLite runs in WAL mode for concurrent reads and uses FTS5 for full-text search on message content. The database schema uses sqlc for type-safe query generation.
+SQLite runs in WAL mode for concurrent reads and uses FTS5 for full-text search on message content. The database schema uses sqlc for type-safe query generation. See [Database Schema](docs/schema.md) for the full ER diagram and state machines.
 
 ## Why "Subtrate"?
 
