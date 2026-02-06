@@ -1348,6 +1348,51 @@ func TestMailService_UpdateState_DefaultUserAgent(t *testing.T) {
 	require.NoError(t, err)
 }
 
+// TestMailService_UpdateState_NoAgentID_ResolvesRecipient verifies that when
+// UpdateState is called without an agent_id (as the web UI does in aggregate
+// views like CodeReviewer), the server looks up the actual recipient instead
+// of defaulting to "User". This is a regression test for a bug where marking
+// messages as read in the CodeReviewer view had no effect because the state
+// update targeted the "User" agent which was not a recipient.
+func TestMailService_UpdateState_NoAgentID_ResolvesRecipient(t *testing.T) {
+	h := newTestHarness(t)
+	defer h.Close()
+
+	ctx := context.Background()
+
+	// Create a non-User agent as the recipient (simulating an agent like
+	// "AzureHaven" that receives review messages).
+	senderID := h.createTestAgent("reviewer-main")
+	recipientID := h.createTestAgent("AzureHaven")
+
+	// Send a message to AzureHaven (not "User").
+	sendResp, err := h.mailClient.SendMail(ctx, &SendMailRequest{
+		SenderId:       senderID,
+		RecipientNames: []string{"AzureHaven"},
+		Subject:        "Review: approve",
+		Body:           "LGTM",
+		Priority:       Priority_PRIORITY_NORMAL,
+	})
+	require.NoError(t, err)
+
+	// Mark as read with agent_id=0 (the CodeReviewer aggregate view path).
+	resp, err := h.mailClient.UpdateState(ctx, &UpdateStateRequest{
+		MessageId: sendResp.MessageId,
+		AgentId:   0,
+		NewState:  MessageState_STATE_READ,
+	})
+	require.NoError(t, err)
+	require.True(t, resp.Success)
+
+	// Verify the message is actually marked as read for the real recipient.
+	msgResp, err := h.mailClient.ReadMessage(ctx, &ReadMessageRequest{
+		MessageId: sendResp.MessageId,
+		AgentId:   recipientID,
+	})
+	require.NoError(t, err)
+	require.Equal(t, MessageState_STATE_READ, msgResp.Message.State)
+}
+
 func TestMailService_PollChanges(t *testing.T) {
 	h := newTestHarness(t)
 	defer h.Close()
