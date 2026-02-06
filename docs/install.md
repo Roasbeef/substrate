@@ -13,7 +13,7 @@ with Subtrate integration fragments.
 ## Option 1: Plugin Installation (Recommended)
 
 The plugin approach lets Claude Code discover Subtrate's hooks and skills
-automatically from the repository directory.
+automatically from the repository.
 
 ### Step 1: Install the substrate CLI and daemon
 
@@ -38,19 +38,96 @@ substrate --help
 substrated --help
 ```
 
-### Step 2: Load the plugin
+### Step 2: Install the plugin
 
-Point Claude Code at the cloned repository:
+There are three ways to load the plugin. Choose one:
+
+**Option A: Marketplace install (recommended for permanent use)**
+
+Add the marketplace and install the plugin:
+
+```
+/plugin marketplace add Roasbeef/substrate
+/plugin install substrate@substrate-plugins
+```
+
+This installs the plugin to your user scope. It persists across sessions and
+auto-updates when you run `/plugin marketplace update`.
+
+**Option B: GitHub source in another marketplace**
+
+If you maintain your own team marketplace, add the Subtrate plugin as a GitHub
+source entry in your `marketplace.json`:
+
+```json
+{
+  "name": "substrate",
+  "source": {
+    "source": "github",
+    "repo": "Roasbeef/substrate"
+  },
+  "description": "Agent command center with mail, reviews, and persistent agent hooks."
+}
+```
+
+Then install:
+
+```
+/plugin install substrate@your-marketplace
+```
+
+**Option C: Local plugin-dir (for development/testing)**
+
+Point Claude Code at the cloned repository directly:
 
 ```bash
 claude --plugin-dir /path/to/subtrate
 ```
 
-This registers the hooks (SessionStart, UserPromptSubmit, Stop, SubagentStop,
-PreCompact) and the `/substrate:substrate` skill automatically.
+This loads the plugin for the current session only.
 
-To load the plugin every session without the flag, install it to your user
-scope from a marketplace or add it to your settings manually.
+### Step 3: Configure settings (optional)
+
+To auto-enable the plugin for all projects, add these entries to your
+`~/.claude/settings.json`:
+
+```json
+{
+  "enabledPlugins": {
+    "substrate@substrate-plugins": true
+  },
+  "extraKnownMarketplaces": {
+    "substrate-plugins": {
+      "source": {
+        "source": "github",
+        "repo": "Roasbeef/substrate"
+      }
+    }
+  }
+}
+```
+
+To share Subtrate with a team via a project, add to `.claude/settings.json`
+in the project repository:
+
+```json
+{
+  "enabledPlugins": {
+    "substrate@substrate-plugins": true
+  },
+  "extraKnownMarketplaces": {
+    "substrate-plugins": {
+      "source": {
+        "source": "github",
+        "repo": "Roasbeef/substrate"
+      }
+    }
+  }
+}
+```
+
+Team members will be prompted to install the marketplace when they trust the
+project folder.
 
 ### Step 3: Start the daemon
 

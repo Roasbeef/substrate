@@ -1,0 +1,18 @@
+{
+  "name": "substrate-plugins",
+  "owner": {
+    "name": "Roasbeef",
+    "email": "laolu@roasbeef.com"
+  },
+  "metadata": {
+    "description": "Agent command center for orchestrating Claude Code agents with mail, messaging, code reviews, and persistent agent lifecycle hooks."
+  },
+  "plugins": [
+    {
+      "name": "substrate",
+      "source": "./",
+      "description": "Agent command center with mail, reviews, and persistent agent hooks.",
+      "version": "1.0.0"
+    }
+  ]
+}
