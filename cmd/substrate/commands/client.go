@@ -36,6 +36,7 @@ type Client struct {
 	mailClient   subtraterpc.MailClient
 	agentClient  subtraterpc.AgentClient
 	reviewClient subtraterpc.ReviewServiceClient
+	taskClient   subtraterpc.TaskServiceClient
 
 	// When using direct DB mode.
 	store       *db.Store
@@ -374,6 +375,7 @@ func tryGRPCConnection(addr string) (*Client, error) {
 		mailClient:   subtraterpc.NewMailClient(conn),
 		agentClient:  agentClient,
 		reviewClient: subtraterpc.NewReviewServiceClient(conn),
+		taskClient:   subtraterpc.NewTaskServiceClient(conn),
 		mode:         ModeGRPC,
 		grpcAddr:     addr,
 	}, nil
@@ -1356,4 +1358,85 @@ func (c *Client) UpdateIssueStatus(
 			Status:   status,
 		},
 	)
+}
+
+// =============================================================================
+// Task client methods (gRPC only - requires daemon)
+// =============================================================================
+
+// ListTasks lists tasks with optional filters.
+func (c *Client) ListTasks(
+	ctx context.Context, req *subtraterpc.ListTasksRequest,
+) (*subtraterpc.ListTasksResponse, error) {
+	if err := c.requireGRPC(); err != nil {
+		return nil, err
+	}
+
+	return c.taskClient.ListTasks(ctx, req)
+}
+
+// GetTaskStats retrieves task statistics.
+func (c *Client) GetTaskStats(
+	ctx context.Context, req *subtraterpc.GetTaskStatsRequest,
+) (*subtraterpc.GetTaskStatsResponse, error) {
+	if err := c.requireGRPC(); err != nil {
+		return nil, err
+	}
+
+	return c.taskClient.GetTaskStats(ctx, req)
+}
+
+// GetAllAgentTaskStats retrieves task statistics for all agents.
+func (c *Client) GetAllAgentTaskStats(
+	ctx context.Context, req *subtraterpc.GetAllAgentTaskStatsRequest,
+) (*subtraterpc.GetAllAgentTaskStatsResponse, error) {
+	if err := c.requireGRPC(); err != nil {
+		return nil, err
+	}
+
+	return c.taskClient.GetAllAgentTaskStats(ctx, req)
+}
+
+// RegisterTaskList registers a new task list for an agent.
+func (c *Client) RegisterTaskList(
+	ctx context.Context, req *subtraterpc.RegisterTaskListRequest,
+) (*subtraterpc.RegisterTaskListResponse, error) {
+	if err := c.requireGRPC(); err != nil {
+		return nil, err
+	}
+
+	return c.taskClient.RegisterTaskList(ctx, req)
+}
+
+// ListTaskLists lists registered task lists.
+func (c *Client) ListTaskLists(
+	ctx context.Context, req *subtraterpc.ListTaskListsRequest,
+) (*subtraterpc.ListTaskListsResponse, error) {
+	if err := c.requireGRPC(); err != nil {
+		return nil, err
+	}
+
+	return c.taskClient.ListTaskLists(ctx, req)
+}
+
+// SyncTaskList triggers a sync of a task list.
+func (c *Client) SyncTaskList(
+	ctx context.Context, req *subtraterpc.SyncTaskListRequest,
+) (*subtraterpc.SyncTaskListResponse, error) {
+	if err := c.requireGRPC(); err != nil {
+		return nil, err
+	}
+
+	return c.taskClient.SyncTaskList(ctx, req)
+}
+
+// UpsertTask creates or updates a task.
+func (c *Client) UpsertTask(
+	ctx context.Context, req *subtraterpc.UpsertTaskRequest,
+) (*subtraterpc.UpsertTaskResponse, error) {
+	if err := c.requireGRPC(); err != nil {
+		return nil, err
+	}
+
+	return c.taskClient.UpsertTask(ctx, req)
 }
