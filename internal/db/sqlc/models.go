@@ -35,6 +35,9 @@ type Agent struct {
 	CurrentSessionID sql.NullString
 	CreatedAt        int64
 	LastActiveAt     int64
+	Purpose          sql.NullString
+	WorkingDir       sql.NullString
+	Hostname         sql.NullString
 }
 
 type AgentTask struct {

@@ -13,7 +13,7 @@ import (
 const CreateAgent = `-- name: CreateAgent :one
 INSERT INTO agents (name, project_key, git_branch, current_session_id, created_at, last_active_at)
 VALUES (?, ?, ?, ?, ?, ?)
-RETURNING id, name, project_key, git_branch, current_session_id, created_at, last_active_at
+RETURNING id, name, project_key, git_branch, current_session_id, created_at, last_active_at, purpose, working_dir, hostname
 `
 
 type CreateAgentParams struct {
@@ -43,6 +43,9 @@ func (q *Queries) CreateAgent(ctx context.Context, arg CreateAgentParams) (Agent
 		&i.CurrentSessionID,
 		&i.CreatedAt,
 		&i.LastActiveAt,
+		&i.Purpose,
+		&i.WorkingDir,
+		&i.Hostname,
 	)
 	return i, err
 }
@@ -96,8 +99,68 @@ func (q *Queries) DeleteSessionIdentity(ctx context.Context, sessionID string) e
 	return err
 }
 
+const DiscoverAgents = `-- name: DiscoverAgents :many
+SELECT
+    a.id, a.name, a.project_key, a.git_branch, a.current_session_id, a.created_at, a.last_active_at, a.purpose, a.working_dir, a.hostname,
+    COALESCE(
+        (SELECT COUNT(*) FROM message_recipients mr
+         WHERE mr.agent_id = a.id AND mr.state = 'unread'), 0
+    ) AS unread_count
+FROM agents a
+ORDER BY a.last_active_at DESC
+`
+
+type DiscoverAgentsRow struct {
+	ID               int64
+	Name             string
+	ProjectKey       sql.NullString
+	GitBranch        sql.NullString
+	CurrentSessionID sql.NullString
+	CreatedAt        int64
+	LastActiveAt     int64
+	Purpose          sql.NullString
+	WorkingDir       sql.NullString
+	Hostname         sql.NullString
+	UnreadCount      int64
+}
+
+func (q *Queries) DiscoverAgents(ctx context.Context) ([]DiscoverAgentsRow, error) {
+	rows, err := q.db.QueryContext(ctx, DiscoverAgents)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []DiscoverAgentsRow
+	for rows.Next() {
+		var i DiscoverAgentsRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.Name,
+			&i.ProjectKey,
+			&i.GitBranch,
+			&i.CurrentSessionID,
+			&i.CreatedAt,
+			&i.LastActiveAt,
+			&i.Purpose,
+			&i.WorkingDir,
+			&i.Hostname,
+			&i.UnreadCount,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const GetAgent = `-- name: GetAgent :one
-SELECT id, name, project_key, git_branch, current_session_id, created_at, last_active_at FROM agents WHERE id = ?
+SELECT id, name, project_key, git_branch, current_session_id, created_at, last_active_at, purpose, working_dir, hostname FROM agents WHERE id = ?
 `
 
 func (q *Queries) GetAgent(ctx context.Context, id int64) (Agent, error) {
@@ -111,12 +174,15 @@ func (q *Queries) GetAgent(ctx context.Context, id int64) (Agent, error) {
 		&i.CurrentSessionID,
 		&i.CreatedAt,
 		&i.LastActiveAt,
+		&i.Purpose,
+		&i.WorkingDir,
+		&i.Hostname,
 	)
 	return i, err
 }
 
 const GetAgentByName = `-- name: GetAgentByName :one
-SELECT id, name, project_key, git_branch, current_session_id, created_at, last_active_at FROM agents WHERE name = ?
+SELECT id, name, project_key, git_branch, current_session_id, created_at, last_active_at, purpose, working_dir, hostname FROM agents WHERE name = ?
 `
 
 func (q *Queries) GetAgentByName(ctx context.Context, name string) (Agent, error) {
@@ -130,12 +196,15 @@ func (q *Queries) GetAgentByName(ctx context.Context, name string) (Agent, error
 		&i.CurrentSessionID,
 		&i.CreatedAt,
 		&i.LastActiveAt,
+		&i.Purpose,
+		&i.WorkingDir,
+		&i.Hostname,
 	)
 	return i, err
 }
 
 const GetAgentBySessionID = `-- name: GetAgentBySessionID :one
-SELECT a.id, a.name, a.project_key, a.git_branch, a.current_session_id, a.created_at, a.last_active_at FROM agents a
+SELECT a.id, a.name, a.project_key, a.git_branch, a.current_session_id, a.created_at, a.last_active_at, a.purpose, a.working_dir, a.hostname FROM agents a
 JOIN session_identities si ON a.id = si.agent_id
 WHERE si.session_id = ?
 `
@@ -151,6 +220,9 @@ func (q *Queries) GetAgentBySessionID(ctx context.Context, sessionID string) (Ag
 		&i.CurrentSessionID,
 		&i.CreatedAt,
 		&i.LastActiveAt,
+		&i.Purpose,
+		&i.WorkingDir,
+		&i.Hostname,
 	)
 	return i, err
 }
@@ -192,7 +264,7 @@ func (q *Queries) GetSessionIdentityByProject(ctx context.Context, projectKey sq
 }
 
 const ListAgents = `-- name: ListAgents :many
-SELECT id, name, project_key, git_branch, current_session_id, created_at, last_active_at FROM agents ORDER BY last_active_at DESC
+SELECT id, name, project_key, git_branch, current_session_id, created_at, last_active_at, purpose, working_dir, hostname FROM agents ORDER BY last_active_at DESC
 `
 
 func (q *Queries) ListAgents(ctx context.Context) ([]Agent, error) {
@@ -212,6 +284,9 @@ func (q *Queries) ListAgents(ctx context.Context) ([]Agent, error) {
 			&i.CurrentSessionID,
 			&i.CreatedAt,
 			&i.LastActiveAt,
+			&i.Purpose,
+			&i.WorkingDir,
+			&i.Hostname,
 		); err != nil {
 			return nil, err
 		}
@@ -227,7 +302,7 @@ func (q *Queries) ListAgents(ctx context.Context) ([]Agent, error) {
 }
 
 const ListAgentsByProject = `-- name: ListAgentsByProject :many
-SELECT id, name, project_key, git_branch, current_session_id, created_at, last_active_at FROM agents WHERE project_key = ? ORDER BY last_active_at DESC
+SELECT id, name, project_key, git_branch, current_session_id, created_at, last_active_at, purpose, working_dir, hostname FROM agents WHERE project_key = ? ORDER BY last_active_at DESC
 `
 
 func (q *Queries) ListAgentsByProject(ctx context.Context, projectKey sql.NullString) ([]Agent, error) {
@@ -247,6 +322,9 @@ func (q *Queries) ListAgentsByProject(ctx context.Context, projectKey sql.NullSt
 			&i.CurrentSessionID,
 			&i.CreatedAt,
 			&i.LastActiveAt,
+			&i.Purpose,
+			&i.WorkingDir,
+			&i.Hostname,
 		); err != nil {
 			return nil, err
 		}
@@ -296,7 +374,7 @@ func (q *Queries) ListSessionIdentitiesByAgent(ctx context.Context, agentID int6
 }
 
 const SearchAgents = `-- name: SearchAgents :many
-SELECT id, name, project_key, git_branch, current_session_id, created_at, last_active_at FROM agents
+SELECT id, name, project_key, git_branch, current_session_id, created_at, last_active_at, purpose, working_dir, hostname FROM agents
 WHERE name LIKE '%' || ?1 || '%'
    OR project_key LIKE '%' || ?1 || '%'
    OR git_branch LIKE '%' || ?1 || '%'
@@ -326,6 +404,9 @@ func (q *Queries) SearchAgents(ctx context.Context, arg SearchAgentsParams) ([]A
 			&i.CurrentSessionID,
 			&i.CreatedAt,
 			&i.LastActiveAt,
+			&i.Purpose,
+			&i.WorkingDir,
+			&i.Hostname,
 		); err != nil {
 			return nil, err
 		}
@@ -338,6 +419,34 @@ func (q *Queries) SearchAgents(ctx context.Context, arg SearchAgentsParams) ([]A
 		return nil, err
 	}
 	return items, nil
+}
+
+const UpdateAgentDiscoveryInfo = `-- name: UpdateAgentDiscoveryInfo :exec
+UPDATE agents SET
+    purpose = COALESCE(NULLIF(?, ''), purpose),
+    working_dir = COALESCE(NULLIF(?, ''), working_dir),
+    hostname = COALESCE(NULLIF(?, ''), hostname),
+    last_active_at = ?
+WHERE id = ?
+`
+
+type UpdateAgentDiscoveryInfoParams struct {
+	Purpose      string
+	WorkingDir   string
+	Hostname     string
+	LastActiveAt int64
+	ID           int64
+}
+
+func (q *Queries) UpdateAgentDiscoveryInfo(ctx context.Context, arg UpdateAgentDiscoveryInfoParams) error {
+	_, err := q.db.ExecContext(ctx, UpdateAgentDiscoveryInfo,
+		arg.Purpose,
+		arg.WorkingDir,
+		arg.Hostname,
+		arg.LastActiveAt,
+		arg.ID,
+	)
+	return err
 }
 
 const UpdateAgentGitBranch = `-- name: UpdateAgentGitBranch :exec
