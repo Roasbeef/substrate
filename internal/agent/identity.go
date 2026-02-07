@@ -556,6 +556,7 @@ func (m *IdentityManager) updateAgentContext(ctx context.Context,
 	if workingDir != "" || hostname != "" {
 		err := m.store.Queries().UpdateAgentDiscoveryInfo(
 			ctx, sqlc.UpdateAgentDiscoveryInfoParams{
+				Purpose:      "", // Preserve existing.
 				WorkingDir:   workingDir,
 				Hostname:     hostname,
 				LastActiveAt: time.Now().Unix(),
