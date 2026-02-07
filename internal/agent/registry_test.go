@@ -340,3 +340,104 @@ func TestRegistry_DeleteAgent_NotFound(t *testing.T) {
 	err := registry.DeleteAgent(ctx, 999999)
 	require.NoError(t, err)
 }
+
+func TestRegistry_DiscoverAgents(t *testing.T) {
+	t.Parallel()
+
+	store, cleanup := testDB(t)
+	defer cleanup()
+
+	registry := NewRegistry(store)
+	ctx := context.Background()
+
+	// Register multiple agents with different projects.
+	_, err := registry.RegisterAgent(
+		ctx, "DiscoverAlice", "/project/alpha", "main",
+	)
+	require.NoError(t, err)
+	_, err = registry.RegisterAgent(
+		ctx, "DiscoverBob", "/project/beta", "feature",
+	)
+	require.NoError(t, err)
+
+	// Discover all agents.
+	rows, err := registry.DiscoverAgents(ctx)
+	require.NoError(t, err)
+	require.Len(t, rows, 2)
+
+	// Verify the rows have the expected fields populated.
+	for _, row := range rows {
+		require.NotEmpty(t, row.Name)
+		require.Greater(t, row.ID, int64(0))
+		// UnreadCount should be 0 since no messages sent.
+		require.Equal(t, int64(0), row.UnreadCount)
+	}
+}
+
+func TestRegistry_UpdateDiscoveryInfo(t *testing.T) {
+	t.Parallel()
+
+	store, cleanup := testDB(t)
+	defer cleanup()
+
+	registry := NewRegistry(store)
+	ctx := context.Background()
+
+	// Register an agent.
+	ag, err := registry.RegisterAgent(
+		ctx, "DiscoveryInfoAgent", "/work/dir", "",
+	)
+	require.NoError(t, err)
+
+	// Update discovery info.
+	err = registry.UpdateDiscoveryInfo(
+		ctx, ag.ID, "backend dev", "/home/user/project",
+		"dev-machine",
+	)
+	require.NoError(t, err)
+
+	// Verify via DiscoverAgents.
+	rows, err := registry.DiscoverAgents(ctx)
+	require.NoError(t, err)
+	require.Len(t, rows, 1)
+
+	row := rows[0]
+	require.Equal(t, "backend dev", row.Purpose.String)
+	require.Equal(t, "/home/user/project", row.WorkingDir.String)
+	require.Equal(t, "dev-machine", row.Hostname.String)
+}
+
+func TestRegistry_UpdateDiscoveryInfo_PartialUpdate(t *testing.T) {
+	t.Parallel()
+
+	store, cleanup := testDB(t)
+	defer cleanup()
+
+	registry := NewRegistry(store)
+	ctx := context.Background()
+
+	// Register an agent and set initial discovery info.
+	ag, err := registry.RegisterAgent(ctx, "PartialAgent", "", "")
+	require.NoError(t, err)
+
+	err = registry.UpdateDiscoveryInfo(
+		ctx, ag.ID, "reviewer", "/path/one", "host1",
+	)
+	require.NoError(t, err)
+
+	// Update only purpose (empty strings should preserve existing).
+	err = registry.UpdateDiscoveryInfo(
+		ctx, ag.ID, "security reviewer", "", "",
+	)
+	require.NoError(t, err)
+
+	// Verify existing fields were preserved.
+	rows, err := registry.DiscoverAgents(ctx)
+	require.NoError(t, err)
+	require.Len(t, rows, 1)
+
+	row := rows[0]
+	require.Equal(t, "security reviewer", row.Purpose.String)
+	require.Equal(t, "/path/one", row.WorkingDir.String)
+	require.Equal(t, "host1", row.Hostname.String)
+}
