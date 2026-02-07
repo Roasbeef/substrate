@@ -119,6 +119,9 @@ http:
     - selector: subtraterpc.Agent.GetAgentsStatus
       get: "/api/v1/agents-status"
 
+    - selector: subtraterpc.Agent.DiscoverAgents
+      get: "/api/v1/agents/discover"
+
     - selector: subtraterpc.Agent.Heartbeat
       post: "/api/v1/heartbeat"
       body: "*"

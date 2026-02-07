@@ -66,3 +66,21 @@ DELETE FROM session_identities WHERE session_id = ?;
 
 -- name: ListSessionIdentitiesByAgent :many
 SELECT * FROM session_identities WHERE agent_id = ? ORDER BY last_active_at DESC;
+
+-- name: UpdateAgentDiscoveryInfo :exec
+UPDATE agents SET
+    purpose = COALESCE(NULLIF(?, ''), purpose),
+    working_dir = COALESCE(NULLIF(?, ''), working_dir),
+    hostname = COALESCE(NULLIF(?, ''), hostname),
+    last_active_at = ?
+WHERE id = ?;
+
+-- name: DiscoverAgents :many
+SELECT
+    a.*,
+    COALESCE(
+        (SELECT COUNT(*) FROM message_recipients mr
+         WHERE mr.agent_id = a.id AND mr.state = 'unread'), 0
+    ) AS unread_count
+FROM agents a
+ORDER BY a.last_active_at DESC;

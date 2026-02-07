@@ -105,6 +105,10 @@ service Agent {
 
     // SaveIdentity persists an agent's current state.
     rpc SaveIdentity (SaveIdentityRequest) returns (SaveIdentityResponse);
+
+    // DiscoverAgents returns all agents with discovery metadata including
+    // status, working directory, purpose, hostname, and unread counts.
+    rpc DiscoverAgents (DiscoverAgentsRequest) returns (DiscoverAgentsResponse);
 }
 
 // Session is the RPC service for managing agent sessions.
@@ -670,6 +674,38 @@ message GetAgentsStatusRequest {}
 // GetAgentsStatusResponse is the response for GetAgentsStatus.
 message GetAgentsStatusResponse {
     repeated AgentWithStatus agents = 1;
+    AgentStatusCounts counts = 2;
+}
+
+// DiscoverAgentsRequest is the request for DiscoverAgents.
+message DiscoverAgentsRequest {
+    // status_filter filters by agent status (match any). Empty means all.
+    repeated AgentStatus status_filter = 1;
+    // project_filter filters by project key prefix.
+    string project_filter = 2;
+    // name_filter filters by agent name substring.
+    string name_filter = 3;
+}
+
+// DiscoveredAgent represents an agent with full discovery metadata.
+message DiscoveredAgent {
+    int64 id = 1;
+    string name = 2;
+    string project_key = 3;
+    string git_branch = 4;
+    AgentStatus status = 5;
+    google.protobuf.Timestamp last_active_at = 6;
+    int64 seconds_since_heartbeat = 7;
+    string session_id = 8;
+    string purpose = 9;
+    string working_dir = 10;
+    string hostname = 11;
+    int64 unread_count = 12;
+}
+
+// DiscoverAgentsResponse is the response for DiscoverAgents.
+message DiscoverAgentsResponse {
+    repeated DiscoveredAgent agents = 1;
     AgentStatusCounts counts = 2;
 }
 
