@@ -13,6 +13,7 @@ const SessionsPage = lazy(() => import('@/pages/SessionsPage'));
 const SettingsPage = lazy(() => import('@/pages/SettingsPage'));
 const SearchResultsPage = lazy(() => import('@/pages/SearchResultsPage'));
 const ReviewsPage = lazy(() => import('@/pages/ReviewsPage'));
+const TasksPage = lazy(() => import('@/pages/TasksPage'));
 
 // Page loading fallback.
 function PageLoader() {
@@ -191,6 +192,12 @@ export const router = createBrowserRouter([
       {
         path: 'reviews/:reviewId',
         element: <ReviewsPage />,
+        errorElement: <RouteErrorBoundary />,
+      },
+      // Tasks routes.
+      {
+        path: 'tasks',
+        element: <TasksPage />,
         errorElement: <RouteErrorBoundary />,
       },
       // Settings.
