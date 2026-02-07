@@ -193,3 +193,55 @@ http:
     - selector: subtraterpc.ReviewService.UpdateIssueStatus
       patch: "/api/v1/reviews/{review_id}/issues/{issue_id}"
       body: "*"
+
+    # TaskService - Task List Operations
+    - selector: subtraterpc.TaskService.RegisterTaskList
+      post: "/api/v1/task-lists"
+      body: "*"
+
+    - selector: subtraterpc.TaskService.GetTaskList
+      get: "/api/v1/task-lists/{list_id}"
+
+    - selector: subtraterpc.TaskService.ListTaskLists
+      get: "/api/v1/task-lists"
+
+    - selector: subtraterpc.TaskService.UnregisterTaskList
+      delete: "/api/v1/task-lists/{list_id}"
+
+    - selector: subtraterpc.TaskService.SyncTaskList
+      post: "/api/v1/task-lists/{list_id}/sync"
+      body: "*"
+
+    # TaskService - Task Operations
+    - selector: subtraterpc.TaskService.UpsertTask
+      post: "/api/v1/tasks"
+      body: "*"
+
+    - selector: subtraterpc.TaskService.GetTask
+      get: "/api/v1/tasks/{list_id}/{claude_task_id}"
+
+    - selector: subtraterpc.TaskService.ListTasks
+      get: "/api/v1/tasks"
+
+    - selector: subtraterpc.TaskService.UpdateTaskStatus
+      patch: "/api/v1/tasks/{list_id}/{claude_task_id}/status"
+      body: "*"
+
+    - selector: subtraterpc.TaskService.UpdateTaskOwner
+      patch: "/api/v1/tasks/{list_id}/{claude_task_id}/owner"
+      body: "*"
+
+    - selector: subtraterpc.TaskService.DeleteTask
+      delete: "/api/v1/tasks/{id}"
+
+    # TaskService - Task Statistics
+    - selector: subtraterpc.TaskService.GetTaskStats
+      get: "/api/v1/tasks/stats"
+
+    - selector: subtraterpc.TaskService.GetAllAgentTaskStats
+      get: "/api/v1/tasks/stats/by-agent"
+
+    # TaskService - Cleanup
+    - selector: subtraterpc.TaskService.PruneOldTasks
+      post: "/api/v1/tasks/prune"
+      body: "*"
