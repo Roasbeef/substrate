@@ -20,6 +20,7 @@ const (
 	WSMsgTypeAgentUpdate = "agent_update"
 	WSMsgTypeActivity    = "activity"
 	WSMsgTypeTaskUpdate  = "task_update"
+	WSMsgTypeSummary     = "summary_updated"
 	WSMsgTypePong        = "pong"
 	WSMsgTypeConnected   = "connected"
 	WSMsgTypeError       = "error"

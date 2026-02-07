@@ -24,6 +24,7 @@ import (
 	"github.com/roasbeef/subtrate/internal/mcp"
 	"github.com/roasbeef/subtrate/internal/review"
 	"github.com/roasbeef/subtrate/internal/store"
+	"github.com/roasbeef/subtrate/internal/summary"
 	"github.com/roasbeef/subtrate/internal/web"
 )
 
@@ -231,6 +232,13 @@ func main() {
 		reviewSvc.ActiveReviewCount(),
 	)
 
+	// Create the summary service for agent activity summaries.
+	summaryCfg := summary.DefaultConfig()
+	summarySvc := summary.NewService(
+		summaryCfg, storage, slog.Default(),
+	)
+	log.Println("Summary service created")
+
 	// Create the MCP server if MCP stdio mode is enabled.
 	var mcpServer *mcp.Server
 	if *enableMCP {
@@ -284,6 +292,9 @@ func main() {
 			webCfg.GRPCEndpoint = *grpcAddr
 		}
 
+		// Wire summary service into the web server.
+		webCfg.SummarySvc = summarySvc
+
 		webServer, err := web.NewServer(webCfg, storage, agentReg)
 		if err != nil {
 			log.Fatalf("Failed to create web server: %v", err)
@@ -311,6 +322,10 @@ func main() {
 			webServer.Shutdown(context.Background())
 		}()
 	}
+
+	// Start the background summary refresh loop.
+	go summarySvc.RunBackgroundRefresh(ctx)
+	log.Println("Summary background refresh started")
 
 	// Run the MCP server on stdio transport if enabled, otherwise
 	// block until signal.

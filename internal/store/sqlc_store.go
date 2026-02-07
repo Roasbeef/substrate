@@ -183,6 +183,20 @@ type QueryStore interface {
 		ctx context.Context, arg sqlc.GetMessagesBySenderNamePrefixParams,
 	) ([]sqlc.GetMessagesBySenderNamePrefixRow, error)
 
+	// Summary operations.
+	CreateAgentSummary(
+		ctx context.Context, arg sqlc.CreateAgentSummaryParams,
+	) (sqlc.AgentSummary, error)
+	GetLatestAgentSummary(
+		ctx context.Context, agentID int64,
+	) (sqlc.AgentSummary, error)
+	GetAgentSummaryHistory(
+		ctx context.Context, arg sqlc.GetAgentSummaryHistoryParams,
+	) ([]sqlc.AgentSummary, error)
+	DeleteOldAgentSummaries(
+		ctx context.Context, createdAt int64,
+	) error
+
 	// Review operations.
 	CreateReview(
 		ctx context.Context, arg sqlc.CreateReviewParams,
@@ -1356,6 +1370,65 @@ func (s *SqlcStore) DeleteOldActivities(ctx context.Context,
 }
 
 // =============================================================================
+// SummaryStore implementation
+// =============================================================================
+
+// CreateSummary persists a new agent activity summary.
+func (s *SqlcStore) CreateSummary(ctx context.Context,
+	params CreateSummaryParams,
+) (AgentSummary, error) {
+	row, err := s.db.CreateAgentSummary(ctx, sqlc.CreateAgentSummaryParams{
+		AgentID:        params.AgentID,
+		Summary:        params.Summary,
+		Delta:          params.Delta,
+		TranscriptHash: params.TranscriptHash,
+		CostUsd:        params.CostUSD,
+		CreatedAt:      time.Now().Unix(),
+	})
+	if err != nil {
+		return AgentSummary{}, err
+	}
+	return AgentSummaryFromSqlc(row), nil
+}
+
+// GetLatestSummary retrieves the most recent summary for an agent.
+func (s *SqlcStore) GetLatestSummary(ctx context.Context,
+	agentID int64,
+) (AgentSummary, error) {
+	row, err := s.db.GetLatestAgentSummary(ctx, agentID)
+	if err != nil {
+		return AgentSummary{}, err
+	}
+	return AgentSummaryFromSqlc(row), nil
+}
+
+// GetSummaryHistory retrieves recent summaries for an agent.
+func (s *SqlcStore) GetSummaryHistory(ctx context.Context,
+	agentID int64, limit int,
+) ([]AgentSummary, error) {
+	rows, err := s.db.GetAgentSummaryHistory(
+		ctx, sqlc.GetAgentSummaryHistoryParams{
+			AgentID: agentID, Limit: int64(limit),
+		},
+	)
+	if err != nil {
+		return nil, err
+	}
+	summaries := make([]AgentSummary, len(rows))
+	for i, row := range rows {
+		summaries[i] = AgentSummaryFromSqlc(row)
+	}
+	return summaries, nil
+}
+
+// DeleteOldSummaries removes summaries older than a given time.
+func (s *SqlcStore) DeleteOldSummaries(ctx context.Context,
+	olderThan time.Time,
+) error {
+	return s.db.DeleteOldAgentSummaries(ctx, olderThan.Unix())
+}
+
+// =============================================================================
 // SessionStore implementation
 // =============================================================================
 
@@ -2066,6 +2139,61 @@ func (s *txSqlcStore) DeleteOldActivities(ctx context.Context,
 	olderThan time.Time,
 ) error {
 	return s.queries.DeleteOldActivities(ctx, olderThan.Unix())
+}
+
+// CreateSummary persists a new agent activity summary.
+func (s *txSqlcStore) CreateSummary(ctx context.Context,
+	params CreateSummaryParams,
+) (AgentSummary, error) {
+	row, err := s.queries.CreateAgentSummary(ctx, sqlc.CreateAgentSummaryParams{
+		AgentID:        params.AgentID,
+		Summary:        params.Summary,
+		Delta:          params.Delta,
+		TranscriptHash: params.TranscriptHash,
+		CostUsd:        params.CostUSD,
+		CreatedAt:      time.Now().Unix(),
+	})
+	if err != nil {
+		return AgentSummary{}, err
+	}
+	return AgentSummaryFromSqlc(row), nil
+}
+
+// GetLatestSummary retrieves the most recent summary for an agent.
+func (s *txSqlcStore) GetLatestSummary(ctx context.Context,
+	agentID int64,
+) (AgentSummary, error) {
+	row, err := s.queries.GetLatestAgentSummary(ctx, agentID)
+	if err != nil {
+		return AgentSummary{}, err
+	}
+	return AgentSummaryFromSqlc(row), nil
+}
+
+// GetSummaryHistory retrieves recent summaries for an agent.
+func (s *txSqlcStore) GetSummaryHistory(ctx context.Context,
+	agentID int64, limit int,
+) ([]AgentSummary, error) {
+	rows, err := s.queries.GetAgentSummaryHistory(
+		ctx, sqlc.GetAgentSummaryHistoryParams{
+			AgentID: agentID, Limit: int64(limit),
+		},
+	)
+	if err != nil {
+		return nil, err
+	}
+	summaries := make([]AgentSummary, len(rows))
+	for i, row := range rows {
+		summaries[i] = AgentSummaryFromSqlc(row)
+	}
+	return summaries, nil
+}
+
+// DeleteOldSummaries removes summaries older than a given time.
+func (s *txSqlcStore) DeleteOldSummaries(ctx context.Context,
+	olderThan time.Time,
+) error {
+	return s.queries.DeleteOldAgentSummaries(ctx, olderThan.Unix())
 }
 
 // CreateSessionIdentity creates a new session identity mapping.

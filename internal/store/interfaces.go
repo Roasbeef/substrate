@@ -235,6 +235,27 @@ type ActivityStore interface {
 	DeleteOldActivities(ctx context.Context, olderThan time.Time) error
 }
 
+// SummaryStore handles agent summary persistence.
+type SummaryStore interface {
+	// CreateSummary persists a new agent activity summary.
+	CreateSummary(
+		ctx context.Context, params CreateSummaryParams,
+	) (AgentSummary, error)
+
+	// GetLatestSummary retrieves the most recent summary for an agent.
+	GetLatestSummary(
+		ctx context.Context, agentID int64,
+	) (AgentSummary, error)
+
+	// GetSummaryHistory retrieves recent summaries for an agent.
+	GetSummaryHistory(
+		ctx context.Context, agentID int64, limit int,
+	) ([]AgentSummary, error)
+
+	// DeleteOldSummaries removes summaries older than a given time.
+	DeleteOldSummaries(ctx context.Context, olderThan time.Time) error
+}
+
 // SessionStore handles session identity persistence.
 type SessionStore interface {
 	// CreateSessionIdentity creates a new session identity mapping.
@@ -525,6 +546,7 @@ type Storage interface {
 	AgentStore
 	TopicStore
 	ActivityStore
+	SummaryStore
 	SessionStore
 	TaskStore
 	ReviewStore
@@ -974,6 +996,39 @@ type CreateReviewIterationParams struct {
 	CostUSD           float64
 	StartedAt         time.Time
 	CompletedAt       *time.Time
+}
+
+// AgentSummary represents a generated activity summary for an agent.
+type AgentSummary struct {
+	ID             int64
+	AgentID        int64
+	Summary        string
+	Delta          string
+	TranscriptHash string
+	CostUSD        float64
+	CreatedAt      time.Time
+}
+
+// CreateSummaryParams contains parameters for creating an agent summary.
+type CreateSummaryParams struct {
+	AgentID        int64
+	Summary        string
+	Delta          string
+	TranscriptHash string
+	CostUSD        float64
+}
+
+// AgentSummaryFromSqlc converts a sqlc.AgentSummary to a store.AgentSummary.
+func AgentSummaryFromSqlc(s sqlc.AgentSummary) AgentSummary {
+	return AgentSummary{
+		ID:             s.ID,
+		AgentID:        s.AgentID,
+		Summary:        s.Summary,
+		Delta:          s.Delta,
+		TranscriptHash: s.TranscriptHash,
+		CostUSD:        s.CostUsd,
+		CreatedAt:      time.Unix(s.CreatedAt, 0),
+	}
 }
 
 // CreateReviewIssueParams contains parameters for creating a review issue.

@@ -148,6 +148,27 @@ export type ActivityType =
   | 'agent_registered'
   | 'heartbeat';
 
+// Agent summary types.
+export interface AgentSummary {
+  agent_id: number;
+  agent_name: string;
+  summary: string;
+  delta: string;
+  generated_at: string;
+  is_stale: boolean;
+  cost_usd: number;
+}
+
+export interface AgentSummaryHistory {
+  id: number;
+  agent_id: number;
+  summary: string;
+  delta: string;
+  transcript_hash: string;
+  cost_usd: number;
+  created_at: string;
+}
+
 // Dashboard stats.
 export interface DashboardStats {
   active_agents: number;
