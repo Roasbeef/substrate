@@ -72,6 +72,18 @@ var HookDefinitions = map[string]HookEntry{
 	},
 }
 
+// TaskHookDefinitions defines PostToolUse hooks for task tool sync.
+// These are installed separately when task sync is enabled.
+var TaskHookDefinitions = map[string]HookEntry{
+	"PostToolUse": {
+		Matcher: "TaskCreate|TaskUpdate|TaskList|TaskGet",
+		Hooks: []HookCommand{{
+			Type:    "command",
+			Command: "~/.claude/hooks/substrate/task_sync.sh",
+		}},
+	},
+}
+
 // LoadSettings loads the Claude settings file.
 func LoadSettings(claudeDir string) (*ClaudeSettings, error) {
 	settingsPath := filepath.Join(claudeDir, "settings.json")
@@ -242,6 +254,55 @@ func GetInstalledHookEvents(settings *ClaudeSettings) []string {
 		}
 	}
 	return events
+}
+
+// InstallTaskHooks adds task sync hooks to the settings.
+func InstallTaskHooks(settings *ClaudeSettings) {
+	for event, hookDef := range TaskHookDefinitions {
+		entries := settings.Hooks[event]
+		alreadyInstalled := slices.ContainsFunc(entries, isTaskSyncHook)
+
+		if !alreadyInstalled {
+			settings.Hooks[event] = append(entries, hookDef)
+		}
+	}
+}
+
+// UninstallTaskHooks removes task sync hooks from the settings.
+func UninstallTaskHooks(settings *ClaudeSettings) {
+	for event, entries := range settings.Hooks {
+		filtered := make([]HookEntry, 0, len(entries))
+		for _, entry := range entries {
+			if !isTaskSyncHook(entry) {
+				filtered = append(filtered, entry)
+			}
+		}
+		if len(filtered) > 0 {
+			settings.Hooks[event] = filtered
+		} else {
+			delete(settings.Hooks, event)
+		}
+	}
+}
+
+// IsTaskHooksInstalled checks if task sync hooks are installed.
+func IsTaskHooksInstalled(settings *ClaudeSettings) bool {
+	entries, ok := settings.Hooks["PostToolUse"]
+	if !ok {
+		return false
+	}
+
+	return slices.ContainsFunc(entries, isTaskSyncHook)
+}
+
+// isTaskSyncHook checks if a hook entry is a task sync hook.
+func isTaskSyncHook(entry HookEntry) bool {
+	for _, hook := range entry.Hooks {
+		if strings.Contains(hook.Command, "task_sync.sh") {
+			return true
+		}
+	}
+	return false
 }
 
 // isSubstrateHook checks if a hook entry is a Subtrate hook.

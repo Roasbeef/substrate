@@ -1,8 +1,11 @@
 package commands
 
 import (
+	"bufio"
 	"context"
+	"encoding/json"
 	"fmt"
+	"io"
 	"os"
 	"strings"
 	"time"
@@ -55,6 +58,14 @@ var tasksListsCmd = &cobra.Command{
 	RunE:  runTasksLists,
 }
 
+// tasksHookSyncCmd processes task tool output from PostToolUse hooks.
+var tasksHookSyncCmd = &cobra.Command{
+	Use:    "hook-sync",
+	Short:  "Process task tool output from hooks (internal)",
+	Hidden: true,
+	RunE:   runTasksHookSync,
+}
+
 // Task command flags.
 var (
 	// List filters.
@@ -72,6 +83,10 @@ var (
 
 	// Stats flags.
 	tasksStatsAgent int64
+
+	// Hook-sync flags.
+	hookSyncTool string
+	hookSyncList string
 )
 
 func init() {
@@ -121,12 +136,23 @@ func init() {
 		"Show stats for specific agent",
 	)
 
+	// Hook-sync flags.
+	tasksHookSyncCmd.Flags().StringVar(
+		&hookSyncTool, "tool", "",
+		"Tool type: create, update, list, get",
+	)
+	tasksHookSyncCmd.Flags().StringVar(
+		&hookSyncList, "list", "",
+		"Task list ID",
+	)
+
 	// Register subcommands.
 	tasksCmd.AddCommand(tasksListCmd)
 	tasksCmd.AddCommand(tasksStatsCmd)
 	tasksCmd.AddCommand(tasksRegisterCmd)
 	tasksCmd.AddCommand(tasksSyncCmd)
 	tasksCmd.AddCommand(tasksListsCmd)
+	tasksCmd.AddCommand(tasksHookSyncCmd)
 }
 
 // runTasksList handles the `substrate tasks list` command.
@@ -548,4 +574,203 @@ func todayStart() time.Time {
 		now.Year(), now.Month(), now.Day(),
 		0, 0, 0, 0, now.Location(),
 	)
+}
+
+// runTasksHookSync handles the `substrate tasks hook-sync` command.
+// This is called by the PostToolUse hook to sync task data from Claude Code.
+func runTasksHookSync(cmd *cobra.Command, args []string) error {
+	ctx := context.Background()
+
+	if hookSyncList == "" {
+		return fmt.Errorf("--list is required")
+	}
+	if hookSyncTool == "" {
+		return fmt.Errorf("--tool is required")
+	}
+
+	// Read JSON from stdin.
+	reader := bufio.NewReader(os.Stdin)
+	data, err := io.ReadAll(reader)
+	if err != nil {
+		return fmt.Errorf("read stdin: %w", err)
+	}
+
+	if len(data) == 0 {
+		return nil // No data to process.
+	}
+
+	client, err := getClient()
+	if err != nil {
+		return err
+	}
+	defer client.Close()
+
+	// Get agent ID from current identity.
+	agentID, _, err := getCurrentAgentWithClient(ctx, client)
+	if err != nil {
+		// Silently fail if no agent - hook might run before identity is set.
+		return nil
+	}
+
+	switch hookSyncTool {
+	case "create":
+		return syncTaskCreate(ctx, client, agentID, hookSyncList, data)
+	case "update":
+		return syncTaskUpdate(ctx, client, agentID, hookSyncList, data)
+	case "list":
+		return syncTaskList(ctx, client, agentID, hookSyncList, data)
+	case "get":
+		return syncTaskGet(ctx, client, agentID, hookSyncList, data)
+	default:
+		return fmt.Errorf("unknown tool: %s", hookSyncTool)
+	}
+}
+
+// ClaudeTask represents the task structure from Claude Code tools.
+type ClaudeTask struct {
+	ID          string   `json:"id"`
+	TaskID      string   `json:"taskId"`
+	Subject     string   `json:"subject"`
+	Description string   `json:"description"`
+	Status      string   `json:"status"`
+	ActiveForm  string   `json:"activeForm"`
+	Owner       string   `json:"owner"`
+	BlockedBy   []string `json:"blockedBy"`
+	Blocks      []string `json:"blocks"`
+}
+
+// ClaudeTaskList represents the TaskList tool output.
+type ClaudeTaskList struct {
+	Tasks []ClaudeTask `json:"tasks"`
+}
+
+// syncTaskCreate handles TaskCreate tool output.
+func syncTaskCreate(
+	ctx context.Context, client *Client, agentID int64,
+	listID string, data []byte,
+) error {
+	var task ClaudeTask
+	if err := json.Unmarshal(data, &task); err != nil {
+		return nil // Ignore invalid JSON.
+	}
+
+	taskID := task.TaskID
+	if taskID == "" {
+		taskID = task.ID
+	}
+	if taskID == "" {
+		return nil
+	}
+
+	_, err := client.UpsertTask(ctx, &subtraterpc.UpsertTaskRequest{
+		AgentId:      agentID,
+		ListId:       listID,
+		ClaudeTaskId: taskID,
+		Subject:      task.Subject,
+		Description:  task.Description,
+		ActiveForm:   task.ActiveForm,
+		Status:       claudeStatusToProto(task.Status),
+		Owner:        task.Owner,
+		BlockedBy:    task.BlockedBy,
+		Blocks:       task.Blocks,
+	})
+	return err
+}
+
+// syncTaskUpdate handles TaskUpdate tool input.
+func syncTaskUpdate(
+	ctx context.Context, client *Client, agentID int64,
+	listID string, data []byte,
+) error {
+	var task ClaudeTask
+	if err := json.Unmarshal(data, &task); err != nil {
+		return nil
+	}
+
+	taskID := task.TaskID
+	if taskID == "" {
+		taskID = task.ID
+	}
+	if taskID == "" {
+		return nil
+	}
+
+	_, err := client.UpsertTask(ctx, &subtraterpc.UpsertTaskRequest{
+		AgentId:      agentID,
+		ListId:       listID,
+		ClaudeTaskId: taskID,
+		Subject:      task.Subject,
+		Description:  task.Description,
+		ActiveForm:   task.ActiveForm,
+		Status:       claudeStatusToProto(task.Status),
+		Owner:        task.Owner,
+		BlockedBy:    task.BlockedBy,
+		Blocks:       task.Blocks,
+	})
+	return err
+}
+
+// syncTaskList handles TaskList tool output.
+func syncTaskList(
+	ctx context.Context, client *Client, agentID int64,
+	listID string, data []byte,
+) error {
+	var taskList ClaudeTaskList
+	if err := json.Unmarshal(data, &taskList); err != nil {
+		// Try as array directly.
+		var tasks []ClaudeTask
+		if err := json.Unmarshal(data, &tasks); err != nil {
+			return nil
+		}
+		taskList.Tasks = tasks
+	}
+
+	for _, task := range taskList.Tasks {
+		taskID := task.TaskID
+		if taskID == "" {
+			taskID = task.ID
+		}
+		if taskID == "" {
+			continue
+		}
+
+		_, _ = client.UpsertTask(ctx, &subtraterpc.UpsertTaskRequest{
+			AgentId:      agentID,
+			ListId:       listID,
+			ClaudeTaskId: taskID,
+			Subject:      task.Subject,
+			Description:  task.Description,
+			ActiveForm:   task.ActiveForm,
+			Status:       claudeStatusToProto(task.Status),
+			Owner:        task.Owner,
+			BlockedBy:    task.BlockedBy,
+			Blocks:       task.Blocks,
+		})
+	}
+	return nil
+}
+
+// syncTaskGet handles TaskGet tool output.
+func syncTaskGet(
+	ctx context.Context, client *Client, agentID int64,
+	listID string, data []byte,
+) error {
+	// TaskGet returns a single task, same as create.
+	return syncTaskCreate(ctx, client, agentID, listID, data)
+}
+
+// claudeStatusToProto converts Claude status strings to proto enum.
+func claudeStatusToProto(status string) subtraterpc.TaskStatus {
+	switch strings.ToLower(status) {
+	case "pending":
+		return subtraterpc.TaskStatus_TASK_STATUS_PENDING
+	case "in_progress", "in-progress", "inprogress":
+		return subtraterpc.TaskStatus_TASK_STATUS_IN_PROGRESS
+	case "completed", "complete", "done":
+		return subtraterpc.TaskStatus_TASK_STATUS_COMPLETED
+	case "deleted":
+		return subtraterpc.TaskStatus_TASK_STATUS_DELETED
+	default:
+		return subtraterpc.TaskStatus_TASK_STATUS_PENDING
+	}
 }
