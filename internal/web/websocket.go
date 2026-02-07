@@ -19,6 +19,7 @@ const (
 	WSMsgTypeNewMessage  = "new_message"
 	WSMsgTypeAgentUpdate = "agent_update"
 	WSMsgTypeActivity    = "activity"
+	WSMsgTypeSummary     = "summary_updated"
 	WSMsgTypePong        = "pong"
 	WSMsgTypeConnected   = "connected"
 	WSMsgTypeError       = "error"

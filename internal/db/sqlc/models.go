@@ -8,6 +8,16 @@ import (
 	"database/sql"
 )
 
+type AgentSummary struct {
+	ID             int64
+	AgentID        int64
+	Summary        string
+	Delta          string
+	TranscriptHash string
+	CostUsd        float64
+	CreatedAt      int64
+}
+
 type Activity struct {
 	ID           int64
 	AgentID      int64

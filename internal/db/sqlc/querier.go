@@ -11,6 +11,10 @@ import (
 
 type Querier interface {
 	ClearAllOperations(ctx context.Context) error
+	CreateAgentSummary(ctx context.Context, arg CreateAgentSummaryParams) (AgentSummary, error)
+	DeleteOldAgentSummaries(ctx context.Context, createdAt int64) error
+	GetAgentSummaryHistory(ctx context.Context, arg GetAgentSummaryHistoryParams) ([]AgentSummary, error)
+	GetLatestAgentSummary(ctx context.Context, agentID int64) (AgentSummary, error)
 	CountActivitiesByAgentToday(ctx context.Context, arg CountActivitiesByAgentTodayParams) (int64, error)
 	CountArchivedByAgent(ctx context.Context, agentID int64) (int64, error)
 	CountOpenIssues(ctx context.Context, reviewID string) (int64, error)

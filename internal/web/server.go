@@ -15,6 +15,7 @@ import (
 	"github.com/roasbeef/subtrate/internal/mail"
 	"github.com/roasbeef/subtrate/internal/mailclient"
 	"github.com/roasbeef/subtrate/internal/store"
+	"github.com/roasbeef/subtrate/internal/summary"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 )
@@ -30,6 +31,7 @@ type Server struct {
 	mailClient   *mailclient.Client         // Shared mail client (required).
 	actClient    *mailclient.ActivityClient // Shared activity client (required).
 	notifHubRef  NotificationHubRef         // Notification hub reference (optional).
+	summarySvc   *summary.Service           // Summary service (optional).
 	hub          *Hub                       // WebSocket hub for real-time updates.
 	notifBridge  *HubNotificationBridge     // Bridge for actor notifications to WebSocket.
 	mux          *http.ServeMux
@@ -52,6 +54,10 @@ type Config struct {
 	// NotificationHubRef is the notification hub reference (optional).
 	// When provided, enables real-time actor-based notifications to WebSocket clients.
 	NotificationHubRef NotificationHubRef
+
+	// SummarySvc is the summary service (optional).
+	// When provided, enables agent summary REST endpoints.
+	SummarySvc *summary.Service
 
 	// GRPCEndpoint is the gRPC server endpoint for the gateway proxy (optional).
 	// When provided, enables REST-to-gRPC proxy via grpc-gateway.
@@ -88,6 +94,7 @@ func NewServer(cfg *Config, st store.Storage,
 		mailClient:   mailclient.NewClient(cfg.MailRef),
 		actClient:    mailclient.NewActivityClient(cfg.ActivityRef),
 		notifHubRef:  cfg.NotificationHubRef,
+		summarySvc:   cfg.SummarySvc,
 		mux:          http.NewServeMux(),
 		addr:         cfg.Addr,
 		grpcEndpoint: cfg.GRPCEndpoint,
@@ -112,6 +119,9 @@ func NewServer(cfg *Config, st store.Storage,
 		s.notifBridge = NewHubNotificationBridge(s.hub, cfg.NotificationHubRef)
 		s.notifBridge.Start()
 	}
+
+	// Register summary REST API routes.
+	s.registerSummaryRoutes()
 
 	// Register WebSocket route.
 	s.mux.HandleFunc("/ws", s.handleWebSocket)
