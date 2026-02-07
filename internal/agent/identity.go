@@ -513,7 +513,8 @@ func (m *IdentityManager) saveSessionDB(ctx context.Context,
 
 // updateAgentContext updates the identity and agent record with the current
 // project context. This ensures the agent's git_branch and project_key reflect
-// the current session, which may change between sessions.
+// the current session, which may change between sessions. It also updates
+// discovery metadata (working_dir, hostname) for agent discovery.
 func (m *IdentityManager) updateAgentContext(ctx context.Context,
 	identity *IdentityFile, projectKey string, gitBranch string,
 ) error {
@@ -543,6 +544,30 @@ func (m *IdentityManager) updateAgentContext(ctx context.Context,
 		)
 		if err != nil {
 			return fmt.Errorf("failed to update agent context: %w", err)
+		}
+	}
+
+	// Update discovery metadata (working_dir and hostname). These are
+	// set automatically so agents are discoverable without explicit
+	// configuration.
+	hostname, _ := os.Hostname()
+	workingDir := projectKey // projectKey is the raw directory path.
+
+	if workingDir != "" || hostname != "" {
+		err := m.store.Queries().UpdateAgentDiscoveryInfo(
+			ctx, sqlc.UpdateAgentDiscoveryInfoParams{
+				WorkingDir:   workingDir,
+				Hostname:     hostname,
+				LastActiveAt: time.Now().Unix(),
+				ID:           identity.AgentID,
+			},
+		)
+		if err != nil {
+			// Non-fatal: discovery info is supplementary.
+			fmt.Fprintf(os.Stderr,
+				"Warning: failed to update discovery info: %v\n",
+				err,
+			)
 		}
 	}
 
