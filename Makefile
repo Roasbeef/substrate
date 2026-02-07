@@ -12,12 +12,23 @@ export CGO_LDFLAGS := -lm
 
 # Variables
 PKG := ./...
+GOMOD := github.com/roasbeef/subtrate
 TIMEOUT := 5m
 FRONTEND_DIR := web/frontend
+
+COMMIT := $(shell git describe --tags --dirty 2>/dev/null || git rev-parse --short HEAD)
 
 GOTEST := go test
 GOLIST := go list $(PKG)
 XARGS := xargs -L 1
+
+# Linker flags for embedding version and commit information. The Commit
+# variable is set via -X to the output of git describe (tag + offset +
+# hash + dirty marker).
+make_ldflags = $(1) -X $(GOMOD)/internal/build.Commit=$(COMMIT)
+
+DEV_LDFLAGS := -ldflags "$(call make_ldflags)"
+RELEASE_LDFLAGS := -ldflags "$(call make_ldflags,-s -w -buildid=)"
 
 # Test commands: pipe package list through xargs to test one package at a
 # time, avoiding parallel compilation races with the race detector.
@@ -32,11 +43,11 @@ build:
 
 .PHONY: build-cli
 build-cli:
-	go build -o substrate ./cmd/substrate
+	go build $(DEV_LDFLAGS) -o substrate ./cmd/substrate
 
 .PHONY: build-daemon
 build-daemon:
-	go build -o substrated ./cmd/substrated
+	go build $(DEV_LDFLAGS) -o substrated ./cmd/substrated
 
 .PHONY: build-all
 build-all: build-cli build-daemon
@@ -86,9 +97,12 @@ bun-test-e2e-quick:
 bun-lint:
 	cd $(FRONTEND_DIR) && bun run lint
 
-# Build daemon with embedded frontend (production build).
+# Build daemon with embedded frontend (production build). Uses release
+# ldflags which strip debug symbols and clear the build ID.
 .PHONY: build-production
-build-production: bun-build build-daemon
+build-production: bun-build
+	go build $(RELEASE_LDFLAGS) -o substrated ./cmd/substrated
+	go build $(RELEASE_LDFLAGS) -o substrate ./cmd/substrate
 	@echo "Production build complete with embedded frontend."
 
 # Full test suite (Go + frontend).
@@ -128,8 +142,8 @@ ci: ci-go ci-frontend
 
 .PHONY: install
 install: bun-install bun-build
-	go install ./cmd/substrate
-	go install ./cmd/substrated
+	go install $(DEV_LDFLAGS) ./cmd/substrate
+	go install $(DEV_LDFLAGS) ./cmd/substrated
 
 # Testing targets
 .PHONY: test

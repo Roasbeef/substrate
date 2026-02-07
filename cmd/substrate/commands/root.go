@@ -1,6 +1,7 @@
 package commands
 
 import (
+	"github.com/roasbeef/subtrate/internal/build"
 	"github.com/spf13/cobra"
 )
 
@@ -35,8 +36,9 @@ var (
 
 // rootCmd is the base command for the CLI.
 var rootCmd = &cobra.Command{
-	Use:   "subtrate-cli",
-	Short: "Subtrate agent command center CLI",
+	Use:     "subtrate-cli",
+	Short:   "Subtrate agent command center CLI",
+	Version: build.Version(),
 	Long: `Subtrate CLI provides mail/messaging capabilities for Claude Code agents.
 
 Use this CLI to send and receive messages, subscribe to topics, and manage
@@ -108,4 +110,5 @@ func init() {
 	rootCmd.AddCommand(reviewCmd)
 	rootCmd.AddCommand(sendDiffCmd)
 	rootCmd.AddCommand(queueCmd)
+	rootCmd.AddCommand(versionCmd)
 }

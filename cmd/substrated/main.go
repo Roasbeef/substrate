@@ -90,6 +90,11 @@ func main() {
 		}
 	}
 
+	// Log version and build information at startup.
+	log.Printf("substrated version %s commit=%s go=%s",
+		build.Version(), commitInfo(), build.GoVersion,
+	)
+
 	// Create a logger for the database.
 	logger := slog.Default()
 
@@ -310,4 +315,18 @@ func main() {
 		// Block until signal received.
 		<-ctx.Done()
 	}
+}
+
+// commitInfo returns the best available commit identifier. It prefers the
+// Commit string set via ldflags (which includes tag info), falling back to
+// the VCS commit hash from runtime/debug.
+func commitInfo() string {
+	if build.Commit != "" {
+		return build.Commit
+	}
+	if build.CommitHash != "" {
+		return build.CommitHash
+	}
+
+	return "dev"
 }
