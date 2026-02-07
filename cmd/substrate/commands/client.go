@@ -1487,3 +1487,112 @@ func (c *Client) DeleteTask(
 
 	return c.taskClient.DeleteTask(ctx, req)
 }
+
+// =============================================================================
+// Discovery client methods
+// =============================================================================
+
+// DiscoveredAgentInfo holds discovery information for a single agent.
+type DiscoveredAgentInfo struct {
+	ID           int64
+	Name         string
+	ProjectKey   string
+	GitBranch    string
+	Status       string
+	LastActive   time.Time
+	SecondsSince int64
+	SessionID    string
+	Purpose      string
+	WorkingDir   string
+	Hostname     string
+	UnreadCount  int64
+}
+
+// DiscoverAgents returns all agents with discovery metadata. In direct
+// mode, status is computed from last_active_at timestamps. The gRPC
+// path will be wired once proto is regenerated.
+func (c *Client) DiscoverAgents(
+	ctx context.Context,
+) ([]DiscoveredAgentInfo, error) {
+	if c.mode == ModeGRPC {
+		// Fallback: use GetAgentsStatus and enrich with available data.
+		resp, err := c.agentClient.GetAgentsStatus(
+			ctx, &subtraterpc.GetAgentsStatusRequest{},
+		)
+		if err != nil {
+			return nil, err
+		}
+
+		agents := make([]DiscoveredAgentInfo, len(resp.Agents))
+		for i, a := range resp.Agents {
+			var lastActive time.Time
+			if a.LastActiveAt != nil {
+				lastActive = a.LastActiveAt.AsTime()
+			}
+			agents[i] = DiscoveredAgentInfo{
+				ID:           a.Id,
+				Name:         a.Name,
+				ProjectKey:   a.ProjectKey,
+				GitBranch:    a.GitBranch,
+				Status:       a.Status.String(),
+				LastActive:   lastActive,
+				SecondsSince: a.SecondsSinceHeartbeat,
+			}
+		}
+		return agents, nil
+	}
+
+	// Direct mode: query discovery rows and compute status.
+	rows, err := c.registry.DiscoverAgents(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	agents := make([]DiscoveredAgentInfo, len(rows))
+	for i := range rows {
+		row := &rows[i]
+		lastActive := time.Unix(row.LastActiveAt, 0)
+		elapsed := time.Since(lastActive)
+
+		status := computeAgentStatus(
+			elapsed, row.CurrentSessionID.Valid,
+		)
+
+		agents[i] = DiscoveredAgentInfo{
+			ID:           row.ID,
+			Name:         row.Name,
+			ProjectKey:   row.ProjectKey.String,
+			GitBranch:    row.GitBranch.String,
+			Status:       status,
+			LastActive:   lastActive,
+			SecondsSince: int64(elapsed.Seconds()),
+			SessionID:    row.CurrentSessionID.String,
+			Purpose:      row.Purpose.String,
+			WorkingDir:   row.WorkingDir.String,
+			Hostname:     row.Hostname.String,
+			UnreadCount:  row.UnreadCount,
+		}
+	}
+
+	return agents, nil
+}
+
+// computeAgentStatus derives an agent's status from the elapsed time since
+// its last heartbeat and whether it has an active session.
+func computeAgentStatus(elapsed time.Duration, hasSession bool) string {
+	const (
+		activeThreshold = 5 * time.Minute
+		idleThreshold   = 30 * time.Minute
+	)
+
+	switch {
+	case elapsed < activeThreshold && hasSession:
+		return "busy"
+	case elapsed < activeThreshold:
+		return "active"
+	case elapsed < idleThreshold:
+		return "idle"
+	default:
+		return "offline"
+	}
+}
