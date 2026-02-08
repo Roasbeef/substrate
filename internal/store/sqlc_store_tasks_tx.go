@@ -172,12 +172,12 @@ func (s *txSqlcStore) UpsertTask(ctx context.Context,
 			created_at, updated_at, started_at, completed_at, file_path, file_mtime
 		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 		ON CONFLICT(list_id, claude_task_id) DO UPDATE SET
-			subject = excluded.subject,
-			description = excluded.description,
-			active_form = excluded.active_form,
-			metadata = excluded.metadata,
+			subject = COALESCE(NULLIF(excluded.subject, ''), agent_tasks.subject),
+			description = COALESCE(NULLIF(excluded.description, ''), agent_tasks.description),
+			active_form = COALESCE(NULLIF(excluded.active_form, ''), agent_tasks.active_form),
+			metadata = COALESCE(NULLIF(excluded.metadata, ''), agent_tasks.metadata),
 			status = excluded.status,
-			owner = excluded.owner,
+			owner = COALESCE(NULLIF(excluded.owner, ''), agent_tasks.owner),
 			blocked_by = excluded.blocked_by,
 			blocks = excluded.blocks,
 			updated_at = excluded.updated_at,
