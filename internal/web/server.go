@@ -224,6 +224,16 @@ func (s *Server) registerGateway(ctx context.Context) error {
 		)
 	}
 
+	// Register TaskService handler.
+	err = subtraterpc.RegisterTaskServiceHandlerFromEndpoint(
+		ctx, s.gatewayMux, s.grpcEndpoint, opts,
+	)
+	if err != nil {
+		return fmt.Errorf(
+			"failed to register TaskService handler: %w", err,
+		)
+	}
+
 	// Mount the gateway at /api/v1/ as the primary API endpoint.
 	// The gateway paths in mail.yaml already include /api/v1, so no prefix stripping needed.
 	s.mux.HandleFunc("/api/v1/", func(w http.ResponseWriter, r *http.Request) {
