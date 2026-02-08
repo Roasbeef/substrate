@@ -70,6 +70,14 @@ var HookDefinitions = map[string]HookEntry{
 			Command: "~/.claude/hooks/substrate/pre_compact.sh",
 		}},
 	},
+	"Notification": {
+		Matcher: "",
+		Hooks: []HookCommand{{
+			Type:    "command",
+			Command: "~/.claude/hooks/substrate/notification.sh",
+			Timeout: 10,
+		}},
+	},
 }
 
 // TaskHookDefinitions defines PostToolUse hooks for task tool sync.

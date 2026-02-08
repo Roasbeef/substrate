@@ -746,6 +746,7 @@ This installs:
 | **Stop** | Main agent stopping | **Persistent agent pattern** - long-poll for 9m30s, always block to keep agent alive |
 | **SubagentStop** | Subagent stopping | One-shot check - block if messages, then allow exit |
 | **PreCompact** | Before compaction | Save identity state for restoration after compaction |
+| **Notification** | Permission prompt, idle, etc. | Send mail to User so notifications appear in web UI |
 
 ### Persistent Agent Pattern
 

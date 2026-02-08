@@ -25,6 +25,9 @@ var PreCompactScript string
 //go:embed scripts/task_sync.sh
 var TaskSyncScript string
 
+//go:embed scripts/notification.sh
+var NotificationScript string
+
 // ScriptNames maps script identifiers to their filenames.
 var ScriptNames = map[string]string{
 	"session_start": "session_start.sh",
@@ -33,6 +36,7 @@ var ScriptNames = map[string]string{
 	"user_prompt":   "user_prompt.sh",
 	"pre_compact":   "pre_compact.sh",
 	"task_sync":     "task_sync.sh",
+	"notification":  "notification.sh",
 }
 
 // GetScript returns the embedded script content by name.
@@ -50,6 +54,8 @@ func GetScript(name string) string {
 		return PreCompactScript
 	case "task_sync":
 		return TaskSyncScript
+	case "notification":
+		return NotificationScript
 	default:
 		return ""
 	}
@@ -64,5 +70,6 @@ func AllScripts() map[string]string {
 		"user_prompt":   UserPromptScript,
 		"pre_compact":   PreCompactScript,
 		"task_sync":     TaskSyncScript,
+		"notification":  NotificationScript,
 	}
 }
