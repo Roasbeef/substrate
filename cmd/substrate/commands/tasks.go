@@ -599,6 +599,14 @@ func runTasksHookSync(cmd *cobra.Command, args []string) error {
 		return nil // No data to process.
 	}
 
+	// The list ID IS the session ID (Claude Code uses the session ID as
+	// the task list ID). If no --session-id was provided and the env var
+	// isn't set, use hookSyncList so identity resolution can find/create
+	// the agent identity.
+	if sessionID == "" && os.Getenv("CLAUDE_SESSION_ID") == "" {
+		sessionID = hookSyncList
+	}
+
 	client, err := getClient()
 	if err != nil {
 		return err
@@ -608,8 +616,12 @@ func runTasksHookSync(cmd *cobra.Command, args []string) error {
 	// Get agent ID from current identity.
 	agentID, _, err := getCurrentAgentWithClient(ctx, client)
 	if err != nil {
-		// Silently fail if no agent - hook might run before identity is set.
-		return nil
+		// Log error but continue with agentID=0 so tasks still sync.
+		// The agent association is secondary to getting tasks into the
+		// database.
+		fmt.Fprintf(os.Stderr, "warning: could not resolve agent "+
+			"identity: %v\n", err)
+		agentID = 0
 	}
 
 	switch hookSyncTool {
@@ -621,6 +633,8 @@ func runTasksHookSync(cmd *cobra.Command, args []string) error {
 		return syncTaskList(ctx, client, agentID, hookSyncList, data)
 	case "get":
 		return syncTaskGet(ctx, client, agentID, hookSyncList, data)
+	case "reconcile":
+		return syncTaskReconcile(ctx, client, agentID, hookSyncList)
 	default:
 		return fmt.Errorf("unknown tool: %s", hookSyncTool)
 	}
@@ -637,11 +651,21 @@ type ClaudeTask struct {
 	Owner       string   `json:"owner"`
 	BlockedBy   []string `json:"blockedBy"`
 	Blocks      []string `json:"blocks"`
+
+	// Incremental dependency updates from TaskUpdate tool.
+	AddBlockedBy []string `json:"addBlockedBy"`
+	AddBlocks    []string `json:"addBlocks"`
 }
 
 // ClaudeTaskList represents the TaskList tool output.
 type ClaudeTaskList struct {
 	Tasks []ClaudeTask `json:"tasks"`
+}
+
+// ClaudeTaskWrapper represents a wrapped task response from Claude Code.
+// TaskGet and TaskCreate responses may be wrapped in {"task": {...}}.
+type ClaudeTaskWrapper struct {
+	Task ClaudeTask `json:"task"`
 }
 
 // syncTaskCreate handles TaskCreate tool output.
@@ -652,6 +676,14 @@ func syncTaskCreate(
 	var task ClaudeTask
 	if err := json.Unmarshal(data, &task); err != nil {
 		return nil // Ignore invalid JSON.
+	}
+
+	// If direct unmarshal didn't find an ID, try wrapped format.
+	if task.ID == "" && task.TaskID == "" {
+		var wrapper ClaudeTaskWrapper
+		if err := json.Unmarshal(data, &wrapper); err == nil {
+			task = wrapper.Task
+		}
 	}
 
 	taskID := task.TaskID
@@ -695,6 +727,30 @@ func syncTaskUpdate(
 		return nil
 	}
 
+	blockedBy := task.BlockedBy
+	blocks := task.Blocks
+
+	// Handle incremental dependency updates (addBlockedBy/addBlocks).
+	// These add to existing arrays rather than replacing them.
+	if len(task.AddBlockedBy) > 0 || len(task.AddBlocks) > 0 {
+		existing, err := client.GetTask(ctx, &subtraterpc.GetTaskProtoRequest{
+			ListId:       listID,
+			ClaudeTaskId: taskID,
+		})
+		if err == nil && existing.Task != nil {
+			blockedBy = mergeStringSlices(
+				existing.Task.BlockedBy, task.AddBlockedBy,
+			)
+			blocks = mergeStringSlices(
+				existing.Task.Blocks, task.AddBlocks,
+			)
+		} else {
+			// Task doesn't exist yet — use add* as initial values.
+			blockedBy = task.AddBlockedBy
+			blocks = task.AddBlocks
+		}
+	}
+
 	_, err := client.UpsertTask(ctx, &subtraterpc.UpsertTaskRequest{
 		AgentId:      agentID,
 		ListId:       listID,
@@ -704,10 +760,29 @@ func syncTaskUpdate(
 		ActiveForm:   task.ActiveForm,
 		Status:       claudeStatusToProto(task.Status),
 		Owner:        task.Owner,
-		BlockedBy:    task.BlockedBy,
-		Blocks:       task.Blocks,
+		BlockedBy:    blockedBy,
+		Blocks:       blocks,
 	})
 	return err
+}
+
+// mergeStringSlices merges two string slices, deduplicating entries.
+func mergeStringSlices(existing, additions []string) []string {
+	seen := make(map[string]bool, len(existing))
+	result := make([]string, 0, len(existing)+len(additions))
+	for _, s := range existing {
+		if !seen[s] {
+			seen[s] = true
+			result = append(result, s)
+		}
+	}
+	for _, s := range additions {
+		if !seen[s] {
+			seen[s] = true
+			result = append(result, s)
+		}
+	}
+	return result
 }
 
 // syncTaskList handles TaskList tool output.
@@ -725,6 +800,23 @@ func syncTaskList(
 		taskList.Tasks = tasks
 	}
 
+	// Compute inverse "blocks" from "blockedBy" since Claude Code's
+	// TaskList only provides blockedBy but not blocks.
+	blocksMap := make(map[string][]string)
+	for _, task := range taskList.Tasks {
+		taskID := task.TaskID
+		if taskID == "" {
+			taskID = task.ID
+		}
+		for _, depID := range task.BlockedBy {
+			blocksMap[depID] = append(blocksMap[depID], taskID)
+		}
+	}
+
+	// Build a set of claude_task_ids present in the response for orphan
+	// detection after upserting.
+	responseTaskIDs := make(map[string]bool, len(taskList.Tasks))
+
 	for _, task := range taskList.Tasks {
 		taskID := task.TaskID
 		if taskID == "" {
@@ -733,6 +825,11 @@ func syncTaskList(
 		if taskID == "" {
 			continue
 		}
+
+		responseTaskIDs[taskID] = true
+
+		// Merge explicit blocks with computed inverse blocks.
+		blocks := mergeStringSlices(task.Blocks, blocksMap[taskID])
 
 		_, _ = client.UpsertTask(ctx, &subtraterpc.UpsertTaskRequest{
 			AgentId:      agentID,
@@ -744,9 +841,30 @@ func syncTaskList(
 			Status:       claudeStatusToProto(task.Status),
 			Owner:        task.Owner,
 			BlockedBy:    task.BlockedBy,
-			Blocks:       task.Blocks,
+			Blocks:       blocks,
 		})
 	}
+
+	// Remove orphan tasks: any task in the DB for this list that is not in
+	// the TaskList response no longer exists in Claude Code's state.
+	dbTasks, err := client.ListTasks(ctx, &subtraterpc.ListTasksRequest{
+		ListId: listID,
+	})
+	if err != nil {
+		return nil // Non-fatal: orphan cleanup is best-effort.
+	}
+
+	for _, dbTask := range dbTasks.GetTasks() {
+		if !responseTaskIDs[dbTask.ClaudeTaskId] {
+			_, _ = client.DeleteTask(
+				ctx,
+				&subtraterpc.DeleteTaskRequest{
+					Id: dbTask.Id,
+				},
+			)
+		}
+	}
+
 	return nil
 }
 
@@ -757,6 +875,96 @@ func syncTaskGet(
 ) error {
 	// TaskGet returns a single task, same as create.
 	return syncTaskCreate(ctx, client, agentID, listID, data)
+}
+
+// syncTaskReconcile reads task JSON files from disk and upserts them into the
+// database. Claude Code stores task state at ~/.claude/tasks/{listID}/*.json,
+// which serves as a source of truth that can be reconciled periodically.
+func syncTaskReconcile(
+	ctx context.Context, client *Client, agentID int64,
+	listID string,
+) error {
+	homeDir, err := os.UserHomeDir()
+	if err != nil {
+		return fmt.Errorf("cannot determine home directory: %w", err)
+	}
+
+	tasksDir := fmt.Sprintf(
+		"%s/.claude/tasks/%s", homeDir, listID,
+	)
+
+	entries, err := os.ReadDir(tasksDir)
+	if err != nil {
+		if os.IsNotExist(err) {
+			// No tasks directory for this list, nothing to reconcile.
+			return nil
+		}
+		return fmt.Errorf("reading tasks dir %s: %w", tasksDir, err)
+	}
+
+	// First pass: read all tasks and build the inverse blocks map from
+	// blockedBy, since on-disk files may not always have blocks populated.
+	var tasks []ClaudeTask
+	for _, entry := range entries {
+		if entry.IsDir() || !strings.HasSuffix(entry.Name(), ".json") {
+			continue
+		}
+
+		filePath := fmt.Sprintf("%s/%s", tasksDir, entry.Name())
+		data, err := os.ReadFile(filePath)
+		if err != nil {
+			continue // Skip unreadable files.
+		}
+
+		var task ClaudeTask
+		if err := json.Unmarshal(data, &task); err != nil {
+			continue // Skip malformed JSON.
+		}
+
+		// Normalize task ID: prefer "id" field.
+		if task.ID == "" && task.TaskID != "" {
+			task.ID = task.TaskID
+		}
+		if task.ID == "" {
+			continue // Skip tasks without an ID.
+		}
+
+		tasks = append(tasks, task)
+	}
+
+	if len(tasks) == 0 {
+		return nil
+	}
+
+	// Compute inverse blocks from blockedBy across all tasks.
+	blocksMap := make(map[string][]string)
+	for _, task := range tasks {
+		for _, depID := range task.BlockedBy {
+			blocksMap[depID] = append(
+				blocksMap[depID], task.ID,
+			)
+		}
+	}
+
+	// Second pass: upsert each task into the database.
+	for _, task := range tasks {
+		blocks := mergeStringSlices(task.Blocks, blocksMap[task.ID])
+
+		_, _ = client.UpsertTask(ctx, &subtraterpc.UpsertTaskRequest{
+			AgentId:      agentID,
+			ListId:       listID,
+			ClaudeTaskId: task.ID,
+			Subject:      task.Subject,
+			Description:  task.Description,
+			ActiveForm:   task.ActiveForm,
+			Status:       claudeStatusToProto(task.Status),
+			Owner:        task.Owner,
+			BlockedBy:    task.BlockedBy,
+			Blocks:       blocks,
+		})
+	}
+
+	return nil
 }
 
 // claudeStatusToProto converts Claude status strings to proto enum.

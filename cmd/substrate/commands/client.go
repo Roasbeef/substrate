@@ -1430,6 +1430,17 @@ func (c *Client) SyncTaskList(
 	return c.taskClient.SyncTaskList(ctx, req)
 }
 
+// GetTask retrieves a task by list ID and Claude task ID.
+func (c *Client) GetTask(
+	ctx context.Context, req *subtraterpc.GetTaskProtoRequest,
+) (*subtraterpc.GetTaskResponse, error) {
+	if err := c.requireGRPC(); err != nil {
+		return nil, err
+	}
+
+	return c.taskClient.GetTask(ctx, req)
+}
+
 // UpsertTask creates or updates a task.
 func (c *Client) UpsertTask(
 	ctx context.Context, req *subtraterpc.UpsertTaskRequest,
@@ -1439,4 +1450,15 @@ func (c *Client) UpsertTask(
 	}
 
 	return c.taskClient.UpsertTask(ctx, req)
+}
+
+// DeleteTask deletes a task by its database ID.
+func (c *Client) DeleteTask(
+	ctx context.Context, req *subtraterpc.DeleteTaskRequest,
+) (*subtraterpc.DeleteTaskResponse, error) {
+	if err := c.requireGRPC(); err != nil {
+		return nil, err
+	}
+
+	return c.taskClient.DeleteTask(ctx, req)
 }
