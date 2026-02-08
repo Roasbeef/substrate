@@ -20,6 +20,7 @@ import (
 	"github.com/roasbeef/subtrate/internal/mail"
 	"github.com/roasbeef/subtrate/internal/mailclient"
 	"github.com/roasbeef/subtrate/internal/review"
+	"github.com/roasbeef/subtrate/internal/store"
 )
 
 // ServerConfig holds configuration for the gRPC server.
@@ -67,6 +68,7 @@ func DefaultServerConfig() ServerConfig {
 type Server struct {
 	cfg          ServerConfig
 	store        *db.Store
+	taskStore    store.TaskStore            // Task CRUD via store interface.
 	mailSvc      *mail.Service              // Direct service for operations not via actor.
 	mailClient   *mailclient.Client         // Shared mail client (required).
 	actClient    *mailclient.ActivityClient // Shared activity client (required).
@@ -97,21 +99,27 @@ type Server struct {
 	UnimplementedActivityServer
 	UnimplementedStatsServer
 	UnimplementedReviewServiceServer
+	UnimplementedTaskServiceServer
 }
 
 // NewServer creates a new gRPC server instance.
 func NewServer(
 	cfg ServerConfig,
-	store *db.Store,
+	dbStore *db.Store,
 	mailSvc *mail.Service,
 	agentReg *agent.Registry,
 	identityMgr *agent.IdentityManager,
 	heartbeatMgr *agent.HeartbeatManager,
 	notificationHub actor.ActorRef[mail.NotificationRequest, mail.NotificationResponse],
 ) *Server {
+	// Create task store from the database connection for direct
+	// CRUD operations without the actor system.
+	taskSt := store.FromDB(dbStore.DB())
+
 	return &Server{
 		cfg:             cfg,
-		store:           store,
+		store:           dbStore,
+		taskStore:       taskSt,
 		mailSvc:         mailSvc,
 		mailClient:      mailclient.NewClient(cfg.MailRef),
 		actClient:       mailclient.NewActivityClient(cfg.ActivityRef),
@@ -153,6 +161,7 @@ func (s *Server) Start() error {
 	RegisterActivityServer(s.grpcServer, s)
 	RegisterStatsServer(s.grpcServer, s)
 	RegisterReviewServiceServer(s.grpcServer, s)
+	RegisterTaskServiceServer(s.grpcServer, s)
 
 	// Start serving in a goroutine.
 	s.wg.Add(1)

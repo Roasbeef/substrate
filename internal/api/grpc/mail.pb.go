@@ -308,6 +308,62 @@ func (ActivityType) EnumDescriptor() ([]byte, []int) {
 	return file_mail_proto_rawDescGZIP(), []int{4}
 }
 
+// TaskStatus represents the status of a task.
+type TaskStatus int32
+
+const (
+	TaskStatus_TASK_STATUS_UNSPECIFIED TaskStatus = 0
+	TaskStatus_TASK_STATUS_PENDING     TaskStatus = 1
+	TaskStatus_TASK_STATUS_IN_PROGRESS TaskStatus = 2
+	TaskStatus_TASK_STATUS_COMPLETED   TaskStatus = 3
+	TaskStatus_TASK_STATUS_DELETED     TaskStatus = 4
+)
+
+// Enum value maps for TaskStatus.
+var (
+	TaskStatus_name = map[int32]string{
+		0: "TASK_STATUS_UNSPECIFIED",
+		1: "TASK_STATUS_PENDING",
+		2: "TASK_STATUS_IN_PROGRESS",
+		3: "TASK_STATUS_COMPLETED",
+		4: "TASK_STATUS_DELETED",
+	}
+	TaskStatus_value = map[string]int32{
+		"TASK_STATUS_UNSPECIFIED": 0,
+		"TASK_STATUS_PENDING":     1,
+		"TASK_STATUS_IN_PROGRESS": 2,
+		"TASK_STATUS_COMPLETED":   3,
+		"TASK_STATUS_DELETED":     4,
+	}
+)
+
+func (x TaskStatus) Enum() *TaskStatus {
+	p := new(TaskStatus)
+	*p = x
+	return p
+}
+
+func (x TaskStatus) String() string {
+	return protoimpl.X.EnumStringOf(x.Descriptor(), protoreflect.EnumNumber(x))
+}
+
+func (TaskStatus) Descriptor() protoreflect.EnumDescriptor {
+	return file_mail_proto_enumTypes[5].Descriptor()
+}
+
+func (TaskStatus) Type() protoreflect.EnumType {
+	return &file_mail_proto_enumTypes[5]
+}
+
+func (x TaskStatus) Number() protoreflect.EnumNumber {
+	return protoreflect.EnumNumber(x)
+}
+
+// Deprecated: Use TaskStatus.Descriptor instead.
+func (TaskStatus) EnumDescriptor() ([]byte, []int) {
+	return file_mail_proto_rawDescGZIP(), []int{5}
+}
+
 // InboxMessage represents a message in an agent's inbox.
 // Note: int64 fields serialize as strings in JSON (protobuf standard).
 // Timestamps use RFC 3339 format. Priority/state serialize as enum strings.
@@ -6783,6 +6839,1982 @@ func (x *GetReviewDiffResponse) GetError() string {
 	return ""
 }
 
+// TaskListProto represents a registered task list.
+type TaskListProto struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Id            int64                  `protobuf:"varint,1,opt,name=id,proto3" json:"id,omitempty"`
+	ListId        string                 `protobuf:"bytes,2,opt,name=list_id,json=listId,proto3" json:"list_id,omitempty"`
+	AgentId       int64                  `protobuf:"varint,3,opt,name=agent_id,json=agentId,proto3" json:"agent_id,omitempty"`
+	WatchPath     string                 `protobuf:"bytes,4,opt,name=watch_path,json=watchPath,proto3" json:"watch_path,omitempty"`
+	CreatedAt     *timestamppb.Timestamp `protobuf:"bytes,5,opt,name=created_at,json=createdAt,proto3" json:"created_at,omitempty"`
+	LastSyncedAt  *timestamppb.Timestamp `protobuf:"bytes,6,opt,name=last_synced_at,json=lastSyncedAt,proto3" json:"last_synced_at,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *TaskListProto) Reset() {
+	*x = TaskListProto{}
+	mi := &file_mail_proto_msgTypes[107]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *TaskListProto) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*TaskListProto) ProtoMessage() {}
+
+func (x *TaskListProto) ProtoReflect() protoreflect.Message {
+	mi := &file_mail_proto_msgTypes[107]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use TaskListProto.ProtoReflect.Descriptor instead.
+func (*TaskListProto) Descriptor() ([]byte, []int) {
+	return file_mail_proto_rawDescGZIP(), []int{107}
+}
+
+func (x *TaskListProto) GetId() int64 {
+	if x != nil {
+		return x.Id
+	}
+	return 0
+}
+
+func (x *TaskListProto) GetListId() string {
+	if x != nil {
+		return x.ListId
+	}
+	return ""
+}
+
+func (x *TaskListProto) GetAgentId() int64 {
+	if x != nil {
+		return x.AgentId
+	}
+	return 0
+}
+
+func (x *TaskListProto) GetWatchPath() string {
+	if x != nil {
+		return x.WatchPath
+	}
+	return ""
+}
+
+func (x *TaskListProto) GetCreatedAt() *timestamppb.Timestamp {
+	if x != nil {
+		return x.CreatedAt
+	}
+	return nil
+}
+
+func (x *TaskListProto) GetLastSyncedAt() *timestamppb.Timestamp {
+	if x != nil {
+		return x.LastSyncedAt
+	}
+	return nil
+}
+
+// TaskProto represents a Claude Code task.
+type TaskProto struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Id            int64                  `protobuf:"varint,1,opt,name=id,proto3" json:"id,omitempty"`
+	AgentId       int64                  `protobuf:"varint,2,opt,name=agent_id,json=agentId,proto3" json:"agent_id,omitempty"`
+	ListId        string                 `protobuf:"bytes,3,opt,name=list_id,json=listId,proto3" json:"list_id,omitempty"`
+	ClaudeTaskId  string                 `protobuf:"bytes,4,opt,name=claude_task_id,json=claudeTaskId,proto3" json:"claude_task_id,omitempty"`
+	Subject       string                 `protobuf:"bytes,5,opt,name=subject,proto3" json:"subject,omitempty"`
+	Description   string                 `protobuf:"bytes,6,opt,name=description,proto3" json:"description,omitempty"`
+	ActiveForm    string                 `protobuf:"bytes,7,opt,name=active_form,json=activeForm,proto3" json:"active_form,omitempty"`
+	MetadataJson  string                 `protobuf:"bytes,8,opt,name=metadata_json,json=metadataJson,proto3" json:"metadata_json,omitempty"`
+	Status        TaskStatus             `protobuf:"varint,9,opt,name=status,proto3,enum=subtraterpc.TaskStatus" json:"status,omitempty"`
+	Owner         string                 `protobuf:"bytes,10,opt,name=owner,proto3" json:"owner,omitempty"`
+	BlockedBy     []string               `protobuf:"bytes,11,rep,name=blocked_by,json=blockedBy,proto3" json:"blocked_by,omitempty"`
+	Blocks        []string               `protobuf:"bytes,12,rep,name=blocks,proto3" json:"blocks,omitempty"`
+	CreatedAt     *timestamppb.Timestamp `protobuf:"bytes,13,opt,name=created_at,json=createdAt,proto3" json:"created_at,omitempty"`
+	UpdatedAt     *timestamppb.Timestamp `protobuf:"bytes,14,opt,name=updated_at,json=updatedAt,proto3" json:"updated_at,omitempty"`
+	StartedAt     *timestamppb.Timestamp `protobuf:"bytes,15,opt,name=started_at,json=startedAt,proto3" json:"started_at,omitempty"`
+	CompletedAt   *timestamppb.Timestamp `protobuf:"bytes,16,opt,name=completed_at,json=completedAt,proto3" json:"completed_at,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *TaskProto) Reset() {
+	*x = TaskProto{}
+	mi := &file_mail_proto_msgTypes[108]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *TaskProto) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*TaskProto) ProtoMessage() {}
+
+func (x *TaskProto) ProtoReflect() protoreflect.Message {
+	mi := &file_mail_proto_msgTypes[108]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use TaskProto.ProtoReflect.Descriptor instead.
+func (*TaskProto) Descriptor() ([]byte, []int) {
+	return file_mail_proto_rawDescGZIP(), []int{108}
+}
+
+func (x *TaskProto) GetId() int64 {
+	if x != nil {
+		return x.Id
+	}
+	return 0
+}
+
+func (x *TaskProto) GetAgentId() int64 {
+	if x != nil {
+		return x.AgentId
+	}
+	return 0
+}
+
+func (x *TaskProto) GetListId() string {
+	if x != nil {
+		return x.ListId
+	}
+	return ""
+}
+
+func (x *TaskProto) GetClaudeTaskId() string {
+	if x != nil {
+		return x.ClaudeTaskId
+	}
+	return ""
+}
+
+func (x *TaskProto) GetSubject() string {
+	if x != nil {
+		return x.Subject
+	}
+	return ""
+}
+
+func (x *TaskProto) GetDescription() string {
+	if x != nil {
+		return x.Description
+	}
+	return ""
+}
+
+func (x *TaskProto) GetActiveForm() string {
+	if x != nil {
+		return x.ActiveForm
+	}
+	return ""
+}
+
+func (x *TaskProto) GetMetadataJson() string {
+	if x != nil {
+		return x.MetadataJson
+	}
+	return ""
+}
+
+func (x *TaskProto) GetStatus() TaskStatus {
+	if x != nil {
+		return x.Status
+	}
+	return TaskStatus_TASK_STATUS_UNSPECIFIED
+}
+
+func (x *TaskProto) GetOwner() string {
+	if x != nil {
+		return x.Owner
+	}
+	return ""
+}
+
+func (x *TaskProto) GetBlockedBy() []string {
+	if x != nil {
+		return x.BlockedBy
+	}
+	return nil
+}
+
+func (x *TaskProto) GetBlocks() []string {
+	if x != nil {
+		return x.Blocks
+	}
+	return nil
+}
+
+func (x *TaskProto) GetCreatedAt() *timestamppb.Timestamp {
+	if x != nil {
+		return x.CreatedAt
+	}
+	return nil
+}
+
+func (x *TaskProto) GetUpdatedAt() *timestamppb.Timestamp {
+	if x != nil {
+		return x.UpdatedAt
+	}
+	return nil
+}
+
+func (x *TaskProto) GetStartedAt() *timestamppb.Timestamp {
+	if x != nil {
+		return x.StartedAt
+	}
+	return nil
+}
+
+func (x *TaskProto) GetCompletedAt() *timestamppb.Timestamp {
+	if x != nil {
+		return x.CompletedAt
+	}
+	return nil
+}
+
+// TaskStatsProto contains aggregate task statistics.
+type TaskStatsProto struct {
+	state           protoimpl.MessageState `protogen:"open.v1"`
+	PendingCount    int64                  `protobuf:"varint,1,opt,name=pending_count,json=pendingCount,proto3" json:"pending_count,omitempty"`
+	InProgressCount int64                  `protobuf:"varint,2,opt,name=in_progress_count,json=inProgressCount,proto3" json:"in_progress_count,omitempty"`
+	CompletedCount  int64                  `protobuf:"varint,3,opt,name=completed_count,json=completedCount,proto3" json:"completed_count,omitempty"`
+	BlockedCount    int64                  `protobuf:"varint,4,opt,name=blocked_count,json=blockedCount,proto3" json:"blocked_count,omitempty"`
+	AvailableCount  int64                  `protobuf:"varint,5,opt,name=available_count,json=availableCount,proto3" json:"available_count,omitempty"`
+	CompletedToday  int64                  `protobuf:"varint,6,opt,name=completed_today,json=completedToday,proto3" json:"completed_today,omitempty"`
+	unknownFields   protoimpl.UnknownFields
+	sizeCache       protoimpl.SizeCache
+}
+
+func (x *TaskStatsProto) Reset() {
+	*x = TaskStatsProto{}
+	mi := &file_mail_proto_msgTypes[109]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *TaskStatsProto) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*TaskStatsProto) ProtoMessage() {}
+
+func (x *TaskStatsProto) ProtoReflect() protoreflect.Message {
+	mi := &file_mail_proto_msgTypes[109]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use TaskStatsProto.ProtoReflect.Descriptor instead.
+func (*TaskStatsProto) Descriptor() ([]byte, []int) {
+	return file_mail_proto_rawDescGZIP(), []int{109}
+}
+
+func (x *TaskStatsProto) GetPendingCount() int64 {
+	if x != nil {
+		return x.PendingCount
+	}
+	return 0
+}
+
+func (x *TaskStatsProto) GetInProgressCount() int64 {
+	if x != nil {
+		return x.InProgressCount
+	}
+	return 0
+}
+
+func (x *TaskStatsProto) GetCompletedCount() int64 {
+	if x != nil {
+		return x.CompletedCount
+	}
+	return 0
+}
+
+func (x *TaskStatsProto) GetBlockedCount() int64 {
+	if x != nil {
+		return x.BlockedCount
+	}
+	return 0
+}
+
+func (x *TaskStatsProto) GetAvailableCount() int64 {
+	if x != nil {
+		return x.AvailableCount
+	}
+	return 0
+}
+
+func (x *TaskStatsProto) GetCompletedToday() int64 {
+	if x != nil {
+		return x.CompletedToday
+	}
+	return 0
+}
+
+// AgentTaskStatsProto contains task statistics for a specific agent.
+type AgentTaskStatsProto struct {
+	state           protoimpl.MessageState `protogen:"open.v1"`
+	AgentId         int64                  `protobuf:"varint,1,opt,name=agent_id,json=agentId,proto3" json:"agent_id,omitempty"`
+	AgentName       string                 `protobuf:"bytes,2,opt,name=agent_name,json=agentName,proto3" json:"agent_name,omitempty"`
+	PendingCount    int64                  `protobuf:"varint,3,opt,name=pending_count,json=pendingCount,proto3" json:"pending_count,omitempty"`
+	InProgressCount int64                  `protobuf:"varint,4,opt,name=in_progress_count,json=inProgressCount,proto3" json:"in_progress_count,omitempty"`
+	BlockedCount    int64                  `protobuf:"varint,5,opt,name=blocked_count,json=blockedCount,proto3" json:"blocked_count,omitempty"`
+	CompletedToday  int64                  `protobuf:"varint,6,opt,name=completed_today,json=completedToday,proto3" json:"completed_today,omitempty"`
+	unknownFields   protoimpl.UnknownFields
+	sizeCache       protoimpl.SizeCache
+}
+
+func (x *AgentTaskStatsProto) Reset() {
+	*x = AgentTaskStatsProto{}
+	mi := &file_mail_proto_msgTypes[110]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *AgentTaskStatsProto) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*AgentTaskStatsProto) ProtoMessage() {}
+
+func (x *AgentTaskStatsProto) ProtoReflect() protoreflect.Message {
+	mi := &file_mail_proto_msgTypes[110]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use AgentTaskStatsProto.ProtoReflect.Descriptor instead.
+func (*AgentTaskStatsProto) Descriptor() ([]byte, []int) {
+	return file_mail_proto_rawDescGZIP(), []int{110}
+}
+
+func (x *AgentTaskStatsProto) GetAgentId() int64 {
+	if x != nil {
+		return x.AgentId
+	}
+	return 0
+}
+
+func (x *AgentTaskStatsProto) GetAgentName() string {
+	if x != nil {
+		return x.AgentName
+	}
+	return ""
+}
+
+func (x *AgentTaskStatsProto) GetPendingCount() int64 {
+	if x != nil {
+		return x.PendingCount
+	}
+	return 0
+}
+
+func (x *AgentTaskStatsProto) GetInProgressCount() int64 {
+	if x != nil {
+		return x.InProgressCount
+	}
+	return 0
+}
+
+func (x *AgentTaskStatsProto) GetBlockedCount() int64 {
+	if x != nil {
+		return x.BlockedCount
+	}
+	return 0
+}
+
+func (x *AgentTaskStatsProto) GetCompletedToday() int64 {
+	if x != nil {
+		return x.CompletedToday
+	}
+	return 0
+}
+
+// RegisterTaskListRequest is the request for RegisterTaskList.
+type RegisterTaskListRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	ListId        string                 `protobuf:"bytes,1,opt,name=list_id,json=listId,proto3" json:"list_id,omitempty"`
+	AgentId       int64                  `protobuf:"varint,2,opt,name=agent_id,json=agentId,proto3" json:"agent_id,omitempty"`
+	WatchPath     string                 `protobuf:"bytes,3,opt,name=watch_path,json=watchPath,proto3" json:"watch_path,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *RegisterTaskListRequest) Reset() {
+	*x = RegisterTaskListRequest{}
+	mi := &file_mail_proto_msgTypes[111]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *RegisterTaskListRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*RegisterTaskListRequest) ProtoMessage() {}
+
+func (x *RegisterTaskListRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_mail_proto_msgTypes[111]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use RegisterTaskListRequest.ProtoReflect.Descriptor instead.
+func (*RegisterTaskListRequest) Descriptor() ([]byte, []int) {
+	return file_mail_proto_rawDescGZIP(), []int{111}
+}
+
+func (x *RegisterTaskListRequest) GetListId() string {
+	if x != nil {
+		return x.ListId
+	}
+	return ""
+}
+
+func (x *RegisterTaskListRequest) GetAgentId() int64 {
+	if x != nil {
+		return x.AgentId
+	}
+	return 0
+}
+
+func (x *RegisterTaskListRequest) GetWatchPath() string {
+	if x != nil {
+		return x.WatchPath
+	}
+	return ""
+}
+
+// RegisterTaskListResponse is the response for RegisterTaskList.
+type RegisterTaskListResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	TaskList      *TaskListProto         `protobuf:"bytes,1,opt,name=task_list,json=taskList,proto3" json:"task_list,omitempty"`
+	Error         string                 `protobuf:"bytes,2,opt,name=error,proto3" json:"error,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *RegisterTaskListResponse) Reset() {
+	*x = RegisterTaskListResponse{}
+	mi := &file_mail_proto_msgTypes[112]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *RegisterTaskListResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*RegisterTaskListResponse) ProtoMessage() {}
+
+func (x *RegisterTaskListResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_mail_proto_msgTypes[112]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use RegisterTaskListResponse.ProtoReflect.Descriptor instead.
+func (*RegisterTaskListResponse) Descriptor() ([]byte, []int) {
+	return file_mail_proto_rawDescGZIP(), []int{112}
+}
+
+func (x *RegisterTaskListResponse) GetTaskList() *TaskListProto {
+	if x != nil {
+		return x.TaskList
+	}
+	return nil
+}
+
+func (x *RegisterTaskListResponse) GetError() string {
+	if x != nil {
+		return x.Error
+	}
+	return ""
+}
+
+// GetTaskListRequest is the request for GetTaskList.
+type GetTaskListRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	ListId        string                 `protobuf:"bytes,1,opt,name=list_id,json=listId,proto3" json:"list_id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetTaskListRequest) Reset() {
+	*x = GetTaskListRequest{}
+	mi := &file_mail_proto_msgTypes[113]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetTaskListRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetTaskListRequest) ProtoMessage() {}
+
+func (x *GetTaskListRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_mail_proto_msgTypes[113]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetTaskListRequest.ProtoReflect.Descriptor instead.
+func (*GetTaskListRequest) Descriptor() ([]byte, []int) {
+	return file_mail_proto_rawDescGZIP(), []int{113}
+}
+
+func (x *GetTaskListRequest) GetListId() string {
+	if x != nil {
+		return x.ListId
+	}
+	return ""
+}
+
+// GetTaskListResponse is the response for GetTaskList.
+type GetTaskListResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	TaskList      *TaskListProto         `protobuf:"bytes,1,opt,name=task_list,json=taskList,proto3" json:"task_list,omitempty"`
+	Error         string                 `protobuf:"bytes,2,opt,name=error,proto3" json:"error,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetTaskListResponse) Reset() {
+	*x = GetTaskListResponse{}
+	mi := &file_mail_proto_msgTypes[114]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetTaskListResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetTaskListResponse) ProtoMessage() {}
+
+func (x *GetTaskListResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_mail_proto_msgTypes[114]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetTaskListResponse.ProtoReflect.Descriptor instead.
+func (*GetTaskListResponse) Descriptor() ([]byte, []int) {
+	return file_mail_proto_rawDescGZIP(), []int{114}
+}
+
+func (x *GetTaskListResponse) GetTaskList() *TaskListProto {
+	if x != nil {
+		return x.TaskList
+	}
+	return nil
+}
+
+func (x *GetTaskListResponse) GetError() string {
+	if x != nil {
+		return x.Error
+	}
+	return ""
+}
+
+// ListTaskListsRequest is the request for ListTaskLists.
+type ListTaskListsRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	AgentId       int64                  `protobuf:"varint,1,opt,name=agent_id,json=agentId,proto3" json:"agent_id,omitempty"` // Optional filter by agent
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ListTaskListsRequest) Reset() {
+	*x = ListTaskListsRequest{}
+	mi := &file_mail_proto_msgTypes[115]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ListTaskListsRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ListTaskListsRequest) ProtoMessage() {}
+
+func (x *ListTaskListsRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_mail_proto_msgTypes[115]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ListTaskListsRequest.ProtoReflect.Descriptor instead.
+func (*ListTaskListsRequest) Descriptor() ([]byte, []int) {
+	return file_mail_proto_rawDescGZIP(), []int{115}
+}
+
+func (x *ListTaskListsRequest) GetAgentId() int64 {
+	if x != nil {
+		return x.AgentId
+	}
+	return 0
+}
+
+// ListTaskListsResponse is the response for ListTaskLists.
+type ListTaskListsResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	TaskLists     []*TaskListProto       `protobuf:"bytes,1,rep,name=task_lists,json=taskLists,proto3" json:"task_lists,omitempty"`
+	Error         string                 `protobuf:"bytes,2,opt,name=error,proto3" json:"error,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ListTaskListsResponse) Reset() {
+	*x = ListTaskListsResponse{}
+	mi := &file_mail_proto_msgTypes[116]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ListTaskListsResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ListTaskListsResponse) ProtoMessage() {}
+
+func (x *ListTaskListsResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_mail_proto_msgTypes[116]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ListTaskListsResponse.ProtoReflect.Descriptor instead.
+func (*ListTaskListsResponse) Descriptor() ([]byte, []int) {
+	return file_mail_proto_rawDescGZIP(), []int{116}
+}
+
+func (x *ListTaskListsResponse) GetTaskLists() []*TaskListProto {
+	if x != nil {
+		return x.TaskLists
+	}
+	return nil
+}
+
+func (x *ListTaskListsResponse) GetError() string {
+	if x != nil {
+		return x.Error
+	}
+	return ""
+}
+
+// UnregisterTaskListRequest is the request for UnregisterTaskList.
+type UnregisterTaskListRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	ListId        string                 `protobuf:"bytes,1,opt,name=list_id,json=listId,proto3" json:"list_id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *UnregisterTaskListRequest) Reset() {
+	*x = UnregisterTaskListRequest{}
+	mi := &file_mail_proto_msgTypes[117]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *UnregisterTaskListRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*UnregisterTaskListRequest) ProtoMessage() {}
+
+func (x *UnregisterTaskListRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_mail_proto_msgTypes[117]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use UnregisterTaskListRequest.ProtoReflect.Descriptor instead.
+func (*UnregisterTaskListRequest) Descriptor() ([]byte, []int) {
+	return file_mail_proto_rawDescGZIP(), []int{117}
+}
+
+func (x *UnregisterTaskListRequest) GetListId() string {
+	if x != nil {
+		return x.ListId
+	}
+	return ""
+}
+
+// UnregisterTaskListResponse is the response for UnregisterTaskList.
+type UnregisterTaskListResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Error         string                 `protobuf:"bytes,1,opt,name=error,proto3" json:"error,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *UnregisterTaskListResponse) Reset() {
+	*x = UnregisterTaskListResponse{}
+	mi := &file_mail_proto_msgTypes[118]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *UnregisterTaskListResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*UnregisterTaskListResponse) ProtoMessage() {}
+
+func (x *UnregisterTaskListResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_mail_proto_msgTypes[118]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use UnregisterTaskListResponse.ProtoReflect.Descriptor instead.
+func (*UnregisterTaskListResponse) Descriptor() ([]byte, []int) {
+	return file_mail_proto_rawDescGZIP(), []int{118}
+}
+
+func (x *UnregisterTaskListResponse) GetError() string {
+	if x != nil {
+		return x.Error
+	}
+	return ""
+}
+
+// UpsertTaskRequest is the request for UpsertTask.
+type UpsertTaskRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	AgentId       int64                  `protobuf:"varint,1,opt,name=agent_id,json=agentId,proto3" json:"agent_id,omitempty"`
+	ListId        string                 `protobuf:"bytes,2,opt,name=list_id,json=listId,proto3" json:"list_id,omitempty"`
+	ClaudeTaskId  string                 `protobuf:"bytes,3,opt,name=claude_task_id,json=claudeTaskId,proto3" json:"claude_task_id,omitempty"`
+	Subject       string                 `protobuf:"bytes,4,opt,name=subject,proto3" json:"subject,omitempty"`
+	Description   string                 `protobuf:"bytes,5,opt,name=description,proto3" json:"description,omitempty"`
+	ActiveForm    string                 `protobuf:"bytes,6,opt,name=active_form,json=activeForm,proto3" json:"active_form,omitempty"`
+	MetadataJson  string                 `protobuf:"bytes,7,opt,name=metadata_json,json=metadataJson,proto3" json:"metadata_json,omitempty"`
+	Status        TaskStatus             `protobuf:"varint,8,opt,name=status,proto3,enum=subtraterpc.TaskStatus" json:"status,omitempty"`
+	Owner         string                 `protobuf:"bytes,9,opt,name=owner,proto3" json:"owner,omitempty"`
+	BlockedBy     []string               `protobuf:"bytes,10,rep,name=blocked_by,json=blockedBy,proto3" json:"blocked_by,omitempty"`
+	Blocks        []string               `protobuf:"bytes,11,rep,name=blocks,proto3" json:"blocks,omitempty"`
+	FilePath      string                 `protobuf:"bytes,12,opt,name=file_path,json=filePath,proto3" json:"file_path,omitempty"`
+	FileMtime     int64                  `protobuf:"varint,13,opt,name=file_mtime,json=fileMtime,proto3" json:"file_mtime,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *UpsertTaskRequest) Reset() {
+	*x = UpsertTaskRequest{}
+	mi := &file_mail_proto_msgTypes[119]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *UpsertTaskRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*UpsertTaskRequest) ProtoMessage() {}
+
+func (x *UpsertTaskRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_mail_proto_msgTypes[119]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use UpsertTaskRequest.ProtoReflect.Descriptor instead.
+func (*UpsertTaskRequest) Descriptor() ([]byte, []int) {
+	return file_mail_proto_rawDescGZIP(), []int{119}
+}
+
+func (x *UpsertTaskRequest) GetAgentId() int64 {
+	if x != nil {
+		return x.AgentId
+	}
+	return 0
+}
+
+func (x *UpsertTaskRequest) GetListId() string {
+	if x != nil {
+		return x.ListId
+	}
+	return ""
+}
+
+func (x *UpsertTaskRequest) GetClaudeTaskId() string {
+	if x != nil {
+		return x.ClaudeTaskId
+	}
+	return ""
+}
+
+func (x *UpsertTaskRequest) GetSubject() string {
+	if x != nil {
+		return x.Subject
+	}
+	return ""
+}
+
+func (x *UpsertTaskRequest) GetDescription() string {
+	if x != nil {
+		return x.Description
+	}
+	return ""
+}
+
+func (x *UpsertTaskRequest) GetActiveForm() string {
+	if x != nil {
+		return x.ActiveForm
+	}
+	return ""
+}
+
+func (x *UpsertTaskRequest) GetMetadataJson() string {
+	if x != nil {
+		return x.MetadataJson
+	}
+	return ""
+}
+
+func (x *UpsertTaskRequest) GetStatus() TaskStatus {
+	if x != nil {
+		return x.Status
+	}
+	return TaskStatus_TASK_STATUS_UNSPECIFIED
+}
+
+func (x *UpsertTaskRequest) GetOwner() string {
+	if x != nil {
+		return x.Owner
+	}
+	return ""
+}
+
+func (x *UpsertTaskRequest) GetBlockedBy() []string {
+	if x != nil {
+		return x.BlockedBy
+	}
+	return nil
+}
+
+func (x *UpsertTaskRequest) GetBlocks() []string {
+	if x != nil {
+		return x.Blocks
+	}
+	return nil
+}
+
+func (x *UpsertTaskRequest) GetFilePath() string {
+	if x != nil {
+		return x.FilePath
+	}
+	return ""
+}
+
+func (x *UpsertTaskRequest) GetFileMtime() int64 {
+	if x != nil {
+		return x.FileMtime
+	}
+	return 0
+}
+
+// UpsertTaskResponse is the response for UpsertTask.
+type UpsertTaskResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Task          *TaskProto             `protobuf:"bytes,1,opt,name=task,proto3" json:"task,omitempty"`
+	Error         string                 `protobuf:"bytes,2,opt,name=error,proto3" json:"error,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *UpsertTaskResponse) Reset() {
+	*x = UpsertTaskResponse{}
+	mi := &file_mail_proto_msgTypes[120]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *UpsertTaskResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*UpsertTaskResponse) ProtoMessage() {}
+
+func (x *UpsertTaskResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_mail_proto_msgTypes[120]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use UpsertTaskResponse.ProtoReflect.Descriptor instead.
+func (*UpsertTaskResponse) Descriptor() ([]byte, []int) {
+	return file_mail_proto_rawDescGZIP(), []int{120}
+}
+
+func (x *UpsertTaskResponse) GetTask() *TaskProto {
+	if x != nil {
+		return x.Task
+	}
+	return nil
+}
+
+func (x *UpsertTaskResponse) GetError() string {
+	if x != nil {
+		return x.Error
+	}
+	return ""
+}
+
+// GetTaskProtoRequest is the request for GetTask.
+type GetTaskProtoRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	ListId        string                 `protobuf:"bytes,1,opt,name=list_id,json=listId,proto3" json:"list_id,omitempty"`
+	ClaudeTaskId  string                 `protobuf:"bytes,2,opt,name=claude_task_id,json=claudeTaskId,proto3" json:"claude_task_id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetTaskProtoRequest) Reset() {
+	*x = GetTaskProtoRequest{}
+	mi := &file_mail_proto_msgTypes[121]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetTaskProtoRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetTaskProtoRequest) ProtoMessage() {}
+
+func (x *GetTaskProtoRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_mail_proto_msgTypes[121]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetTaskProtoRequest.ProtoReflect.Descriptor instead.
+func (*GetTaskProtoRequest) Descriptor() ([]byte, []int) {
+	return file_mail_proto_rawDescGZIP(), []int{121}
+}
+
+func (x *GetTaskProtoRequest) GetListId() string {
+	if x != nil {
+		return x.ListId
+	}
+	return ""
+}
+
+func (x *GetTaskProtoRequest) GetClaudeTaskId() string {
+	if x != nil {
+		return x.ClaudeTaskId
+	}
+	return ""
+}
+
+// GetTaskResponse is the response for GetTask.
+type GetTaskResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Task          *TaskProto             `protobuf:"bytes,1,opt,name=task,proto3" json:"task,omitempty"`
+	Error         string                 `protobuf:"bytes,2,opt,name=error,proto3" json:"error,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetTaskResponse) Reset() {
+	*x = GetTaskResponse{}
+	mi := &file_mail_proto_msgTypes[122]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetTaskResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetTaskResponse) ProtoMessage() {}
+
+func (x *GetTaskResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_mail_proto_msgTypes[122]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetTaskResponse.ProtoReflect.Descriptor instead.
+func (*GetTaskResponse) Descriptor() ([]byte, []int) {
+	return file_mail_proto_rawDescGZIP(), []int{122}
+}
+
+func (x *GetTaskResponse) GetTask() *TaskProto {
+	if x != nil {
+		return x.Task
+	}
+	return nil
+}
+
+func (x *GetTaskResponse) GetError() string {
+	if x != nil {
+		return x.Error
+	}
+	return ""
+}
+
+// ListTasksRequest is the request for ListTasks.
+type ListTasksRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	AgentId       int64                  `protobuf:"varint,1,opt,name=agent_id,json=agentId,proto3" json:"agent_id,omitempty"`
+	ListId        string                 `protobuf:"bytes,2,opt,name=list_id,json=listId,proto3" json:"list_id,omitempty"`
+	Status        TaskStatus             `protobuf:"varint,3,opt,name=status,proto3,enum=subtraterpc.TaskStatus" json:"status,omitempty"`
+	ActiveOnly    bool                   `protobuf:"varint,4,opt,name=active_only,json=activeOnly,proto3" json:"active_only,omitempty"`
+	AvailableOnly bool                   `protobuf:"varint,5,opt,name=available_only,json=availableOnly,proto3" json:"available_only,omitempty"`
+	Limit         int32                  `protobuf:"varint,6,opt,name=limit,proto3" json:"limit,omitempty"`
+	Offset        int32                  `protobuf:"varint,7,opt,name=offset,proto3" json:"offset,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ListTasksRequest) Reset() {
+	*x = ListTasksRequest{}
+	mi := &file_mail_proto_msgTypes[123]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ListTasksRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ListTasksRequest) ProtoMessage() {}
+
+func (x *ListTasksRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_mail_proto_msgTypes[123]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ListTasksRequest.ProtoReflect.Descriptor instead.
+func (*ListTasksRequest) Descriptor() ([]byte, []int) {
+	return file_mail_proto_rawDescGZIP(), []int{123}
+}
+
+func (x *ListTasksRequest) GetAgentId() int64 {
+	if x != nil {
+		return x.AgentId
+	}
+	return 0
+}
+
+func (x *ListTasksRequest) GetListId() string {
+	if x != nil {
+		return x.ListId
+	}
+	return ""
+}
+
+func (x *ListTasksRequest) GetStatus() TaskStatus {
+	if x != nil {
+		return x.Status
+	}
+	return TaskStatus_TASK_STATUS_UNSPECIFIED
+}
+
+func (x *ListTasksRequest) GetActiveOnly() bool {
+	if x != nil {
+		return x.ActiveOnly
+	}
+	return false
+}
+
+func (x *ListTasksRequest) GetAvailableOnly() bool {
+	if x != nil {
+		return x.AvailableOnly
+	}
+	return false
+}
+
+func (x *ListTasksRequest) GetLimit() int32 {
+	if x != nil {
+		return x.Limit
+	}
+	return 0
+}
+
+func (x *ListTasksRequest) GetOffset() int32 {
+	if x != nil {
+		return x.Offset
+	}
+	return 0
+}
+
+// ListTasksResponse is the response for ListTasks.
+type ListTasksResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Tasks         []*TaskProto           `protobuf:"bytes,1,rep,name=tasks,proto3" json:"tasks,omitempty"`
+	Error         string                 `protobuf:"bytes,2,opt,name=error,proto3" json:"error,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ListTasksResponse) Reset() {
+	*x = ListTasksResponse{}
+	mi := &file_mail_proto_msgTypes[124]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ListTasksResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ListTasksResponse) ProtoMessage() {}
+
+func (x *ListTasksResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_mail_proto_msgTypes[124]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ListTasksResponse.ProtoReflect.Descriptor instead.
+func (*ListTasksResponse) Descriptor() ([]byte, []int) {
+	return file_mail_proto_rawDescGZIP(), []int{124}
+}
+
+func (x *ListTasksResponse) GetTasks() []*TaskProto {
+	if x != nil {
+		return x.Tasks
+	}
+	return nil
+}
+
+func (x *ListTasksResponse) GetError() string {
+	if x != nil {
+		return x.Error
+	}
+	return ""
+}
+
+// UpdateTaskStatusRequest is the request for UpdateTaskStatus.
+type UpdateTaskStatusRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	ListId        string                 `protobuf:"bytes,1,opt,name=list_id,json=listId,proto3" json:"list_id,omitempty"`
+	ClaudeTaskId  string                 `protobuf:"bytes,2,opt,name=claude_task_id,json=claudeTaskId,proto3" json:"claude_task_id,omitempty"`
+	Status        TaskStatus             `protobuf:"varint,3,opt,name=status,proto3,enum=subtraterpc.TaskStatus" json:"status,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *UpdateTaskStatusRequest) Reset() {
+	*x = UpdateTaskStatusRequest{}
+	mi := &file_mail_proto_msgTypes[125]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *UpdateTaskStatusRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*UpdateTaskStatusRequest) ProtoMessage() {}
+
+func (x *UpdateTaskStatusRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_mail_proto_msgTypes[125]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use UpdateTaskStatusRequest.ProtoReflect.Descriptor instead.
+func (*UpdateTaskStatusRequest) Descriptor() ([]byte, []int) {
+	return file_mail_proto_rawDescGZIP(), []int{125}
+}
+
+func (x *UpdateTaskStatusRequest) GetListId() string {
+	if x != nil {
+		return x.ListId
+	}
+	return ""
+}
+
+func (x *UpdateTaskStatusRequest) GetClaudeTaskId() string {
+	if x != nil {
+		return x.ClaudeTaskId
+	}
+	return ""
+}
+
+func (x *UpdateTaskStatusRequest) GetStatus() TaskStatus {
+	if x != nil {
+		return x.Status
+	}
+	return TaskStatus_TASK_STATUS_UNSPECIFIED
+}
+
+// UpdateTaskStatusResponse is the response for UpdateTaskStatus.
+type UpdateTaskStatusResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Error         string                 `protobuf:"bytes,1,opt,name=error,proto3" json:"error,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *UpdateTaskStatusResponse) Reset() {
+	*x = UpdateTaskStatusResponse{}
+	mi := &file_mail_proto_msgTypes[126]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *UpdateTaskStatusResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*UpdateTaskStatusResponse) ProtoMessage() {}
+
+func (x *UpdateTaskStatusResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_mail_proto_msgTypes[126]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use UpdateTaskStatusResponse.ProtoReflect.Descriptor instead.
+func (*UpdateTaskStatusResponse) Descriptor() ([]byte, []int) {
+	return file_mail_proto_rawDescGZIP(), []int{126}
+}
+
+func (x *UpdateTaskStatusResponse) GetError() string {
+	if x != nil {
+		return x.Error
+	}
+	return ""
+}
+
+// UpdateTaskOwnerRequest is the request for UpdateTaskOwner.
+type UpdateTaskOwnerRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	ListId        string                 `protobuf:"bytes,1,opt,name=list_id,json=listId,proto3" json:"list_id,omitempty"`
+	ClaudeTaskId  string                 `protobuf:"bytes,2,opt,name=claude_task_id,json=claudeTaskId,proto3" json:"claude_task_id,omitempty"`
+	Owner         string                 `protobuf:"bytes,3,opt,name=owner,proto3" json:"owner,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *UpdateTaskOwnerRequest) Reset() {
+	*x = UpdateTaskOwnerRequest{}
+	mi := &file_mail_proto_msgTypes[127]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *UpdateTaskOwnerRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*UpdateTaskOwnerRequest) ProtoMessage() {}
+
+func (x *UpdateTaskOwnerRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_mail_proto_msgTypes[127]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use UpdateTaskOwnerRequest.ProtoReflect.Descriptor instead.
+func (*UpdateTaskOwnerRequest) Descriptor() ([]byte, []int) {
+	return file_mail_proto_rawDescGZIP(), []int{127}
+}
+
+func (x *UpdateTaskOwnerRequest) GetListId() string {
+	if x != nil {
+		return x.ListId
+	}
+	return ""
+}
+
+func (x *UpdateTaskOwnerRequest) GetClaudeTaskId() string {
+	if x != nil {
+		return x.ClaudeTaskId
+	}
+	return ""
+}
+
+func (x *UpdateTaskOwnerRequest) GetOwner() string {
+	if x != nil {
+		return x.Owner
+	}
+	return ""
+}
+
+// UpdateTaskOwnerResponse is the response for UpdateTaskOwner.
+type UpdateTaskOwnerResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Error         string                 `protobuf:"bytes,1,opt,name=error,proto3" json:"error,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *UpdateTaskOwnerResponse) Reset() {
+	*x = UpdateTaskOwnerResponse{}
+	mi := &file_mail_proto_msgTypes[128]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *UpdateTaskOwnerResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*UpdateTaskOwnerResponse) ProtoMessage() {}
+
+func (x *UpdateTaskOwnerResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_mail_proto_msgTypes[128]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use UpdateTaskOwnerResponse.ProtoReflect.Descriptor instead.
+func (*UpdateTaskOwnerResponse) Descriptor() ([]byte, []int) {
+	return file_mail_proto_rawDescGZIP(), []int{128}
+}
+
+func (x *UpdateTaskOwnerResponse) GetError() string {
+	if x != nil {
+		return x.Error
+	}
+	return ""
+}
+
+// DeleteTaskRequest is the request for DeleteTask.
+type DeleteTaskRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Id            int64                  `protobuf:"varint,1,opt,name=id,proto3" json:"id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *DeleteTaskRequest) Reset() {
+	*x = DeleteTaskRequest{}
+	mi := &file_mail_proto_msgTypes[129]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *DeleteTaskRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*DeleteTaskRequest) ProtoMessage() {}
+
+func (x *DeleteTaskRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_mail_proto_msgTypes[129]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use DeleteTaskRequest.ProtoReflect.Descriptor instead.
+func (*DeleteTaskRequest) Descriptor() ([]byte, []int) {
+	return file_mail_proto_rawDescGZIP(), []int{129}
+}
+
+func (x *DeleteTaskRequest) GetId() int64 {
+	if x != nil {
+		return x.Id
+	}
+	return 0
+}
+
+// DeleteTaskResponse is the response for DeleteTask.
+type DeleteTaskResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Error         string                 `protobuf:"bytes,1,opt,name=error,proto3" json:"error,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *DeleteTaskResponse) Reset() {
+	*x = DeleteTaskResponse{}
+	mi := &file_mail_proto_msgTypes[130]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *DeleteTaskResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*DeleteTaskResponse) ProtoMessage() {}
+
+func (x *DeleteTaskResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_mail_proto_msgTypes[130]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use DeleteTaskResponse.ProtoReflect.Descriptor instead.
+func (*DeleteTaskResponse) Descriptor() ([]byte, []int) {
+	return file_mail_proto_rawDescGZIP(), []int{130}
+}
+
+func (x *DeleteTaskResponse) GetError() string {
+	if x != nil {
+		return x.Error
+	}
+	return ""
+}
+
+// GetTaskStatsRequest is the request for GetTaskStats.
+type GetTaskStatsRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	AgentId       int64                  `protobuf:"varint,1,opt,name=agent_id,json=agentId,proto3" json:"agent_id,omitempty"`
+	ListId        string                 `protobuf:"bytes,2,opt,name=list_id,json=listId,proto3" json:"list_id,omitempty"`
+	TodaySince    *timestamppb.Timestamp `protobuf:"bytes,3,opt,name=today_since,json=todaySince,proto3" json:"today_since,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetTaskStatsRequest) Reset() {
+	*x = GetTaskStatsRequest{}
+	mi := &file_mail_proto_msgTypes[131]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetTaskStatsRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetTaskStatsRequest) ProtoMessage() {}
+
+func (x *GetTaskStatsRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_mail_proto_msgTypes[131]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetTaskStatsRequest.ProtoReflect.Descriptor instead.
+func (*GetTaskStatsRequest) Descriptor() ([]byte, []int) {
+	return file_mail_proto_rawDescGZIP(), []int{131}
+}
+
+func (x *GetTaskStatsRequest) GetAgentId() int64 {
+	if x != nil {
+		return x.AgentId
+	}
+	return 0
+}
+
+func (x *GetTaskStatsRequest) GetListId() string {
+	if x != nil {
+		return x.ListId
+	}
+	return ""
+}
+
+func (x *GetTaskStatsRequest) GetTodaySince() *timestamppb.Timestamp {
+	if x != nil {
+		return x.TodaySince
+	}
+	return nil
+}
+
+// GetTaskStatsResponse is the response for GetTaskStats.
+type GetTaskStatsResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Stats         *TaskStatsProto        `protobuf:"bytes,1,opt,name=stats,proto3" json:"stats,omitempty"`
+	Error         string                 `protobuf:"bytes,2,opt,name=error,proto3" json:"error,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetTaskStatsResponse) Reset() {
+	*x = GetTaskStatsResponse{}
+	mi := &file_mail_proto_msgTypes[132]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetTaskStatsResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetTaskStatsResponse) ProtoMessage() {}
+
+func (x *GetTaskStatsResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_mail_proto_msgTypes[132]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetTaskStatsResponse.ProtoReflect.Descriptor instead.
+func (*GetTaskStatsResponse) Descriptor() ([]byte, []int) {
+	return file_mail_proto_rawDescGZIP(), []int{132}
+}
+
+func (x *GetTaskStatsResponse) GetStats() *TaskStatsProto {
+	if x != nil {
+		return x.Stats
+	}
+	return nil
+}
+
+func (x *GetTaskStatsResponse) GetError() string {
+	if x != nil {
+		return x.Error
+	}
+	return ""
+}
+
+// GetAllAgentTaskStatsRequest is the request for GetAllAgentTaskStats.
+type GetAllAgentTaskStatsRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	TodaySince    *timestamppb.Timestamp `protobuf:"bytes,1,opt,name=today_since,json=todaySince,proto3" json:"today_since,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetAllAgentTaskStatsRequest) Reset() {
+	*x = GetAllAgentTaskStatsRequest{}
+	mi := &file_mail_proto_msgTypes[133]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetAllAgentTaskStatsRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetAllAgentTaskStatsRequest) ProtoMessage() {}
+
+func (x *GetAllAgentTaskStatsRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_mail_proto_msgTypes[133]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetAllAgentTaskStatsRequest.ProtoReflect.Descriptor instead.
+func (*GetAllAgentTaskStatsRequest) Descriptor() ([]byte, []int) {
+	return file_mail_proto_rawDescGZIP(), []int{133}
+}
+
+func (x *GetAllAgentTaskStatsRequest) GetTodaySince() *timestamppb.Timestamp {
+	if x != nil {
+		return x.TodaySince
+	}
+	return nil
+}
+
+// GetAllAgentTaskStatsResponse is the response for GetAllAgentTaskStats.
+type GetAllAgentTaskStatsResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Stats         []*AgentTaskStatsProto `protobuf:"bytes,1,rep,name=stats,proto3" json:"stats,omitempty"`
+	Error         string                 `protobuf:"bytes,2,opt,name=error,proto3" json:"error,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetAllAgentTaskStatsResponse) Reset() {
+	*x = GetAllAgentTaskStatsResponse{}
+	mi := &file_mail_proto_msgTypes[134]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetAllAgentTaskStatsResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetAllAgentTaskStatsResponse) ProtoMessage() {}
+
+func (x *GetAllAgentTaskStatsResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_mail_proto_msgTypes[134]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetAllAgentTaskStatsResponse.ProtoReflect.Descriptor instead.
+func (*GetAllAgentTaskStatsResponse) Descriptor() ([]byte, []int) {
+	return file_mail_proto_rawDescGZIP(), []int{134}
+}
+
+func (x *GetAllAgentTaskStatsResponse) GetStats() []*AgentTaskStatsProto {
+	if x != nil {
+		return x.Stats
+	}
+	return nil
+}
+
+func (x *GetAllAgentTaskStatsResponse) GetError() string {
+	if x != nil {
+		return x.Error
+	}
+	return ""
+}
+
+// SyncTaskListRequest is the request for SyncTaskList.
+type SyncTaskListRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	ListId        string                 `protobuf:"bytes,1,opt,name=list_id,json=listId,proto3" json:"list_id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *SyncTaskListRequest) Reset() {
+	*x = SyncTaskListRequest{}
+	mi := &file_mail_proto_msgTypes[135]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *SyncTaskListRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*SyncTaskListRequest) ProtoMessage() {}
+
+func (x *SyncTaskListRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_mail_proto_msgTypes[135]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use SyncTaskListRequest.ProtoReflect.Descriptor instead.
+func (*SyncTaskListRequest) Descriptor() ([]byte, []int) {
+	return file_mail_proto_rawDescGZIP(), []int{135}
+}
+
+func (x *SyncTaskListRequest) GetListId() string {
+	if x != nil {
+		return x.ListId
+	}
+	return ""
+}
+
+// SyncTaskListResponse is the response for SyncTaskList.
+type SyncTaskListResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	TasksUpdated  int32                  `protobuf:"varint,1,opt,name=tasks_updated,json=tasksUpdated,proto3" json:"tasks_updated,omitempty"`
+	TasksDeleted  int32                  `protobuf:"varint,2,opt,name=tasks_deleted,json=tasksDeleted,proto3" json:"tasks_deleted,omitempty"`
+	Error         string                 `protobuf:"bytes,3,opt,name=error,proto3" json:"error,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *SyncTaskListResponse) Reset() {
+	*x = SyncTaskListResponse{}
+	mi := &file_mail_proto_msgTypes[136]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *SyncTaskListResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*SyncTaskListResponse) ProtoMessage() {}
+
+func (x *SyncTaskListResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_mail_proto_msgTypes[136]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use SyncTaskListResponse.ProtoReflect.Descriptor instead.
+func (*SyncTaskListResponse) Descriptor() ([]byte, []int) {
+	return file_mail_proto_rawDescGZIP(), []int{136}
+}
+
+func (x *SyncTaskListResponse) GetTasksUpdated() int32 {
+	if x != nil {
+		return x.TasksUpdated
+	}
+	return 0
+}
+
+func (x *SyncTaskListResponse) GetTasksDeleted() int32 {
+	if x != nil {
+		return x.TasksDeleted
+	}
+	return 0
+}
+
+func (x *SyncTaskListResponse) GetError() string {
+	if x != nil {
+		return x.Error
+	}
+	return ""
+}
+
+// PruneOldTasksRequest is the request for PruneOldTasks.
+type PruneOldTasksRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	OlderThan     *timestamppb.Timestamp `protobuf:"bytes,1,opt,name=older_than,json=olderThan,proto3" json:"older_than,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *PruneOldTasksRequest) Reset() {
+	*x = PruneOldTasksRequest{}
+	mi := &file_mail_proto_msgTypes[137]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *PruneOldTasksRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*PruneOldTasksRequest) ProtoMessage() {}
+
+func (x *PruneOldTasksRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_mail_proto_msgTypes[137]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use PruneOldTasksRequest.ProtoReflect.Descriptor instead.
+func (*PruneOldTasksRequest) Descriptor() ([]byte, []int) {
+	return file_mail_proto_rawDescGZIP(), []int{137}
+}
+
+func (x *PruneOldTasksRequest) GetOlderThan() *timestamppb.Timestamp {
+	if x != nil {
+		return x.OlderThan
+	}
+	return nil
+}
+
+// PruneOldTasksResponse is the response for PruneOldTasks.
+type PruneOldTasksResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Error         string                 `protobuf:"bytes,1,opt,name=error,proto3" json:"error,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *PruneOldTasksResponse) Reset() {
+	*x = PruneOldTasksResponse{}
+	mi := &file_mail_proto_msgTypes[138]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *PruneOldTasksResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*PruneOldTasksResponse) ProtoMessage() {}
+
+func (x *PruneOldTasksResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_mail_proto_msgTypes[138]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use PruneOldTasksResponse.ProtoReflect.Descriptor instead.
+func (*PruneOldTasksResponse) Descriptor() ([]byte, []int) {
+	return file_mail_proto_rawDescGZIP(), []int{138}
+}
+
+func (x *PruneOldTasksResponse) GetError() string {
+	if x != nil {
+		return x.Error
+	}
+	return ""
+}
+
 var File_mail_proto protoreflect.FileDescriptor
 
 const file_mail_proto_rawDesc = "" +
@@ -7287,7 +9319,157 @@ const file_mail_proto_rawDesc = "" +
 	"\x15GetReviewDiffResponse\x12\x14\n" +
 	"\x05patch\x18\x01 \x01(\tR\x05patch\x12\x18\n" +
 	"\acommand\x18\x02 \x01(\tR\acommand\x12\x14\n" +
-	"\x05error\x18\x03 \x01(\tR\x05error*`\n" +
+	"\x05error\x18\x03 \x01(\tR\x05error\"\xef\x01\n" +
+	"\rTaskListProto\x12\x0e\n" +
+	"\x02id\x18\x01 \x01(\x03R\x02id\x12\x17\n" +
+	"\alist_id\x18\x02 \x01(\tR\x06listId\x12\x19\n" +
+	"\bagent_id\x18\x03 \x01(\x03R\aagentId\x12\x1d\n" +
+	"\n" +
+	"watch_path\x18\x04 \x01(\tR\twatchPath\x129\n" +
+	"\n" +
+	"created_at\x18\x05 \x01(\v2\x1a.google.protobuf.TimestampR\tcreatedAt\x12@\n" +
+	"\x0elast_synced_at\x18\x06 \x01(\v2\x1a.google.protobuf.TimestampR\flastSyncedAt\"\xe5\x04\n" +
+	"\tTaskProto\x12\x0e\n" +
+	"\x02id\x18\x01 \x01(\x03R\x02id\x12\x19\n" +
+	"\bagent_id\x18\x02 \x01(\x03R\aagentId\x12\x17\n" +
+	"\alist_id\x18\x03 \x01(\tR\x06listId\x12$\n" +
+	"\x0eclaude_task_id\x18\x04 \x01(\tR\fclaudeTaskId\x12\x18\n" +
+	"\asubject\x18\x05 \x01(\tR\asubject\x12 \n" +
+	"\vdescription\x18\x06 \x01(\tR\vdescription\x12\x1f\n" +
+	"\vactive_form\x18\a \x01(\tR\n" +
+	"activeForm\x12#\n" +
+	"\rmetadata_json\x18\b \x01(\tR\fmetadataJson\x12/\n" +
+	"\x06status\x18\t \x01(\x0e2\x17.subtraterpc.TaskStatusR\x06status\x12\x14\n" +
+	"\x05owner\x18\n" +
+	" \x01(\tR\x05owner\x12\x1d\n" +
+	"\n" +
+	"blocked_by\x18\v \x03(\tR\tblockedBy\x12\x16\n" +
+	"\x06blocks\x18\f \x03(\tR\x06blocks\x129\n" +
+	"\n" +
+	"created_at\x18\r \x01(\v2\x1a.google.protobuf.TimestampR\tcreatedAt\x129\n" +
+	"\n" +
+	"updated_at\x18\x0e \x01(\v2\x1a.google.protobuf.TimestampR\tupdatedAt\x129\n" +
+	"\n" +
+	"started_at\x18\x0f \x01(\v2\x1a.google.protobuf.TimestampR\tstartedAt\x12=\n" +
+	"\fcompleted_at\x18\x10 \x01(\v2\x1a.google.protobuf.TimestampR\vcompletedAt\"\x81\x02\n" +
+	"\x0eTaskStatsProto\x12#\n" +
+	"\rpending_count\x18\x01 \x01(\x03R\fpendingCount\x12*\n" +
+	"\x11in_progress_count\x18\x02 \x01(\x03R\x0finProgressCount\x12'\n" +
+	"\x0fcompleted_count\x18\x03 \x01(\x03R\x0ecompletedCount\x12#\n" +
+	"\rblocked_count\x18\x04 \x01(\x03R\fblockedCount\x12'\n" +
+	"\x0favailable_count\x18\x05 \x01(\x03R\x0eavailableCount\x12'\n" +
+	"\x0fcompleted_today\x18\x06 \x01(\x03R\x0ecompletedToday\"\xee\x01\n" +
+	"\x13AgentTaskStatsProto\x12\x19\n" +
+	"\bagent_id\x18\x01 \x01(\x03R\aagentId\x12\x1d\n" +
+	"\n" +
+	"agent_name\x18\x02 \x01(\tR\tagentName\x12#\n" +
+	"\rpending_count\x18\x03 \x01(\x03R\fpendingCount\x12*\n" +
+	"\x11in_progress_count\x18\x04 \x01(\x03R\x0finProgressCount\x12#\n" +
+	"\rblocked_count\x18\x05 \x01(\x03R\fblockedCount\x12'\n" +
+	"\x0fcompleted_today\x18\x06 \x01(\x03R\x0ecompletedToday\"l\n" +
+	"\x17RegisterTaskListRequest\x12\x17\n" +
+	"\alist_id\x18\x01 \x01(\tR\x06listId\x12\x19\n" +
+	"\bagent_id\x18\x02 \x01(\x03R\aagentId\x12\x1d\n" +
+	"\n" +
+	"watch_path\x18\x03 \x01(\tR\twatchPath\"i\n" +
+	"\x18RegisterTaskListResponse\x127\n" +
+	"\ttask_list\x18\x01 \x01(\v2\x1a.subtraterpc.TaskListProtoR\btaskList\x12\x14\n" +
+	"\x05error\x18\x02 \x01(\tR\x05error\"-\n" +
+	"\x12GetTaskListRequest\x12\x17\n" +
+	"\alist_id\x18\x01 \x01(\tR\x06listId\"d\n" +
+	"\x13GetTaskListResponse\x127\n" +
+	"\ttask_list\x18\x01 \x01(\v2\x1a.subtraterpc.TaskListProtoR\btaskList\x12\x14\n" +
+	"\x05error\x18\x02 \x01(\tR\x05error\"1\n" +
+	"\x14ListTaskListsRequest\x12\x19\n" +
+	"\bagent_id\x18\x01 \x01(\x03R\aagentId\"h\n" +
+	"\x15ListTaskListsResponse\x129\n" +
+	"\n" +
+	"task_lists\x18\x01 \x03(\v2\x1a.subtraterpc.TaskListProtoR\ttaskLists\x12\x14\n" +
+	"\x05error\x18\x02 \x01(\tR\x05error\"4\n" +
+	"\x19UnregisterTaskListRequest\x12\x17\n" +
+	"\alist_id\x18\x01 \x01(\tR\x06listId\"2\n" +
+	"\x1aUnregisterTaskListResponse\x12\x14\n" +
+	"\x05error\x18\x01 \x01(\tR\x05error\"\xa9\x03\n" +
+	"\x11UpsertTaskRequest\x12\x19\n" +
+	"\bagent_id\x18\x01 \x01(\x03R\aagentId\x12\x17\n" +
+	"\alist_id\x18\x02 \x01(\tR\x06listId\x12$\n" +
+	"\x0eclaude_task_id\x18\x03 \x01(\tR\fclaudeTaskId\x12\x18\n" +
+	"\asubject\x18\x04 \x01(\tR\asubject\x12 \n" +
+	"\vdescription\x18\x05 \x01(\tR\vdescription\x12\x1f\n" +
+	"\vactive_form\x18\x06 \x01(\tR\n" +
+	"activeForm\x12#\n" +
+	"\rmetadata_json\x18\a \x01(\tR\fmetadataJson\x12/\n" +
+	"\x06status\x18\b \x01(\x0e2\x17.subtraterpc.TaskStatusR\x06status\x12\x14\n" +
+	"\x05owner\x18\t \x01(\tR\x05owner\x12\x1d\n" +
+	"\n" +
+	"blocked_by\x18\n" +
+	" \x03(\tR\tblockedBy\x12\x16\n" +
+	"\x06blocks\x18\v \x03(\tR\x06blocks\x12\x1b\n" +
+	"\tfile_path\x18\f \x01(\tR\bfilePath\x12\x1d\n" +
+	"\n" +
+	"file_mtime\x18\r \x01(\x03R\tfileMtime\"V\n" +
+	"\x12UpsertTaskResponse\x12*\n" +
+	"\x04task\x18\x01 \x01(\v2\x16.subtraterpc.TaskProtoR\x04task\x12\x14\n" +
+	"\x05error\x18\x02 \x01(\tR\x05error\"T\n" +
+	"\x13GetTaskProtoRequest\x12\x17\n" +
+	"\alist_id\x18\x01 \x01(\tR\x06listId\x12$\n" +
+	"\x0eclaude_task_id\x18\x02 \x01(\tR\fclaudeTaskId\"S\n" +
+	"\x0fGetTaskResponse\x12*\n" +
+	"\x04task\x18\x01 \x01(\v2\x16.subtraterpc.TaskProtoR\x04task\x12\x14\n" +
+	"\x05error\x18\x02 \x01(\tR\x05error\"\xed\x01\n" +
+	"\x10ListTasksRequest\x12\x19\n" +
+	"\bagent_id\x18\x01 \x01(\x03R\aagentId\x12\x17\n" +
+	"\alist_id\x18\x02 \x01(\tR\x06listId\x12/\n" +
+	"\x06status\x18\x03 \x01(\x0e2\x17.subtraterpc.TaskStatusR\x06status\x12\x1f\n" +
+	"\vactive_only\x18\x04 \x01(\bR\n" +
+	"activeOnly\x12%\n" +
+	"\x0eavailable_only\x18\x05 \x01(\bR\ravailableOnly\x12\x14\n" +
+	"\x05limit\x18\x06 \x01(\x05R\x05limit\x12\x16\n" +
+	"\x06offset\x18\a \x01(\x05R\x06offset\"W\n" +
+	"\x11ListTasksResponse\x12,\n" +
+	"\x05tasks\x18\x01 \x03(\v2\x16.subtraterpc.TaskProtoR\x05tasks\x12\x14\n" +
+	"\x05error\x18\x02 \x01(\tR\x05error\"\x89\x01\n" +
+	"\x17UpdateTaskStatusRequest\x12\x17\n" +
+	"\alist_id\x18\x01 \x01(\tR\x06listId\x12$\n" +
+	"\x0eclaude_task_id\x18\x02 \x01(\tR\fclaudeTaskId\x12/\n" +
+	"\x06status\x18\x03 \x01(\x0e2\x17.subtraterpc.TaskStatusR\x06status\"0\n" +
+	"\x18UpdateTaskStatusResponse\x12\x14\n" +
+	"\x05error\x18\x01 \x01(\tR\x05error\"m\n" +
+	"\x16UpdateTaskOwnerRequest\x12\x17\n" +
+	"\alist_id\x18\x01 \x01(\tR\x06listId\x12$\n" +
+	"\x0eclaude_task_id\x18\x02 \x01(\tR\fclaudeTaskId\x12\x14\n" +
+	"\x05owner\x18\x03 \x01(\tR\x05owner\"/\n" +
+	"\x17UpdateTaskOwnerResponse\x12\x14\n" +
+	"\x05error\x18\x01 \x01(\tR\x05error\"#\n" +
+	"\x11DeleteTaskRequest\x12\x0e\n" +
+	"\x02id\x18\x01 \x01(\x03R\x02id\"*\n" +
+	"\x12DeleteTaskResponse\x12\x14\n" +
+	"\x05error\x18\x01 \x01(\tR\x05error\"\x86\x01\n" +
+	"\x13GetTaskStatsRequest\x12\x19\n" +
+	"\bagent_id\x18\x01 \x01(\x03R\aagentId\x12\x17\n" +
+	"\alist_id\x18\x02 \x01(\tR\x06listId\x12;\n" +
+	"\vtoday_since\x18\x03 \x01(\v2\x1a.google.protobuf.TimestampR\n" +
+	"todaySince\"_\n" +
+	"\x14GetTaskStatsResponse\x121\n" +
+	"\x05stats\x18\x01 \x01(\v2\x1b.subtraterpc.TaskStatsProtoR\x05stats\x12\x14\n" +
+	"\x05error\x18\x02 \x01(\tR\x05error\"Z\n" +
+	"\x1bGetAllAgentTaskStatsRequest\x12;\n" +
+	"\vtoday_since\x18\x01 \x01(\v2\x1a.google.protobuf.TimestampR\n" +
+	"todaySince\"l\n" +
+	"\x1cGetAllAgentTaskStatsResponse\x126\n" +
+	"\x05stats\x18\x01 \x03(\v2 .subtraterpc.AgentTaskStatsProtoR\x05stats\x12\x14\n" +
+	"\x05error\x18\x02 \x01(\tR\x05error\".\n" +
+	"\x13SyncTaskListRequest\x12\x17\n" +
+	"\alist_id\x18\x01 \x01(\tR\x06listId\"v\n" +
+	"\x14SyncTaskListResponse\x12#\n" +
+	"\rtasks_updated\x18\x01 \x01(\x05R\ftasksUpdated\x12#\n" +
+	"\rtasks_deleted\x18\x02 \x01(\x05R\ftasksDeleted\x12\x14\n" +
+	"\x05error\x18\x03 \x01(\tR\x05error\"Q\n" +
+	"\x14PruneOldTasksRequest\x129\n" +
+	"\n" +
+	"older_than\x18\x01 \x01(\v2\x1a.google.protobuf.TimestampR\tolderThan\"-\n" +
+	"\x15PruneOldTasksResponse\x12\x14\n" +
+	"\x05error\x18\x01 \x01(\tR\x05error*`\n" +
 	"\bPriority\x12\x18\n" +
 	"\x14PRIORITY_UNSPECIFIED\x10\x00\x12\x10\n" +
 	"\fPRIORITY_LOW\x10\x01\x12\x13\n" +
@@ -7320,7 +9502,14 @@ const file_mail_proto_rawDesc = "" +
 	"\x1dACTIVITY_TYPE_SESSION_STARTED\x10\x03\x12#\n" +
 	"\x1fACTIVITY_TYPE_SESSION_COMPLETED\x10\x04\x12\"\n" +
 	"\x1eACTIVITY_TYPE_AGENT_REGISTERED\x10\x05\x12\x1b\n" +
-	"\x17ACTIVITY_TYPE_HEARTBEAT\x10\x062\xa8\x0e\n" +
+	"\x17ACTIVITY_TYPE_HEARTBEAT\x10\x06*\x93\x01\n" +
+	"\n" +
+	"TaskStatus\x12\x1b\n" +
+	"\x17TASK_STATUS_UNSPECIFIED\x10\x00\x12\x17\n" +
+	"\x13TASK_STATUS_PENDING\x10\x01\x12\x1b\n" +
+	"\x17TASK_STATUS_IN_PROGRESS\x10\x02\x12\x19\n" +
+	"\x15TASK_STATUS_COMPLETED\x10\x03\x12\x17\n" +
+	"\x13TASK_STATUS_DELETED\x10\x042\xa8\x0e\n" +
 	"\x04Mail\x12G\n" +
 	"\bSendMail\x12\x1c.subtraterpc.SendMailRequest\x1a\x1d.subtraterpc.SendMailResponse\x12M\n" +
 	"\n" +
@@ -7369,7 +9558,24 @@ const file_mail_proto_rawDesc = "" +
 	"\x0eListActivities\x12\".subtraterpc.ListActivitiesRequest\x1a#.subtraterpc.ListActivitiesResponse2\xbd\x01\n" +
 	"\x05Stats\x12b\n" +
 	"\x11GetDashboardStats\x12%.subtraterpc.GetDashboardStatsRequest\x1a&.subtraterpc.GetDashboardStatsResponse\x12P\n" +
-	"\vHealthCheck\x12\x1f.subtraterpc.HealthCheckRequest\x1a .subtraterpc.HealthCheckResponse2\xc8\x06\n" +
+	"\vHealthCheck\x12\x1f.subtraterpc.HealthCheckRequest\x1a .subtraterpc.HealthCheckResponse2\xe2\t\n" +
+	"\vTaskService\x12_\n" +
+	"\x10RegisterTaskList\x12$.subtraterpc.RegisterTaskListRequest\x1a%.subtraterpc.RegisterTaskListResponse\x12P\n" +
+	"\vGetTaskList\x12\x1f.subtraterpc.GetTaskListRequest\x1a .subtraterpc.GetTaskListResponse\x12V\n" +
+	"\rListTaskLists\x12!.subtraterpc.ListTaskListsRequest\x1a\".subtraterpc.ListTaskListsResponse\x12e\n" +
+	"\x12UnregisterTaskList\x12&.subtraterpc.UnregisterTaskListRequest\x1a'.subtraterpc.UnregisterTaskListResponse\x12M\n" +
+	"\n" +
+	"UpsertTask\x12\x1e.subtraterpc.UpsertTaskRequest\x1a\x1f.subtraterpc.UpsertTaskResponse\x12I\n" +
+	"\aGetTask\x12 .subtraterpc.GetTaskProtoRequest\x1a\x1c.subtraterpc.GetTaskResponse\x12J\n" +
+	"\tListTasks\x12\x1d.subtraterpc.ListTasksRequest\x1a\x1e.subtraterpc.ListTasksResponse\x12_\n" +
+	"\x10UpdateTaskStatus\x12$.subtraterpc.UpdateTaskStatusRequest\x1a%.subtraterpc.UpdateTaskStatusResponse\x12\\\n" +
+	"\x0fUpdateTaskOwner\x12#.subtraterpc.UpdateTaskOwnerRequest\x1a$.subtraterpc.UpdateTaskOwnerResponse\x12M\n" +
+	"\n" +
+	"DeleteTask\x12\x1e.subtraterpc.DeleteTaskRequest\x1a\x1f.subtraterpc.DeleteTaskResponse\x12S\n" +
+	"\fGetTaskStats\x12 .subtraterpc.GetTaskStatsRequest\x1a!.subtraterpc.GetTaskStatsResponse\x12k\n" +
+	"\x14GetAllAgentTaskStats\x12(.subtraterpc.GetAllAgentTaskStatsRequest\x1a).subtraterpc.GetAllAgentTaskStatsResponse\x12S\n" +
+	"\fSyncTaskList\x12 .subtraterpc.SyncTaskListRequest\x1a!.subtraterpc.SyncTaskListResponse\x12V\n" +
+	"\rPruneOldTasks\x12!.subtraterpc.PruneOldTasksRequest\x1a\".subtraterpc.PruneOldTasksResponse2\xc8\x06\n" +
 	"\rReviewService\x12S\n" +
 	"\fCreateReview\x12 .subtraterpc.CreateReviewRequest\x1a!.subtraterpc.CreateReviewResponse\x12Z\n" +
 	"\vListReviews\x12$.subtraterpc.ListReviewsProtoRequest\x1a%.subtraterpc.ListReviewsProtoResponse\x12R\n" +
@@ -7393,278 +9599,360 @@ func file_mail_proto_rawDescGZIP() []byte {
 	return file_mail_proto_rawDescData
 }
 
-var file_mail_proto_enumTypes = make([]protoimpl.EnumInfo, 5)
-var file_mail_proto_msgTypes = make([]protoimpl.MessageInfo, 110)
+var file_mail_proto_enumTypes = make([]protoimpl.EnumInfo, 6)
+var file_mail_proto_msgTypes = make([]protoimpl.MessageInfo, 142)
 var file_mail_proto_goTypes = []any{
 	(Priority)(0),                          // 0: subtraterpc.Priority
 	(MessageState)(0),                      // 1: subtraterpc.MessageState
 	(AgentStatus)(0),                       // 2: subtraterpc.AgentStatus
 	(SessionStatus)(0),                     // 3: subtraterpc.SessionStatus
 	(ActivityType)(0),                      // 4: subtraterpc.ActivityType
-	(*InboxMessage)(nil),                   // 5: subtraterpc.InboxMessage
-	(*SendMailRequest)(nil),                // 6: subtraterpc.SendMailRequest
-	(*SendMailResponse)(nil),               // 7: subtraterpc.SendMailResponse
-	(*FetchInboxRequest)(nil),              // 8: subtraterpc.FetchInboxRequest
-	(*FetchInboxResponse)(nil),             // 9: subtraterpc.FetchInboxResponse
-	(*ReadMessageRequest)(nil),             // 10: subtraterpc.ReadMessageRequest
-	(*ReadMessageResponse)(nil),            // 11: subtraterpc.ReadMessageResponse
-	(*ReadThreadRequest)(nil),              // 12: subtraterpc.ReadThreadRequest
-	(*ReadThreadResponse)(nil),             // 13: subtraterpc.ReadThreadResponse
-	(*UpdateStateRequest)(nil),             // 14: subtraterpc.UpdateStateRequest
-	(*UpdateStateResponse)(nil),            // 15: subtraterpc.UpdateStateResponse
-	(*AckMessageRequest)(nil),              // 16: subtraterpc.AckMessageRequest
-	(*AckMessageResponse)(nil),             // 17: subtraterpc.AckMessageResponse
-	(*GetStatusRequest)(nil),               // 18: subtraterpc.GetStatusRequest
-	(*GetStatusResponse)(nil),              // 19: subtraterpc.GetStatusResponse
-	(*PollChangesRequest)(nil),             // 20: subtraterpc.PollChangesRequest
-	(*PollChangesResponse)(nil),            // 21: subtraterpc.PollChangesResponse
-	(*SubscribeInboxRequest)(nil),          // 22: subtraterpc.SubscribeInboxRequest
-	(*PublishRequest)(nil),                 // 23: subtraterpc.PublishRequest
-	(*PublishResponse)(nil),                // 24: subtraterpc.PublishResponse
-	(*SubscribeRequest)(nil),               // 25: subtraterpc.SubscribeRequest
-	(*SubscribeResponse)(nil),              // 26: subtraterpc.SubscribeResponse
-	(*UnsubscribeRequest)(nil),             // 27: subtraterpc.UnsubscribeRequest
-	(*UnsubscribeResponse)(nil),            // 28: subtraterpc.UnsubscribeResponse
-	(*Topic)(nil),                          // 29: subtraterpc.Topic
-	(*ListTopicsRequest)(nil),              // 30: subtraterpc.ListTopicsRequest
-	(*ListTopicsResponse)(nil),             // 31: subtraterpc.ListTopicsResponse
-	(*SearchRequest)(nil),                  // 32: subtraterpc.SearchRequest
-	(*SearchResponse)(nil),                 // 33: subtraterpc.SearchResponse
-	(*HasUnackedStatusToRequest)(nil),      // 34: subtraterpc.HasUnackedStatusToRequest
-	(*HasUnackedStatusToResponse)(nil),     // 35: subtraterpc.HasUnackedStatusToResponse
-	(*RegisterAgentRequest)(nil),           // 36: subtraterpc.RegisterAgentRequest
-	(*RegisterAgentResponse)(nil),          // 37: subtraterpc.RegisterAgentResponse
-	(*GetAgentRequest)(nil),                // 38: subtraterpc.GetAgentRequest
-	(*GetAgentResponse)(nil),               // 39: subtraterpc.GetAgentResponse
-	(*ListAgentsRequest)(nil),              // 40: subtraterpc.ListAgentsRequest
-	(*ListAgentsResponse)(nil),             // 41: subtraterpc.ListAgentsResponse
-	(*EnsureIdentityRequest)(nil),          // 42: subtraterpc.EnsureIdentityRequest
-	(*EnsureIdentityResponse)(nil),         // 43: subtraterpc.EnsureIdentityResponse
-	(*SaveIdentityRequest)(nil),            // 44: subtraterpc.SaveIdentityRequest
-	(*SaveIdentityResponse)(nil),           // 45: subtraterpc.SaveIdentityResponse
-	(*DeleteAgentRequest)(nil),             // 46: subtraterpc.DeleteAgentRequest
-	(*DeleteAgentResponse)(nil),            // 47: subtraterpc.DeleteAgentResponse
-	(*ReplyToThreadRequest)(nil),           // 48: subtraterpc.ReplyToThreadRequest
-	(*ReplyToThreadResponse)(nil),          // 49: subtraterpc.ReplyToThreadResponse
-	(*ArchiveThreadRequest)(nil),           // 50: subtraterpc.ArchiveThreadRequest
-	(*ArchiveThreadResponse)(nil),          // 51: subtraterpc.ArchiveThreadResponse
-	(*DeleteThreadRequest)(nil),            // 52: subtraterpc.DeleteThreadRequest
-	(*DeleteThreadResponse)(nil),           // 53: subtraterpc.DeleteThreadResponse
-	(*MarkThreadUnreadRequest)(nil),        // 54: subtraterpc.MarkThreadUnreadRequest
-	(*MarkThreadUnreadResponse)(nil),       // 55: subtraterpc.MarkThreadUnreadResponse
-	(*GetTopicRequest)(nil),                // 56: subtraterpc.GetTopicRequest
-	(*GetTopicResponse)(nil),               // 57: subtraterpc.GetTopicResponse
-	(*AutocompleteRecipientsRequest)(nil),  // 58: subtraterpc.AutocompleteRecipientsRequest
-	(*AutocompleteRecipient)(nil),          // 59: subtraterpc.AutocompleteRecipient
-	(*AutocompleteRecipientsResponse)(nil), // 60: subtraterpc.AutocompleteRecipientsResponse
-	(*DeleteMessageRequest)(nil),           // 61: subtraterpc.DeleteMessageRequest
-	(*DeleteMessageResponse)(nil),          // 62: subtraterpc.DeleteMessageResponse
-	(*UpdateAgentRequest)(nil),             // 63: subtraterpc.UpdateAgentRequest
-	(*UpdateAgentResponse)(nil),            // 64: subtraterpc.UpdateAgentResponse
-	(*AgentWithStatus)(nil),                // 65: subtraterpc.AgentWithStatus
-	(*AgentStatusCounts)(nil),              // 66: subtraterpc.AgentStatusCounts
-	(*GetAgentsStatusRequest)(nil),         // 67: subtraterpc.GetAgentsStatusRequest
-	(*GetAgentsStatusResponse)(nil),        // 68: subtraterpc.GetAgentsStatusResponse
-	(*HeartbeatRequest)(nil),               // 69: subtraterpc.HeartbeatRequest
-	(*HeartbeatResponse)(nil),              // 70: subtraterpc.HeartbeatResponse
-	(*SessionInfo)(nil),                    // 71: subtraterpc.SessionInfo
-	(*ListSessionsRequest)(nil),            // 72: subtraterpc.ListSessionsRequest
-	(*ListSessionsResponse)(nil),           // 73: subtraterpc.ListSessionsResponse
-	(*GetSessionRequest)(nil),              // 74: subtraterpc.GetSessionRequest
-	(*GetSessionResponse)(nil),             // 75: subtraterpc.GetSessionResponse
-	(*StartSessionRequest)(nil),            // 76: subtraterpc.StartSessionRequest
-	(*StartSessionResponse)(nil),           // 77: subtraterpc.StartSessionResponse
-	(*CompleteSessionRequest)(nil),         // 78: subtraterpc.CompleteSessionRequest
-	(*CompleteSessionResponse)(nil),        // 79: subtraterpc.CompleteSessionResponse
-	(*ActivityInfo)(nil),                   // 80: subtraterpc.ActivityInfo
-	(*ListActivitiesRequest)(nil),          // 81: subtraterpc.ListActivitiesRequest
-	(*ListActivitiesResponse)(nil),         // 82: subtraterpc.ListActivitiesResponse
-	(*DashboardStats)(nil),                 // 83: subtraterpc.DashboardStats
-	(*GetDashboardStatsRequest)(nil),       // 84: subtraterpc.GetDashboardStatsRequest
-	(*GetDashboardStatsResponse)(nil),      // 85: subtraterpc.GetDashboardStatsResponse
-	(*HealthCheckRequest)(nil),             // 86: subtraterpc.HealthCheckRequest
-	(*HealthCheckResponse)(nil),            // 87: subtraterpc.HealthCheckResponse
-	(*BranchTarget)(nil),                   // 88: subtraterpc.BranchTarget
-	(*CommitTarget)(nil),                   // 89: subtraterpc.CommitTarget
-	(*CommitRangeTarget)(nil),              // 90: subtraterpc.CommitRangeTarget
-	(*PRTarget)(nil),                       // 91: subtraterpc.PRTarget
-	(*CreateReviewRequest)(nil),            // 92: subtraterpc.CreateReviewRequest
-	(*CreateReviewResponse)(nil),           // 93: subtraterpc.CreateReviewResponse
-	(*ListReviewsProtoRequest)(nil),        // 94: subtraterpc.ListReviewsProtoRequest
-	(*ListReviewsProtoResponse)(nil),       // 95: subtraterpc.ListReviewsProtoResponse
-	(*ReviewSummaryProto)(nil),             // 96: subtraterpc.ReviewSummaryProto
-	(*GetReviewProtoRequest)(nil),          // 97: subtraterpc.GetReviewProtoRequest
-	(*ReviewDetailResponse)(nil),           // 98: subtraterpc.ReviewDetailResponse
-	(*ReviewIterationProto)(nil),           // 99: subtraterpc.ReviewIterationProto
-	(*ResubmitReviewRequest)(nil),          // 100: subtraterpc.ResubmitReviewRequest
-	(*CancelReviewProtoRequest)(nil),       // 101: subtraterpc.CancelReviewProtoRequest
-	(*CancelReviewProtoResponse)(nil),      // 102: subtraterpc.CancelReviewProtoResponse
-	(*DeleteReviewProtoRequest)(nil),       // 103: subtraterpc.DeleteReviewProtoRequest
-	(*DeleteReviewProtoResponse)(nil),      // 104: subtraterpc.DeleteReviewProtoResponse
-	(*ListReviewIssuesRequest)(nil),        // 105: subtraterpc.ListReviewIssuesRequest
-	(*ListReviewIssuesResponse)(nil),       // 106: subtraterpc.ListReviewIssuesResponse
-	(*ReviewIssueProto)(nil),               // 107: subtraterpc.ReviewIssueProto
-	(*UpdateIssueStatusRequest)(nil),       // 108: subtraterpc.UpdateIssueStatusRequest
-	(*UpdateIssueStatusResponse)(nil),      // 109: subtraterpc.UpdateIssueStatusResponse
-	(*GetReviewDiffRequest)(nil),           // 110: subtraterpc.GetReviewDiffRequest
-	(*GetReviewDiffResponse)(nil),          // 111: subtraterpc.GetReviewDiffResponse
-	nil,                                    // 112: subtraterpc.PollChangesRequest.SinceOffsetsEntry
-	nil,                                    // 113: subtraterpc.PollChangesResponse.NewOffsetsEntry
-	nil,                                    // 114: subtraterpc.SaveIdentityRequest.ConsumerOffsetsEntry
-	(*timestamppb.Timestamp)(nil),          // 115: google.protobuf.Timestamp
+	(TaskStatus)(0),                        // 5: subtraterpc.TaskStatus
+	(*InboxMessage)(nil),                   // 6: subtraterpc.InboxMessage
+	(*SendMailRequest)(nil),                // 7: subtraterpc.SendMailRequest
+	(*SendMailResponse)(nil),               // 8: subtraterpc.SendMailResponse
+	(*FetchInboxRequest)(nil),              // 9: subtraterpc.FetchInboxRequest
+	(*FetchInboxResponse)(nil),             // 10: subtraterpc.FetchInboxResponse
+	(*ReadMessageRequest)(nil),             // 11: subtraterpc.ReadMessageRequest
+	(*ReadMessageResponse)(nil),            // 12: subtraterpc.ReadMessageResponse
+	(*ReadThreadRequest)(nil),              // 13: subtraterpc.ReadThreadRequest
+	(*ReadThreadResponse)(nil),             // 14: subtraterpc.ReadThreadResponse
+	(*UpdateStateRequest)(nil),             // 15: subtraterpc.UpdateStateRequest
+	(*UpdateStateResponse)(nil),            // 16: subtraterpc.UpdateStateResponse
+	(*AckMessageRequest)(nil),              // 17: subtraterpc.AckMessageRequest
+	(*AckMessageResponse)(nil),             // 18: subtraterpc.AckMessageResponse
+	(*GetStatusRequest)(nil),               // 19: subtraterpc.GetStatusRequest
+	(*GetStatusResponse)(nil),              // 20: subtraterpc.GetStatusResponse
+	(*PollChangesRequest)(nil),             // 21: subtraterpc.PollChangesRequest
+	(*PollChangesResponse)(nil),            // 22: subtraterpc.PollChangesResponse
+	(*SubscribeInboxRequest)(nil),          // 23: subtraterpc.SubscribeInboxRequest
+	(*PublishRequest)(nil),                 // 24: subtraterpc.PublishRequest
+	(*PublishResponse)(nil),                // 25: subtraterpc.PublishResponse
+	(*SubscribeRequest)(nil),               // 26: subtraterpc.SubscribeRequest
+	(*SubscribeResponse)(nil),              // 27: subtraterpc.SubscribeResponse
+	(*UnsubscribeRequest)(nil),             // 28: subtraterpc.UnsubscribeRequest
+	(*UnsubscribeResponse)(nil),            // 29: subtraterpc.UnsubscribeResponse
+	(*Topic)(nil),                          // 30: subtraterpc.Topic
+	(*ListTopicsRequest)(nil),              // 31: subtraterpc.ListTopicsRequest
+	(*ListTopicsResponse)(nil),             // 32: subtraterpc.ListTopicsResponse
+	(*SearchRequest)(nil),                  // 33: subtraterpc.SearchRequest
+	(*SearchResponse)(nil),                 // 34: subtraterpc.SearchResponse
+	(*HasUnackedStatusToRequest)(nil),      // 35: subtraterpc.HasUnackedStatusToRequest
+	(*HasUnackedStatusToResponse)(nil),     // 36: subtraterpc.HasUnackedStatusToResponse
+	(*RegisterAgentRequest)(nil),           // 37: subtraterpc.RegisterAgentRequest
+	(*RegisterAgentResponse)(nil),          // 38: subtraterpc.RegisterAgentResponse
+	(*GetAgentRequest)(nil),                // 39: subtraterpc.GetAgentRequest
+	(*GetAgentResponse)(nil),               // 40: subtraterpc.GetAgentResponse
+	(*ListAgentsRequest)(nil),              // 41: subtraterpc.ListAgentsRequest
+	(*ListAgentsResponse)(nil),             // 42: subtraterpc.ListAgentsResponse
+	(*EnsureIdentityRequest)(nil),          // 43: subtraterpc.EnsureIdentityRequest
+	(*EnsureIdentityResponse)(nil),         // 44: subtraterpc.EnsureIdentityResponse
+	(*SaveIdentityRequest)(nil),            // 45: subtraterpc.SaveIdentityRequest
+	(*SaveIdentityResponse)(nil),           // 46: subtraterpc.SaveIdentityResponse
+	(*DeleteAgentRequest)(nil),             // 47: subtraterpc.DeleteAgentRequest
+	(*DeleteAgentResponse)(nil),            // 48: subtraterpc.DeleteAgentResponse
+	(*ReplyToThreadRequest)(nil),           // 49: subtraterpc.ReplyToThreadRequest
+	(*ReplyToThreadResponse)(nil),          // 50: subtraterpc.ReplyToThreadResponse
+	(*ArchiveThreadRequest)(nil),           // 51: subtraterpc.ArchiveThreadRequest
+	(*ArchiveThreadResponse)(nil),          // 52: subtraterpc.ArchiveThreadResponse
+	(*DeleteThreadRequest)(nil),            // 53: subtraterpc.DeleteThreadRequest
+	(*DeleteThreadResponse)(nil),           // 54: subtraterpc.DeleteThreadResponse
+	(*MarkThreadUnreadRequest)(nil),        // 55: subtraterpc.MarkThreadUnreadRequest
+	(*MarkThreadUnreadResponse)(nil),       // 56: subtraterpc.MarkThreadUnreadResponse
+	(*GetTopicRequest)(nil),                // 57: subtraterpc.GetTopicRequest
+	(*GetTopicResponse)(nil),               // 58: subtraterpc.GetTopicResponse
+	(*AutocompleteRecipientsRequest)(nil),  // 59: subtraterpc.AutocompleteRecipientsRequest
+	(*AutocompleteRecipient)(nil),          // 60: subtraterpc.AutocompleteRecipient
+	(*AutocompleteRecipientsResponse)(nil), // 61: subtraterpc.AutocompleteRecipientsResponse
+	(*DeleteMessageRequest)(nil),           // 62: subtraterpc.DeleteMessageRequest
+	(*DeleteMessageResponse)(nil),          // 63: subtraterpc.DeleteMessageResponse
+	(*UpdateAgentRequest)(nil),             // 64: subtraterpc.UpdateAgentRequest
+	(*UpdateAgentResponse)(nil),            // 65: subtraterpc.UpdateAgentResponse
+	(*AgentWithStatus)(nil),                // 66: subtraterpc.AgentWithStatus
+	(*AgentStatusCounts)(nil),              // 67: subtraterpc.AgentStatusCounts
+	(*GetAgentsStatusRequest)(nil),         // 68: subtraterpc.GetAgentsStatusRequest
+	(*GetAgentsStatusResponse)(nil),        // 69: subtraterpc.GetAgentsStatusResponse
+	(*HeartbeatRequest)(nil),               // 70: subtraterpc.HeartbeatRequest
+	(*HeartbeatResponse)(nil),              // 71: subtraterpc.HeartbeatResponse
+	(*SessionInfo)(nil),                    // 72: subtraterpc.SessionInfo
+	(*ListSessionsRequest)(nil),            // 73: subtraterpc.ListSessionsRequest
+	(*ListSessionsResponse)(nil),           // 74: subtraterpc.ListSessionsResponse
+	(*GetSessionRequest)(nil),              // 75: subtraterpc.GetSessionRequest
+	(*GetSessionResponse)(nil),             // 76: subtraterpc.GetSessionResponse
+	(*StartSessionRequest)(nil),            // 77: subtraterpc.StartSessionRequest
+	(*StartSessionResponse)(nil),           // 78: subtraterpc.StartSessionResponse
+	(*CompleteSessionRequest)(nil),         // 79: subtraterpc.CompleteSessionRequest
+	(*CompleteSessionResponse)(nil),        // 80: subtraterpc.CompleteSessionResponse
+	(*ActivityInfo)(nil),                   // 81: subtraterpc.ActivityInfo
+	(*ListActivitiesRequest)(nil),          // 82: subtraterpc.ListActivitiesRequest
+	(*ListActivitiesResponse)(nil),         // 83: subtraterpc.ListActivitiesResponse
+	(*DashboardStats)(nil),                 // 84: subtraterpc.DashboardStats
+	(*GetDashboardStatsRequest)(nil),       // 85: subtraterpc.GetDashboardStatsRequest
+	(*GetDashboardStatsResponse)(nil),      // 86: subtraterpc.GetDashboardStatsResponse
+	(*HealthCheckRequest)(nil),             // 87: subtraterpc.HealthCheckRequest
+	(*HealthCheckResponse)(nil),            // 88: subtraterpc.HealthCheckResponse
+	(*BranchTarget)(nil),                   // 89: subtraterpc.BranchTarget
+	(*CommitTarget)(nil),                   // 90: subtraterpc.CommitTarget
+	(*CommitRangeTarget)(nil),              // 91: subtraterpc.CommitRangeTarget
+	(*PRTarget)(nil),                       // 92: subtraterpc.PRTarget
+	(*CreateReviewRequest)(nil),            // 93: subtraterpc.CreateReviewRequest
+	(*CreateReviewResponse)(nil),           // 94: subtraterpc.CreateReviewResponse
+	(*ListReviewsProtoRequest)(nil),        // 95: subtraterpc.ListReviewsProtoRequest
+	(*ListReviewsProtoResponse)(nil),       // 96: subtraterpc.ListReviewsProtoResponse
+	(*ReviewSummaryProto)(nil),             // 97: subtraterpc.ReviewSummaryProto
+	(*GetReviewProtoRequest)(nil),          // 98: subtraterpc.GetReviewProtoRequest
+	(*ReviewDetailResponse)(nil),           // 99: subtraterpc.ReviewDetailResponse
+	(*ReviewIterationProto)(nil),           // 100: subtraterpc.ReviewIterationProto
+	(*ResubmitReviewRequest)(nil),          // 101: subtraterpc.ResubmitReviewRequest
+	(*CancelReviewProtoRequest)(nil),       // 102: subtraterpc.CancelReviewProtoRequest
+	(*CancelReviewProtoResponse)(nil),      // 103: subtraterpc.CancelReviewProtoResponse
+	(*DeleteReviewProtoRequest)(nil),       // 104: subtraterpc.DeleteReviewProtoRequest
+	(*DeleteReviewProtoResponse)(nil),      // 105: subtraterpc.DeleteReviewProtoResponse
+	(*ListReviewIssuesRequest)(nil),        // 106: subtraterpc.ListReviewIssuesRequest
+	(*ListReviewIssuesResponse)(nil),       // 107: subtraterpc.ListReviewIssuesResponse
+	(*ReviewIssueProto)(nil),               // 108: subtraterpc.ReviewIssueProto
+	(*UpdateIssueStatusRequest)(nil),       // 109: subtraterpc.UpdateIssueStatusRequest
+	(*UpdateIssueStatusResponse)(nil),      // 110: subtraterpc.UpdateIssueStatusResponse
+	(*GetReviewDiffRequest)(nil),           // 111: subtraterpc.GetReviewDiffRequest
+	(*GetReviewDiffResponse)(nil),          // 112: subtraterpc.GetReviewDiffResponse
+	(*TaskListProto)(nil),                  // 113: subtraterpc.TaskListProto
+	(*TaskProto)(nil),                      // 114: subtraterpc.TaskProto
+	(*TaskStatsProto)(nil),                 // 115: subtraterpc.TaskStatsProto
+	(*AgentTaskStatsProto)(nil),            // 116: subtraterpc.AgentTaskStatsProto
+	(*RegisterTaskListRequest)(nil),        // 117: subtraterpc.RegisterTaskListRequest
+	(*RegisterTaskListResponse)(nil),       // 118: subtraterpc.RegisterTaskListResponse
+	(*GetTaskListRequest)(nil),             // 119: subtraterpc.GetTaskListRequest
+	(*GetTaskListResponse)(nil),            // 120: subtraterpc.GetTaskListResponse
+	(*ListTaskListsRequest)(nil),           // 121: subtraterpc.ListTaskListsRequest
+	(*ListTaskListsResponse)(nil),          // 122: subtraterpc.ListTaskListsResponse
+	(*UnregisterTaskListRequest)(nil),      // 123: subtraterpc.UnregisterTaskListRequest
+	(*UnregisterTaskListResponse)(nil),     // 124: subtraterpc.UnregisterTaskListResponse
+	(*UpsertTaskRequest)(nil),              // 125: subtraterpc.UpsertTaskRequest
+	(*UpsertTaskResponse)(nil),             // 126: subtraterpc.UpsertTaskResponse
+	(*GetTaskProtoRequest)(nil),            // 127: subtraterpc.GetTaskProtoRequest
+	(*GetTaskResponse)(nil),                // 128: subtraterpc.GetTaskResponse
+	(*ListTasksRequest)(nil),               // 129: subtraterpc.ListTasksRequest
+	(*ListTasksResponse)(nil),              // 130: subtraterpc.ListTasksResponse
+	(*UpdateTaskStatusRequest)(nil),        // 131: subtraterpc.UpdateTaskStatusRequest
+	(*UpdateTaskStatusResponse)(nil),       // 132: subtraterpc.UpdateTaskStatusResponse
+	(*UpdateTaskOwnerRequest)(nil),         // 133: subtraterpc.UpdateTaskOwnerRequest
+	(*UpdateTaskOwnerResponse)(nil),        // 134: subtraterpc.UpdateTaskOwnerResponse
+	(*DeleteTaskRequest)(nil),              // 135: subtraterpc.DeleteTaskRequest
+	(*DeleteTaskResponse)(nil),             // 136: subtraterpc.DeleteTaskResponse
+	(*GetTaskStatsRequest)(nil),            // 137: subtraterpc.GetTaskStatsRequest
+	(*GetTaskStatsResponse)(nil),           // 138: subtraterpc.GetTaskStatsResponse
+	(*GetAllAgentTaskStatsRequest)(nil),    // 139: subtraterpc.GetAllAgentTaskStatsRequest
+	(*GetAllAgentTaskStatsResponse)(nil),   // 140: subtraterpc.GetAllAgentTaskStatsResponse
+	(*SyncTaskListRequest)(nil),            // 141: subtraterpc.SyncTaskListRequest
+	(*SyncTaskListResponse)(nil),           // 142: subtraterpc.SyncTaskListResponse
+	(*PruneOldTasksRequest)(nil),           // 143: subtraterpc.PruneOldTasksRequest
+	(*PruneOldTasksResponse)(nil),          // 144: subtraterpc.PruneOldTasksResponse
+	nil,                                    // 145: subtraterpc.PollChangesRequest.SinceOffsetsEntry
+	nil,                                    // 146: subtraterpc.PollChangesResponse.NewOffsetsEntry
+	nil,                                    // 147: subtraterpc.SaveIdentityRequest.ConsumerOffsetsEntry
+	(*timestamppb.Timestamp)(nil),          // 148: google.protobuf.Timestamp
 }
 var file_mail_proto_depIdxs = []int32{
 	0,   // 0: subtraterpc.InboxMessage.priority:type_name -> subtraterpc.Priority
 	1,   // 1: subtraterpc.InboxMessage.state:type_name -> subtraterpc.MessageState
-	115, // 2: subtraterpc.InboxMessage.created_at:type_name -> google.protobuf.Timestamp
-	115, // 3: subtraterpc.InboxMessage.deadline_at:type_name -> google.protobuf.Timestamp
-	115, // 4: subtraterpc.InboxMessage.snoozed_until:type_name -> google.protobuf.Timestamp
-	115, // 5: subtraterpc.InboxMessage.read_at:type_name -> google.protobuf.Timestamp
-	115, // 6: subtraterpc.InboxMessage.acknowledged_at:type_name -> google.protobuf.Timestamp
+	148, // 2: subtraterpc.InboxMessage.created_at:type_name -> google.protobuf.Timestamp
+	148, // 3: subtraterpc.InboxMessage.deadline_at:type_name -> google.protobuf.Timestamp
+	148, // 4: subtraterpc.InboxMessage.snoozed_until:type_name -> google.protobuf.Timestamp
+	148, // 5: subtraterpc.InboxMessage.read_at:type_name -> google.protobuf.Timestamp
+	148, // 6: subtraterpc.InboxMessage.acknowledged_at:type_name -> google.protobuf.Timestamp
 	0,   // 7: subtraterpc.SendMailRequest.priority:type_name -> subtraterpc.Priority
-	115, // 8: subtraterpc.SendMailRequest.deadline_at:type_name -> google.protobuf.Timestamp
+	148, // 8: subtraterpc.SendMailRequest.deadline_at:type_name -> google.protobuf.Timestamp
 	1,   // 9: subtraterpc.FetchInboxRequest.state_filter:type_name -> subtraterpc.MessageState
-	5,   // 10: subtraterpc.FetchInboxResponse.messages:type_name -> subtraterpc.InboxMessage
-	5,   // 11: subtraterpc.ReadMessageResponse.message:type_name -> subtraterpc.InboxMessage
-	5,   // 12: subtraterpc.ReadThreadResponse.messages:type_name -> subtraterpc.InboxMessage
+	6,   // 10: subtraterpc.FetchInboxResponse.messages:type_name -> subtraterpc.InboxMessage
+	6,   // 11: subtraterpc.ReadMessageResponse.message:type_name -> subtraterpc.InboxMessage
+	6,   // 12: subtraterpc.ReadThreadResponse.messages:type_name -> subtraterpc.InboxMessage
 	1,   // 13: subtraterpc.UpdateStateRequest.new_state:type_name -> subtraterpc.MessageState
-	115, // 14: subtraterpc.UpdateStateRequest.snoozed_until:type_name -> google.protobuf.Timestamp
-	112, // 15: subtraterpc.PollChangesRequest.since_offsets:type_name -> subtraterpc.PollChangesRequest.SinceOffsetsEntry
-	5,   // 16: subtraterpc.PollChangesResponse.new_messages:type_name -> subtraterpc.InboxMessage
-	113, // 17: subtraterpc.PollChangesResponse.new_offsets:type_name -> subtraterpc.PollChangesResponse.NewOffsetsEntry
+	148, // 14: subtraterpc.UpdateStateRequest.snoozed_until:type_name -> google.protobuf.Timestamp
+	145, // 15: subtraterpc.PollChangesRequest.since_offsets:type_name -> subtraterpc.PollChangesRequest.SinceOffsetsEntry
+	6,   // 16: subtraterpc.PollChangesResponse.new_messages:type_name -> subtraterpc.InboxMessage
+	146, // 17: subtraterpc.PollChangesResponse.new_offsets:type_name -> subtraterpc.PollChangesResponse.NewOffsetsEntry
 	0,   // 18: subtraterpc.PublishRequest.priority:type_name -> subtraterpc.Priority
-	115, // 19: subtraterpc.Topic.created_at:type_name -> google.protobuf.Timestamp
-	29,  // 20: subtraterpc.ListTopicsResponse.topics:type_name -> subtraterpc.Topic
-	5,   // 21: subtraterpc.SearchResponse.results:type_name -> subtraterpc.InboxMessage
-	115, // 22: subtraterpc.GetAgentResponse.created_at:type_name -> google.protobuf.Timestamp
-	115, // 23: subtraterpc.GetAgentResponse.last_active_at:type_name -> google.protobuf.Timestamp
-	39,  // 24: subtraterpc.ListAgentsResponse.agents:type_name -> subtraterpc.GetAgentResponse
-	114, // 25: subtraterpc.SaveIdentityRequest.consumer_offsets:type_name -> subtraterpc.SaveIdentityRequest.ConsumerOffsetsEntry
-	29,  // 26: subtraterpc.GetTopicResponse.topic:type_name -> subtraterpc.Topic
-	59,  // 27: subtraterpc.AutocompleteRecipientsResponse.recipients:type_name -> subtraterpc.AutocompleteRecipient
-	39,  // 28: subtraterpc.UpdateAgentResponse.agent:type_name -> subtraterpc.GetAgentResponse
+	148, // 19: subtraterpc.Topic.created_at:type_name -> google.protobuf.Timestamp
+	30,  // 20: subtraterpc.ListTopicsResponse.topics:type_name -> subtraterpc.Topic
+	6,   // 21: subtraterpc.SearchResponse.results:type_name -> subtraterpc.InboxMessage
+	148, // 22: subtraterpc.GetAgentResponse.created_at:type_name -> google.protobuf.Timestamp
+	148, // 23: subtraterpc.GetAgentResponse.last_active_at:type_name -> google.protobuf.Timestamp
+	40,  // 24: subtraterpc.ListAgentsResponse.agents:type_name -> subtraterpc.GetAgentResponse
+	147, // 25: subtraterpc.SaveIdentityRequest.consumer_offsets:type_name -> subtraterpc.SaveIdentityRequest.ConsumerOffsetsEntry
+	30,  // 26: subtraterpc.GetTopicResponse.topic:type_name -> subtraterpc.Topic
+	60,  // 27: subtraterpc.AutocompleteRecipientsResponse.recipients:type_name -> subtraterpc.AutocompleteRecipient
+	40,  // 28: subtraterpc.UpdateAgentResponse.agent:type_name -> subtraterpc.GetAgentResponse
 	2,   // 29: subtraterpc.AgentWithStatus.status:type_name -> subtraterpc.AgentStatus
-	115, // 30: subtraterpc.AgentWithStatus.last_active_at:type_name -> google.protobuf.Timestamp
-	65,  // 31: subtraterpc.GetAgentsStatusResponse.agents:type_name -> subtraterpc.AgentWithStatus
-	66,  // 32: subtraterpc.GetAgentsStatusResponse.counts:type_name -> subtraterpc.AgentStatusCounts
-	115, // 33: subtraterpc.SessionInfo.started_at:type_name -> google.protobuf.Timestamp
-	115, // 34: subtraterpc.SessionInfo.ended_at:type_name -> google.protobuf.Timestamp
+	148, // 30: subtraterpc.AgentWithStatus.last_active_at:type_name -> google.protobuf.Timestamp
+	66,  // 31: subtraterpc.GetAgentsStatusResponse.agents:type_name -> subtraterpc.AgentWithStatus
+	67,  // 32: subtraterpc.GetAgentsStatusResponse.counts:type_name -> subtraterpc.AgentStatusCounts
+	148, // 33: subtraterpc.SessionInfo.started_at:type_name -> google.protobuf.Timestamp
+	148, // 34: subtraterpc.SessionInfo.ended_at:type_name -> google.protobuf.Timestamp
 	3,   // 35: subtraterpc.SessionInfo.status:type_name -> subtraterpc.SessionStatus
-	71,  // 36: subtraterpc.ListSessionsResponse.sessions:type_name -> subtraterpc.SessionInfo
-	71,  // 37: subtraterpc.GetSessionResponse.session:type_name -> subtraterpc.SessionInfo
-	71,  // 38: subtraterpc.StartSessionResponse.session:type_name -> subtraterpc.SessionInfo
+	72,  // 36: subtraterpc.ListSessionsResponse.sessions:type_name -> subtraterpc.SessionInfo
+	72,  // 37: subtraterpc.GetSessionResponse.session:type_name -> subtraterpc.SessionInfo
+	72,  // 38: subtraterpc.StartSessionResponse.session:type_name -> subtraterpc.SessionInfo
 	4,   // 39: subtraterpc.ActivityInfo.type:type_name -> subtraterpc.ActivityType
-	115, // 40: subtraterpc.ActivityInfo.created_at:type_name -> google.protobuf.Timestamp
+	148, // 40: subtraterpc.ActivityInfo.created_at:type_name -> google.protobuf.Timestamp
 	4,   // 41: subtraterpc.ListActivitiesRequest.type:type_name -> subtraterpc.ActivityType
-	80,  // 42: subtraterpc.ListActivitiesResponse.activities:type_name -> subtraterpc.ActivityInfo
-	83,  // 43: subtraterpc.GetDashboardStatsResponse.stats:type_name -> subtraterpc.DashboardStats
-	115, // 44: subtraterpc.HealthCheckResponse.time:type_name -> google.protobuf.Timestamp
-	88,  // 45: subtraterpc.CreateReviewRequest.branch_target:type_name -> subtraterpc.BranchTarget
-	89,  // 46: subtraterpc.CreateReviewRequest.commit_target:type_name -> subtraterpc.CommitTarget
-	90,  // 47: subtraterpc.CreateReviewRequest.commit_range_target:type_name -> subtraterpc.CommitRangeTarget
-	91,  // 48: subtraterpc.CreateReviewRequest.pr_target:type_name -> subtraterpc.PRTarget
-	96,  // 49: subtraterpc.ListReviewsProtoResponse.reviews:type_name -> subtraterpc.ReviewSummaryProto
-	99,  // 50: subtraterpc.ReviewDetailResponse.iteration_details:type_name -> subtraterpc.ReviewIterationProto
-	107, // 51: subtraterpc.ListReviewIssuesResponse.issues:type_name -> subtraterpc.ReviewIssueProto
-	6,   // 52: subtraterpc.Mail.SendMail:input_type -> subtraterpc.SendMailRequest
-	8,   // 53: subtraterpc.Mail.FetchInbox:input_type -> subtraterpc.FetchInboxRequest
-	10,  // 54: subtraterpc.Mail.ReadMessage:input_type -> subtraterpc.ReadMessageRequest
-	12,  // 55: subtraterpc.Mail.ReadThread:input_type -> subtraterpc.ReadThreadRequest
-	14,  // 56: subtraterpc.Mail.UpdateState:input_type -> subtraterpc.UpdateStateRequest
-	16,  // 57: subtraterpc.Mail.AckMessage:input_type -> subtraterpc.AckMessageRequest
-	18,  // 58: subtraterpc.Mail.GetStatus:input_type -> subtraterpc.GetStatusRequest
-	20,  // 59: subtraterpc.Mail.PollChanges:input_type -> subtraterpc.PollChangesRequest
-	22,  // 60: subtraterpc.Mail.SubscribeInbox:input_type -> subtraterpc.SubscribeInboxRequest
-	23,  // 61: subtraterpc.Mail.Publish:input_type -> subtraterpc.PublishRequest
-	25,  // 62: subtraterpc.Mail.Subscribe:input_type -> subtraterpc.SubscribeRequest
-	27,  // 63: subtraterpc.Mail.Unsubscribe:input_type -> subtraterpc.UnsubscribeRequest
-	30,  // 64: subtraterpc.Mail.ListTopics:input_type -> subtraterpc.ListTopicsRequest
-	32,  // 65: subtraterpc.Mail.Search:input_type -> subtraterpc.SearchRequest
-	34,  // 66: subtraterpc.Mail.HasUnackedStatusTo:input_type -> subtraterpc.HasUnackedStatusToRequest
-	48,  // 67: subtraterpc.Mail.ReplyToThread:input_type -> subtraterpc.ReplyToThreadRequest
-	50,  // 68: subtraterpc.Mail.ArchiveThread:input_type -> subtraterpc.ArchiveThreadRequest
-	52,  // 69: subtraterpc.Mail.DeleteThread:input_type -> subtraterpc.DeleteThreadRequest
-	54,  // 70: subtraterpc.Mail.MarkThreadUnread:input_type -> subtraterpc.MarkThreadUnreadRequest
-	56,  // 71: subtraterpc.Mail.GetTopic:input_type -> subtraterpc.GetTopicRequest
-	58,  // 72: subtraterpc.Mail.AutocompleteRecipients:input_type -> subtraterpc.AutocompleteRecipientsRequest
-	61,  // 73: subtraterpc.Mail.DeleteMessage:input_type -> subtraterpc.DeleteMessageRequest
-	36,  // 74: subtraterpc.Agent.RegisterAgent:input_type -> subtraterpc.RegisterAgentRequest
-	38,  // 75: subtraterpc.Agent.GetAgent:input_type -> subtraterpc.GetAgentRequest
-	40,  // 76: subtraterpc.Agent.ListAgents:input_type -> subtraterpc.ListAgentsRequest
-	46,  // 77: subtraterpc.Agent.DeleteAgent:input_type -> subtraterpc.DeleteAgentRequest
-	63,  // 78: subtraterpc.Agent.UpdateAgent:input_type -> subtraterpc.UpdateAgentRequest
-	67,  // 79: subtraterpc.Agent.GetAgentsStatus:input_type -> subtraterpc.GetAgentsStatusRequest
-	69,  // 80: subtraterpc.Agent.Heartbeat:input_type -> subtraterpc.HeartbeatRequest
-	42,  // 81: subtraterpc.Agent.EnsureIdentity:input_type -> subtraterpc.EnsureIdentityRequest
-	44,  // 82: subtraterpc.Agent.SaveIdentity:input_type -> subtraterpc.SaveIdentityRequest
-	72,  // 83: subtraterpc.Session.ListSessions:input_type -> subtraterpc.ListSessionsRequest
-	74,  // 84: subtraterpc.Session.GetSession:input_type -> subtraterpc.GetSessionRequest
-	76,  // 85: subtraterpc.Session.StartSession:input_type -> subtraterpc.StartSessionRequest
-	78,  // 86: subtraterpc.Session.CompleteSession:input_type -> subtraterpc.CompleteSessionRequest
-	81,  // 87: subtraterpc.Activity.ListActivities:input_type -> subtraterpc.ListActivitiesRequest
-	84,  // 88: subtraterpc.Stats.GetDashboardStats:input_type -> subtraterpc.GetDashboardStatsRequest
-	86,  // 89: subtraterpc.Stats.HealthCheck:input_type -> subtraterpc.HealthCheckRequest
-	92,  // 90: subtraterpc.ReviewService.CreateReview:input_type -> subtraterpc.CreateReviewRequest
-	94,  // 91: subtraterpc.ReviewService.ListReviews:input_type -> subtraterpc.ListReviewsProtoRequest
-	97,  // 92: subtraterpc.ReviewService.GetReview:input_type -> subtraterpc.GetReviewProtoRequest
-	100, // 93: subtraterpc.ReviewService.ResubmitReview:input_type -> subtraterpc.ResubmitReviewRequest
-	101, // 94: subtraterpc.ReviewService.CancelReview:input_type -> subtraterpc.CancelReviewProtoRequest
-	103, // 95: subtraterpc.ReviewService.DeleteReview:input_type -> subtraterpc.DeleteReviewProtoRequest
-	105, // 96: subtraterpc.ReviewService.ListReviewIssues:input_type -> subtraterpc.ListReviewIssuesRequest
-	108, // 97: subtraterpc.ReviewService.UpdateIssueStatus:input_type -> subtraterpc.UpdateIssueStatusRequest
-	110, // 98: subtraterpc.ReviewService.GetReviewDiff:input_type -> subtraterpc.GetReviewDiffRequest
-	7,   // 99: subtraterpc.Mail.SendMail:output_type -> subtraterpc.SendMailResponse
-	9,   // 100: subtraterpc.Mail.FetchInbox:output_type -> subtraterpc.FetchInboxResponse
-	11,  // 101: subtraterpc.Mail.ReadMessage:output_type -> subtraterpc.ReadMessageResponse
-	13,  // 102: subtraterpc.Mail.ReadThread:output_type -> subtraterpc.ReadThreadResponse
-	15,  // 103: subtraterpc.Mail.UpdateState:output_type -> subtraterpc.UpdateStateResponse
-	17,  // 104: subtraterpc.Mail.AckMessage:output_type -> subtraterpc.AckMessageResponse
-	19,  // 105: subtraterpc.Mail.GetStatus:output_type -> subtraterpc.GetStatusResponse
-	21,  // 106: subtraterpc.Mail.PollChanges:output_type -> subtraterpc.PollChangesResponse
-	5,   // 107: subtraterpc.Mail.SubscribeInbox:output_type -> subtraterpc.InboxMessage
-	24,  // 108: subtraterpc.Mail.Publish:output_type -> subtraterpc.PublishResponse
-	26,  // 109: subtraterpc.Mail.Subscribe:output_type -> subtraterpc.SubscribeResponse
-	28,  // 110: subtraterpc.Mail.Unsubscribe:output_type -> subtraterpc.UnsubscribeResponse
-	31,  // 111: subtraterpc.Mail.ListTopics:output_type -> subtraterpc.ListTopicsResponse
-	33,  // 112: subtraterpc.Mail.Search:output_type -> subtraterpc.SearchResponse
-	35,  // 113: subtraterpc.Mail.HasUnackedStatusTo:output_type -> subtraterpc.HasUnackedStatusToResponse
-	49,  // 114: subtraterpc.Mail.ReplyToThread:output_type -> subtraterpc.ReplyToThreadResponse
-	51,  // 115: subtraterpc.Mail.ArchiveThread:output_type -> subtraterpc.ArchiveThreadResponse
-	53,  // 116: subtraterpc.Mail.DeleteThread:output_type -> subtraterpc.DeleteThreadResponse
-	55,  // 117: subtraterpc.Mail.MarkThreadUnread:output_type -> subtraterpc.MarkThreadUnreadResponse
-	57,  // 118: subtraterpc.Mail.GetTopic:output_type -> subtraterpc.GetTopicResponse
-	60,  // 119: subtraterpc.Mail.AutocompleteRecipients:output_type -> subtraterpc.AutocompleteRecipientsResponse
-	62,  // 120: subtraterpc.Mail.DeleteMessage:output_type -> subtraterpc.DeleteMessageResponse
-	37,  // 121: subtraterpc.Agent.RegisterAgent:output_type -> subtraterpc.RegisterAgentResponse
-	39,  // 122: subtraterpc.Agent.GetAgent:output_type -> subtraterpc.GetAgentResponse
-	41,  // 123: subtraterpc.Agent.ListAgents:output_type -> subtraterpc.ListAgentsResponse
-	47,  // 124: subtraterpc.Agent.DeleteAgent:output_type -> subtraterpc.DeleteAgentResponse
-	64,  // 125: subtraterpc.Agent.UpdateAgent:output_type -> subtraterpc.UpdateAgentResponse
-	68,  // 126: subtraterpc.Agent.GetAgentsStatus:output_type -> subtraterpc.GetAgentsStatusResponse
-	70,  // 127: subtraterpc.Agent.Heartbeat:output_type -> subtraterpc.HeartbeatResponse
-	43,  // 128: subtraterpc.Agent.EnsureIdentity:output_type -> subtraterpc.EnsureIdentityResponse
-	45,  // 129: subtraterpc.Agent.SaveIdentity:output_type -> subtraterpc.SaveIdentityResponse
-	73,  // 130: subtraterpc.Session.ListSessions:output_type -> subtraterpc.ListSessionsResponse
-	75,  // 131: subtraterpc.Session.GetSession:output_type -> subtraterpc.GetSessionResponse
-	77,  // 132: subtraterpc.Session.StartSession:output_type -> subtraterpc.StartSessionResponse
-	79,  // 133: subtraterpc.Session.CompleteSession:output_type -> subtraterpc.CompleteSessionResponse
-	82,  // 134: subtraterpc.Activity.ListActivities:output_type -> subtraterpc.ListActivitiesResponse
-	85,  // 135: subtraterpc.Stats.GetDashboardStats:output_type -> subtraterpc.GetDashboardStatsResponse
-	87,  // 136: subtraterpc.Stats.HealthCheck:output_type -> subtraterpc.HealthCheckResponse
-	93,  // 137: subtraterpc.ReviewService.CreateReview:output_type -> subtraterpc.CreateReviewResponse
-	95,  // 138: subtraterpc.ReviewService.ListReviews:output_type -> subtraterpc.ListReviewsProtoResponse
-	98,  // 139: subtraterpc.ReviewService.GetReview:output_type -> subtraterpc.ReviewDetailResponse
-	93,  // 140: subtraterpc.ReviewService.ResubmitReview:output_type -> subtraterpc.CreateReviewResponse
-	102, // 141: subtraterpc.ReviewService.CancelReview:output_type -> subtraterpc.CancelReviewProtoResponse
-	104, // 142: subtraterpc.ReviewService.DeleteReview:output_type -> subtraterpc.DeleteReviewProtoResponse
-	106, // 143: subtraterpc.ReviewService.ListReviewIssues:output_type -> subtraterpc.ListReviewIssuesResponse
-	109, // 144: subtraterpc.ReviewService.UpdateIssueStatus:output_type -> subtraterpc.UpdateIssueStatusResponse
-	111, // 145: subtraterpc.ReviewService.GetReviewDiff:output_type -> subtraterpc.GetReviewDiffResponse
-	99,  // [99:146] is the sub-list for method output_type
-	52,  // [52:99] is the sub-list for method input_type
-	52,  // [52:52] is the sub-list for extension type_name
-	52,  // [52:52] is the sub-list for extension extendee
-	0,   // [0:52] is the sub-list for field type_name
+	81,  // 42: subtraterpc.ListActivitiesResponse.activities:type_name -> subtraterpc.ActivityInfo
+	84,  // 43: subtraterpc.GetDashboardStatsResponse.stats:type_name -> subtraterpc.DashboardStats
+	148, // 44: subtraterpc.HealthCheckResponse.time:type_name -> google.protobuf.Timestamp
+	89,  // 45: subtraterpc.CreateReviewRequest.branch_target:type_name -> subtraterpc.BranchTarget
+	90,  // 46: subtraterpc.CreateReviewRequest.commit_target:type_name -> subtraterpc.CommitTarget
+	91,  // 47: subtraterpc.CreateReviewRequest.commit_range_target:type_name -> subtraterpc.CommitRangeTarget
+	92,  // 48: subtraterpc.CreateReviewRequest.pr_target:type_name -> subtraterpc.PRTarget
+	97,  // 49: subtraterpc.ListReviewsProtoResponse.reviews:type_name -> subtraterpc.ReviewSummaryProto
+	100, // 50: subtraterpc.ReviewDetailResponse.iteration_details:type_name -> subtraterpc.ReviewIterationProto
+	108, // 51: subtraterpc.ListReviewIssuesResponse.issues:type_name -> subtraterpc.ReviewIssueProto
+	148, // 52: subtraterpc.TaskListProto.created_at:type_name -> google.protobuf.Timestamp
+	148, // 53: subtraterpc.TaskListProto.last_synced_at:type_name -> google.protobuf.Timestamp
+	5,   // 54: subtraterpc.TaskProto.status:type_name -> subtraterpc.TaskStatus
+	148, // 55: subtraterpc.TaskProto.created_at:type_name -> google.protobuf.Timestamp
+	148, // 56: subtraterpc.TaskProto.updated_at:type_name -> google.protobuf.Timestamp
+	148, // 57: subtraterpc.TaskProto.started_at:type_name -> google.protobuf.Timestamp
+	148, // 58: subtraterpc.TaskProto.completed_at:type_name -> google.protobuf.Timestamp
+	113, // 59: subtraterpc.RegisterTaskListResponse.task_list:type_name -> subtraterpc.TaskListProto
+	113, // 60: subtraterpc.GetTaskListResponse.task_list:type_name -> subtraterpc.TaskListProto
+	113, // 61: subtraterpc.ListTaskListsResponse.task_lists:type_name -> subtraterpc.TaskListProto
+	5,   // 62: subtraterpc.UpsertTaskRequest.status:type_name -> subtraterpc.TaskStatus
+	114, // 63: subtraterpc.UpsertTaskResponse.task:type_name -> subtraterpc.TaskProto
+	114, // 64: subtraterpc.GetTaskResponse.task:type_name -> subtraterpc.TaskProto
+	5,   // 65: subtraterpc.ListTasksRequest.status:type_name -> subtraterpc.TaskStatus
+	114, // 66: subtraterpc.ListTasksResponse.tasks:type_name -> subtraterpc.TaskProto
+	5,   // 67: subtraterpc.UpdateTaskStatusRequest.status:type_name -> subtraterpc.TaskStatus
+	148, // 68: subtraterpc.GetTaskStatsRequest.today_since:type_name -> google.protobuf.Timestamp
+	115, // 69: subtraterpc.GetTaskStatsResponse.stats:type_name -> subtraterpc.TaskStatsProto
+	148, // 70: subtraterpc.GetAllAgentTaskStatsRequest.today_since:type_name -> google.protobuf.Timestamp
+	116, // 71: subtraterpc.GetAllAgentTaskStatsResponse.stats:type_name -> subtraterpc.AgentTaskStatsProto
+	148, // 72: subtraterpc.PruneOldTasksRequest.older_than:type_name -> google.protobuf.Timestamp
+	7,   // 73: subtraterpc.Mail.SendMail:input_type -> subtraterpc.SendMailRequest
+	9,   // 74: subtraterpc.Mail.FetchInbox:input_type -> subtraterpc.FetchInboxRequest
+	11,  // 75: subtraterpc.Mail.ReadMessage:input_type -> subtraterpc.ReadMessageRequest
+	13,  // 76: subtraterpc.Mail.ReadThread:input_type -> subtraterpc.ReadThreadRequest
+	15,  // 77: subtraterpc.Mail.UpdateState:input_type -> subtraterpc.UpdateStateRequest
+	17,  // 78: subtraterpc.Mail.AckMessage:input_type -> subtraterpc.AckMessageRequest
+	19,  // 79: subtraterpc.Mail.GetStatus:input_type -> subtraterpc.GetStatusRequest
+	21,  // 80: subtraterpc.Mail.PollChanges:input_type -> subtraterpc.PollChangesRequest
+	23,  // 81: subtraterpc.Mail.SubscribeInbox:input_type -> subtraterpc.SubscribeInboxRequest
+	24,  // 82: subtraterpc.Mail.Publish:input_type -> subtraterpc.PublishRequest
+	26,  // 83: subtraterpc.Mail.Subscribe:input_type -> subtraterpc.SubscribeRequest
+	28,  // 84: subtraterpc.Mail.Unsubscribe:input_type -> subtraterpc.UnsubscribeRequest
+	31,  // 85: subtraterpc.Mail.ListTopics:input_type -> subtraterpc.ListTopicsRequest
+	33,  // 86: subtraterpc.Mail.Search:input_type -> subtraterpc.SearchRequest
+	35,  // 87: subtraterpc.Mail.HasUnackedStatusTo:input_type -> subtraterpc.HasUnackedStatusToRequest
+	49,  // 88: subtraterpc.Mail.ReplyToThread:input_type -> subtraterpc.ReplyToThreadRequest
+	51,  // 89: subtraterpc.Mail.ArchiveThread:input_type -> subtraterpc.ArchiveThreadRequest
+	53,  // 90: subtraterpc.Mail.DeleteThread:input_type -> subtraterpc.DeleteThreadRequest
+	55,  // 91: subtraterpc.Mail.MarkThreadUnread:input_type -> subtraterpc.MarkThreadUnreadRequest
+	57,  // 92: subtraterpc.Mail.GetTopic:input_type -> subtraterpc.GetTopicRequest
+	59,  // 93: subtraterpc.Mail.AutocompleteRecipients:input_type -> subtraterpc.AutocompleteRecipientsRequest
+	62,  // 94: subtraterpc.Mail.DeleteMessage:input_type -> subtraterpc.DeleteMessageRequest
+	37,  // 95: subtraterpc.Agent.RegisterAgent:input_type -> subtraterpc.RegisterAgentRequest
+	39,  // 96: subtraterpc.Agent.GetAgent:input_type -> subtraterpc.GetAgentRequest
+	41,  // 97: subtraterpc.Agent.ListAgents:input_type -> subtraterpc.ListAgentsRequest
+	47,  // 98: subtraterpc.Agent.DeleteAgent:input_type -> subtraterpc.DeleteAgentRequest
+	64,  // 99: subtraterpc.Agent.UpdateAgent:input_type -> subtraterpc.UpdateAgentRequest
+	68,  // 100: subtraterpc.Agent.GetAgentsStatus:input_type -> subtraterpc.GetAgentsStatusRequest
+	70,  // 101: subtraterpc.Agent.Heartbeat:input_type -> subtraterpc.HeartbeatRequest
+	43,  // 102: subtraterpc.Agent.EnsureIdentity:input_type -> subtraterpc.EnsureIdentityRequest
+	45,  // 103: subtraterpc.Agent.SaveIdentity:input_type -> subtraterpc.SaveIdentityRequest
+	73,  // 104: subtraterpc.Session.ListSessions:input_type -> subtraterpc.ListSessionsRequest
+	75,  // 105: subtraterpc.Session.GetSession:input_type -> subtraterpc.GetSessionRequest
+	77,  // 106: subtraterpc.Session.StartSession:input_type -> subtraterpc.StartSessionRequest
+	79,  // 107: subtraterpc.Session.CompleteSession:input_type -> subtraterpc.CompleteSessionRequest
+	82,  // 108: subtraterpc.Activity.ListActivities:input_type -> subtraterpc.ListActivitiesRequest
+	85,  // 109: subtraterpc.Stats.GetDashboardStats:input_type -> subtraterpc.GetDashboardStatsRequest
+	87,  // 110: subtraterpc.Stats.HealthCheck:input_type -> subtraterpc.HealthCheckRequest
+	117, // 111: subtraterpc.TaskService.RegisterTaskList:input_type -> subtraterpc.RegisterTaskListRequest
+	119, // 112: subtraterpc.TaskService.GetTaskList:input_type -> subtraterpc.GetTaskListRequest
+	121, // 113: subtraterpc.TaskService.ListTaskLists:input_type -> subtraterpc.ListTaskListsRequest
+	123, // 114: subtraterpc.TaskService.UnregisterTaskList:input_type -> subtraterpc.UnregisterTaskListRequest
+	125, // 115: subtraterpc.TaskService.UpsertTask:input_type -> subtraterpc.UpsertTaskRequest
+	127, // 116: subtraterpc.TaskService.GetTask:input_type -> subtraterpc.GetTaskProtoRequest
+	129, // 117: subtraterpc.TaskService.ListTasks:input_type -> subtraterpc.ListTasksRequest
+	131, // 118: subtraterpc.TaskService.UpdateTaskStatus:input_type -> subtraterpc.UpdateTaskStatusRequest
+	133, // 119: subtraterpc.TaskService.UpdateTaskOwner:input_type -> subtraterpc.UpdateTaskOwnerRequest
+	135, // 120: subtraterpc.TaskService.DeleteTask:input_type -> subtraterpc.DeleteTaskRequest
+	137, // 121: subtraterpc.TaskService.GetTaskStats:input_type -> subtraterpc.GetTaskStatsRequest
+	139, // 122: subtraterpc.TaskService.GetAllAgentTaskStats:input_type -> subtraterpc.GetAllAgentTaskStatsRequest
+	141, // 123: subtraterpc.TaskService.SyncTaskList:input_type -> subtraterpc.SyncTaskListRequest
+	143, // 124: subtraterpc.TaskService.PruneOldTasks:input_type -> subtraterpc.PruneOldTasksRequest
+	93,  // 125: subtraterpc.ReviewService.CreateReview:input_type -> subtraterpc.CreateReviewRequest
+	95,  // 126: subtraterpc.ReviewService.ListReviews:input_type -> subtraterpc.ListReviewsProtoRequest
+	98,  // 127: subtraterpc.ReviewService.GetReview:input_type -> subtraterpc.GetReviewProtoRequest
+	101, // 128: subtraterpc.ReviewService.ResubmitReview:input_type -> subtraterpc.ResubmitReviewRequest
+	102, // 129: subtraterpc.ReviewService.CancelReview:input_type -> subtraterpc.CancelReviewProtoRequest
+	104, // 130: subtraterpc.ReviewService.DeleteReview:input_type -> subtraterpc.DeleteReviewProtoRequest
+	106, // 131: subtraterpc.ReviewService.ListReviewIssues:input_type -> subtraterpc.ListReviewIssuesRequest
+	109, // 132: subtraterpc.ReviewService.UpdateIssueStatus:input_type -> subtraterpc.UpdateIssueStatusRequest
+	111, // 133: subtraterpc.ReviewService.GetReviewDiff:input_type -> subtraterpc.GetReviewDiffRequest
+	8,   // 134: subtraterpc.Mail.SendMail:output_type -> subtraterpc.SendMailResponse
+	10,  // 135: subtraterpc.Mail.FetchInbox:output_type -> subtraterpc.FetchInboxResponse
+	12,  // 136: subtraterpc.Mail.ReadMessage:output_type -> subtraterpc.ReadMessageResponse
+	14,  // 137: subtraterpc.Mail.ReadThread:output_type -> subtraterpc.ReadThreadResponse
+	16,  // 138: subtraterpc.Mail.UpdateState:output_type -> subtraterpc.UpdateStateResponse
+	18,  // 139: subtraterpc.Mail.AckMessage:output_type -> subtraterpc.AckMessageResponse
+	20,  // 140: subtraterpc.Mail.GetStatus:output_type -> subtraterpc.GetStatusResponse
+	22,  // 141: subtraterpc.Mail.PollChanges:output_type -> subtraterpc.PollChangesResponse
+	6,   // 142: subtraterpc.Mail.SubscribeInbox:output_type -> subtraterpc.InboxMessage
+	25,  // 143: subtraterpc.Mail.Publish:output_type -> subtraterpc.PublishResponse
+	27,  // 144: subtraterpc.Mail.Subscribe:output_type -> subtraterpc.SubscribeResponse
+	29,  // 145: subtraterpc.Mail.Unsubscribe:output_type -> subtraterpc.UnsubscribeResponse
+	32,  // 146: subtraterpc.Mail.ListTopics:output_type -> subtraterpc.ListTopicsResponse
+	34,  // 147: subtraterpc.Mail.Search:output_type -> subtraterpc.SearchResponse
+	36,  // 148: subtraterpc.Mail.HasUnackedStatusTo:output_type -> subtraterpc.HasUnackedStatusToResponse
+	50,  // 149: subtraterpc.Mail.ReplyToThread:output_type -> subtraterpc.ReplyToThreadResponse
+	52,  // 150: subtraterpc.Mail.ArchiveThread:output_type -> subtraterpc.ArchiveThreadResponse
+	54,  // 151: subtraterpc.Mail.DeleteThread:output_type -> subtraterpc.DeleteThreadResponse
+	56,  // 152: subtraterpc.Mail.MarkThreadUnread:output_type -> subtraterpc.MarkThreadUnreadResponse
+	58,  // 153: subtraterpc.Mail.GetTopic:output_type -> subtraterpc.GetTopicResponse
+	61,  // 154: subtraterpc.Mail.AutocompleteRecipients:output_type -> subtraterpc.AutocompleteRecipientsResponse
+	63,  // 155: subtraterpc.Mail.DeleteMessage:output_type -> subtraterpc.DeleteMessageResponse
+	38,  // 156: subtraterpc.Agent.RegisterAgent:output_type -> subtraterpc.RegisterAgentResponse
+	40,  // 157: subtraterpc.Agent.GetAgent:output_type -> subtraterpc.GetAgentResponse
+	42,  // 158: subtraterpc.Agent.ListAgents:output_type -> subtraterpc.ListAgentsResponse
+	48,  // 159: subtraterpc.Agent.DeleteAgent:output_type -> subtraterpc.DeleteAgentResponse
+	65,  // 160: subtraterpc.Agent.UpdateAgent:output_type -> subtraterpc.UpdateAgentResponse
+	69,  // 161: subtraterpc.Agent.GetAgentsStatus:output_type -> subtraterpc.GetAgentsStatusResponse
+	71,  // 162: subtraterpc.Agent.Heartbeat:output_type -> subtraterpc.HeartbeatResponse
+	44,  // 163: subtraterpc.Agent.EnsureIdentity:output_type -> subtraterpc.EnsureIdentityResponse
+	46,  // 164: subtraterpc.Agent.SaveIdentity:output_type -> subtraterpc.SaveIdentityResponse
+	74,  // 165: subtraterpc.Session.ListSessions:output_type -> subtraterpc.ListSessionsResponse
+	76,  // 166: subtraterpc.Session.GetSession:output_type -> subtraterpc.GetSessionResponse
+	78,  // 167: subtraterpc.Session.StartSession:output_type -> subtraterpc.StartSessionResponse
+	80,  // 168: subtraterpc.Session.CompleteSession:output_type -> subtraterpc.CompleteSessionResponse
+	83,  // 169: subtraterpc.Activity.ListActivities:output_type -> subtraterpc.ListActivitiesResponse
+	86,  // 170: subtraterpc.Stats.GetDashboardStats:output_type -> subtraterpc.GetDashboardStatsResponse
+	88,  // 171: subtraterpc.Stats.HealthCheck:output_type -> subtraterpc.HealthCheckResponse
+	118, // 172: subtraterpc.TaskService.RegisterTaskList:output_type -> subtraterpc.RegisterTaskListResponse
+	120, // 173: subtraterpc.TaskService.GetTaskList:output_type -> subtraterpc.GetTaskListResponse
+	122, // 174: subtraterpc.TaskService.ListTaskLists:output_type -> subtraterpc.ListTaskListsResponse
+	124, // 175: subtraterpc.TaskService.UnregisterTaskList:output_type -> subtraterpc.UnregisterTaskListResponse
+	126, // 176: subtraterpc.TaskService.UpsertTask:output_type -> subtraterpc.UpsertTaskResponse
+	128, // 177: subtraterpc.TaskService.GetTask:output_type -> subtraterpc.GetTaskResponse
+	130, // 178: subtraterpc.TaskService.ListTasks:output_type -> subtraterpc.ListTasksResponse
+	132, // 179: subtraterpc.TaskService.UpdateTaskStatus:output_type -> subtraterpc.UpdateTaskStatusResponse
+	134, // 180: subtraterpc.TaskService.UpdateTaskOwner:output_type -> subtraterpc.UpdateTaskOwnerResponse
+	136, // 181: subtraterpc.TaskService.DeleteTask:output_type -> subtraterpc.DeleteTaskResponse
+	138, // 182: subtraterpc.TaskService.GetTaskStats:output_type -> subtraterpc.GetTaskStatsResponse
+	140, // 183: subtraterpc.TaskService.GetAllAgentTaskStats:output_type -> subtraterpc.GetAllAgentTaskStatsResponse
+	142, // 184: subtraterpc.TaskService.SyncTaskList:output_type -> subtraterpc.SyncTaskListResponse
+	144, // 185: subtraterpc.TaskService.PruneOldTasks:output_type -> subtraterpc.PruneOldTasksResponse
+	94,  // 186: subtraterpc.ReviewService.CreateReview:output_type -> subtraterpc.CreateReviewResponse
+	96,  // 187: subtraterpc.ReviewService.ListReviews:output_type -> subtraterpc.ListReviewsProtoResponse
+	99,  // 188: subtraterpc.ReviewService.GetReview:output_type -> subtraterpc.ReviewDetailResponse
+	94,  // 189: subtraterpc.ReviewService.ResubmitReview:output_type -> subtraterpc.CreateReviewResponse
+	103, // 190: subtraterpc.ReviewService.CancelReview:output_type -> subtraterpc.CancelReviewProtoResponse
+	105, // 191: subtraterpc.ReviewService.DeleteReview:output_type -> subtraterpc.DeleteReviewProtoResponse
+	107, // 192: subtraterpc.ReviewService.ListReviewIssues:output_type -> subtraterpc.ListReviewIssuesResponse
+	110, // 193: subtraterpc.ReviewService.UpdateIssueStatus:output_type -> subtraterpc.UpdateIssueStatusResponse
+	112, // 194: subtraterpc.ReviewService.GetReviewDiff:output_type -> subtraterpc.GetReviewDiffResponse
+	134, // [134:195] is the sub-list for method output_type
+	73,  // [73:134] is the sub-list for method input_type
+	73,  // [73:73] is the sub-list for extension type_name
+	73,  // [73:73] is the sub-list for extension extendee
+	0,   // [0:73] is the sub-list for field type_name
 }
 
 func init() { file_mail_proto_init() }
@@ -7683,10 +9971,10 @@ func file_mail_proto_init() {
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_mail_proto_rawDesc), len(file_mail_proto_rawDesc)),
-			NumEnums:      5,
-			NumMessages:   110,
+			NumEnums:      6,
+			NumMessages:   142,
 			NumExtensions: 0,
-			NumServices:   6,
+			NumServices:   7,
 		},
 		GoTypes:           file_mail_proto_goTypes,
 		DependencyIndexes: file_mail_proto_depIdxs,

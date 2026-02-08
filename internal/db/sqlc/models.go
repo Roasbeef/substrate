@@ -27,6 +27,48 @@ type Agent struct {
 	LastActiveAt     int64
 }
 
+type AgentTask struct {
+	ID           int64
+	AgentID      int64
+	ListID       string
+	ClaudeTaskID string
+	Subject      string
+	Description  sql.NullString
+	ActiveForm   sql.NullString
+	Metadata     sql.NullString
+	Status       string
+	Owner        sql.NullString
+	BlockedBy    sql.NullString
+	Blocks       sql.NullString
+	CreatedAt    int64
+	UpdatedAt    int64
+	StartedAt    sql.NullInt64
+	CompletedAt  sql.NullInt64
+	FilePath     sql.NullString
+	FileMtime    sql.NullInt64
+}
+
+type AvailableTask struct {
+	ID           int64
+	AgentID      int64
+	ListID       string
+	ClaudeTaskID string
+	Subject      string
+	Description  sql.NullString
+	ActiveForm   sql.NullString
+	Metadata     sql.NullString
+	Status       string
+	Owner        sql.NullString
+	BlockedBy    sql.NullString
+	Blocks       sql.NullString
+	CreatedAt    int64
+	UpdatedAt    int64
+	StartedAt    sql.NullInt64
+	CompletedAt  sql.NullInt64
+	FilePath     sql.NullString
+	FileMtime    sql.NullInt64
+}
+
 type ConsumerOffset struct {
 	AgentID    int64
 	TopicID    int64
@@ -150,6 +192,15 @@ type Subscription struct {
 	AgentID      int64
 	TopicID      int64
 	SubscribedAt int64
+}
+
+type TaskList struct {
+	ID           int64
+	ListID       string
+	AgentID      int64
+	WatchPath    string
+	CreatedAt    int64
+	LastSyncedAt sql.NullInt64
 }
 
 type Topic struct {
