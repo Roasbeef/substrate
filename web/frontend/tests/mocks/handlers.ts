@@ -236,7 +236,7 @@ export function createMockTaskList(
   };
 }
 
-// Default mock task data.
+// Default mock task data with dependency chain: task-001 → task-002 → task-003.
 const mockTasks = [
   createMockTask({
     id: '1',
@@ -245,6 +245,7 @@ const mockTasks = [
     claude_task_id: 'task-001',
     subject: 'Implement feature X',
     status: 'TASK_STATUS_PENDING',
+    blocks: ['task-002'],
   }),
   createMockTask({
     id: '2',
@@ -254,6 +255,8 @@ const mockTasks = [
     subject: 'Fix bug in parser',
     status: 'TASK_STATUS_IN_PROGRESS',
     owner: 'Agent1',
+    blocked_by: ['task-001'],
+    blocks: ['task-003'],
   }),
   createMockTask({
     id: '3',
@@ -263,6 +266,7 @@ const mockTasks = [
     subject: 'Write documentation',
     status: 'TASK_STATUS_COMPLETED',
     owner: 'Agent2',
+    blocked_by: ['task-002'],
   }),
 ];
 

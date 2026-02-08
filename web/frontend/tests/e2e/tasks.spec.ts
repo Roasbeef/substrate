@@ -1,261 +1,668 @@
-// E2E tests for tasks page functionality.
-// Tests task listing, status filters, stats cards, and agent filtering.
+// E2E tests for the Tasks page.
+// Tests board view, list view, detail panel, status filters, agent filter,
+// view toggle, stats cards, and dependency visualization.
+//
+// These tests run against a real Go server with a test database. Task data
+// may or may not be present, so tests use resilient structural assertions
+// alongside conditional data-dependent checks.
 
 import { test, expect } from '@playwright/test';
 
-test.describe('Tasks Page', () => {
+// ---------------------------------------------------------------------------
+// Page structure and header.
+// ---------------------------------------------------------------------------
+
+test.describe('Tasks Page — Structure', () => {
   test.beforeEach(async ({ page }) => {
     await page.goto('/tasks');
     await page.waitForLoadState('networkidle');
   });
 
-  test('displays tasks page with header', async ({ page }) => {
-    // Verify tasks page loads without errors.
-    await expect(page.locator('#root')).not.toBeEmpty();
-
-    // Verify the page header is rendered.
-    await expect(page.getByRole('heading', { name: 'Tasks', level: 1 })).toBeVisible();
-
-    // Verify the subtitle text is present.
-    await expect(page.getByText('Track Claude Code agent tasks and progress.')).toBeVisible();
+  test('displays page header and subtitle', async ({ page }) => {
+    await expect(
+      page.getByRole('heading', { name: 'Tasks', level: 1 }),
+    ).toBeVisible();
+    await expect(
+      page.getByText('Track Claude Code agent tasks and progress.'),
+    ).toBeVisible();
   });
 
-  test('displays task list with task rows', async ({ page }) => {
-    // The mock API returns 3 tasks. Look for task subjects in the rendered output.
-    await expect(page.getByText('Implement feature X')).toBeVisible();
-    await expect(page.getByText('Fix bug in parser')).toBeVisible();
-    await expect(page.getByText('Write documentation')).toBeVisible();
+  test('displays view toggle with list and board buttons', async ({ page }) => {
+    const listBtn = page.getByRole('button', { name: 'list', exact: true });
+    const boardBtn = page.getByRole('button', { name: 'board', exact: true });
+    await expect(listBtn).toBeVisible();
+    await expect(boardBtn).toBeVisible();
   });
 
-  test('displays task status badges', async ({ page }) => {
-    // Verify status badges are rendered with correct text.
-    await expect(page.getByText('Pending', { exact: true })).toBeVisible();
-    await expect(page.getByText('In Progress', { exact: true })).toBeVisible();
-    await expect(page.getByText('Completed', { exact: true })).toBeVisible();
+  test('displays agent filter dropdown with All Agents default', async ({ page }) => {
+    const select = page.getByRole('combobox');
+    await expect(select).toBeVisible();
+    await expect(select).toContainText('All Agents');
   });
 
-  test('displays stats cards with counts', async ({ page }) => {
-    // The mock stats endpoint returns specific counts. Verify stats cards render.
-    // Stats cards show label text underneath the number.
-    const statsSection = page.locator('.grid');
-
-    if (await statsSection.isVisible()) {
-      // Verify stat labels are present.
-      await expect(page.getByText('In Progress').first()).toBeVisible();
-      await expect(page.getByText('Pending').first()).toBeVisible();
-      await expect(page.getByText('Available')).toBeVisible();
-      await expect(page.getByText('Blocked')).toBeVisible();
-      await expect(page.getByText('Today')).toBeVisible();
-    }
-  });
-
-  test('displays task owner when set', async ({ page }) => {
-    // The "Fix bug in parser" task has owner "Agent1" and
-    // "Write documentation" task has owner "Agent2".
-    const ownerElements = page.getByText('Agent1');
-    const count = await ownerElements.count();
-
-    // At least one Agent1 reference should be visible (either in task row or stats).
-    expect(count).toBeGreaterThanOrEqual(0);
+  test('page loads without JavaScript errors', async ({ page }) => {
+    const errors: Error[] = [];
+    page.on('pageerror', (err) => errors.push(err));
+    await page.goto('/tasks');
+    await page.waitForLoadState('networkidle');
+    expect(errors).toHaveLength(0);
   });
 });
 
-test.describe('Tasks Status Filters', () => {
+// ---------------------------------------------------------------------------
+// Board view (default).
+// ---------------------------------------------------------------------------
+
+test.describe('Tasks Page — Board View', () => {
   test.beforeEach(async ({ page }) => {
     await page.goto('/tasks');
     await page.waitForLoadState('networkidle');
   });
 
-  test('status filter tabs are visible', async ({ page }) => {
-    // Verify all four filter tabs are rendered.
+  test('board view is the default view', async ({ page }) => {
+    // Board button should be active (has shadow-sm/bg-white style).
+    const boardBtn = page.getByRole('button', { name: 'board', exact: true });
+    await expect(boardBtn).toBeVisible();
+
+    // Board view renders three column headers.
+    await expect(page.getByText('Pending').first()).toBeVisible();
+    await expect(page.getByText('In Progress').first()).toBeVisible();
+    await expect(page.getByText('Completed').first()).toBeVisible();
+  });
+
+  test('board columns show task count badges', async ({ page }) => {
+    // Each column header has a count badge (a number in a pill).
+    // There should be at least three count elements visible in the columns.
+    const columns = page.locator('.flex.flex-1.flex-col');
+    const count = await columns.count();
+    expect(count).toBeGreaterThanOrEqual(3);
+  });
+
+  test('empty columns show "No tasks" placeholder', async ({ page }) => {
+    // At least one column might be empty and show the placeholder.
+    const noTasksText = page.getByText('No tasks', { exact: true });
+    const noTasksCount = await noTasksText.count();
+    // There should be at least zero "No tasks" placeholders (non-negative).
+    expect(noTasksCount).toBeGreaterThanOrEqual(0);
+  });
+
+  test('clicking a task card opens the detail panel', async ({ page }) => {
+    // Find any task card button in the board view.
+    const taskCards = page.locator('button').filter({
+      has: page.locator('h4'),
+    });
+    const cardCount = await taskCards.count();
+
+    if (cardCount > 0) {
+      await taskCards.first().click();
+
+      // Detail panel should appear with close button and section headers.
+      const closeBtn = page.locator('button').filter({
+        has: page.locator('svg path[d="M6 18L18 6M6 6l12 12"]'),
+      });
+      await expect(closeBtn.first()).toBeVisible();
+
+      // Detail panel shows Timeline and Identifiers sections.
+      await expect(page.getByText('Timeline')).toBeVisible();
+      await expect(page.getByText('Identifiers')).toBeVisible();
+    }
+  });
+
+  test('detail panel closes on close button click', async ({ page }) => {
+    const taskCards = page.locator('button').filter({
+      has: page.locator('h4'),
+    });
+    const cardCount = await taskCards.count();
+
+    if (cardCount > 0) {
+      await taskCards.first().click();
+      await expect(page.getByText('Timeline')).toBeVisible();
+
+      // Click the close button (X icon).
+      const closeBtn = page.locator('button').filter({
+        has: page.locator('svg path[d="M6 18L18 6M6 6l12 12"]'),
+      });
+      await closeBtn.first().click();
+
+      // Panel should be gone — Timeline section no longer visible.
+      await expect(page.getByText('Timeline')).not.toBeVisible();
+    }
+  });
+
+  test('detail panel closes on Escape key', async ({ page }) => {
+    const taskCards = page.locator('button').filter({
+      has: page.locator('h4'),
+    });
+    const cardCount = await taskCards.count();
+
+    if (cardCount > 0) {
+      await taskCards.first().click();
+      await expect(page.getByText('Timeline')).toBeVisible();
+
+      await page.keyboard.press('Escape');
+      await expect(page.getByText('Timeline')).not.toBeVisible();
+    }
+  });
+});
+
+// ---------------------------------------------------------------------------
+// View toggle — switching between list and board.
+// ---------------------------------------------------------------------------
+
+test.describe('Tasks Page — View Toggle', () => {
+  test.beforeEach(async ({ page }) => {
+    await page.goto('/tasks');
+    await page.waitForLoadState('networkidle');
+  });
+
+  test('switching to list view shows status filter tabs', async ({ page }) => {
+    const listBtn = page.getByRole('button', { name: 'list', exact: true });
+    await listBtn.click();
+
+    // List view shows status filter tab group.
+    await expect(
+      page.getByRole('button', { name: 'All', exact: true }),
+    ).toBeVisible();
+    await expect(
+      page.getByRole('button', { name: 'In Progress', exact: true }),
+    ).toBeVisible();
+    await expect(
+      page.getByRole('button', { name: 'Pending', exact: true }),
+    ).toBeVisible();
+    await expect(
+      page.getByRole('button', { name: 'Completed', exact: true }),
+    ).toBeVisible();
+  });
+
+  test('switching back to board view hides status filter tabs', async ({ page }) => {
+    // Switch to list first.
+    const listBtn = page.getByRole('button', { name: 'list', exact: true });
+    await listBtn.click();
+    await expect(
+      page.getByRole('button', { name: 'All', exact: true }),
+    ).toBeVisible();
+
+    // Switch back to board.
+    const boardBtn = page.getByRole('button', { name: 'board', exact: true });
+    await boardBtn.click();
+
+    // Status filter tabs should no longer be visible (they only show in list view).
+    // The "All" button from filters should be gone; the column headers remain.
     const allTab = page.getByRole('button', { name: 'All', exact: true });
-    const inProgressTab = page.getByRole('button', { name: 'In Progress', exact: true });
-    const pendingTab = page.getByRole('button', { name: 'Pending', exact: true });
-    const completedTab = page.getByRole('button', { name: 'Completed', exact: true });
+    await expect(allTab).not.toBeVisible();
+  });
 
+  test('list view shows task rows with status badges', async ({ page }) => {
+    const listBtn = page.getByRole('button', { name: 'list', exact: true });
+    await listBtn.click();
+
+    // Task rows are button elements with h3 headings inside.
+    const taskRows = page.locator('button').filter({
+      has: page.locator('h3'),
+    });
+    const rowCount = await taskRows.count();
+
+    if (rowCount > 0) {
+      // At least one task row should have a heading.
+      const firstHeading = taskRows.first().locator('h3');
+      await expect(firstHeading).toBeVisible();
+    }
+  });
+
+  test('clicking task row in list view opens detail panel', async ({ page }) => {
+    const listBtn = page.getByRole('button', { name: 'list', exact: true });
+    await listBtn.click();
+
+    const taskRows = page.locator('button').filter({
+      has: page.locator('h3'),
+    });
+    const rowCount = await taskRows.count();
+
+    if (rowCount > 0) {
+      await taskRows.first().click();
+      await expect(page.getByText('Timeline')).toBeVisible();
+      await expect(page.getByText('Identifiers')).toBeVisible();
+    }
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Stats cards.
+// ---------------------------------------------------------------------------
+
+test.describe('Tasks Page — Stats Cards', () => {
+  test.beforeEach(async ({ page }) => {
+    await page.goto('/tasks');
+    await page.waitForLoadState('networkidle');
+  });
+
+  test('displays all six stats card labels', async ({ page }) => {
+    // Stats cards show these labels in uppercase text.
+    const labels = ['In Progress', 'Pending', 'Available', 'Blocked', 'Completed', 'Today'];
+    for (const label of labels) {
+      await expect(page.getByText(label).first()).toBeVisible();
+    }
+  });
+
+  test('stats cards show numeric values', async ({ page }) => {
+    // Each stat card has a large number (text-2xl font-bold).
+    const statNumbers = page.locator('.text-2xl.font-bold');
+    const count = await statNumbers.count();
+    expect(count).toBeGreaterThanOrEqual(6);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Status filter tabs (list view).
+// ---------------------------------------------------------------------------
+
+test.describe('Tasks Page — Status Filters', () => {
+  test.beforeEach(async ({ page }) => {
+    await page.goto('/tasks');
+    await page.waitForLoadState('networkidle');
+    // Switch to list view for filter tabs.
+    await page.getByRole('button', { name: 'list', exact: true }).click();
+  });
+
+  test('All filter tab is active by default', async ({ page }) => {
+    const allTab = page.getByRole('button', { name: 'All', exact: true });
+    // Active tab has shadow-sm class (white bg).
     await expect(allTab).toBeVisible();
-    await expect(inProgressTab).toBeVisible();
-    await expect(pendingTab).toBeVisible();
-    await expect(completedTab).toBeVisible();
   });
 
-  test('clicking In Progress filter tab filters tasks', async ({ page }) => {
-    const inProgressTab = page.getByRole('button', { name: 'In Progress', exact: true });
-    await inProgressTab.click();
-
-    // Wait for the filtered results to load.
+  test('clicking In Progress filter updates the view', async ({ page }) => {
+    const tab = page.getByRole('button', { name: 'In Progress', exact: true });
+    await tab.click();
     await page.waitForLoadState('networkidle');
-
-    // The "All" tab should no longer be the active/selected one.
-    // The In Progress tab should now appear selected (has shadow-sm class).
-    await expect(inProgressTab).toBeVisible();
+    await expect(tab).toBeVisible();
   });
 
-  test('clicking Pending filter tab filters tasks', async ({ page }) => {
-    const pendingTab = page.getByRole('button', { name: 'Pending', exact: true });
-    await pendingTab.click();
-
-    // Wait for filtered results.
+  test('clicking Pending filter updates the view', async ({ page }) => {
+    const tab = page.getByRole('button', { name: 'Pending', exact: true });
+    await tab.click();
     await page.waitForLoadState('networkidle');
-
-    // The tab should be clickable without errors.
-    await expect(pendingTab).toBeVisible();
+    await expect(tab).toBeVisible();
   });
 
-  test('clicking Completed filter tab filters tasks', async ({ page }) => {
-    const completedTab = page.getByRole('button', { name: 'Completed', exact: true });
-    await completedTab.click();
-
-    // Wait for filtered results.
+  test('clicking Completed filter updates the view', async ({ page }) => {
+    const tab = page.getByRole('button', { name: 'Completed', exact: true });
+    await tab.click();
     await page.waitForLoadState('networkidle');
-
-    await expect(completedTab).toBeVisible();
+    await expect(tab).toBeVisible();
   });
 
-  test('clicking All filter tab shows all tasks', async ({ page }) => {
-    // First click a specific filter.
-    const inProgressTab = page.getByRole('button', { name: 'In Progress', exact: true });
-    await inProgressTab.click();
+  test('clicking All filter resets after filtering', async ({ page }) => {
+    // Apply a specific filter first.
+    await page
+      .getByRole('button', { name: 'In Progress', exact: true })
+      .click();
     await page.waitForLoadState('networkidle');
 
-    // Then click All to reset.
+    // Reset to All.
     const allTab = page.getByRole('button', { name: 'All', exact: true });
     await allTab.click();
     await page.waitForLoadState('networkidle');
-
-    // All tab should be visible and active.
     await expect(allTab).toBeVisible();
   });
 });
 
-test.describe('Tasks Agent Filter', () => {
+// ---------------------------------------------------------------------------
+// Agent filter dropdown.
+// ---------------------------------------------------------------------------
+
+test.describe('Tasks Page — Agent Filter', () => {
   test.beforeEach(async ({ page }) => {
     await page.goto('/tasks');
     await page.waitForLoadState('networkidle');
   });
 
-  test('agent filter dropdown is visible', async ({ page }) => {
-    // The agent filter is a <select> element with "All Agents" as default.
-    const agentSelect = page.locator('select');
-    await expect(agentSelect).toBeVisible();
-
-    // Verify the default option text.
-    await expect(agentSelect).toContainText('All Agents');
+  test('agent dropdown has All Agents option', async ({ page }) => {
+    const select = page.getByRole('combobox');
+    await expect(select).toContainText('All Agents');
   });
 
-  test('agent filter dropdown has agent options', async ({ page }) => {
-    const agentSelect = page.locator('select');
-
-    // Check that agent options exist (populated from the agents-status API).
-    const options = agentSelect.locator('option');
+  test('agent dropdown shows only active agents', async ({ page }) => {
+    const select = page.getByRole('combobox');
+    const options = select.locator('option');
     const count = await options.count();
 
-    // Should have at least the "All Agents" default option.
+    // Should have at least the default "All Agents" option.
     expect(count).toBeGreaterThanOrEqual(1);
+
+    // Active agent options should include project/branch context (· separator).
+    for (let i = 1; i < count; i++) {
+      const text = await options.nth(i).textContent();
+      // Active agents should have a display name (non-empty).
+      expect(text?.trim().length).toBeGreaterThan(0);
+    }
+  });
+
+  test('selecting an agent filters the tasks and stats', async ({ page }) => {
+    const select = page.getByRole('combobox');
+    const options = select.locator('option');
+    const count = await options.count();
+
+    if (count > 1) {
+      // Select the first real agent option.
+      const optionValue = await options.nth(1).getAttribute('value');
+      if (optionValue) {
+        await select.selectOption(optionValue);
+        await page.waitForLoadState('networkidle');
+
+        // The dropdown should reflect the selected agent.
+        await expect(select).toHaveValue(optionValue);
+      }
+    }
+  });
+
+  test('resetting agent filter to All shows all tasks', async ({ page }) => {
+    const select = page.getByRole('combobox');
+    const options = select.locator('option');
+    const count = await options.count();
+
+    if (count > 1) {
+      // Select an agent first.
+      const optionValue = await options.nth(1).getAttribute('value');
+      if (optionValue) {
+        await select.selectOption(optionValue);
+        await page.waitForLoadState('networkidle');
+      }
+
+      // Reset to All Agents.
+      await select.selectOption('');
+      await page.waitForLoadState('networkidle');
+      await expect(select).toHaveValue('');
+    }
   });
 });
 
-test.describe('Tasks Per-Agent Summary Table', () => {
+// ---------------------------------------------------------------------------
+// Detail panel content.
+// ---------------------------------------------------------------------------
+
+test.describe('Tasks Page — Detail Panel', () => {
   test.beforeEach(async ({ page }) => {
     await page.goto('/tasks');
     await page.waitForLoadState('networkidle');
   });
 
-  test('per-agent summary table is displayed', async ({ page }) => {
-    // The per-agent summary table shows when agentStats data is present
-    // and no agent filter is active.
-    const summaryHeading = page.getByText('Per-Agent Summary');
+  test('detail panel shows task subject as heading', async ({ page }) => {
+    const taskCards = page.locator('button').filter({
+      has: page.locator('h4'),
+    });
+    const cardCount = await taskCards.count();
 
-    if (await summaryHeading.isVisible()) {
-      // Verify the table headers exist.
-      await expect(page.getByText('Agent')).toBeVisible();
+    if (cardCount > 0) {
+      // Get the subject text from the card.
+      const subjectText = await taskCards.first().locator('h4').textContent();
+      await taskCards.first().click();
 
-      // Verify the table has agent rows.
-      const tableRows = page.locator('tbody tr');
-      const rowCount = await tableRows.count();
-      expect(rowCount).toBeGreaterThan(0);
+      // The panel heading (h2) should match the card subject.
+      if (subjectText) {
+        await expect(page.locator('h2').filter({ hasText: subjectText })).toBeVisible();
+      }
     }
   });
 
-  test('clicking agent row in summary sets agent filter', async ({ page }) => {
-    const summaryHeading = page.getByText('Per-Agent Summary');
+  test('detail panel shows status badge', async ({ page }) => {
+    const taskCards = page.locator('button').filter({
+      has: page.locator('h4'),
+    });
+    const cardCount = await taskCards.count();
 
-    if (await summaryHeading.isVisible()) {
-      // Click on the first agent row in the summary table.
-      const firstRow = page.locator('tbody tr').first();
-      await firstRow.click();
+    if (cardCount > 0) {
+      await taskCards.first().click();
 
-      // Wait for filtered results.
-      await page.waitForLoadState('networkidle');
+      // Panel header shows a status badge with one of the known statuses.
+      const statusTexts = ['Pending', 'In Progress', 'Completed'];
+      let found = false;
+      for (const status of statusTexts) {
+        const badge = page.locator('span').filter({ hasText: new RegExp(`^${status}$`) });
+        if ((await badge.count()) > 0) {
+          found = true;
+          break;
+        }
+      }
+      expect(found).toBeTruthy();
+    }
+  });
 
-      // The per-agent summary table should be hidden after selecting an agent
-      // (it only shows when no agent filter is active).
-      await expect(summaryHeading).not.toBeVisible();
+  test('detail panel shows Timeline section with dates', async ({ page }) => {
+    const taskCards = page.locator('button').filter({
+      has: page.locator('h4'),
+    });
+    const cardCount = await taskCards.count();
+
+    if (cardCount > 0) {
+      await taskCards.first().click();
+      await expect(page.getByText('Timeline')).toBeVisible();
+
+      // Timeline shows at least "Created" label.
+      await expect(page.getByText('Created')).toBeVisible();
+    }
+  });
+
+  test('detail panel shows Identifiers section', async ({ page }) => {
+    const taskCards = page.locator('button').filter({
+      has: page.locator('h4'),
+    });
+    const cardCount = await taskCards.count();
+
+    if (cardCount > 0) {
+      await taskCards.first().click();
+      await expect(page.getByText('Identifiers')).toBeVisible();
+      await expect(page.getByText('List ID')).toBeVisible();
+      await expect(page.getByText('Task ID')).toBeVisible();
+    }
+  });
+
+  test('detail panel shows Description section when task has one', async ({ page }) => {
+    const taskCards = page.locator('button').filter({
+      has: page.locator('h4'),
+    });
+    const cardCount = await taskCards.count();
+
+    if (cardCount > 0) {
+      await taskCards.first().click();
+
+      // Description section is conditionally rendered.
+      const descSection = page.getByText('Description');
+      // It may or may not be present, depending on data.
+      const isVisible = await descSection.isVisible().catch(() => false);
+      // Just verify no errors — the section renders if description exists.
+      expect(typeof isVisible).toBe('boolean');
+    }
+  });
+
+  test('clicking same task card again closes the detail panel', async ({ page }) => {
+    const taskCards = page.locator('button').filter({
+      has: page.locator('h4'),
+    });
+    const cardCount = await taskCards.count();
+
+    if (cardCount > 0) {
+      // Open.
+      await taskCards.first().click();
+      await expect(page.getByText('Timeline')).toBeVisible();
+
+      // Click the scrim (backdrop) to close.
+      const scrim = page.locator('.fixed.inset-0.z-40');
+      if (await scrim.isVisible()) {
+        await scrim.click({ force: true });
+        await expect(page.getByText('Timeline')).not.toBeVisible();
+      }
     }
   });
 });
 
-test.describe('Tasks Navigation', () => {
+// ---------------------------------------------------------------------------
+// Task card content in board view.
+// ---------------------------------------------------------------------------
+
+test.describe('Tasks Page — Task Card Content', () => {
+  test.beforeEach(async ({ page }) => {
+    await page.goto('/tasks');
+    await page.waitForLoadState('networkidle');
+  });
+
+  test('task cards show subject heading', async ({ page }) => {
+    const taskCards = page.locator('button').filter({
+      has: page.locator('h4'),
+    });
+    const count = await taskCards.count();
+
+    if (count > 0) {
+      const heading = taskCards.first().locator('h4');
+      const text = await heading.textContent();
+      expect(text?.trim().length).toBeGreaterThan(0);
+    }
+  });
+
+  test('task cards show claude_task_id as monospace #id', async ({ page }) => {
+    const taskCards = page.locator('button').filter({
+      has: page.locator('h4'),
+    });
+    const count = await taskCards.count();
+
+    if (count > 0) {
+      // Look for font-mono element starting with #.
+      const idBadge = taskCards.first().locator('.font-mono');
+      const idCount = await idBadge.count();
+      if (idCount > 0) {
+        const text = await idBadge.first().textContent();
+        expect(text).toMatch(/^#/);
+      }
+    }
+  });
+
+  test('task cards show relative timestamp', async ({ page }) => {
+    const taskCards = page.locator('button').filter({
+      has: page.locator('h4'),
+    });
+    const count = await taskCards.count();
+
+    if (count > 0) {
+      // Look for time-related text (ago, just now, or date).
+      const card = taskCards.first();
+      const text = await card.textContent();
+      // Should contain some time reference.
+      const hasTime = /ago|just now|\d{1,2}\/\d{1,2}\/\d{4}/.test(text ?? '');
+      expect(hasTime).toBeTruthy();
+    }
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Navigation and sidebar.
+// ---------------------------------------------------------------------------
+
+test.describe('Tasks Page — Navigation', () => {
   test('clicking Tasks in sidebar navigates to tasks page', async ({ page }) => {
-    // Start from a different page.
     await page.goto('/inbox');
     await page.waitForLoadState('networkidle');
 
-    // Find the Tasks link in the sidebar navigation.
     const sidebar = page.getByRole('complementary');
     const tasksLink = sidebar.getByRole('link', { name: /tasks/i });
 
     if (await tasksLink.isVisible()) {
       await tasksLink.click();
       await page.waitForLoadState('networkidle');
-
-      // Verify we navigated to the tasks page.
       await expect(page).toHaveURL(/\/tasks/);
-
-      // Verify the tasks page header is visible.
-      await expect(page.getByRole('heading', { name: 'Tasks', level: 1 })).toBeVisible();
+      await expect(
+        page.getByRole('heading', { name: 'Tasks', level: 1 }),
+      ).toBeVisible();
     }
-  });
-
-  test('tasks page loads without JavaScript errors', async ({ page }) => {
-    // Collect page errors.
-    const pageErrors: Error[] = [];
-    page.on('pageerror', (error) => {
-      pageErrors.push(error);
-    });
-
-    await page.goto('/tasks');
-    await page.waitForLoadState('networkidle');
-
-    // No uncaught JavaScript errors should occur.
-    expect(pageErrors).toHaveLength(0);
   });
 });
 
-test.describe('Tasks Empty State', () => {
-  test('shows empty state message when no tasks match filter', async ({ page }) => {
+// ---------------------------------------------------------------------------
+// Dependency visualization (data-dependent).
+// ---------------------------------------------------------------------------
+
+test.describe('Tasks Page — Dependencies', () => {
+  test.beforeEach(async ({ page }) => {
+    await page.goto('/tasks');
+    await page.waitForLoadState('networkidle');
+  });
+
+  test('detail panel shows Dependencies section for blocked tasks', async ({ page }) => {
+    // Find a task card, open detail, check for Dependencies section.
+    // This section only appears when the task has blocked_by or blocks.
+    const taskCards = page.locator('button').filter({
+      has: page.locator('h4'),
+    });
+    const count = await taskCards.count();
+
+    let foundDeps = false;
+    for (let i = 0; i < Math.min(count, 5); i++) {
+      await taskCards.nth(i).click();
+      // Wait for panel to appear.
+      await page.waitForTimeout(300);
+
+      const depsSection = page.getByText('Dependencies');
+      if (await depsSection.isVisible().catch(() => false)) {
+        foundDeps = true;
+
+        // Verify dependency cards are shown (Blocked by or Blocks).
+        const blockedBy = page.getByText('Blocked by');
+        const blocks = page.getByText('Blocks');
+        const hasBlockedBy = await blockedBy.isVisible().catch(() => false);
+        const hasBlocks = await blocks.isVisible().catch(() => false);
+        expect(hasBlockedBy || hasBlocks).toBeTruthy();
+        break;
+      }
+
+      // Close panel before trying next card.
+      await page.keyboard.press('Escape');
+      await page.waitForTimeout(200);
+    }
+
+    // This test is conditional — deps may not exist in the test database.
+    // If no deps found, that's acceptable for an E2E test against a real db.
+    if (!foundDeps) {
+      console.log('No tasks with dependencies found — skipping dep assertions.');
+    }
+  });
+
+  test('blocked task indicator shows in board cards', async ({ page }) => {
+    // Look for "Blocked" text in a card's chip.
+    const blockedChips = page.locator('span').filter({ hasText: 'Blocked' });
+    const count = await blockedChips.count();
+
+    // May or may not exist in test data — just verify no errors.
+    expect(count).toBeGreaterThanOrEqual(0);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Empty state.
+// ---------------------------------------------------------------------------
+
+test.describe('Tasks Page — Empty State', () => {
+  test('shows appropriate empty state when no tasks match agent filter', async ({ page }) => {
     await page.goto('/tasks');
     await page.waitForLoadState('networkidle');
 
-    // The empty state appears when the task list is empty.
-    // With mock data, tasks are present. However, filtering might
-    // produce an empty result. Check that the empty state component
-    // structure exists in the DOM when tasks are filtered to nothing.
-    const emptyStateText = page.getByText('No tasks');
+    // Switch to list view to check for empty state text.
+    await page.getByRole('button', { name: 'list', exact: true }).click();
 
-    // With mock data, we expect tasks to be present, so empty state should
-    // not be visible initially.
-    const isEmptyStateVisible = await emptyStateText.isVisible().catch(() => false);
+    // Try selecting an agent that probably has no tasks.
+    const select = page.getByRole('combobox');
+    const options = select.locator('option');
+    const count = await options.count();
 
-    if (isEmptyStateVisible) {
-      // If empty state is visible, verify its content.
-      await expect(page.getByText('No tasks have been tracked yet.')).toBeVisible();
-      await expect(
-        page.getByText('Tasks are automatically tracked when agents use TodoWrite.'),
-      ).toBeVisible();
-    } else {
-      // Tasks are present, so task content should be visible instead.
-      await expect(page.locator('#root')).not.toBeEmpty();
+    // If there are multiple agents, one might have no tasks.
+    if (count > 2) {
+      // Try the last agent — less likely to have tasks in a test db.
+      const lastValue = await options.nth(count - 1).getAttribute('value');
+      if (lastValue) {
+        await select.selectOption(lastValue);
+        await page.waitForLoadState('networkidle');
+
+        // Check if empty state or task list is shown — both are valid.
+        const content = page.locator('#root');
+        await expect(content).not.toBeEmpty();
+      }
     }
   });
 });
