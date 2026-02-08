@@ -7,6 +7,7 @@ export type WSMessageType =
   | 'new_message'
   | 'agent_update'
   | 'activity'
+  | 'task_update'
   | 'pong'
   | 'subscribed'
   | 'error';

@@ -4,8 +4,10 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { clsx } from 'clsx';
 import { twMerge } from 'tailwind-merge';
-import { useTasks, useTaskStats, useAgentTaskStats } from '@/hooks/useTasks.js';
+import { useQueryClient } from '@tanstack/react-query';
+import { useTasks, useTaskStats, useAgentTaskStats, taskKeys } from '@/hooks/useTasks.js';
 import { useAgentsStatus } from '@/hooks/useAgents.js';
+import { useTaskUpdates } from '@/hooks/useWebSocket.js';
 import { getAgentContext } from '@/lib/utils.js';
 import { Spinner } from '@/components/ui/Spinner.js';
 import type { Task, TaskListOptions } from '@/api/tasks.js';
@@ -1097,6 +1099,16 @@ export default function TasksPage() {
   const { data: stats } = useTaskStats(agentFilter);
   const { data: agentsData } = useAgentsStatus();
   const { data: agentStats } = useAgentTaskStats();
+
+  // Invalidate task queries on WebSocket task_update events for real-time UI.
+  const queryClient = useQueryClient();
+  useTaskUpdates(
+    useCallback(() => {
+      void queryClient.invalidateQueries({ queryKey: taskKeys.lists() });
+      void queryClient.invalidateQueries({ queryKey: taskKeys.stats() });
+      void queryClient.invalidateQueries({ queryKey: taskKeys.agentStats() });
+    }, [queryClient]),
+  );
 
   const selectedKey = selectedTask ? taskKey(selectedTask) : null;
 

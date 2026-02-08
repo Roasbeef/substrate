@@ -140,6 +140,11 @@ func (s *Server) Start() error {
 	return s.srv.ListenAndServe()
 }
 
+// GetHub returns the WebSocket hub for external notification integration.
+func (s *Server) GetHub() *Hub {
+	return s.hub
+}
+
 // Shutdown gracefully shuts down the server.
 func (s *Server) Shutdown(ctx context.Context) error {
 	// Stop the notification bridge first.

@@ -83,6 +83,10 @@ type Server struct {
 	// reviewRef is the actor reference for the review service.
 	reviewRef review.ReviewActorRef
 
+	// taskNotifier receives callbacks after task mutations for real-time
+	// notifications (e.g., WebSocket broadcasts). Optional.
+	taskNotifier TaskChangeNotifier
+
 	grpcServer *grpc.Server
 	listener   net.Listener
 
@@ -129,6 +133,18 @@ func NewServer(
 		notificationHub: notificationHub,
 		reviewRef:       cfg.ReviewRef,
 		quit:            make(chan struct{}),
+	}
+}
+
+// SetTaskNotifier sets the callback for task change notifications.
+func (s *Server) SetTaskNotifier(n TaskChangeNotifier) {
+	s.taskNotifier = n
+}
+
+// notifyTaskChange calls the task notifier if one is configured.
+func (s *Server) notifyTaskChange(action string, payload map[string]any) {
+	if s.taskNotifier != nil {
+		s.taskNotifier.OnTaskChange(action, payload)
 	}
 }
 

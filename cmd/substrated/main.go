@@ -289,6 +289,15 @@ func main() {
 			log.Fatalf("Failed to create web server: %v", err)
 		}
 
+		// Wire task change notifications from gRPC server to WebSocket hub
+		// so the UI updates in real time when tasks are created or modified.
+		if grpcServer != nil && webServer.GetHub() != nil {
+			grpcServer.SetTaskNotifier(
+				web.NewHubTaskNotifier(webServer.GetHub()),
+			)
+			log.Println("Task change notifications wired: gRPC → WebSocket")
+		}
+
 		go func() {
 			log.Printf("Starting web server on %s", *webAddr)
 			if err := webServer.Start(); err != nil && err != http.ErrServerClosed {

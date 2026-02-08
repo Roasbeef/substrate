@@ -209,6 +209,27 @@ export function useActivityUpdates(handler: (payload: ActivityPayload[]) => void
   }, [client, handler]);
 }
 
+// Task update payload type.
+export interface TaskUpdatePayload {
+  action: string;
+  list_id?: string;
+  claude_task_id?: string;
+  agent_id?: number;
+  status?: string;
+  owner?: string;
+  id?: number;
+}
+
+// Hook to subscribe to task updates.
+export function useTaskUpdates(handler: (payload: TaskUpdatePayload) => void): void {
+  const client = useWebSocketClient();
+
+  useEffect(() => {
+    const unsubscribe = client.on<TaskUpdatePayload>('task_update', handler);
+    return unsubscribe;
+  }, [client, handler]);
+}
+
 // Hook to subscribe to new messages.
 export function useNewMessages(handler: (payload: NewMessagePayload) => void): void {
   const client = useWebSocketClient();

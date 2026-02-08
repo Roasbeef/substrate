@@ -11,6 +11,14 @@ import (
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
+// TaskChangeNotifier is called after task mutations to enable real-time
+// notifications (e.g., WebSocket broadcasts). The action describes what
+// happened and the payload carries relevant IDs for cache invalidation.
+type TaskChangeNotifier interface {
+	// OnTaskChange is called after a task mutation completes successfully.
+	OnTaskChange(action string, payload map[string]any)
+}
+
 // RegisterTaskList registers a new task list for an agent.
 func (s *Server) RegisterTaskList(
 	ctx context.Context, req *RegisterTaskListRequest,
@@ -163,6 +171,13 @@ func (s *Server) UpsertTask(
 		)
 	}
 
+	s.notifyTaskChange("upsert", map[string]any{
+		"list_id":        req.ListId,
+		"claude_task_id": req.ClaudeTaskId,
+		"agent_id":       req.AgentId,
+		"status":         taskStatusToString(req.Status),
+	})
+
 	return &UpsertTaskResponse{Task: taskToProto(task)}, nil
 }
 
@@ -258,9 +273,11 @@ func (s *Server) UpdateTaskStatus(
 		)
 	}
 
+	statusStr := taskStatusToString(req.Status)
+
 	err := s.taskStore.UpdateTaskStatus(
 		ctx, req.ListId, req.ClaudeTaskId,
-		taskStatusToString(req.Status), time.Now(),
+		statusStr, time.Now(),
 	)
 	if err != nil {
 		return nil, status.Errorf(
@@ -268,6 +285,12 @@ func (s *Server) UpdateTaskStatus(
 			"failed to update task status: %v", err,
 		)
 	}
+
+	s.notifyTaskChange("status", map[string]any{
+		"list_id":        req.ListId,
+		"claude_task_id": req.ClaudeTaskId,
+		"status":         statusStr,
+	})
 
 	return &UpdateTaskStatusResponse{}, nil
 }
@@ -294,6 +317,12 @@ func (s *Server) UpdateTaskOwner(
 		)
 	}
 
+	s.notifyTaskChange("owner", map[string]any{
+		"list_id":        req.ListId,
+		"claude_task_id": req.ClaudeTaskId,
+		"owner":          req.Owner,
+	})
+
 	return &UpdateTaskOwnerResponse{}, nil
 }
 
@@ -313,6 +342,10 @@ func (s *Server) DeleteTask(
 			codes.Internal, "failed to delete task: %v", err,
 		)
 	}
+
+	s.notifyTaskChange("delete", map[string]any{
+		"id": req.Id,
+	})
 
 	return &DeleteTaskResponse{}, nil
 }
@@ -410,6 +443,10 @@ func (s *Server) SyncTaskList(
 			"failed to update sync time: %v", err,
 		)
 	}
+
+	s.notifyTaskChange("sync", map[string]any{
+		"list_id": req.ListId,
+	})
 
 	return &SyncTaskListResponse{}, nil
 }
