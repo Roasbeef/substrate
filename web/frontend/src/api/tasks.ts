@@ -1,7 +1,7 @@
 // API functions for task-related operations.
 // Uses grpc-gateway REST API directly.
 
-import { get, post, patch, del } from './client.js';
+import { get, post, patch } from './client.js';
 
 // Helper to convert proto int64 (string) to number.
 function toNumber(value: string | number | undefined): number {
@@ -227,14 +227,12 @@ function buildQueryString(options: TaskListOptions): string {
   return queryString ? `?${queryString}` : '';
 }
 
-// Parse timestamp to Date.
+// Parse timestamp to Date, returning null for empty or invalid strings.
 function parseTimestamp(ts?: string): Date | null {
   if (!ts) return null;
-  try {
-    return new Date(ts);
-  } catch {
-    return null;
-  }
+  const date = new Date(ts);
+  if (isNaN(date.getTime())) return null;
+  return date;
 }
 
 // Parse gateway task response to Task.
@@ -260,18 +258,21 @@ function parseTask(t: GatewayTaskResponse['task']): Task {
 }
 
 // Parse gateway task list response to TaskList.
-function parseTaskList(
-  tl: GatewayListTaskListsResponse['task_lists'] extends (infer T)[]
-    ? T
-    : never,
-): TaskList {
+function parseTaskList(tl: {
+  id?: string;
+  list_id?: string;
+  agent_id?: string;
+  watch_path?: string;
+  created_at?: string;
+  last_synced_at?: string;
+}): TaskList {
   return {
-    id: toNumber(tl?.id),
-    list_id: tl?.list_id ?? '',
-    agent_id: toNumber(tl?.agent_id),
-    watch_path: tl?.watch_path ?? '',
-    created_at: parseTimestamp(tl?.created_at),
-    last_synced_at: parseTimestamp(tl?.last_synced_at),
+    id: toNumber(tl.id),
+    list_id: tl.list_id ?? '',
+    agent_id: toNumber(tl.agent_id),
+    watch_path: tl.watch_path ?? '',
+    created_at: parseTimestamp(tl.created_at),
+    last_synced_at: parseTimestamp(tl.last_synced_at),
   };
 }
 
