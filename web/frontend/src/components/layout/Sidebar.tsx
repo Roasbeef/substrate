@@ -141,6 +141,19 @@ function TasksIcon() {
   );
 }
 
+function PlansIcon() {
+  return (
+    <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+      <path
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        strokeWidth={2}
+        d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
+      />
+    </svg>
+  );
+}
+
 function SettingsIcon() {
   return (
     <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -221,6 +234,7 @@ const navItems: NavItem[] = [
   { id: 'sessions', label: 'Sessions', path: routes.sessions, icon: <TerminalIcon /> },
   { id: 'reviews', label: 'Reviews', path: routes.reviews, icon: <CodeReviewIcon /> },
   { id: 'tasks', label: 'Tasks', path: routes.tasks, icon: <TasksIcon /> },
+  { id: 'plans', label: 'Plans', path: routes.plans, icon: <PlansIcon /> },
 ];
 
 // Logo component - hidden in sidebar since branding is in header now.
@@ -414,6 +428,7 @@ function useActiveSection(): SidebarSection {
   if (path.startsWith('/sessions')) return 'sessions';
   if (path.startsWith('/reviews')) return 'reviews';
   if (path.startsWith('/tasks')) return 'tasks';
+  if (path.startsWith('/plans')) return 'plans';
   if (path.startsWith('/starred')) return 'starred';
   if (path.startsWith('/snoozed')) return 'snoozed';
   if (path.startsWith('/sent')) return 'sent';
