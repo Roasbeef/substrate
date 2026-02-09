@@ -20,6 +20,7 @@ import (
 	"github.com/roasbeef/subtrate/internal/mail"
 	"github.com/roasbeef/subtrate/internal/mailclient"
 	"github.com/roasbeef/subtrate/internal/review"
+	"github.com/roasbeef/subtrate/internal/store"
 )
 
 // ServerConfig holds configuration for the gRPC server.
@@ -67,6 +68,7 @@ func DefaultServerConfig() ServerConfig {
 type Server struct {
 	cfg          ServerConfig
 	store        *db.Store
+	taskStore    store.TaskStore            // Task CRUD via store interface.
 	mailSvc      *mail.Service              // Direct service for operations not via actor.
 	mailClient   *mailclient.Client         // Shared mail client (required).
 	actClient    *mailclient.ActivityClient // Shared activity client (required).
@@ -80,6 +82,10 @@ type Server struct {
 
 	// reviewRef is the actor reference for the review service.
 	reviewRef review.ReviewActorRef
+
+	// taskNotifier receives callbacks after task mutations for real-time
+	// notifications (e.g., WebSocket broadcasts). Optional.
+	taskNotifier TaskChangeNotifier
 
 	grpcServer *grpc.Server
 	listener   net.Listener
@@ -97,21 +103,27 @@ type Server struct {
 	UnimplementedActivityServer
 	UnimplementedStatsServer
 	UnimplementedReviewServiceServer
+	UnimplementedTaskServiceServer
 }
 
 // NewServer creates a new gRPC server instance.
 func NewServer(
 	cfg ServerConfig,
-	store *db.Store,
+	dbStore *db.Store,
 	mailSvc *mail.Service,
 	agentReg *agent.Registry,
 	identityMgr *agent.IdentityManager,
 	heartbeatMgr *agent.HeartbeatManager,
 	notificationHub actor.ActorRef[mail.NotificationRequest, mail.NotificationResponse],
 ) *Server {
+	// Create task store from the database connection for direct
+	// CRUD operations without the actor system.
+	taskSt := store.FromDB(dbStore.DB())
+
 	return &Server{
 		cfg:             cfg,
-		store:           store,
+		store:           dbStore,
+		taskStore:       taskSt,
 		mailSvc:         mailSvc,
 		mailClient:      mailclient.NewClient(cfg.MailRef),
 		actClient:       mailclient.NewActivityClient(cfg.ActivityRef),
@@ -121,6 +133,18 @@ func NewServer(
 		notificationHub: notificationHub,
 		reviewRef:       cfg.ReviewRef,
 		quit:            make(chan struct{}),
+	}
+}
+
+// SetTaskNotifier sets the callback for task change notifications.
+func (s *Server) SetTaskNotifier(n TaskChangeNotifier) {
+	s.taskNotifier = n
+}
+
+// notifyTaskChange calls the task notifier if one is configured.
+func (s *Server) notifyTaskChange(action string, payload map[string]any) {
+	if s.taskNotifier != nil {
+		s.taskNotifier.OnTaskChange(action, payload)
 	}
 }
 
@@ -153,6 +177,7 @@ func (s *Server) Start() error {
 	RegisterActivityServer(s.grpcServer, s)
 	RegisterStatsServer(s.grpcServer, s)
 	RegisterReviewServiceServer(s.grpcServer, s)
+	RegisterTaskServiceServer(s.grpcServer, s)
 
 	// Start serving in a goroutine.
 	s.wg.Add(1)

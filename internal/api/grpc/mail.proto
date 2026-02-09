@@ -137,6 +137,51 @@ service Stats {
     rpc HealthCheck (HealthCheckRequest) returns (HealthCheckResponse);
 }
 
+// TaskService handles Claude Code task operations.
+service TaskService {
+    // RegisterTaskList registers a new task list for an agent.
+    rpc RegisterTaskList (RegisterTaskListRequest) returns (RegisterTaskListResponse);
+
+    // GetTaskList retrieves a task list by ID.
+    rpc GetTaskList (GetTaskListRequest) returns (GetTaskListResponse);
+
+    // ListTaskLists lists registered task lists.
+    rpc ListTaskLists (ListTaskListsRequest) returns (ListTaskListsResponse);
+
+    // UnregisterTaskList removes a task list registration.
+    rpc UnregisterTaskList (UnregisterTaskListRequest) returns (UnregisterTaskListResponse);
+
+    // UpsertTask creates or updates a task.
+    rpc UpsertTask (UpsertTaskRequest) returns (UpsertTaskResponse);
+
+    // GetTask retrieves a task by Claude task ID.
+    rpc GetTask (GetTaskProtoRequest) returns (GetTaskResponse);
+
+    // ListTasks lists tasks with optional filters.
+    rpc ListTasks (ListTasksRequest) returns (ListTasksResponse);
+
+    // UpdateTaskStatus updates a task's status.
+    rpc UpdateTaskStatus (UpdateTaskStatusRequest) returns (UpdateTaskStatusResponse);
+
+    // UpdateTaskOwner assigns an owner to a task.
+    rpc UpdateTaskOwner (UpdateTaskOwnerRequest) returns (UpdateTaskOwnerResponse);
+
+    // DeleteTask deletes a task.
+    rpc DeleteTask (DeleteTaskRequest) returns (DeleteTaskResponse);
+
+    // GetTaskStats retrieves task statistics.
+    rpc GetTaskStats (GetTaskStatsRequest) returns (GetTaskStatsResponse);
+
+    // GetAllAgentTaskStats retrieves task stats grouped by agent.
+    rpc GetAllAgentTaskStats (GetAllAgentTaskStatsRequest) returns (GetAllAgentTaskStatsResponse);
+
+    // SyncTaskList triggers a sync of a task list.
+    rpc SyncTaskList (SyncTaskListRequest) returns (SyncTaskListResponse);
+
+    // PruneOldTasks removes old completed/deleted tasks.
+    rpc PruneOldTasks (PruneOldTasksRequest) returns (PruneOldTasksResponse);
+}
+
 // ReviewService handles code review operations.
 service ReviewService {
     // CreateReview creates a new review request.
@@ -1000,4 +1045,244 @@ message GetReviewDiffResponse {
     // The git command that was run to produce the diff.
     string command = 2;
     string error = 3;
+}
+
+// =============================================================================
+// TaskService Messages
+// =============================================================================
+
+// TaskStatus represents the status of a task.
+enum TaskStatus {
+    TASK_STATUS_UNSPECIFIED = 0;
+    TASK_STATUS_PENDING = 1;
+    TASK_STATUS_IN_PROGRESS = 2;
+    TASK_STATUS_COMPLETED = 3;
+    TASK_STATUS_DELETED = 4;
+}
+
+// TaskListProto represents a registered task list.
+message TaskListProto {
+    int64 id = 1;
+    string list_id = 2;
+    int64 agent_id = 3;
+    string watch_path = 4;
+    google.protobuf.Timestamp created_at = 5;
+    google.protobuf.Timestamp last_synced_at = 6;
+}
+
+// TaskProto represents a Claude Code task.
+message TaskProto {
+    int64 id = 1;
+    int64 agent_id = 2;
+    string list_id = 3;
+    string claude_task_id = 4;
+    string subject = 5;
+    string description = 6;
+    string active_form = 7;
+    string metadata_json = 8;
+    TaskStatus status = 9;
+    string owner = 10;
+    repeated string blocked_by = 11;
+    repeated string blocks = 12;
+    google.protobuf.Timestamp created_at = 13;
+    google.protobuf.Timestamp updated_at = 14;
+    google.protobuf.Timestamp started_at = 15;
+    google.protobuf.Timestamp completed_at = 16;
+}
+
+// TaskStatsProto contains aggregate task statistics.
+message TaskStatsProto {
+    int64 pending_count = 1;
+    int64 in_progress_count = 2;
+    int64 completed_count = 3;
+    int64 blocked_count = 4;
+    int64 available_count = 5;
+    int64 completed_today = 6;
+}
+
+// AgentTaskStatsProto contains task statistics for a specific agent.
+message AgentTaskStatsProto {
+    int64 agent_id = 1;
+    string agent_name = 2;
+    int64 pending_count = 3;
+    int64 in_progress_count = 4;
+    int64 blocked_count = 5;
+    int64 completed_today = 6;
+}
+
+// RegisterTaskListRequest is the request for RegisterTaskList.
+message RegisterTaskListRequest {
+    string list_id = 1;
+    int64 agent_id = 2;
+    string watch_path = 3;
+}
+
+// RegisterTaskListResponse is the response for RegisterTaskList.
+message RegisterTaskListResponse {
+    TaskListProto task_list = 1;
+    string error = 2;
+}
+
+// GetTaskListRequest is the request for GetTaskList.
+message GetTaskListRequest {
+    string list_id = 1;
+}
+
+// GetTaskListResponse is the response for GetTaskList.
+message GetTaskListResponse {
+    TaskListProto task_list = 1;
+    string error = 2;
+}
+
+// ListTaskListsRequest is the request for ListTaskLists.
+message ListTaskListsRequest {
+    int64 agent_id = 1;  // Optional filter by agent
+}
+
+// ListTaskListsResponse is the response for ListTaskLists.
+message ListTaskListsResponse {
+    repeated TaskListProto task_lists = 1;
+    string error = 2;
+}
+
+// UnregisterTaskListRequest is the request for UnregisterTaskList.
+message UnregisterTaskListRequest {
+    string list_id = 1;
+}
+
+// UnregisterTaskListResponse is the response for UnregisterTaskList.
+message UnregisterTaskListResponse {
+    string error = 1;
+}
+
+// UpsertTaskRequest is the request for UpsertTask.
+message UpsertTaskRequest {
+    int64 agent_id = 1;
+    string list_id = 2;
+    string claude_task_id = 3;
+    string subject = 4;
+    string description = 5;
+    string active_form = 6;
+    string metadata_json = 7;
+    TaskStatus status = 8;
+    string owner = 9;
+    repeated string blocked_by = 10;
+    repeated string blocks = 11;
+    string file_path = 12;
+    int64 file_mtime = 13;
+}
+
+// UpsertTaskResponse is the response for UpsertTask.
+message UpsertTaskResponse {
+    TaskProto task = 1;
+    string error = 2;
+}
+
+// GetTaskProtoRequest is the request for GetTask.
+message GetTaskProtoRequest {
+    string list_id = 1;
+    string claude_task_id = 2;
+}
+
+// GetTaskResponse is the response for GetTask.
+message GetTaskResponse {
+    TaskProto task = 1;
+    string error = 2;
+}
+
+// ListTasksRequest is the request for ListTasks.
+message ListTasksRequest {
+    int64 agent_id = 1;
+    string list_id = 2;
+    TaskStatus status = 3;
+    bool active_only = 4;
+    bool available_only = 5;
+    int32 limit = 6;
+    int32 offset = 7;
+}
+
+// ListTasksResponse is the response for ListTasks.
+message ListTasksResponse {
+    repeated TaskProto tasks = 1;
+    string error = 2;
+}
+
+// UpdateTaskStatusRequest is the request for UpdateTaskStatus.
+message UpdateTaskStatusRequest {
+    string list_id = 1;
+    string claude_task_id = 2;
+    TaskStatus status = 3;
+}
+
+// UpdateTaskStatusResponse is the response for UpdateTaskStatus.
+message UpdateTaskStatusResponse {
+    string error = 1;
+}
+
+// UpdateTaskOwnerRequest is the request for UpdateTaskOwner.
+message UpdateTaskOwnerRequest {
+    string list_id = 1;
+    string claude_task_id = 2;
+    string owner = 3;
+}
+
+// UpdateTaskOwnerResponse is the response for UpdateTaskOwner.
+message UpdateTaskOwnerResponse {
+    string error = 1;
+}
+
+// DeleteTaskRequest is the request for DeleteTask.
+message DeleteTaskRequest {
+    int64 id = 1;
+}
+
+// DeleteTaskResponse is the response for DeleteTask.
+message DeleteTaskResponse {
+    string error = 1;
+}
+
+// GetTaskStatsRequest is the request for GetTaskStats.
+message GetTaskStatsRequest {
+    int64 agent_id = 1;
+    string list_id = 2;
+    google.protobuf.Timestamp today_since = 3;
+}
+
+// GetTaskStatsResponse is the response for GetTaskStats.
+message GetTaskStatsResponse {
+    TaskStatsProto stats = 1;
+    string error = 2;
+}
+
+// GetAllAgentTaskStatsRequest is the request for GetAllAgentTaskStats.
+message GetAllAgentTaskStatsRequest {
+    google.protobuf.Timestamp today_since = 1;
+}
+
+// GetAllAgentTaskStatsResponse is the response for GetAllAgentTaskStats.
+message GetAllAgentTaskStatsResponse {
+    repeated AgentTaskStatsProto stats = 1;
+    string error = 2;
+}
+
+// SyncTaskListRequest is the request for SyncTaskList.
+message SyncTaskListRequest {
+    string list_id = 1;
+}
+
+// SyncTaskListResponse is the response for SyncTaskList.
+message SyncTaskListResponse {
+    int32 tasks_updated = 1;
+    int32 tasks_deleted = 2;
+    string error = 3;
+}
+
+// PruneOldTasksRequest is the request for PruneOldTasks.
+message PruneOldTasksRequest {
+    google.protobuf.Timestamp older_than = 1;
+}
+
+// PruneOldTasksResponse is the response for PruneOldTasks.
+message PruneOldTasksResponse {
+    string error = 1;
 }

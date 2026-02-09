@@ -50,7 +50,6 @@ func OpenQueueStore(dbPath string, cfg QueueConfig) (*QueueStore, error) {
 func (s *QueueStore) Enqueue(
 	ctx context.Context, op PendingOperation,
 ) error {
-
 	return s.sqliteStore.WithTx(ctx, func(
 		ctx context.Context, q *sqlc.Queries,
 	) error {
@@ -143,7 +142,6 @@ func (s *QueueStore) MarkDelivered(ctx context.Context, id int64) error {
 func (s *QueueStore) MarkFailed(
 	ctx context.Context, id int64, errMsg string,
 ) error {
-
 	return s.sqliteStore.WithTx(ctx, func(
 		ctx context.Context, q *sqlc.Queries,
 	) error {

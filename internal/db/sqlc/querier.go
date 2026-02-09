@@ -22,6 +22,8 @@ type Querier interface {
 	CountSnoozedByAgent(ctx context.Context, agentID int64) (int64, error)
 	CountStarredByAgent(ctx context.Context, agentID int64) (int64, error)
 	CountSubscribersByTopic(ctx context.Context, topicID int64) (int64, error)
+	// Task count query for list
+	CountTasksByList(ctx context.Context, listID string) (int64, error)
 	CountUnreadByAgent(ctx context.Context, agentID int64) (int64, error)
 	CountUnreadUrgentByAgent(ctx context.Context, agentID int64) (int64, error)
 	CreateActivity(ctx context.Context, arg CreateActivityParams) (Activity, error)
@@ -33,6 +35,10 @@ type Querier interface {
 	CreateReviewIteration(ctx context.Context, arg CreateReviewIterationParams) (ReviewIteration, error)
 	CreateSessionIdentity(ctx context.Context, arg CreateSessionIdentityParams) error
 	CreateSubscription(ctx context.Context, arg CreateSubscriptionParams) error
+	// Task CRUD queries
+	CreateTask(ctx context.Context, arg CreateTaskParams) (AgentTask, error)
+	// Task list registration queries
+	CreateTaskList(ctx context.Context, arg CreateTaskListParams) (TaskList, error)
 	CreateTopic(ctx context.Context, arg CreateTopicParams) (Topic, error)
 	DeleteAgent(ctx context.Context, id int64) error
 	DeleteMessage(ctx context.Context, id int64) error
@@ -43,6 +49,10 @@ type Querier interface {
 	DeleteReviewIterations(ctx context.Context, reviewID string) error
 	DeleteSessionIdentity(ctx context.Context, sessionID string) error
 	DeleteSubscription(ctx context.Context, arg DeleteSubscriptionParams) error
+	// Cleanup queries
+	DeleteTask(ctx context.Context, id int64) error
+	DeleteTaskList(ctx context.Context, listID string) error
+	DeleteTasksByList(ctx context.Context, listID string) error
 	DeleteTopic(ctx context.Context, id int64) error
 	DrainPendingOperations(ctx context.Context) ([]PendingOperation, error)
 	EnqueueOperation(ctx context.Context, arg EnqueueOperationParams) (PendingOperation, error)
@@ -50,12 +60,14 @@ type Querier interface {
 	GetAgent(ctx context.Context, id int64) (Agent, error)
 	GetAgentByName(ctx context.Context, name string) (Agent, error)
 	GetAgentBySessionID(ctx context.Context, sessionID string) (Agent, error)
+	GetAllAgentTaskStats(ctx context.Context) ([]GetAllAgentTaskStatsRow, error)
 	// Global inbox view: all messages across all agents, not archived or trashed.
 	GetAllInboxMessages(ctx context.Context, limit int64) ([]GetAllInboxMessagesRow, error)
 	// Global inbox view with pagination support.
 	GetAllInboxMessagesPaginated(ctx context.Context, arg GetAllInboxMessagesPaginatedParams) ([]GetAllInboxMessagesPaginatedRow, error)
 	// Global sent view: all sent messages across all agents.
 	GetAllSentMessages(ctx context.Context, limit int64) ([]GetAllSentMessagesRow, error)
+	GetAllTaskStats(ctx context.Context) (GetAllTaskStatsRow, error)
 	GetArchivedMessages(ctx context.Context, arg GetArchivedMessagesParams) ([]GetArchivedMessagesRow, error)
 	GetConsumerOffset(ctx context.Context, arg GetConsumerOffsetParams) (int64, error)
 	GetInboxMessages(ctx context.Context, arg GetInboxMessagesParams) ([]GetInboxMessagesRow, error)
@@ -96,6 +108,13 @@ type Querier interface {
 	GetSnoozedMessagesReadyToWake(ctx context.Context, snoozedUntil sql.NullInt64) ([]GetSnoozedMessagesReadyToWakeRow, error)
 	GetStarredMessages(ctx context.Context, arg GetStarredMessagesParams) ([]GetStarredMessagesRow, error)
 	GetSubscription(ctx context.Context, arg GetSubscriptionParams) (Subscription, error)
+	GetTask(ctx context.Context, id int64) (AgentTask, error)
+	GetTaskByClaudeID(ctx context.Context, arg GetTaskByClaudeIDParams) (AgentTask, error)
+	GetTaskList(ctx context.Context, listID string) (TaskList, error)
+	GetTaskListByID(ctx context.Context, id int64) (TaskList, error)
+	// Task statistics queries
+	GetTaskStatsByAgent(ctx context.Context, agentID int64) (GetTaskStatsByAgentRow, error)
+	GetTaskStatsByList(ctx context.Context, listID string) (GetTaskStatsByListRow, error)
 	GetTopic(ctx context.Context, id int64) (Topic, error)
 	GetTopicByName(ctx context.Context, name string) (Topic, error)
 	GetTrashMessages(ctx context.Context, arg GetTrashMessagesParams) ([]GetTrashMessagesRow, error)
@@ -105,27 +124,43 @@ type Querier interface {
 	HasUnackedStatusToAgent(ctx context.Context, arg HasUnackedStatusToAgentParams) (int64, error)
 	// Returns reviews that are in non-terminal states (for restart recovery).
 	ListActiveReviews(ctx context.Context) ([]Review, error)
+	ListActiveTasksByAgent(ctx context.Context, agentID int64) ([]AgentTask, error)
 	ListActivitiesByAgent(ctx context.Context, arg ListActivitiesByAgentParams) ([]Activity, error)
 	ListActivitiesByType(ctx context.Context, arg ListActivitiesByTypeParams) ([]Activity, error)
 	ListActivitiesSince(ctx context.Context, arg ListActivitiesSinceParams) ([]Activity, error)
 	ListAgents(ctx context.Context) ([]Agent, error)
 	ListAgentsByProject(ctx context.Context, projectKey sql.NullString) ([]Agent, error)
+	ListAllTasks(ctx context.Context, arg ListAllTasksParams) ([]AgentTask, error)
+	ListAvailableTasks(ctx context.Context, agentID int64) ([]AgentTask, error)
+	ListBlockedTasks(ctx context.Context, agentID int64) ([]AgentTask, error)
 	ListConsumerOffsetsByAgent(ctx context.Context, agentID int64) ([]ListConsumerOffsetsByAgentRow, error)
+	ListInProgressTasks(ctx context.Context, agentID int64) ([]AgentTask, error)
 	ListMessagesByPriority(ctx context.Context, arg ListMessagesByPriorityParams) ([]Message, error)
 	ListPendingOperations(ctx context.Context) ([]PendingOperation, error)
+	ListPendingTasks(ctx context.Context, agentID int64) ([]AgentTask, error)
 	ListRecentActivities(ctx context.Context, limit int64) ([]Activity, error)
+	ListRecentCompletedTasks(ctx context.Context, arg ListRecentCompletedTasksParams) ([]AgentTask, error)
 	ListReviews(ctx context.Context, arg ListReviewsParams) ([]Review, error)
 	ListReviewsByRequester(ctx context.Context, arg ListReviewsByRequesterParams) ([]Review, error)
 	ListReviewsByState(ctx context.Context, arg ListReviewsByStateParams) ([]Review, error)
 	ListSessionIdentitiesByAgent(ctx context.Context, agentID int64) ([]SessionIdentity, error)
 	ListSubscriptionsByAgent(ctx context.Context, agentID int64) ([]Topic, error)
 	ListSubscriptionsByTopic(ctx context.Context, topicID int64) ([]Agent, error)
+	ListTaskLists(ctx context.Context) ([]TaskList, error)
+	ListTaskListsByAgent(ctx context.Context, agentID int64) ([]TaskList, error)
+	// Task listing queries
+	ListTasksByAgent(ctx context.Context, agentID int64) ([]AgentTask, error)
+	ListTasksByAgentWithLimit(ctx context.Context, arg ListTasksByAgentWithLimitParams) ([]AgentTask, error)
+	ListTasksByList(ctx context.Context, listID string) ([]AgentTask, error)
+	ListTasksByStatus(ctx context.Context, arg ListTasksByStatusParams) ([]AgentTask, error)
 	ListTopics(ctx context.Context) ([]Topic, error)
 	ListTopicsByType(ctx context.Context, topicType string) ([]Topic, error)
 	ListTopicsWithMessageCount(ctx context.Context) ([]ListTopicsWithMessageCountRow, error)
 	MarkMessageDeletedBySender(ctx context.Context, arg MarkMessageDeletedBySenderParams) error
 	MarkOperationDelivered(ctx context.Context, id int64) error
 	MarkOperationFailed(ctx context.Context, arg MarkOperationFailedParams) error
+	MarkTasksDeletedByList(ctx context.Context, arg MarkTasksDeletedByListParams) error
+	PruneOldTasks(ctx context.Context, completedAt sql.NullInt64) error
 	PurgeExpiredOperations(ctx context.Context, expiresAt int64) (int64, error)
 	// Simple LIKE-based search on subject and body. FTS5 is available but this
 	// covers basic cases. The search term should be passed with wildcards.
@@ -144,11 +179,15 @@ type Querier interface {
 	UpdateReviewIssueStatus(ctx context.Context, arg UpdateReviewIssueStatusParams) error
 	UpdateReviewState(ctx context.Context, arg UpdateReviewStateParams) error
 	UpdateSessionIdentityLastActive(ctx context.Context, arg UpdateSessionIdentityLastActiveParams) error
+	UpdateTaskListSyncTime(ctx context.Context, arg UpdateTaskListSyncTimeParams) error
+	UpdateTaskOwner(ctx context.Context, arg UpdateTaskOwnerParams) error
+	UpdateTaskStatus(ctx context.Context, arg UpdateTaskStatusParams) error
 	// Update the state of all message recipients in a thread for a specific agent.
 	// Used for archive, trash, and mark as unread operations.
 	UpdateThreadRecipientState(ctx context.Context, arg UpdateThreadRecipientStateParams) (int64, error)
 	UpdateTopicRetention(ctx context.Context, arg UpdateTopicRetentionParams) error
 	UpsertConsumerOffset(ctx context.Context, arg UpsertConsumerOffsetParams) error
+	UpsertTask(ctx context.Context, arg UpsertTaskParams) (AgentTask, error)
 	WakeSnoozedMessages(ctx context.Context, snoozedUntil sql.NullInt64) (int64, error)
 }
 

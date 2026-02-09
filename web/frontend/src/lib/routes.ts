@@ -15,6 +15,7 @@ export const routes = {
   session: (sessionId: number | string) => `/sessions/${sessionId}`,
   reviews: '/reviews',
   review: (reviewId: string) => `/reviews/${reviewId}`,
+  tasks: '/tasks',
   settings: '/settings',
   search: '/search',
 } as const;

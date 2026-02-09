@@ -104,6 +104,12 @@ func NewTransactionExecutor[Querier any](db BatchedQuerier,
 		optFunc(txOpts)
 	}
 
+	// Fall back to the default logger if none was provided, to avoid
+	// nil pointer panics during transaction retry logging.
+	if log == nil {
+		log = slog.Default()
+	}
+
 	return &TransactionExecutor[Querier]{
 		BatchedQuerier: db,
 		createQuery:    createQuery,

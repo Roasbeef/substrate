@@ -19,6 +19,7 @@ const (
 	WSMsgTypeNewMessage  = "new_message"
 	WSMsgTypeAgentUpdate = "agent_update"
 	WSMsgTypeActivity    = "activity"
+	WSMsgTypeTaskUpdate  = "task_update"
 	WSMsgTypePong        = "pong"
 	WSMsgTypeConnected   = "connected"
 	WSMsgTypeError       = "error"
@@ -293,6 +294,39 @@ func (h *Hub) BroadcastToAll(msg *WSMessage) {
 	default:
 		log.Printf("WebSocket: Broadcast buffer full, dropping message")
 	}
+}
+
+// HubTaskNotifier adapts the WebSocket Hub to the gRPC TaskChangeNotifier
+// interface, forwarding task mutation events as WebSocket broadcasts.
+type HubTaskNotifier struct {
+	hub *Hub
+}
+
+// NewHubTaskNotifier creates a new notifier that broadcasts task changes via
+// the WebSocket hub.
+func NewHubTaskNotifier(hub *Hub) *HubTaskNotifier {
+	return &HubTaskNotifier{hub: hub}
+}
+
+// OnTaskChange implements the gRPC TaskChangeNotifier interface by broadcasting
+// the task change to all connected WebSocket clients.
+func (n *HubTaskNotifier) OnTaskChange(action string, payload map[string]any) {
+	n.hub.BroadcastTaskUpdate(action, payload)
+}
+
+// BroadcastTaskUpdate notifies all clients of a task change.
+// The action string describes what happened (e.g., "upsert", "status", "owner",
+// "sync", "delete") and the payload carries relevant IDs for cache invalidation.
+func (h *Hub) BroadcastTaskUpdate(action string, payload map[string]any) {
+	if payload == nil {
+		payload = make(map[string]any)
+	}
+	payload["action"] = action
+
+	h.BroadcastToAll(&WSMessage{
+		Type:    WSMsgTypeTaskUpdate,
+		Payload: payload,
+	})
 }
 
 // BroadcastNewMessage notifies clients of a new message.

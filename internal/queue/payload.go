@@ -59,7 +59,6 @@ func MarshalPayload(payload any) (string, error) {
 func UnmarshalPayload(
 	opType OperationType, jsonStr string,
 ) (any, error) {
-
 	switch opType {
 	case OpSend:
 		var p SendPayload

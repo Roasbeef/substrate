@@ -25,11 +25,18 @@ type MockStore struct {
 	activities        []Activity
 	sessionIdentities map[string]SessionIdentity
 
+	// Task data stores.
+	taskLists  map[string]TaskList
+	tasks      map[int64]Task
+	tasksByKey map[string]int64 // "listID:claudeTaskID" -> task ID
+
 	// Counters for auto-incrementing IDs.
 	nextMessageID  int64
 	nextAgentID    int64
 	nextTopicID    int64
 	nextActivityID int64
+	nextTaskListID int64
+	nextTaskID     int64
 }
 
 // NewMockStore creates a new in-memory mock store.
@@ -45,10 +52,15 @@ func NewMockStore() *MockStore {
 		subscriptions:     make(map[int64]map[int64]bool),
 		activities:        make([]Activity, 0),
 		sessionIdentities: make(map[string]SessionIdentity),
+		taskLists:         make(map[string]TaskList),
+		tasks:             make(map[int64]Task),
+		tasksByKey:        make(map[string]int64),
 		nextMessageID:     1,
 		nextAgentID:       1,
 		nextTopicID:       1,
 		nextActivityID:    1,
+		nextTaskListID:    1,
+		nextTaskID:        1,
 	}
 }
 

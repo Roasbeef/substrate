@@ -35,10 +35,17 @@ This command:
 1. Creates ~/.claude/hooks/substrate/ with hook scripts
 2. Updates ~/.claude/settings.json to register hooks
 3. Installs the Subtrate skill to ~/.claude/skills/substrate/
+4. Optionally installs task sync hooks for auto-syncing Claude Code tasks
 
 Existing hooks in settings.json are preserved; Subtrate hooks are appended.`,
 	RunE: runHooksInstall,
 }
+
+// Hook install flags.
+var (
+	installWithTasks bool
+	installNoTasks   bool
+)
 
 var hooksUninstallCmd = &cobra.Command{
 	Use:   "uninstall",
@@ -55,6 +62,15 @@ var hooksStatusCmd = &cobra.Command{
 }
 
 func init() {
+	hooksInstallCmd.Flags().BoolVar(
+		&installWithTasks, "with-tasks", false,
+		"Install task sync hooks for auto-syncing Claude Code tasks",
+	)
+	hooksInstallCmd.Flags().BoolVar(
+		&installNoTasks, "no-tasks", false,
+		"Skip installing task sync hooks",
+	)
+
 	hooksCmd.AddCommand(hooksInstallCmd)
 	hooksCmd.AddCommand(hooksUninstallCmd)
 	hooksCmd.AddCommand(hooksStatusCmd)
@@ -90,6 +106,11 @@ func runHooksInstall(cmd *cobra.Command, args []string) error {
 
 	hooks.InstallHooks(settings)
 
+	// Install task hooks if requested.
+	if installWithTasks && !installNoTasks {
+		hooks.InstallTaskHooks(settings)
+	}
+
 	if err := hooks.SaveSettings(claudeDir, settings); err != nil {
 		return fmt.Errorf("failed to save settings: %w", err)
 	}
@@ -109,6 +130,15 @@ func runHooksInstall(cmd *cobra.Command, args []string) error {
 	fmt.Println("Hooks installed:")
 	for event := range hooks.HookDefinitions {
 		fmt.Printf("  - %s\n", event)
+	}
+	if installWithTasks && !installNoTasks {
+		fmt.Println()
+		fmt.Println("Task sync hooks installed:")
+		for event := range hooks.TaskHookDefinitions {
+			fmt.Printf("  - %s (TaskCreate|TaskUpdate|TaskList|TaskGet)\n", event)
+		}
+		fmt.Println()
+		fmt.Println("Task sync requires CLAUDE_CODE_TASK_LIST_ID to be set.")
 	}
 	fmt.Println()
 	fmt.Println("Start a new Claude Code session to activate the hooks.")
@@ -132,6 +162,7 @@ func runHooksUninstall(cmd *cobra.Command, args []string) error {
 	}
 
 	hooks.UninstallHooks(settings)
+	hooks.UninstallTaskHooks(settings)
 
 	if err := hooks.SaveSettings(claudeDir, settings); err != nil {
 		return fmt.Errorf("failed to save settings: %w", err)
@@ -183,15 +214,19 @@ func runHooksStatus(cmd *cobra.Command, args []string) error {
 	// Check settings.
 	installedEvents := hooks.GetInstalledHookEvents(settings)
 
+	// Check task hooks.
+	taskHooksInstalled := hooks.IsTaskHooksInstalled(settings)
+
 	switch outputFormat {
 	case "json":
 		return outputJSON(map[string]any{
-			"installed":     hooks.IsInstalled(settings),
-			"scripts_exist": scriptFilesExist,
-			"skill_exists":  skillExists,
-			"hook_events":   installedEvents,
-			"scripts_dir":   scriptsDir,
-			"settings_path": filepath.Join(claudeDir, "settings.json"),
+			"installed":            hooks.IsInstalled(settings),
+			"scripts_exist":        scriptFilesExist,
+			"skill_exists":         skillExists,
+			"task_hooks_installed": taskHooksInstalled,
+			"hook_events":          installedEvents,
+			"scripts_dir":          scriptsDir,
+			"settings_path":        filepath.Join(claudeDir, "settings.json"),
 		})
 	default:
 		fmt.Println("Subtrate Hooks Status")
@@ -231,6 +266,15 @@ func runHooksStatus(cmd *cobra.Command, args []string) error {
 			for _, event := range installedEvents {
 				fmt.Printf("  - %s\n", event)
 			}
+		}
+
+		fmt.Println()
+		fmt.Println("Task Sync Hooks:")
+		if taskHooksInstalled {
+			fmt.Println("  PostToolUse: INSTALLED (TaskCreate|TaskUpdate|TaskList|TaskGet)")
+			fmt.Println("  Enable sync by setting CLAUDE_CODE_TASK_LIST_ID")
+		} else {
+			fmt.Println("  Not installed (use --with-tasks to enable)")
 		}
 	}
 

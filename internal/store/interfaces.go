@@ -256,6 +256,135 @@ type SessionStore interface {
 	) error
 }
 
+// TaskStore provides task tracking operations for Claude Code tasks.
+type TaskStore interface {
+	// CreateTaskList registers a new task list for watching.
+	CreateTaskList(
+		ctx context.Context, params CreateTaskListParams,
+	) (TaskList, error)
+
+	// GetTaskList retrieves a task list by its list ID.
+	GetTaskList(ctx context.Context, listID string) (TaskList, error)
+
+	// GetTaskListByID retrieves a task list by its database ID.
+	GetTaskListByID(ctx context.Context, id int64) (TaskList, error)
+
+	// ListTaskLists lists all registered task lists.
+	ListTaskLists(ctx context.Context) ([]TaskList, error)
+
+	// ListTaskListsByAgent lists task lists for a specific agent.
+	ListTaskListsByAgent(ctx context.Context, agentID int64) ([]TaskList, error)
+
+	// UpdateTaskListSyncTime updates the last sync timestamp.
+	UpdateTaskListSyncTime(
+		ctx context.Context, listID string, syncTime time.Time,
+	) error
+
+	// DeleteTaskList removes a task list and its tasks.
+	DeleteTaskList(ctx context.Context, listID string) error
+
+	// CreateTask creates a new task.
+	CreateTask(ctx context.Context, params CreateTaskParams) (Task, error)
+
+	// UpsertTask creates or updates a task.
+	UpsertTask(ctx context.Context, params UpsertTaskParams) (Task, error)
+
+	// GetTask retrieves a task by its database ID.
+	GetTask(ctx context.Context, id int64) (Task, error)
+
+	// GetTaskByClaudeID retrieves a task by its Claude task ID within a list.
+	GetTaskByClaudeID(
+		ctx context.Context, listID, claudeTaskID string,
+	) (Task, error)
+
+	// ListTasksByAgent lists all tasks for an agent.
+	ListTasksByAgent(ctx context.Context, agentID int64) ([]Task, error)
+
+	// ListTasksByAgentWithLimit lists tasks with pagination.
+	ListTasksByAgentWithLimit(
+		ctx context.Context, agentID int64, limit, offset int,
+	) ([]Task, error)
+
+	// ListActiveTasksByAgent lists pending and in_progress tasks.
+	ListActiveTasksByAgent(ctx context.Context, agentID int64) ([]Task, error)
+
+	// ListTasksByList lists all tasks for a specific list.
+	ListTasksByList(ctx context.Context, listID string) ([]Task, error)
+
+	// ListInProgressTasks lists tasks currently in progress.
+	ListInProgressTasks(ctx context.Context, agentID int64) ([]Task, error)
+
+	// ListPendingTasks lists pending tasks.
+	ListPendingTasks(ctx context.Context, agentID int64) ([]Task, error)
+
+	// ListBlockedTasks lists tasks with blockers.
+	ListBlockedTasks(ctx context.Context, agentID int64) ([]Task, error)
+
+	// ListAvailableTasks lists tasks that can be started (pending, no owner,
+	// no blockers).
+	ListAvailableTasks(ctx context.Context, agentID int64) ([]Task, error)
+
+	// ListRecentCompletedTasks lists recently completed tasks.
+	ListRecentCompletedTasks(
+		ctx context.Context, agentID int64, since time.Time, limit int,
+	) ([]Task, error)
+
+	// ListAllTasks lists all tasks with pagination.
+	ListAllTasks(ctx context.Context, limit, offset int) ([]Task, error)
+
+	// ListTasksByStatus lists tasks by status with pagination.
+	ListTasksByStatus(
+		ctx context.Context, status string, limit, offset int,
+	) ([]Task, error)
+
+	// UpdateTaskStatus updates a task's status with timestamp handling.
+	UpdateTaskStatus(
+		ctx context.Context, listID, claudeTaskID, status string,
+		now time.Time,
+	) error
+
+	// UpdateTaskOwner assigns an owner to a task.
+	UpdateTaskOwner(
+		ctx context.Context, listID, claudeTaskID, owner string,
+		now time.Time,
+	) error
+
+	// GetTaskStatsByAgent returns task statistics for an agent.
+	GetTaskStatsByAgent(
+		ctx context.Context, agentID int64, todaySince time.Time,
+	) (TaskStats, error)
+
+	// GetTaskStatsByList returns task statistics for a list.
+	GetTaskStatsByList(
+		ctx context.Context, listID string, todaySince time.Time,
+	) (TaskStats, error)
+
+	// GetAllTaskStats returns global task statistics.
+	GetAllTaskStats(ctx context.Context, todaySince time.Time) (TaskStats, error)
+
+	// GetAllAgentTaskStats returns task statistics grouped by agent.
+	GetAllAgentTaskStats(
+		ctx context.Context, todaySince time.Time,
+	) ([]AgentTaskStats, error)
+
+	// CountTasksByList counts tasks in a list.
+	CountTasksByList(ctx context.Context, listID string) (int64, error)
+
+	// DeleteTask deletes a task by ID.
+	DeleteTask(ctx context.Context, id int64) error
+
+	// DeleteTasksByList deletes all tasks in a list.
+	DeleteTasksByList(ctx context.Context, listID string) error
+
+	// MarkTasksDeletedByList marks tasks as deleted if not in active list.
+	MarkTasksDeletedByList(
+		ctx context.Context, listID string, activeIDs []string, now time.Time,
+	) error
+
+	// PruneOldTasks removes old completed/deleted tasks.
+	PruneOldTasks(ctx context.Context, olderThan time.Time) error
+}
+
 // ReviewStore provides review CRUD operations.
 type ReviewStore interface {
 	// CreateReview creates a new review record.
@@ -342,6 +471,7 @@ type Storage interface {
 	TopicStore
 	ActivityStore
 	SessionStore
+	TaskStore
 	ReviewStore
 
 	// WithTx executes a function within a write database transaction.
@@ -443,6 +573,57 @@ type SessionIdentity struct {
 	LastActiveAt time.Time
 }
 
+// TaskList represents a registered task list for file watching.
+type TaskList struct {
+	ID           int64
+	ListID       string
+	AgentID      int64
+	WatchPath    string
+	CreatedAt    time.Time
+	LastSyncedAt *time.Time
+}
+
+// Task represents a Claude Code task.
+type Task struct {
+	ID           int64
+	AgentID      int64
+	ListID       string
+	ClaudeTaskID string
+	Subject      string
+	Description  string
+	ActiveForm   string
+	Metadata     string
+	Status       string
+	Owner        string
+	BlockedBy    string // JSON array of task IDs
+	Blocks       string // JSON array of task IDs
+	CreatedAt    time.Time
+	UpdatedAt    time.Time
+	StartedAt    *time.Time
+	CompletedAt  *time.Time
+	FilePath     string
+	FileMtime    int64
+}
+
+// TaskStats contains aggregate task statistics.
+type TaskStats struct {
+	PendingCount    int64
+	InProgressCount int64
+	CompletedCount  int64
+	BlockedCount    int64
+	AvailableCount  int64
+	CompletedToday  int64
+}
+
+// AgentTaskStats contains task statistics for a specific agent.
+type AgentTaskStats struct {
+	AgentID         int64
+	PendingCount    int64
+	InProgressCount int64
+	BlockedCount    int64
+	CompletedToday  int64
+}
+
 // Parameter types for create operations.
 
 // CreateMessageParams contains parameters for creating a message.
@@ -488,6 +669,49 @@ type CreateSessionIdentityParams struct {
 	AgentID    int64
 	ProjectKey string
 	GitBranch  string
+}
+
+// CreateTaskListParams contains parameters for registering a task list.
+type CreateTaskListParams struct {
+	ListID    string
+	AgentID   int64
+	WatchPath string
+}
+
+// CreateTaskParams contains parameters for creating a task.
+type CreateTaskParams struct {
+	AgentID      int64
+	ListID       string
+	ClaudeTaskID string
+	Subject      string
+	Description  string
+	ActiveForm   string
+	Metadata     string
+	Status       string
+	Owner        string
+	BlockedBy    string
+	Blocks       string
+	FilePath     string
+	FileMtime    int64
+}
+
+// UpsertTaskParams contains parameters for upserting a task.
+type UpsertTaskParams struct {
+	AgentID      int64
+	ListID       string
+	ClaudeTaskID string
+	Subject      string
+	Description  string
+	ActiveForm   string
+	Metadata     string
+	Status       string
+	Owner        string
+	BlockedBy    string
+	Blocks       string
+	StartedAt    *time.Time
+	CompletedAt  *time.Time
+	FilePath     string
+	FileMtime    int64
 }
 
 // Conversion functions from sqlc models.

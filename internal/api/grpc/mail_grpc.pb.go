@@ -1887,6 +1887,634 @@ var Stats_ServiceDesc = grpc.ServiceDesc{
 }
 
 const (
+	TaskService_RegisterTaskList_FullMethodName     = "/subtraterpc.TaskService/RegisterTaskList"
+	TaskService_GetTaskList_FullMethodName          = "/subtraterpc.TaskService/GetTaskList"
+	TaskService_ListTaskLists_FullMethodName        = "/subtraterpc.TaskService/ListTaskLists"
+	TaskService_UnregisterTaskList_FullMethodName   = "/subtraterpc.TaskService/UnregisterTaskList"
+	TaskService_UpsertTask_FullMethodName           = "/subtraterpc.TaskService/UpsertTask"
+	TaskService_GetTask_FullMethodName              = "/subtraterpc.TaskService/GetTask"
+	TaskService_ListTasks_FullMethodName            = "/subtraterpc.TaskService/ListTasks"
+	TaskService_UpdateTaskStatus_FullMethodName     = "/subtraterpc.TaskService/UpdateTaskStatus"
+	TaskService_UpdateTaskOwner_FullMethodName      = "/subtraterpc.TaskService/UpdateTaskOwner"
+	TaskService_DeleteTask_FullMethodName           = "/subtraterpc.TaskService/DeleteTask"
+	TaskService_GetTaskStats_FullMethodName         = "/subtraterpc.TaskService/GetTaskStats"
+	TaskService_GetAllAgentTaskStats_FullMethodName = "/subtraterpc.TaskService/GetAllAgentTaskStats"
+	TaskService_SyncTaskList_FullMethodName         = "/subtraterpc.TaskService/SyncTaskList"
+	TaskService_PruneOldTasks_FullMethodName        = "/subtraterpc.TaskService/PruneOldTasks"
+)
+
+// TaskServiceClient is the client API for TaskService service.
+//
+// For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
+//
+// TaskService handles Claude Code task operations.
+type TaskServiceClient interface {
+	// RegisterTaskList registers a new task list for an agent.
+	RegisterTaskList(ctx context.Context, in *RegisterTaskListRequest, opts ...grpc.CallOption) (*RegisterTaskListResponse, error)
+	// GetTaskList retrieves a task list by ID.
+	GetTaskList(ctx context.Context, in *GetTaskListRequest, opts ...grpc.CallOption) (*GetTaskListResponse, error)
+	// ListTaskLists lists registered task lists.
+	ListTaskLists(ctx context.Context, in *ListTaskListsRequest, opts ...grpc.CallOption) (*ListTaskListsResponse, error)
+	// UnregisterTaskList removes a task list registration.
+	UnregisterTaskList(ctx context.Context, in *UnregisterTaskListRequest, opts ...grpc.CallOption) (*UnregisterTaskListResponse, error)
+	// UpsertTask creates or updates a task.
+	UpsertTask(ctx context.Context, in *UpsertTaskRequest, opts ...grpc.CallOption) (*UpsertTaskResponse, error)
+	// GetTask retrieves a task by Claude task ID.
+	GetTask(ctx context.Context, in *GetTaskProtoRequest, opts ...grpc.CallOption) (*GetTaskResponse, error)
+	// ListTasks lists tasks with optional filters.
+	ListTasks(ctx context.Context, in *ListTasksRequest, opts ...grpc.CallOption) (*ListTasksResponse, error)
+	// UpdateTaskStatus updates a task's status.
+	UpdateTaskStatus(ctx context.Context, in *UpdateTaskStatusRequest, opts ...grpc.CallOption) (*UpdateTaskStatusResponse, error)
+	// UpdateTaskOwner assigns an owner to a task.
+	UpdateTaskOwner(ctx context.Context, in *UpdateTaskOwnerRequest, opts ...grpc.CallOption) (*UpdateTaskOwnerResponse, error)
+	// DeleteTask deletes a task.
+	DeleteTask(ctx context.Context, in *DeleteTaskRequest, opts ...grpc.CallOption) (*DeleteTaskResponse, error)
+	// GetTaskStats retrieves task statistics.
+	GetTaskStats(ctx context.Context, in *GetTaskStatsRequest, opts ...grpc.CallOption) (*GetTaskStatsResponse, error)
+	// GetAllAgentTaskStats retrieves task stats grouped by agent.
+	GetAllAgentTaskStats(ctx context.Context, in *GetAllAgentTaskStatsRequest, opts ...grpc.CallOption) (*GetAllAgentTaskStatsResponse, error)
+	// SyncTaskList triggers a sync of a task list.
+	SyncTaskList(ctx context.Context, in *SyncTaskListRequest, opts ...grpc.CallOption) (*SyncTaskListResponse, error)
+	// PruneOldTasks removes old completed/deleted tasks.
+	PruneOldTasks(ctx context.Context, in *PruneOldTasksRequest, opts ...grpc.CallOption) (*PruneOldTasksResponse, error)
+}
+
+type taskServiceClient struct {
+	cc grpc.ClientConnInterface
+}
+
+func NewTaskServiceClient(cc grpc.ClientConnInterface) TaskServiceClient {
+	return &taskServiceClient{cc}
+}
+
+func (c *taskServiceClient) RegisterTaskList(ctx context.Context, in *RegisterTaskListRequest, opts ...grpc.CallOption) (*RegisterTaskListResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(RegisterTaskListResponse)
+	err := c.cc.Invoke(ctx, TaskService_RegisterTaskList_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *taskServiceClient) GetTaskList(ctx context.Context, in *GetTaskListRequest, opts ...grpc.CallOption) (*GetTaskListResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(GetTaskListResponse)
+	err := c.cc.Invoke(ctx, TaskService_GetTaskList_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *taskServiceClient) ListTaskLists(ctx context.Context, in *ListTaskListsRequest, opts ...grpc.CallOption) (*ListTaskListsResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ListTaskListsResponse)
+	err := c.cc.Invoke(ctx, TaskService_ListTaskLists_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *taskServiceClient) UnregisterTaskList(ctx context.Context, in *UnregisterTaskListRequest, opts ...grpc.CallOption) (*UnregisterTaskListResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(UnregisterTaskListResponse)
+	err := c.cc.Invoke(ctx, TaskService_UnregisterTaskList_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *taskServiceClient) UpsertTask(ctx context.Context, in *UpsertTaskRequest, opts ...grpc.CallOption) (*UpsertTaskResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(UpsertTaskResponse)
+	err := c.cc.Invoke(ctx, TaskService_UpsertTask_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *taskServiceClient) GetTask(ctx context.Context, in *GetTaskProtoRequest, opts ...grpc.CallOption) (*GetTaskResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(GetTaskResponse)
+	err := c.cc.Invoke(ctx, TaskService_GetTask_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *taskServiceClient) ListTasks(ctx context.Context, in *ListTasksRequest, opts ...grpc.CallOption) (*ListTasksResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ListTasksResponse)
+	err := c.cc.Invoke(ctx, TaskService_ListTasks_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *taskServiceClient) UpdateTaskStatus(ctx context.Context, in *UpdateTaskStatusRequest, opts ...grpc.CallOption) (*UpdateTaskStatusResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(UpdateTaskStatusResponse)
+	err := c.cc.Invoke(ctx, TaskService_UpdateTaskStatus_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *taskServiceClient) UpdateTaskOwner(ctx context.Context, in *UpdateTaskOwnerRequest, opts ...grpc.CallOption) (*UpdateTaskOwnerResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(UpdateTaskOwnerResponse)
+	err := c.cc.Invoke(ctx, TaskService_UpdateTaskOwner_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *taskServiceClient) DeleteTask(ctx context.Context, in *DeleteTaskRequest, opts ...grpc.CallOption) (*DeleteTaskResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(DeleteTaskResponse)
+	err := c.cc.Invoke(ctx, TaskService_DeleteTask_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *taskServiceClient) GetTaskStats(ctx context.Context, in *GetTaskStatsRequest, opts ...grpc.CallOption) (*GetTaskStatsResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(GetTaskStatsResponse)
+	err := c.cc.Invoke(ctx, TaskService_GetTaskStats_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *taskServiceClient) GetAllAgentTaskStats(ctx context.Context, in *GetAllAgentTaskStatsRequest, opts ...grpc.CallOption) (*GetAllAgentTaskStatsResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(GetAllAgentTaskStatsResponse)
+	err := c.cc.Invoke(ctx, TaskService_GetAllAgentTaskStats_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *taskServiceClient) SyncTaskList(ctx context.Context, in *SyncTaskListRequest, opts ...grpc.CallOption) (*SyncTaskListResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(SyncTaskListResponse)
+	err := c.cc.Invoke(ctx, TaskService_SyncTaskList_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *taskServiceClient) PruneOldTasks(ctx context.Context, in *PruneOldTasksRequest, opts ...grpc.CallOption) (*PruneOldTasksResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(PruneOldTasksResponse)
+	err := c.cc.Invoke(ctx, TaskService_PruneOldTasks_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+// TaskServiceServer is the server API for TaskService service.
+// All implementations must embed UnimplementedTaskServiceServer
+// for forward compatibility.
+//
+// TaskService handles Claude Code task operations.
+type TaskServiceServer interface {
+	// RegisterTaskList registers a new task list for an agent.
+	RegisterTaskList(context.Context, *RegisterTaskListRequest) (*RegisterTaskListResponse, error)
+	// GetTaskList retrieves a task list by ID.
+	GetTaskList(context.Context, *GetTaskListRequest) (*GetTaskListResponse, error)
+	// ListTaskLists lists registered task lists.
+	ListTaskLists(context.Context, *ListTaskListsRequest) (*ListTaskListsResponse, error)
+	// UnregisterTaskList removes a task list registration.
+	UnregisterTaskList(context.Context, *UnregisterTaskListRequest) (*UnregisterTaskListResponse, error)
+	// UpsertTask creates or updates a task.
+	UpsertTask(context.Context, *UpsertTaskRequest) (*UpsertTaskResponse, error)
+	// GetTask retrieves a task by Claude task ID.
+	GetTask(context.Context, *GetTaskProtoRequest) (*GetTaskResponse, error)
+	// ListTasks lists tasks with optional filters.
+	ListTasks(context.Context, *ListTasksRequest) (*ListTasksResponse, error)
+	// UpdateTaskStatus updates a task's status.
+	UpdateTaskStatus(context.Context, *UpdateTaskStatusRequest) (*UpdateTaskStatusResponse, error)
+	// UpdateTaskOwner assigns an owner to a task.
+	UpdateTaskOwner(context.Context, *UpdateTaskOwnerRequest) (*UpdateTaskOwnerResponse, error)
+	// DeleteTask deletes a task.
+	DeleteTask(context.Context, *DeleteTaskRequest) (*DeleteTaskResponse, error)
+	// GetTaskStats retrieves task statistics.
+	GetTaskStats(context.Context, *GetTaskStatsRequest) (*GetTaskStatsResponse, error)
+	// GetAllAgentTaskStats retrieves task stats grouped by agent.
+	GetAllAgentTaskStats(context.Context, *GetAllAgentTaskStatsRequest) (*GetAllAgentTaskStatsResponse, error)
+	// SyncTaskList triggers a sync of a task list.
+	SyncTaskList(context.Context, *SyncTaskListRequest) (*SyncTaskListResponse, error)
+	// PruneOldTasks removes old completed/deleted tasks.
+	PruneOldTasks(context.Context, *PruneOldTasksRequest) (*PruneOldTasksResponse, error)
+	mustEmbedUnimplementedTaskServiceServer()
+}
+
+// UnimplementedTaskServiceServer must be embedded to have
+// forward compatible implementations.
+//
+// NOTE: this should be embedded by value instead of pointer to avoid a nil
+// pointer dereference when methods are called.
+type UnimplementedTaskServiceServer struct{}
+
+func (UnimplementedTaskServiceServer) RegisterTaskList(context.Context, *RegisterTaskListRequest) (*RegisterTaskListResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method RegisterTaskList not implemented")
+}
+func (UnimplementedTaskServiceServer) GetTaskList(context.Context, *GetTaskListRequest) (*GetTaskListResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method GetTaskList not implemented")
+}
+func (UnimplementedTaskServiceServer) ListTaskLists(context.Context, *ListTaskListsRequest) (*ListTaskListsResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method ListTaskLists not implemented")
+}
+func (UnimplementedTaskServiceServer) UnregisterTaskList(context.Context, *UnregisterTaskListRequest) (*UnregisterTaskListResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method UnregisterTaskList not implemented")
+}
+func (UnimplementedTaskServiceServer) UpsertTask(context.Context, *UpsertTaskRequest) (*UpsertTaskResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method UpsertTask not implemented")
+}
+func (UnimplementedTaskServiceServer) GetTask(context.Context, *GetTaskProtoRequest) (*GetTaskResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method GetTask not implemented")
+}
+func (UnimplementedTaskServiceServer) ListTasks(context.Context, *ListTasksRequest) (*ListTasksResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method ListTasks not implemented")
+}
+func (UnimplementedTaskServiceServer) UpdateTaskStatus(context.Context, *UpdateTaskStatusRequest) (*UpdateTaskStatusResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method UpdateTaskStatus not implemented")
+}
+func (UnimplementedTaskServiceServer) UpdateTaskOwner(context.Context, *UpdateTaskOwnerRequest) (*UpdateTaskOwnerResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method UpdateTaskOwner not implemented")
+}
+func (UnimplementedTaskServiceServer) DeleteTask(context.Context, *DeleteTaskRequest) (*DeleteTaskResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method DeleteTask not implemented")
+}
+func (UnimplementedTaskServiceServer) GetTaskStats(context.Context, *GetTaskStatsRequest) (*GetTaskStatsResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method GetTaskStats not implemented")
+}
+func (UnimplementedTaskServiceServer) GetAllAgentTaskStats(context.Context, *GetAllAgentTaskStatsRequest) (*GetAllAgentTaskStatsResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method GetAllAgentTaskStats not implemented")
+}
+func (UnimplementedTaskServiceServer) SyncTaskList(context.Context, *SyncTaskListRequest) (*SyncTaskListResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method SyncTaskList not implemented")
+}
+func (UnimplementedTaskServiceServer) PruneOldTasks(context.Context, *PruneOldTasksRequest) (*PruneOldTasksResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method PruneOldTasks not implemented")
+}
+func (UnimplementedTaskServiceServer) mustEmbedUnimplementedTaskServiceServer() {}
+func (UnimplementedTaskServiceServer) testEmbeddedByValue()                     {}
+
+// UnsafeTaskServiceServer may be embedded to opt out of forward compatibility for this service.
+// Use of this interface is not recommended, as added methods to TaskServiceServer will
+// result in compilation errors.
+type UnsafeTaskServiceServer interface {
+	mustEmbedUnimplementedTaskServiceServer()
+}
+
+func RegisterTaskServiceServer(s grpc.ServiceRegistrar, srv TaskServiceServer) {
+	// If the following call pancis, it indicates UnimplementedTaskServiceServer was
+	// embedded by pointer and is nil.  This will cause panics if an
+	// unimplemented method is ever invoked, so we test this at initialization
+	// time to prevent it from happening at runtime later due to I/O.
+	if t, ok := srv.(interface{ testEmbeddedByValue() }); ok {
+		t.testEmbeddedByValue()
+	}
+	s.RegisterService(&TaskService_ServiceDesc, srv)
+}
+
+func _TaskService_RegisterTaskList_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(RegisterTaskListRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(TaskServiceServer).RegisterTaskList(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: TaskService_RegisterTaskList_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(TaskServiceServer).RegisterTaskList(ctx, req.(*RegisterTaskListRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _TaskService_GetTaskList_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetTaskListRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(TaskServiceServer).GetTaskList(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: TaskService_GetTaskList_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(TaskServiceServer).GetTaskList(ctx, req.(*GetTaskListRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _TaskService_ListTaskLists_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ListTaskListsRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(TaskServiceServer).ListTaskLists(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: TaskService_ListTaskLists_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(TaskServiceServer).ListTaskLists(ctx, req.(*ListTaskListsRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _TaskService_UnregisterTaskList_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(UnregisterTaskListRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(TaskServiceServer).UnregisterTaskList(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: TaskService_UnregisterTaskList_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(TaskServiceServer).UnregisterTaskList(ctx, req.(*UnregisterTaskListRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _TaskService_UpsertTask_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(UpsertTaskRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(TaskServiceServer).UpsertTask(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: TaskService_UpsertTask_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(TaskServiceServer).UpsertTask(ctx, req.(*UpsertTaskRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _TaskService_GetTask_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetTaskProtoRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(TaskServiceServer).GetTask(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: TaskService_GetTask_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(TaskServiceServer).GetTask(ctx, req.(*GetTaskProtoRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _TaskService_ListTasks_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ListTasksRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(TaskServiceServer).ListTasks(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: TaskService_ListTasks_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(TaskServiceServer).ListTasks(ctx, req.(*ListTasksRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _TaskService_UpdateTaskStatus_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(UpdateTaskStatusRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(TaskServiceServer).UpdateTaskStatus(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: TaskService_UpdateTaskStatus_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(TaskServiceServer).UpdateTaskStatus(ctx, req.(*UpdateTaskStatusRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _TaskService_UpdateTaskOwner_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(UpdateTaskOwnerRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(TaskServiceServer).UpdateTaskOwner(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: TaskService_UpdateTaskOwner_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(TaskServiceServer).UpdateTaskOwner(ctx, req.(*UpdateTaskOwnerRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _TaskService_DeleteTask_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(DeleteTaskRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(TaskServiceServer).DeleteTask(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: TaskService_DeleteTask_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(TaskServiceServer).DeleteTask(ctx, req.(*DeleteTaskRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _TaskService_GetTaskStats_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetTaskStatsRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(TaskServiceServer).GetTaskStats(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: TaskService_GetTaskStats_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(TaskServiceServer).GetTaskStats(ctx, req.(*GetTaskStatsRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _TaskService_GetAllAgentTaskStats_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetAllAgentTaskStatsRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(TaskServiceServer).GetAllAgentTaskStats(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: TaskService_GetAllAgentTaskStats_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(TaskServiceServer).GetAllAgentTaskStats(ctx, req.(*GetAllAgentTaskStatsRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _TaskService_SyncTaskList_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(SyncTaskListRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(TaskServiceServer).SyncTaskList(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: TaskService_SyncTaskList_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(TaskServiceServer).SyncTaskList(ctx, req.(*SyncTaskListRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _TaskService_PruneOldTasks_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(PruneOldTasksRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(TaskServiceServer).PruneOldTasks(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: TaskService_PruneOldTasks_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(TaskServiceServer).PruneOldTasks(ctx, req.(*PruneOldTasksRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+// TaskService_ServiceDesc is the grpc.ServiceDesc for TaskService service.
+// It's only intended for direct use with grpc.RegisterService,
+// and not to be introspected or modified (even as a copy)
+var TaskService_ServiceDesc = grpc.ServiceDesc{
+	ServiceName: "subtraterpc.TaskService",
+	HandlerType: (*TaskServiceServer)(nil),
+	Methods: []grpc.MethodDesc{
+		{
+			MethodName: "RegisterTaskList",
+			Handler:    _TaskService_RegisterTaskList_Handler,
+		},
+		{
+			MethodName: "GetTaskList",
+			Handler:    _TaskService_GetTaskList_Handler,
+		},
+		{
+			MethodName: "ListTaskLists",
+			Handler:    _TaskService_ListTaskLists_Handler,
+		},
+		{
+			MethodName: "UnregisterTaskList",
+			Handler:    _TaskService_UnregisterTaskList_Handler,
+		},
+		{
+			MethodName: "UpsertTask",
+			Handler:    _TaskService_UpsertTask_Handler,
+		},
+		{
+			MethodName: "GetTask",
+			Handler:    _TaskService_GetTask_Handler,
+		},
+		{
+			MethodName: "ListTasks",
+			Handler:    _TaskService_ListTasks_Handler,
+		},
+		{
+			MethodName: "UpdateTaskStatus",
+			Handler:    _TaskService_UpdateTaskStatus_Handler,
+		},
+		{
+			MethodName: "UpdateTaskOwner",
+			Handler:    _TaskService_UpdateTaskOwner_Handler,
+		},
+		{
+			MethodName: "DeleteTask",
+			Handler:    _TaskService_DeleteTask_Handler,
+		},
+		{
+			MethodName: "GetTaskStats",
+			Handler:    _TaskService_GetTaskStats_Handler,
+		},
+		{
+			MethodName: "GetAllAgentTaskStats",
+			Handler:    _TaskService_GetAllAgentTaskStats_Handler,
+		},
+		{
+			MethodName: "SyncTaskList",
+			Handler:    _TaskService_SyncTaskList_Handler,
+		},
+		{
+			MethodName: "PruneOldTasks",
+			Handler:    _TaskService_PruneOldTasks_Handler,
+		},
+	},
+	Streams:  []grpc.StreamDesc{},
+	Metadata: "mail.proto",
+}
+
+const (
 	ReviewService_CreateReview_FullMethodName      = "/subtraterpc.ReviewService/CreateReview"
 	ReviewService_ListReviews_FullMethodName       = "/subtraterpc.ReviewService/ListReviews"
 	ReviewService_GetReview_FullMethodName         = "/subtraterpc.ReviewService/GetReview"

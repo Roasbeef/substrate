@@ -110,5 +110,6 @@ func init() {
 	rootCmd.AddCommand(reviewCmd)
 	rootCmd.AddCommand(sendDiffCmd)
 	rootCmd.AddCommand(queueCmd)
+	rootCmd.AddCommand(tasksCmd)
 	rootCmd.AddCommand(versionCmd)
 }

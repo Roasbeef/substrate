@@ -181,6 +181,111 @@ export function createMockReview(
   };
 }
 
+// Mock task data factories.
+export function createMockTask(
+  overrides: Partial<{
+    id: string;
+    agent_id: string;
+    list_id: string;
+    claude_task_id: string;
+    subject: string;
+    description: string;
+    status: string;
+    owner: string;
+    blocked_by: string[];
+    blocks: string[];
+  }> = {},
+) {
+  return {
+    id: overrides.id ?? '1',
+    agent_id: overrides.agent_id ?? '2',
+    list_id: overrides.list_id ?? 'list-abc',
+    claude_task_id: overrides.claude_task_id ?? 'task-001',
+    subject: overrides.subject ?? 'Implement feature X',
+    description: overrides.description ?? 'Build the new feature with tests',
+    active_form: '',
+    metadata_json: '',
+    status: overrides.status ?? 'TASK_STATUS_PENDING',
+    owner: overrides.owner ?? '',
+    blocked_by: overrides.blocked_by ?? [],
+    blocks: overrides.blocks ?? [],
+    created_at: '2026-01-15T10:00:00Z',
+    updated_at: '2026-01-15T12:00:00Z',
+    started_at: '',
+    completed_at: '',
+  };
+}
+
+export function createMockTaskList(
+  overrides: Partial<{
+    id: string;
+    list_id: string;
+    agent_id: string;
+    agent_name: string;
+    watch_path: string;
+  }> = {},
+) {
+  return {
+    id: overrides.id ?? '1',
+    list_id: overrides.list_id ?? 'list-abc',
+    agent_id: overrides.agent_id ?? '2',
+    agent_name: overrides.agent_name ?? 'Agent1',
+    watch_path: overrides.watch_path ?? '/home/user/.tasks/list-abc.md',
+    created_at: '2026-01-15T09:00:00Z',
+    last_synced_at: '2026-01-15T12:00:00Z',
+  };
+}
+
+// Default mock task data with dependency chain: task-001 → task-002 → task-003.
+const mockTasks = [
+  createMockTask({
+    id: '1',
+    agent_id: '2',
+    list_id: 'list-abc',
+    claude_task_id: 'task-001',
+    subject: 'Implement feature X',
+    status: 'TASK_STATUS_PENDING',
+    blocks: ['task-002'],
+  }),
+  createMockTask({
+    id: '2',
+    agent_id: '2',
+    list_id: 'list-abc',
+    claude_task_id: 'task-002',
+    subject: 'Fix bug in parser',
+    status: 'TASK_STATUS_IN_PROGRESS',
+    owner: 'Agent1',
+    blocked_by: ['task-001'],
+    blocks: ['task-003'],
+  }),
+  createMockTask({
+    id: '3',
+    agent_id: '3',
+    list_id: 'list-def',
+    claude_task_id: 'task-003',
+    subject: 'Write documentation',
+    status: 'TASK_STATUS_COMPLETED',
+    owner: 'Agent2',
+    blocked_by: ['task-002'],
+  }),
+];
+
+const mockTaskLists = [
+  createMockTaskList({
+    id: '1',
+    list_id: 'list-abc',
+    agent_id: '2',
+    agent_name: 'Agent1',
+  }),
+  createMockTaskList({
+    id: '2',
+    list_id: 'list-def',
+    agent_id: '3',
+    agent_name: 'Agent2',
+    watch_path: '/home/user/.tasks/list-def.md',
+  }),
+];
+
 // Mock activities.
 const mockActivities: Activity[] = [
   {
@@ -595,5 +700,102 @@ export const handlers = [
 
   http.patch(`${API_BASE}/reviews/:reviewId/issues/:issueId`, () => {
     return HttpResponse.json({});
+  }),
+
+  // Tasks.
+  http.get(`${API_BASE}/tasks`, ({ request }) => {
+    const url = new URL(request.url);
+    const agentId = url.searchParams.get('agent_id');
+    const listId = url.searchParams.get('list_id');
+    const status = url.searchParams.get('status');
+
+    let filtered = [...mockTasks];
+    if (agentId) {
+      filtered = filtered.filter((t) => t.agent_id === agentId);
+    }
+    if (listId) {
+      filtered = filtered.filter((t) => t.list_id === listId);
+    }
+    if (status) {
+      filtered = filtered.filter((t) => t.status === status);
+    }
+    return HttpResponse.json({ tasks: filtered });
+  }),
+
+  http.get(`${API_BASE}/tasks/stats`, () => {
+    return HttpResponse.json({
+      stats: {
+        pending_count: '5',
+        in_progress_count: '3',
+        completed_count: '12',
+        blocked_count: '1',
+        available_count: '4',
+        completed_today: '2',
+      },
+    });
+  }),
+
+  http.get(`${API_BASE}/tasks/stats/by-agent`, () => {
+    return HttpResponse.json({
+      stats: [
+        {
+          agent_id: '2',
+          agent_name: 'Agent1',
+          pending_count: '3',
+          in_progress_count: '2',
+          blocked_count: '0',
+          completed_today: '1',
+        },
+        {
+          agent_id: '3',
+          agent_name: 'Agent2',
+          pending_count: '2',
+          in_progress_count: '1',
+          blocked_count: '1',
+          completed_today: '1',
+        },
+      ],
+    });
+  }),
+
+  http.get(`${API_BASE}/tasks/:listId/:claudeTaskId`, ({ params }) => {
+    const listId = params.listId as string;
+    const claudeTaskId = params.claudeTaskId as string;
+    const task = mockTasks.find(
+      (t) => t.list_id === listId && t.claude_task_id === claudeTaskId,
+    );
+    if (!task) {
+      return HttpResponse.json(
+        { error: { code: 'not_found', message: 'Task not found' } },
+        { status: 404 },
+      );
+    }
+    return HttpResponse.json({ task });
+  }),
+
+  http.patch(`${API_BASE}/tasks/:listId/:claudeTaskId/status`, () => {
+    return HttpResponse.json({});
+  }),
+
+  http.patch(`${API_BASE}/tasks/:listId/:claudeTaskId/owner`, () => {
+    return HttpResponse.json({});
+  }),
+
+  // Task lists.
+  http.get(`${API_BASE}/task-lists`, ({ request }) => {
+    const url = new URL(request.url);
+    const agentId = url.searchParams.get('agent_id');
+    let filtered = [...mockTaskLists];
+    if (agentId) {
+      filtered = filtered.filter((tl) => tl.agent_id === agentId);
+    }
+    return HttpResponse.json({ task_lists: filtered });
+  }),
+
+  http.post(`${API_BASE}/task-lists/:listId/sync`, () => {
+    return HttpResponse.json({
+      tasks_updated: 3,
+      tasks_deleted: 1,
+    });
   }),
 ];

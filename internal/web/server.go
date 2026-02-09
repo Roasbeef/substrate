@@ -140,6 +140,11 @@ func (s *Server) Start() error {
 	return s.srv.ListenAndServe()
 }
 
+// GetHub returns the WebSocket hub for external notification integration.
+func (s *Server) GetHub() *Hub {
+	return s.hub
+}
+
 // Shutdown gracefully shuts down the server.
 func (s *Server) Shutdown(ctx context.Context) error {
 	// Stop the notification bridge first.
@@ -221,6 +226,16 @@ func (s *Server) registerGateway(ctx context.Context) error {
 	if err != nil {
 		return fmt.Errorf(
 			"failed to register ReviewService handler: %w", err,
+		)
+	}
+
+	// Register TaskService handler.
+	err = subtraterpc.RegisterTaskServiceHandlerFromEndpoint(
+		ctx, s.gatewayMux, s.grpcEndpoint, opts,
+	)
+	if err != nil {
+		return fmt.Errorf(
+			"failed to register TaskService handler: %w", err,
 		)
 	}
 
