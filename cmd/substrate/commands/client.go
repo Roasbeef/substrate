@@ -32,11 +32,12 @@ const (
 // a gRPC connection to substrated or direct database access.
 type Client struct {
 	// When using gRPC mode.
-	conn         *grpc.ClientConn
-	mailClient   subtraterpc.MailClient
-	agentClient  subtraterpc.AgentClient
-	reviewClient subtraterpc.ReviewServiceClient
-	taskClient   subtraterpc.TaskServiceClient
+	conn             *grpc.ClientConn
+	mailClient       subtraterpc.MailClient
+	agentClient      subtraterpc.AgentClient
+	reviewClient     subtraterpc.ReviewServiceClient
+	taskClient       subtraterpc.TaskServiceClient
+	planReviewClient subtraterpc.PlanReviewServiceClient
 
 	// When using direct DB mode.
 	store       *db.Store
@@ -371,13 +372,14 @@ func tryGRPCConnection(addr string) (*Client, error) {
 	}
 
 	return &Client{
-		conn:         conn,
-		mailClient:   subtraterpc.NewMailClient(conn),
-		agentClient:  agentClient,
-		reviewClient: subtraterpc.NewReviewServiceClient(conn),
-		taskClient:   subtraterpc.NewTaskServiceClient(conn),
-		mode:         ModeGRPC,
-		grpcAddr:     addr,
+		conn:             conn,
+		mailClient:       subtraterpc.NewMailClient(conn),
+		agentClient:      agentClient,
+		reviewClient:     subtraterpc.NewReviewServiceClient(conn),
+		taskClient:       subtraterpc.NewTaskServiceClient(conn),
+		planReviewClient: subtraterpc.NewPlanReviewServiceClient(conn),
+		mode:             ModeGRPC,
+		grpcAddr:         addr,
 	}, nil
 }
 

@@ -13,6 +13,7 @@ import (
 
 	"github.com/google/uuid"
 	claudeagent "github.com/roasbeef/claude-agent-sdk-go"
+	subtraterpc "github.com/roasbeef/subtrate/internal/api/grpc"
 	"github.com/roasbeef/subtrate/internal/mail"
 	"github.com/roasbeef/subtrate/internal/store"
 	"github.com/spf13/cobra"
@@ -1015,11 +1016,27 @@ func (c *Client) CreatePlanReview(
 		return s.CreatePlanReview(ctx, params)
 	}
 
-	// gRPC mode — will be implemented in Phase 4.
-	return store.PlanReview{}, fmt.Errorf(
-		"plan review commands require direct mode " +
-			"(daemon plan review API not yet available)",
-	)
+	// gRPC mode.
+	req := &subtraterpc.CreatePlanReviewRequest{
+		PlanReviewId: params.PlanReviewID,
+		ThreadId:     params.ThreadID,
+		RequesterId:  params.RequesterID,
+		ReviewerName: params.ReviewerName,
+		PlanPath:     params.PlanPath,
+		PlanTitle:    params.PlanTitle,
+		PlanSummary:  params.PlanSummary,
+		SessionId:    params.SessionID,
+	}
+	if params.MessageID != nil {
+		req.MessageId = *params.MessageID
+	}
+
+	resp, err := c.planReviewClient.CreatePlanReview(ctx, req)
+	if err != nil {
+		return store.PlanReview{}, err
+	}
+
+	return planReviewFromProto(resp), nil
 }
 
 // GetPlanReview retrieves a plan review by its UUID.
@@ -1034,10 +1051,16 @@ func (c *Client) GetPlanReview(
 		return s.GetPlanReview(ctx, planReviewID)
 	}
 
-	return store.PlanReview{}, fmt.Errorf(
-		"plan review commands require direct mode " +
-			"(daemon plan review API not yet available)",
+	resp, err := c.planReviewClient.GetPlanReview(
+		ctx, &subtraterpc.GetPlanReviewRequest{
+			PlanReviewId: planReviewID,
+		},
 	)
+	if err != nil {
+		return store.PlanReview{}, err
+	}
+
+	return planReviewFromProto(resp), nil
 }
 
 // GetPlanReviewBySession retrieves the pending plan review for a session.
@@ -1052,10 +1075,16 @@ func (c *Client) GetPlanReviewBySession(
 		return s.GetPlanReviewBySession(ctx, sessionID)
 	}
 
-	return store.PlanReview{}, fmt.Errorf(
-		"plan review commands require direct mode " +
-			"(daemon plan review API not yet available)",
+	resp, err := c.planReviewClient.GetPlanReviewBySession(
+		ctx, &subtraterpc.GetPlanReviewBySessionRequest{
+			SessionId: sessionID,
+		},
 	)
+	if err != nil {
+		return store.PlanReview{}, err
+	}
+
+	return planReviewFromProto(resp), nil
 }
 
 // UpdatePlanReviewState updates the state of a plan review.
@@ -1070,8 +1099,49 @@ func (c *Client) UpdatePlanReviewState(
 		return s.UpdatePlanReviewState(ctx, params)
 	}
 
-	return fmt.Errorf(
-		"plan review commands require direct mode " +
-			"(daemon plan review API not yet available)",
-	)
+	req := &subtraterpc.UpdatePlanReviewStatusRequest{
+		PlanReviewId:    params.PlanReviewID,
+		State:           params.State,
+		ReviewerComment: params.ReviewerComment,
+	}
+	if params.ReviewedBy != nil {
+		req.ReviewedBy = *params.ReviewedBy
+	}
+
+	_, err := c.planReviewClient.UpdatePlanReviewStatus(ctx, req)
+	return err
+}
+
+// planReviewFromProto converts a PlanReviewProto to a store.PlanReview.
+func planReviewFromProto(p *subtraterpc.PlanReviewProto) store.PlanReview {
+	pr := store.PlanReview{
+		ID:              p.Id,
+		PlanReviewID:    p.PlanReviewId,
+		ThreadID:        p.ThreadId,
+		RequesterID:     p.RequesterId,
+		ReviewerName:    p.ReviewerName,
+		PlanPath:        p.PlanPath,
+		PlanTitle:       p.PlanTitle,
+		PlanSummary:     p.PlanSummary,
+		State:           p.State,
+		ReviewerComment: p.ReviewerComment,
+		SessionID:       p.SessionId,
+		CreatedAt:       time.Unix(p.CreatedAt, 0),
+		UpdatedAt:       time.Unix(p.UpdatedAt, 0),
+	}
+
+	if p.MessageId != 0 {
+		msgID := p.MessageId
+		pr.MessageID = &msgID
+	}
+	if p.ReviewedBy != 0 {
+		reviewedBy := p.ReviewedBy
+		pr.ReviewedBy = &reviewedBy
+	}
+	if p.ReviewedAt != 0 {
+		t := time.Unix(p.ReviewedAt, 0)
+		pr.ReviewedAt = &t
+	}
+
+	return pr
 }

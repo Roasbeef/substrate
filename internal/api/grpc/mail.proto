@@ -1288,3 +1288,124 @@ message PruneOldTasksRequest {
 message PruneOldTasksResponse {
     string error = 1;
 }
+
+// =============================================================================
+// PlanReviewService
+// =============================================================================
+
+// PlanReviewService handles plan review operations for the plan mode workflow.
+service PlanReviewService {
+    // CreatePlanReview creates a new plan review record.
+    rpc CreatePlanReview (CreatePlanReviewRequest) returns (PlanReviewProto);
+
+    // GetPlanReview retrieves a plan review by its UUID.
+    rpc GetPlanReview (GetPlanReviewRequest) returns (PlanReviewProto);
+
+    // GetPlanReviewByThread retrieves the latest plan review for a thread.
+    rpc GetPlanReviewByThread (GetPlanReviewByThreadRequest) returns (PlanReviewProto);
+
+    // GetPlanReviewBySession retrieves the pending plan review for a session.
+    rpc GetPlanReviewBySession (GetPlanReviewBySessionRequest) returns (PlanReviewProto);
+
+    // ListPlanReviews lists plan reviews with optional filters.
+    rpc ListPlanReviews (ListPlanReviewsRequest) returns (ListPlanReviewsResponse);
+
+    // UpdatePlanReviewStatus updates the status of a plan review.
+    rpc UpdatePlanReviewStatus (UpdatePlanReviewStatusRequest) returns (PlanReviewProto);
+
+    // DeletePlanReview deletes a plan review by its UUID.
+    rpc DeletePlanReview (DeletePlanReviewRequest) returns (DeletePlanReviewResponse);
+}
+
+// =============================================================================
+// PlanReviewService Messages
+// =============================================================================
+
+// PlanReviewState represents the state of a plan review.
+enum PlanReviewState {
+    PLAN_REVIEW_STATE_UNSPECIFIED = 0;
+    PLAN_REVIEW_STATE_PENDING = 1;
+    PLAN_REVIEW_STATE_APPROVED = 2;
+    PLAN_REVIEW_STATE_REJECTED = 3;
+    PLAN_REVIEW_STATE_CHANGES_REQUESTED = 4;
+}
+
+// PlanReviewProto represents a plan review record.
+message PlanReviewProto {
+    int64 id = 1;
+    string plan_review_id = 2;
+    int64 message_id = 3;
+    string thread_id = 4;
+    int64 requester_id = 5;
+    string reviewer_name = 6;
+    string plan_path = 7;
+    string plan_title = 8;
+    string plan_summary = 9;
+    string state = 10;
+    string reviewer_comment = 11;
+    int64 reviewed_by = 12;
+    string session_id = 13;
+    int64 created_at = 14;
+    int64 updated_at = 15;
+    int64 reviewed_at = 16;
+    string error = 17;
+}
+
+// CreatePlanReviewRequest is the request for CreatePlanReview.
+message CreatePlanReviewRequest {
+    string plan_review_id = 1;
+    int64 message_id = 2;
+    string thread_id = 3;
+    int64 requester_id = 4;
+    string reviewer_name = 5;
+    string plan_path = 6;
+    string plan_title = 7;
+    string plan_summary = 8;
+    string session_id = 9;
+}
+
+// GetPlanReviewRequest is the request for GetPlanReview.
+message GetPlanReviewRequest {
+    string plan_review_id = 1;
+}
+
+// GetPlanReviewByThreadRequest is the request for GetPlanReviewByThread.
+message GetPlanReviewByThreadRequest {
+    string thread_id = 1;
+}
+
+// GetPlanReviewBySessionRequest is the request for GetPlanReviewBySession.
+message GetPlanReviewBySessionRequest {
+    string session_id = 1;
+}
+
+// ListPlanReviewsRequest is the request for ListPlanReviews.
+message ListPlanReviewsRequest {
+    string state = 1;
+    int64 requester_id = 2;
+    int32 limit = 3;
+    int32 offset = 4;
+}
+
+// ListPlanReviewsResponse is the response for ListPlanReviews.
+message ListPlanReviewsResponse {
+    repeated PlanReviewProto plan_reviews = 1;
+}
+
+// UpdatePlanReviewStatusRequest is the request for UpdatePlanReviewStatus.
+message UpdatePlanReviewStatusRequest {
+    string plan_review_id = 1;
+    string state = 2;
+    string reviewer_comment = 3;
+    int64 reviewed_by = 4;
+}
+
+// DeletePlanReviewRequest is the request for DeletePlanReview.
+message DeletePlanReviewRequest {
+    string plan_review_id = 1;
+}
+
+// DeletePlanReviewResponse is the response for DeletePlanReview.
+message DeletePlanReviewResponse {
+    string error = 1;
+}

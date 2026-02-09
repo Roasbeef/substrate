@@ -245,3 +245,27 @@ http:
     - selector: subtraterpc.TaskService.PruneOldTasks
       post: "/api/v1/tasks/prune"
       body: "*"
+
+    # PlanReviewService - Plan Review Operations
+    - selector: subtraterpc.PlanReviewService.CreatePlanReview
+      post: "/api/v1/plan-reviews"
+      body: "*"
+
+    - selector: subtraterpc.PlanReviewService.GetPlanReview
+      get: "/api/v1/plan-reviews/{plan_review_id}"
+
+    - selector: subtraterpc.PlanReviewService.GetPlanReviewByThread
+      get: "/api/v1/plan-reviews/by-thread/{thread_id}"
+
+    - selector: subtraterpc.PlanReviewService.GetPlanReviewBySession
+      get: "/api/v1/plan-reviews/by-session/{session_id}"
+
+    - selector: subtraterpc.PlanReviewService.ListPlanReviews
+      get: "/api/v1/plan-reviews"
+
+    - selector: subtraterpc.PlanReviewService.UpdatePlanReviewStatus
+      patch: "/api/v1/plan-reviews/{plan_review_id}"
+      body: "*"
+
+    - selector: subtraterpc.PlanReviewService.DeletePlanReview
+      delete: "/api/v1/plan-reviews/{plan_review_id}"
