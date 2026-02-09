@@ -324,11 +324,11 @@ func TestFormatPlanMessageNoSummary(t *testing.T) {
 // TestKeywordPatterns verifies the approval/rejection regex patterns.
 func TestKeywordPatterns(t *testing.T) {
 	tests := []struct {
-		name     string
-		text     string
-		approve  bool
-		reject   bool
-		changes  bool
+		name    string
+		text    string
+		approve bool
+		reject  bool
+		changes bool
 	}{
 		{
 			name: "approve", text: "I approve this plan",
@@ -363,13 +363,13 @@ func TestKeywordPatterns(t *testing.T) {
 			reject: true,
 		},
 		{
-			name: "changes requested",
-			text: "Changes requested on this plan",
+			name:    "changes requested",
+			text:    "Changes requested on this plan",
 			changes: true,
 		},
 		{
-			name: "needs changes",
-			text: "This needs changes before proceeding",
+			name:    "needs changes",
+			text:    "This needs changes before proceeding",
 			changes: true,
 		},
 		{

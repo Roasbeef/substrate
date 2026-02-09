@@ -80,6 +80,27 @@ var HookDefinitions = map[string]HookEntry{
 	},
 }
 
+// PlanHookDefinitions defines hooks for plan mode integration.
+// PostToolUse tracks plan file writes; PreToolUse intercepts ExitPlanMode
+// to submit plans for review before proceeding.
+var PlanHookDefinitions = map[string]HookEntry{
+	"PostToolUse": {
+		Matcher: "Write",
+		Hooks: []HookCommand{{
+			Type:    "command",
+			Command: "~/.claude/hooks/substrate/posttooluse_plan.sh",
+		}},
+	},
+	"PreToolUse": {
+		Matcher: "ExitPlanMode",
+		Hooks: []HookCommand{{
+			Type:    "command",
+			Command: "~/.claude/hooks/substrate/pretooluse_plan.sh",
+			Timeout: 600,
+		}},
+	},
+}
+
 // TaskHookDefinitions defines PostToolUse hooks for task tool sync.
 // These are installed separately when task sync is enabled.
 var TaskHookDefinitions = map[string]HookEntry{
@@ -301,6 +322,58 @@ func IsTaskHooksInstalled(settings *ClaudeSettings) bool {
 	}
 
 	return slices.ContainsFunc(entries, isTaskSyncHook)
+}
+
+// InstallPlanHooks adds plan mode hooks to the settings.
+func InstallPlanHooks(settings *ClaudeSettings) {
+	for event, hookDef := range PlanHookDefinitions {
+		entries := settings.Hooks[event]
+		alreadyInstalled := slices.ContainsFunc(entries, isPlanHook)
+
+		if !alreadyInstalled {
+			settings.Hooks[event] = append(entries, hookDef)
+		}
+	}
+}
+
+// UninstallPlanHooks removes plan mode hooks from the settings.
+func UninstallPlanHooks(settings *ClaudeSettings) {
+	for event, entries := range settings.Hooks {
+		filtered := make([]HookEntry, 0, len(entries))
+		for _, entry := range entries {
+			if !isPlanHook(entry) {
+				filtered = append(filtered, entry)
+			}
+		}
+		if len(filtered) > 0 {
+			settings.Hooks[event] = filtered
+		} else {
+			delete(settings.Hooks, event)
+		}
+	}
+}
+
+// IsPlanHooksInstalled checks if plan mode hooks are installed.
+func IsPlanHooksInstalled(settings *ClaudeSettings) bool {
+	// Check if the PreToolUse ExitPlanMode hook is present.
+	entries, ok := settings.Hooks["PreToolUse"]
+	if !ok {
+		return false
+	}
+
+	return slices.ContainsFunc(entries, isPlanHook)
+}
+
+// isPlanHook checks if a hook entry is a plan mode hook.
+func isPlanHook(entry HookEntry) bool {
+	for _, hook := range entry.Hooks {
+		if strings.Contains(hook.Command, "posttooluse_plan.sh") ||
+			strings.Contains(hook.Command, "pretooluse_plan.sh") {
+
+			return true
+		}
+	}
+	return false
 }
 
 // isTaskSyncHook checks if a hook entry is a task sync hook.
