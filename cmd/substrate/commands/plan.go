@@ -448,10 +448,11 @@ func runPlanSubmit(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("send plan mail: %w", err)
 	}
 
-	// Create plan review record.
+	// Create plan review record. V7 UUID failure is non-fatal since
+	// the function returns a valid V4 fallback.
 	prID, err := newPlanReviewID()
 	if err != nil {
-		return fmt.Errorf("generate plan review ID: %w", err)
+		fmt.Fprintf(os.Stderr, "Warning: %v\n", err)
 	}
 
 	review, err := client.CreatePlanReview(
@@ -571,11 +572,15 @@ func resolvePlanSessionID() string {
 	return os.Getenv("CLAUDE_SESSION_ID")
 }
 
-// newPlanReviewID generates a new UUID for a plan review.
+// newPlanReviewID generates a new UUID for a plan review. Uses V7
+// (time-ordered) when available, falling back to V4 with a warning.
 func newPlanReviewID() (string, error) {
 	id, err := uuid.NewV7()
 	if err != nil {
-		return uuid.New().String(), nil
+		fallbackID := uuid.New()
+		return fallbackID.String(), fmt.Errorf(
+			"V7 UUID failed, using V4 fallback: %w", err,
+		)
 	}
 	return id.String(), nil
 }
