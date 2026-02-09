@@ -240,6 +240,41 @@ type QueryStore interface {
 	DeleteReview(
 		ctx context.Context, reviewID string,
 	) error
+
+	// Plan review operations.
+	CreatePlanReview(
+		ctx context.Context, arg sqlc.CreatePlanReviewParams,
+	) (sqlc.PlanReview, error)
+	GetPlanReview(
+		ctx context.Context, planReviewID string,
+	) (sqlc.PlanReview, error)
+	GetPlanReviewByID(
+		ctx context.Context, id int64,
+	) (sqlc.PlanReview, error)
+	GetPlanReviewByMessage(
+		ctx context.Context, messageID sql.NullInt64,
+	) (sqlc.PlanReview, error)
+	GetPlanReviewByThread(
+		ctx context.Context, threadID string,
+	) (sqlc.PlanReview, error)
+	GetPlanReviewBySession(
+		ctx context.Context, sessionID sql.NullString,
+	) (sqlc.PlanReview, error)
+	ListPlanReviews(
+		ctx context.Context, arg sqlc.ListPlanReviewsParams,
+	) ([]sqlc.PlanReview, error)
+	ListPlanReviewsByState(
+		ctx context.Context, arg sqlc.ListPlanReviewsByStateParams,
+	) ([]sqlc.PlanReview, error)
+	ListPlanReviewsByRequester(
+		ctx context.Context, arg sqlc.ListPlanReviewsByRequesterParams,
+	) ([]sqlc.PlanReview, error)
+	UpdatePlanReviewState(
+		ctx context.Context, arg sqlc.UpdatePlanReviewStateParams,
+	) error
+	DeletePlanReview(
+		ctx context.Context, planReviewID string,
+	) error
 }
 
 // BatchedQueryStore is a version of QueryStore that's capable of batched

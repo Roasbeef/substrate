@@ -121,6 +121,25 @@ type PendingOperation struct {
 	Status         string
 }
 
+type PlanReview struct {
+	ID              int64
+	PlanReviewID    string
+	MessageID       sql.NullInt64
+	ThreadID        string
+	RequesterID     int64
+	ReviewerName    string
+	PlanPath        string
+	PlanTitle       string
+	PlanSummary     sql.NullString
+	State           string
+	ReviewerComment sql.NullString
+	ReviewedBy      sql.NullInt64
+	SessionID       sql.NullString
+	CreatedAt       int64
+	UpdatedAt       int64
+	ReviewedAt      sql.NullInt64
+}
+
 type Review struct {
 	ID          int64
 	ReviewID    string

@@ -469,6 +469,56 @@ type ReviewStore interface {
 	DeleteReview(ctx context.Context, reviewID string) error
 }
 
+// PlanReviewStore provides plan review CRUD operations.
+type PlanReviewStore interface {
+	// CreatePlanReview creates a new plan review record.
+	CreatePlanReview(
+		ctx context.Context, params CreatePlanReviewParams,
+	) (PlanReview, error)
+
+	// GetPlanReview retrieves a plan review by its UUID.
+	GetPlanReview(ctx context.Context, planReviewID string) (PlanReview, error)
+
+	// GetPlanReviewByMessage retrieves a plan review by message ID.
+	GetPlanReviewByMessage(
+		ctx context.Context, messageID int64,
+	) (PlanReview, error)
+
+	// GetPlanReviewByThread retrieves the latest plan review for a thread.
+	GetPlanReviewByThread(
+		ctx context.Context, threadID string,
+	) (PlanReview, error)
+
+	// GetPlanReviewBySession retrieves the pending plan review for a session.
+	GetPlanReviewBySession(
+		ctx context.Context, sessionID string,
+	) (PlanReview, error)
+
+	// ListPlanReviews lists plan reviews ordered by creation time.
+	ListPlanReviews(
+		ctx context.Context, limit, offset int,
+	) ([]PlanReview, error)
+
+	// ListPlanReviewsByState lists plan reviews matching the given state.
+	ListPlanReviewsByState(
+		ctx context.Context, state string, limit int,
+	) ([]PlanReview, error)
+
+	// ListPlanReviewsByRequester lists plan reviews by the requesting agent.
+	ListPlanReviewsByRequester(
+		ctx context.Context, requesterID int64, limit int,
+	) ([]PlanReview, error)
+
+	// UpdatePlanReviewState updates the state and reviewer info of a plan
+	// review.
+	UpdatePlanReviewState(
+		ctx context.Context, params UpdatePlanReviewStateParams,
+	) error
+
+	// DeletePlanReview deletes a plan review by its UUID.
+	DeletePlanReview(ctx context.Context, planReviewID string) error
+}
+
 // Storage combines all store interfaces for unified access.
 type Storage interface {
 	MessageStore
@@ -478,6 +528,7 @@ type Storage interface {
 	SessionStore
 	TaskStore
 	ReviewStore
+	PlanReviewStore
 
 	// WithTx executes a function within a write database transaction.
 	WithTx(ctx context.Context, fn func(ctx context.Context, s Storage) error) error
@@ -1024,6 +1075,80 @@ func ReviewIssueFromSqlc(ri sqlc.ReviewIssue) ReviewIssue {
 		issue.ResolvedInIteration = &v
 	}
 	return issue
+}
+
+// PlanReview represents a plan review record.
+type PlanReview struct {
+	ID              int64
+	PlanReviewID    string
+	MessageID       *int64
+	ThreadID        string
+	RequesterID     int64
+	ReviewerName    string
+	PlanPath        string
+	PlanTitle       string
+	PlanSummary     string
+	State           string
+	ReviewerComment string
+	ReviewedBy      *int64
+	SessionID       string
+	CreatedAt       time.Time
+	UpdatedAt       time.Time
+	ReviewedAt      *time.Time
+}
+
+// CreatePlanReviewParams contains parameters for creating a plan review.
+type CreatePlanReviewParams struct {
+	PlanReviewID string
+	MessageID    *int64
+	ThreadID     string
+	RequesterID  int64
+	ReviewerName string
+	PlanPath     string
+	PlanTitle    string
+	PlanSummary  string
+	SessionID    string
+}
+
+// UpdatePlanReviewStateParams contains parameters for updating plan review
+// state.
+type UpdatePlanReviewStateParams struct {
+	PlanReviewID    string
+	State           string
+	ReviewerComment string
+	ReviewedBy      *int64
+}
+
+// PlanReviewFromSqlc converts a sqlc.PlanReview to a store.PlanReview.
+func PlanReviewFromSqlc(pr sqlc.PlanReview) PlanReview {
+	review := PlanReview{
+		ID:              pr.ID,
+		PlanReviewID:    pr.PlanReviewID,
+		ThreadID:        pr.ThreadID,
+		RequesterID:     pr.RequesterID,
+		ReviewerName:    pr.ReviewerName,
+		PlanPath:        pr.PlanPath,
+		PlanTitle:       pr.PlanTitle,
+		PlanSummary:     pr.PlanSummary.String,
+		State:           pr.State,
+		ReviewerComment: pr.ReviewerComment.String,
+		SessionID:       pr.SessionID.String,
+		CreatedAt:       time.Unix(pr.CreatedAt, 0),
+		UpdatedAt:       time.Unix(pr.UpdatedAt, 0),
+	}
+	if pr.MessageID.Valid {
+		v := pr.MessageID.Int64
+		review.MessageID = &v
+	}
+	if pr.ReviewedBy.Valid {
+		v := pr.ReviewedBy.Int64
+		review.ReviewedBy = &v
+	}
+	if pr.ReviewedAt.Valid {
+		t := time.Unix(pr.ReviewedAt.Int64, 0)
+		review.ReviewedAt = &t
+	}
+	return review
 }
 
 // ToSqlcNullString converts a string to sql.NullString.
