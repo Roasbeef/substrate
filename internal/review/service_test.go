@@ -875,6 +875,86 @@ func TestService_ReviewerConfigs(t *testing.T) {
 	)
 }
 
+// TestService_HandleSubActorResultTwice verifies that calling
+// handleSubActorResult twice on the same review (first with request_changes,
+// then with approve) correctly transitions the FSM through
+// changes_requested → approved and reaches a terminal state.
+func TestService_HandleSubActorResultTwice(t *testing.T) {
+	t.Parallel()
+
+	svc, storage, cleanup := newTestService(t)
+	defer cleanup()
+
+	ctx := context.Background()
+
+	// Create an agent to be the requester.
+	agent := createTestAgent(t, storage, "TestAuthor")
+
+	// Create a review record in the DB.
+	review, err := storage.CreateReview(ctx, store.CreateReviewParams{
+		ReviewID:    "review-double-callback",
+		ThreadID:    "thread-double",
+		RepoPath:    "/tmp/repo",
+		BaseBranch:  "main",
+		Branch:      "feature",
+		ReviewType:  "full",
+		Priority:    "normal",
+		RequesterID: agent.ID,
+	})
+	require.NoError(t, err)
+
+	// Set up an FSM already in under_review state and register it.
+	fsm := NewReviewFSMFromDB(
+		review.ReviewID, review.ThreadID,
+		review.RepoPath, agent.ID, "under_review",
+	)
+	svc.mu.Lock()
+	svc.activeReviews[review.ReviewID] = fsm
+	svc.mu.Unlock()
+
+	// First callback: request_changes.
+	svc.handleSubActorResult(ctx, &SubActorResult{
+		ReviewID: review.ReviewID,
+		Result: &ReviewerResult{
+			Decision: "request_changes",
+			Summary:  "Found issues",
+			Issues: []ReviewerIssue{
+				{
+					Title:       "Missing validation",
+					Severity:    "high",
+					IssueType:   "bug",
+					Description: "Input not validated",
+				},
+			},
+		},
+		Duration: 5 * time.Second,
+	})
+
+	require.Equal(t, "changes_requested", fsm.CurrentState())
+	require.False(t, fsm.IsTerminal())
+
+	// Second callback: approve (reviewer updated decision after
+	// back-and-forth conversation).
+	svc.handleSubActorResult(ctx, &SubActorResult{
+		ReviewID: review.ReviewID,
+		Result: &ReviewerResult{
+			Decision: "approve",
+			Summary:  "Issues addressed in discussion",
+		},
+		Duration: 3 * time.Second,
+	})
+
+	require.Equal(t, "approved", fsm.CurrentState())
+	require.True(t, fsm.IsTerminal())
+
+	// Verify the FSM was removed from active tracking since it
+	// reached a terminal state.
+	svc.mu.RLock()
+	_, stillActive := svc.activeReviews[review.ReviewID]
+	svc.mu.RUnlock()
+	require.False(t, stillActive)
+}
+
 // unknownMsg is a test-only message type that the service doesn't handle.
 type unknownMsg struct {
 	actor.BaseMessage
