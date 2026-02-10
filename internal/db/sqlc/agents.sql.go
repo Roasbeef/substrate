@@ -295,6 +295,51 @@ func (q *Queries) ListSessionIdentitiesByAgent(ctx context.Context, agentID int6
 	return items, nil
 }
 
+const SearchAgents = `-- name: SearchAgents :many
+SELECT id, name, project_key, git_branch, current_session_id, created_at, last_active_at FROM agents
+WHERE name LIKE '%' || ?1 || '%'
+   OR project_key LIKE '%' || ?1 || '%'
+   OR git_branch LIKE '%' || ?1 || '%'
+ORDER BY last_active_at DESC
+LIMIT ?2
+`
+
+type SearchAgentsParams struct {
+	Query      sql.NullString
+	MaxResults int64
+}
+
+func (q *Queries) SearchAgents(ctx context.Context, arg SearchAgentsParams) ([]Agent, error) {
+	rows, err := q.db.QueryContext(ctx, SearchAgents, arg.Query, arg.MaxResults)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []Agent
+	for rows.Next() {
+		var i Agent
+		if err := rows.Scan(
+			&i.ID,
+			&i.Name,
+			&i.ProjectKey,
+			&i.GitBranch,
+			&i.CurrentSessionID,
+			&i.CreatedAt,
+			&i.LastActiveAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const UpdateAgentGitBranch = `-- name: UpdateAgentGitBranch :exec
 UPDATE agents SET git_branch = ?, project_key = ?, last_active_at = ? WHERE id = ?
 `

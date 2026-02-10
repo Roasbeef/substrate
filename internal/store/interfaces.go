@@ -162,6 +162,11 @@ type AgentStore interface {
 	// UpdateAgentName updates an agent's display name.
 	UpdateAgentName(ctx context.Context, id int64, name string) error
 
+	// SearchAgents searches agents by name, project_key, or git_branch.
+	SearchAgents(
+		ctx context.Context, query string, limit int,
+	) ([]Agent, error)
+
 	// DeleteAgent deletes an agent by its ID.
 	DeleteAgent(ctx context.Context, id int64) error
 }
