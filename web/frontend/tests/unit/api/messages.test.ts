@@ -201,7 +201,8 @@ describe('messages API', () => {
       server.use(
         http.post('/api/v1/messages', async ({ request }) => {
           const body = (await request.json()) as {
-            to?: number[];
+            sender_id?: number;
+            recipient_names?: string[];
             subject?: string;
             body?: string;
           };
@@ -218,7 +219,8 @@ describe('messages API', () => {
       );
 
       const result = await sendMessage({
-        to: [2],
+        sender_id: 1,
+        recipient_names: ['Bob'],
         subject: 'New Message',
         body: 'Hello, World!',
       });
@@ -231,7 +233,7 @@ describe('messages API', () => {
       server.use(
         http.post('/api/v1/messages', async ({ request }) => {
           const body = (await request.json()) as { priority?: string };
-          expect(body.priority).toBe('urgent');
+          expect(body.priority).toBe('PRIORITY_URGENT');
           return HttpResponse.json({
             id: 101,
             sender_id: 1,
@@ -245,10 +247,11 @@ describe('messages API', () => {
       );
 
       await sendMessage({
-        to: [2],
+        sender_id: 1,
+        recipient_names: ['Bob'],
         subject: 'Urgent',
         body: 'Important!',
-        priority: 'urgent',
+        priority: 'PRIORITY_URGENT',
       });
     });
 
@@ -263,7 +266,7 @@ describe('messages API', () => {
       );
 
       await expect(
-        sendMessage({ to: [2], subject: '', body: 'test' }),
+        sendMessage({ sender_id: 1, recipient_names: ['Bob'], subject: '', body: 'test' }),
       ).rejects.toThrow();
     });
   });

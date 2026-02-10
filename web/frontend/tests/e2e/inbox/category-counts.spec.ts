@@ -15,32 +15,32 @@ test.describe('Inbox category tab counts', () => {
     // Send messages from User (Primary category).
     await request.post('/api/v1/messages', {
       data: {
-        to: ['TestAgent'],
-        from: 'User',
+        sender_id: 6,
+        recipient_names: ['TestAgent'],
         subject: 'User Message 1',
         body: 'Message from user',
-        priority: 'normal',
+        priority: 'PRIORITY_NORMAL',
       },
     });
 
     await request.post('/api/v1/messages', {
       data: {
-        to: ['TestAgent'],
-        from: 'User',
+        sender_id: 6,
+        recipient_names: ['TestAgent'],
         subject: 'User Message 2',
         body: 'Another message from user',
-        priority: 'normal',
+        priority: 'PRIORITY_NORMAL',
       },
     });
 
     // Send a message from an agent (Agents category).
     await request.post('/api/v1/messages', {
       data: {
-        to: ['User'],
-        from: 'TestAgent',
+        sender_id: 1,
+        recipient_names: ['User'],
         subject: 'Agent Message',
         body: 'Message from agent',
-        priority: 'normal',
+        priority: 'PRIORITY_NORMAL',
       },
     });
 

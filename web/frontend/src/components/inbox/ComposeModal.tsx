@@ -5,11 +5,21 @@ import { Modal } from '@/components/ui/Modal.js';
 import { Button } from '@/components/ui/Button.js';
 import { Input, Textarea, Select } from '@/components/ui/Input.js';
 import { RecipientInput } from './RecipientInput.js';
+import { useAuthStore } from '@/stores/auth.js';
 import type {
   AutocompleteRecipient,
   MessagePriority,
+  ProtoPriority,
   SendMessageRequest,
 } from '@/types/api.js';
+
+// Map human-friendly priority values to proto enum names.
+const priorityToProto: Record<MessagePriority, ProtoPriority> = {
+  low: 'PRIORITY_LOW',
+  normal: 'PRIORITY_NORMAL',
+  high: 'PRIORITY_URGENT',
+  urgent: 'PRIORITY_URGENT',
+};
 
 // Form state interface.
 interface ComposeFormState {
@@ -132,12 +142,14 @@ export function ComposeModal({
         return;
       }
 
+      const currentAgent = useAuthStore.getState().currentAgent;
       const data: SendMessageRequest = {
-        to: form.recipients.map((r) => r.id),
+        sender_id: currentAgent?.id ?? 0,
+        recipient_names: form.recipients.map((r) => r.name),
         subject: form.subject.trim(),
         body: form.body.trim(),
-        priority: form.priority,
-        ...(form.deadline && { deadline: form.deadline }),
+        priority: priorityToProto[form.priority],
+        ...(form.deadline && { deadline_at: form.deadline }),
       };
 
       try {

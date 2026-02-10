@@ -372,29 +372,38 @@ describe('enrichSearchResult', () => {
 describe('useEnrichedSearch', () => {
   const mockResults: SearchResult[] = [
     { type: 'message', id: 1, title: 'Message', snippet: 'Content', created_at: '2024-01-01' },
-    { type: 'agent', id: 2, title: 'Agent', snippet: 'Content', created_at: '2024-01-01' },
   ];
 
   const mockResponse: APIResponse<SearchResult[]> = {
     data: mockResults,
   };
 
+  const mockAgents: AutocompleteRecipient[] = [
+    { id: 10, name: 'TestAgent', project_key: '/path/to/project', git_branch: 'main', status: 'active' },
+  ];
+
   beforeEach(() => {
     vi.clearAllMocks();
     vi.mocked(searchApi.search).mockResolvedValue(mockResponse);
+    vi.mocked(searchApi.autocompleteRecipients).mockResolvedValue(mockAgents);
   });
 
-  it('returns enriched results with routes', async () => {
+  it('returns enriched results with agents first then messages', async () => {
     const { result } = renderHook(() => useEnrichedSearch('test', 50), {
       wrapper: createWrapper(),
     });
 
+    // Search returns 1 message, autocomplete returns 1 agent = 2 total.
     await waitFor(() => {
       expect(result.current.enrichedResults.length).toBe(2);
     }, { timeout: 500 });
 
-    expect(result.current.enrichedResults[0]?.route).toBe('/thread/1');
-    expect(result.current.enrichedResults[1]?.route).toBe('/agents/2');
+    // Agents appear first.
+    expect(result.current.enrichedResults[0]?.type).toBe('agent');
+    expect(result.current.enrichedResults[0]?.route).toBe('/agents/10');
+    // Messages appear after agents.
+    expect(result.current.enrichedResults[1]?.type).toBe('message');
+    expect(result.current.enrichedResults[1]?.route).toBe('/thread/1');
   });
 
   it('memoizes enriched results', async () => {

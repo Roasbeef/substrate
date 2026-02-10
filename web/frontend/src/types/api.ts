@@ -272,13 +272,22 @@ export interface CreateReviewResponse {
 }
 
 // Create/update request types.
+// Proto priority enum values accepted by gRPC-gateway.
+export type ProtoPriority =
+  | 'PRIORITY_UNSPECIFIED'
+  | 'PRIORITY_LOW'
+  | 'PRIORITY_NORMAL'
+  | 'PRIORITY_URGENT';
+
 export interface SendMessageRequest {
-  to: number[];
+  sender_id: number;
+  recipient_names: string[];
   subject: string;
   body: string;
-  priority?: MessagePriority;
-  topic_id?: number;
-  deadline?: string;
+  priority?: ProtoPriority;
+  topic_name?: string;
+  thread_id?: string;
+  deadline_at?: string;
 }
 
 export interface CreateAgentRequest {
