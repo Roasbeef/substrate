@@ -346,11 +346,13 @@ func (s *Server) PollChanges(ctx context.Context, req *PollChangesRequest) (*Pol
 	if resp.Error != nil {
 		return nil, status.Errorf(codes.Internal, "failed to poll changes: %v", resp.Error)
 	}
-	newMessages := resp.NewMessages
 	newOffsets := resp.NewOffsets
 
+	protoMsgs := convertMessages(resp.NewMessages)
+	s.populateRecipients(ctx, protoMsgs)
+
 	return &PollChangesResponse{
-		NewMessages: convertMessages(newMessages),
+		NewMessages: protoMsgs,
 		NewOffsets:  newOffsets,
 	}, nil
 }
@@ -406,7 +408,11 @@ func (s *Server) SubscribeInbox(req *SubscribeInboxRequest, stream Mail_Subscrib
 			if !ok {
 				return nil
 			}
-			if err := stream.Send(convertMessage(&msg)); err != nil {
+			protoMsg := convertMessage(&msg)
+			s.populateRecipients(
+				stream.Context(), []*InboxMessage{protoMsg},
+			)
+			if err := stream.Send(protoMsg); err != nil {
 				return err
 			}
 		}
