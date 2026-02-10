@@ -341,11 +341,6 @@ func TestFSM_InvalidTransitions(t *testing.T) {
 			event: ResubmitEvent{NewCommitSHA: "abc"},
 		},
 		{
-			name:  "approve in changes_requested",
-			state: &StateChangesRequested{},
-			event: ApproveEvent{ReviewerID: "R"},
-		},
-		{
 			name:  "approve in re_review",
 			state: &StateReReview{},
 			event: ApproveEvent{ReviewerID: "R"},
@@ -421,6 +416,218 @@ func TestFSM_OutboxPersistStateContent(t *testing.T) {
 		}
 	}
 	t.Fatal("PersistReviewState not found in outbox")
+}
+
+// TestFSM_ChangesRequestedDirectApprove tests the back-and-forth path where
+// the reviewer approves directly from the changes_requested state without a
+// formal resubmit cycle.
+func TestFSM_ChangesRequestedDirectApprove(t *testing.T) {
+	ctx := context.Background()
+	fsm := newTestFSM()
+
+	// Drive to changes_requested.
+	_, _ = fsm.ProcessEvent(ctx, SubmitForReviewEvent{RequesterID: 1})
+	_, _ = fsm.ProcessEvent(ctx, StartReviewEvent{ReviewerID: "R"})
+	_, _ = fsm.ProcessEvent(ctx, RequestChangesEvent{
+		ReviewerID: "R",
+		Issues: []ReviewIssueSummary{
+			{Title: "Bug", Severity: "high"},
+		},
+	})
+
+	if fsm.CurrentState() != "changes_requested" {
+		t.Fatalf(
+			"expected 'changes_requested', got %q",
+			fsm.CurrentState(),
+		)
+	}
+
+	// Approve directly from changes_requested.
+	outbox, err := fsm.ProcessEvent(ctx, ApproveEvent{
+		ReviewerID: "R",
+	})
+	if err != nil {
+		t.Fatalf("Approve from changes_requested failed: %v", err)
+	}
+	if fsm.CurrentState() != "approved" {
+		t.Fatalf("expected 'approved', got %q", fsm.CurrentState())
+	}
+	if !fsm.IsTerminal() {
+		t.Fatal("approved state should be terminal")
+	}
+
+	assertHasOutboxEvent[PersistReviewState](t, outbox)
+	assertHasOutboxEvent[NotifyReviewStateChange](t, outbox)
+	assertHasOutboxEvent[RecordActivity](t, outbox)
+}
+
+// TestFSM_ChangesRequestedDirectReject tests the path where the reviewer
+// rejects directly from the changes_requested state.
+func TestFSM_ChangesRequestedDirectReject(t *testing.T) {
+	ctx := context.Background()
+	fsm := newTestFSM()
+
+	// Drive to changes_requested.
+	_, _ = fsm.ProcessEvent(ctx, SubmitForReviewEvent{RequesterID: 1})
+	_, _ = fsm.ProcessEvent(ctx, StartReviewEvent{ReviewerID: "R"})
+	_, _ = fsm.ProcessEvent(ctx, RequestChangesEvent{
+		ReviewerID: "R",
+		Issues: []ReviewIssueSummary{
+			{Title: "Fatal flaw", Severity: "critical"},
+		},
+	})
+
+	if fsm.CurrentState() != "changes_requested" {
+		t.Fatalf(
+			"expected 'changes_requested', got %q",
+			fsm.CurrentState(),
+		)
+	}
+
+	// Reject directly from changes_requested.
+	outbox, err := fsm.ProcessEvent(ctx, RejectEvent{
+		ReviewerID: "R",
+		Reason:     "unfixable design issue",
+	})
+	if err != nil {
+		t.Fatalf("Reject from changes_requested failed: %v", err)
+	}
+	if fsm.CurrentState() != "rejected" {
+		t.Fatalf("expected 'rejected', got %q", fsm.CurrentState())
+	}
+	if !fsm.IsTerminal() {
+		t.Fatal("rejected state should be terminal")
+	}
+
+	assertHasOutboxEvent[PersistReviewState](t, outbox)
+	assertHasOutboxEvent[NotifyReviewStateChange](t, outbox)
+	assertHasOutboxEvent[RecordActivity](t, outbox)
+}
+
+// TestFSM_ChangesRequestedSecondRoundChanges tests that a reviewer can issue
+// a second round of change requests while already in changes_requested state.
+func TestFSM_ChangesRequestedSecondRoundChanges(t *testing.T) {
+	ctx := context.Background()
+	fsm := newTestFSM()
+
+	// Drive to changes_requested.
+	_, _ = fsm.ProcessEvent(ctx, SubmitForReviewEvent{RequesterID: 1})
+	_, _ = fsm.ProcessEvent(ctx, StartReviewEvent{ReviewerID: "R"})
+	_, _ = fsm.ProcessEvent(ctx, RequestChangesEvent{
+		ReviewerID: "R",
+		Issues: []ReviewIssueSummary{
+			{Title: "First issue", Severity: "high"},
+		},
+	})
+
+	if fsm.CurrentState() != "changes_requested" {
+		t.Fatalf(
+			"expected 'changes_requested', got %q",
+			fsm.CurrentState(),
+		)
+	}
+
+	// Issue another round of changes from changes_requested.
+	newIssues := []ReviewIssueSummary{
+		{Title: "Second issue", Severity: "medium"},
+		{Title: "Third issue", Severity: "low"},
+	}
+	outbox, err := fsm.ProcessEvent(ctx, RequestChangesEvent{
+		ReviewerID: "R",
+		Issues:     newIssues,
+	})
+	if err != nil {
+		t.Fatalf(
+			"RequestChanges from changes_requested failed: %v",
+			err,
+		)
+	}
+	if fsm.CurrentState() != "changes_requested" {
+		t.Fatalf(
+			"expected 'changes_requested', got %q",
+			fsm.CurrentState(),
+		)
+	}
+	if fsm.IsTerminal() {
+		t.Fatal("changes_requested should not be terminal")
+	}
+
+	assertHasOutboxEvent[PersistReviewState](t, outbox)
+	assertHasOutboxEvent[NotifyReviewStateChange](t, outbox)
+	assertHasOutboxEvent[CreateReviewIssues](t, outbox)
+	assertHasOutboxEvent[RecordActivity](t, outbox)
+}
+
+// TestFSM_ChangesRequestedOutboxContent verifies outbox event field values
+// for the changes_requested → approved transition.
+func TestFSM_ChangesRequestedOutboxContent(t *testing.T) {
+	ctx := context.Background()
+	fsm := NewReviewFSM("r-99", "t-88", "/tmp/code", 5)
+
+	// Drive to changes_requested.
+	_, _ = fsm.ProcessEvent(ctx, SubmitForReviewEvent{RequesterID: 5})
+	_, _ = fsm.ProcessEvent(ctx, StartReviewEvent{ReviewerID: "R"})
+	_, _ = fsm.ProcessEvent(ctx, RequestChangesEvent{
+		ReviewerID: "R",
+		Issues: []ReviewIssueSummary{
+			{Title: "Bug", Severity: "high"},
+		},
+	})
+
+	// Approve from changes_requested.
+	outbox, err := fsm.ProcessEvent(ctx, ApproveEvent{
+		ReviewerID: "R",
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	// Verify PersistReviewState fields.
+	var foundPersist bool
+	for _, evt := range outbox {
+		if persist, ok := evt.(PersistReviewState); ok {
+			foundPersist = true
+			if persist.ReviewID != "r-99" {
+				t.Fatalf(
+					"expected ReviewID 'r-99', got %q",
+					persist.ReviewID,
+				)
+			}
+			if persist.NewState != "approved" {
+				t.Fatalf(
+					"expected NewState 'approved', got %q",
+					persist.NewState,
+				)
+			}
+		}
+	}
+	if !foundPersist {
+		t.Fatal("PersistReviewState not found in outbox")
+	}
+
+	// Verify NotifyReviewStateChange fields.
+	var foundNotify bool
+	for _, evt := range outbox {
+		if notify, ok := evt.(NotifyReviewStateChange); ok {
+			foundNotify = true
+			if notify.OldState != "changes_requested" {
+				t.Fatalf(
+					"expected OldState "+
+						"'changes_requested', got %q",
+					notify.OldState,
+				)
+			}
+			if notify.NewState != "approved" {
+				t.Fatalf(
+					"expected NewState 'approved', got %q",
+					notify.NewState,
+				)
+			}
+		}
+	}
+	if !foundNotify {
+		t.Fatal("NotifyReviewStateChange not found in outbox")
+	}
 }
 
 // TestStateFromString_Unknown tests that an unknown state falls back to New.
