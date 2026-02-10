@@ -2420,6 +2420,7 @@ type GetAgentResponse struct {
 	SessionId     string                 `protobuf:"bytes,4,opt,name=session_id,json=sessionId,proto3" json:"session_id,omitempty"` // Current session ID (renamed from current_session_id)
 	CreatedAt     *timestamppb.Timestamp `protobuf:"bytes,5,opt,name=created_at,json=createdAt,proto3" json:"created_at,omitempty"`
 	LastActiveAt  *timestamppb.Timestamp `protobuf:"bytes,6,opt,name=last_active_at,json=lastActiveAt,proto3" json:"last_active_at,omitempty"`
+	GitBranch     string                 `protobuf:"bytes,7,opt,name=git_branch,json=gitBranch,proto3" json:"git_branch,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -2494,6 +2495,13 @@ func (x *GetAgentResponse) GetLastActiveAt() *timestamppb.Timestamp {
 		return x.LastActiveAt
 	}
 	return nil
+}
+
+func (x *GetAgentResponse) GetGitBranch() string {
+	if x != nil {
+		return x.GitBranch
+	}
+	return ""
 }
 
 // ListAgentsRequest is the request for ListAgents.
@@ -8980,7 +8988,7 @@ const file_mail_proto_rawDesc = "" +
 	"\x04name\x18\x02 \x01(\tR\x04name\"@\n" +
 	"\x0fGetAgentRequest\x12\x19\n" +
 	"\bagent_id\x18\x01 \x01(\x03R\aagentId\x12\x12\n" +
-	"\x04name\x18\x02 \x01(\tR\x04name\"\xf3\x01\n" +
+	"\x04name\x18\x02 \x01(\tR\x04name\"\x92\x02\n" +
 	"\x10GetAgentResponse\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\x03R\x02id\x12\x12\n" +
 	"\x04name\x18\x02 \x01(\tR\x04name\x12\x1f\n" +
@@ -8990,7 +8998,9 @@ const file_mail_proto_rawDesc = "" +
 	"session_id\x18\x04 \x01(\tR\tsessionId\x129\n" +
 	"\n" +
 	"created_at\x18\x05 \x01(\v2\x1a.google.protobuf.TimestampR\tcreatedAt\x12@\n" +
-	"\x0elast_active_at\x18\x06 \x01(\v2\x1a.google.protobuf.TimestampR\flastActiveAt\")\n" +
+	"\x0elast_active_at\x18\x06 \x01(\v2\x1a.google.protobuf.TimestampR\flastActiveAt\x12\x1d\n" +
+	"\n" +
+	"git_branch\x18\a \x01(\tR\tgitBranch\")\n" +
 	"\x11ListAgentsRequest\x12\x14\n" +
 	"\x05limit\x18\x01 \x01(\x05R\x05limit\"K\n" +
 	"\x12ListAgentsResponse\x125\n" +

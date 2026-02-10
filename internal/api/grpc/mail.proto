@@ -478,6 +478,7 @@ message GetAgentResponse {
     string session_id = 4;  // Current session ID (renamed from current_session_id)
     google.protobuf.Timestamp created_at = 5;
     google.protobuf.Timestamp last_active_at = 6;
+    string git_branch = 7;
 }
 
 // ListAgentsRequest is the request for ListAgents.
