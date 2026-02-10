@@ -385,6 +385,7 @@ type InboxMessage struct {
 	SnoozedUntil     *timestamppb.Timestamp `protobuf:"bytes,12,opt,name=snoozed_until,json=snoozedUntil,proto3" json:"snoozed_until,omitempty"`       // null if not snoozed
 	ReadAt           *timestamppb.Timestamp `protobuf:"bytes,13,opt,name=read_at,json=readAt,proto3" json:"read_at,omitempty"`                         // null if unread
 	AcknowledgedAt   *timestamppb.Timestamp `protobuf:"bytes,14,opt,name=acknowledged_at,json=acknowledgedAt,proto3" json:"acknowledged_at,omitempty"` // null if not acked
+	RecipientNames   []string               `protobuf:"bytes,17,rep,name=recipient_names,json=recipientNames,proto3" json:"recipient_names,omitempty"` // Names of all recipients.
 	unknownFields    protoimpl.UnknownFields
 	sizeCache        protoimpl.SizeCache
 }
@@ -527,6 +528,13 @@ func (x *InboxMessage) GetReadAt() *timestamppb.Timestamp {
 func (x *InboxMessage) GetAcknowledgedAt() *timestamppb.Timestamp {
 	if x != nil {
 		return x.AcknowledgedAt
+	}
+	return nil
+}
+
+func (x *InboxMessage) GetRecipientNames() []string {
+	if x != nil {
+		return x.RecipientNames
 	}
 	return nil
 }
@@ -8828,7 +8836,7 @@ var File_mail_proto protoreflect.FileDescriptor
 const file_mail_proto_rawDesc = "" +
 	"\n" +
 	"\n" +
-	"mail.proto\x12\vsubtraterpc\x1a\x1fgoogle/protobuf/timestamp.proto\"\xb3\x05\n" +
+	"mail.proto\x12\vsubtraterpc\x1a\x1fgoogle/protobuf/timestamp.proto\"\xdc\x05\n" +
 	"\fInboxMessage\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\x03R\x02id\x12\x1b\n" +
 	"\tthread_id\x18\x02 \x01(\tR\bthreadId\x12\x19\n" +
@@ -8849,7 +8857,8 @@ const file_mail_proto_rawDesc = "" +
 	"deadlineAt\x12?\n" +
 	"\rsnoozed_until\x18\f \x01(\v2\x1a.google.protobuf.TimestampR\fsnoozedUntil\x123\n" +
 	"\aread_at\x18\r \x01(\v2\x1a.google.protobuf.TimestampR\x06readAt\x12C\n" +
-	"\x0facknowledged_at\x18\x0e \x01(\v2\x1a.google.protobuf.TimestampR\x0eacknowledgedAt\"\x85\x03\n" +
+	"\x0facknowledged_at\x18\x0e \x01(\v2\x1a.google.protobuf.TimestampR\x0eacknowledgedAt\x12'\n" +
+	"\x0frecipient_names\x18\x11 \x03(\tR\x0erecipientNames\"\x85\x03\n" +
 	"\x0fSendMailRequest\x12\x1b\n" +
 	"\tsender_id\x18\x01 \x01(\x03R\bsenderId\x12'\n" +
 	"\x0frecipient_names\x18\x02 \x03(\tR\x0erecipientNames\x12\x1d\n" +

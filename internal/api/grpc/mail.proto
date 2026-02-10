@@ -251,6 +251,7 @@ message InboxMessage {
     google.protobuf.Timestamp snoozed_until = 12;    // null if not snoozed
     google.protobuf.Timestamp read_at = 13;          // null if unread
     google.protobuf.Timestamp acknowledged_at = 14;  // null if not acked
+    repeated string recipient_names = 17;            // Names of all recipients.
 }
 
 // SendMailRequest is the request for SendMail.

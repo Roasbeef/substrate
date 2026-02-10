@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"log/slog"
 	"strings"
 	"time"
 	"unicode/utf8"
@@ -137,8 +138,11 @@ func (s *Server) FetchInbox(ctx context.Context, req *FetchInboxRequest) (*Fetch
 			)
 		}
 
+		protoMsgs := convertMessagesForList(resp.Messages)
+		s.populateRecipients(ctx, protoMsgs)
+
 		return &FetchInboxResponse{
-			Messages: convertMessagesForList(resp.Messages),
+			Messages: protoMsgs,
 		}, nil
 	}
 
@@ -159,10 +163,12 @@ func (s *Server) FetchInbox(ctx context.Context, req *FetchInboxRequest) (*Fetch
 	if resp.Error != nil {
 		return nil, status.Errorf(codes.Internal, "failed to fetch inbox: %v", resp.Error)
 	}
-	msgs := resp.Messages
+
+	protoMsgs := convertMessagesForList(resp.Messages)
+	s.populateRecipients(ctx, protoMsgs)
 
 	return &FetchInboxResponse{
-		Messages: convertMessagesForList(msgs),
+		Messages: protoMsgs,
 	}, nil
 }
 
@@ -184,9 +190,11 @@ func (s *Server) ReadMessage(ctx context.Context, req *ReadMessageRequest) (*Rea
 		return nil, status.Errorf(codes.Internal, "failed to read message: %v", resp.Error)
 	}
 	msg := resp.Message
+	protoMsg := convertMessage(msg)
+	s.populateRecipients(ctx, []*InboxMessage{protoMsg})
 
 	return &ReadMessageResponse{
-		Message: convertMessage(msg),
+		Message: protoMsg,
 	}, nil
 }
 
@@ -211,8 +219,11 @@ func (s *Server) ReadThread(ctx context.Context, req *ReadThreadRequest) (*ReadT
 		return nil, status.Errorf(codes.Internal, "failed to read thread: %v", err)
 	}
 
+	protoMsgs := convertMessages(msgs)
+	s.populateRecipients(ctx, protoMsgs)
+
 	return &ReadThreadResponse{
-		Messages: convertMessages(msgs),
+		Messages: protoMsgs,
 	}, nil
 }
 
@@ -1019,6 +1030,48 @@ func convertMessagesForList(msgs []mail.InboxMessage) []*InboxMessage {
 		result[i] = convertMessage(&msg)
 	}
 	return result
+}
+
+// populateRecipients fetches recipient names for a batch of proto
+// messages and sets the RecipientNames field on each one.
+func (s *Server) populateRecipients(
+	ctx context.Context, msgs []*InboxMessage,
+) {
+	if len(msgs) == 0 {
+		return
+	}
+
+	ids := make([]int64, len(msgs))
+	for i, m := range msgs {
+		ids[i] = m.Id
+	}
+
+	rows, err := s.store.Queries().GetMessageRecipientsWithAgentsBulk(
+		ctx, ids,
+	)
+	if err != nil {
+		// Non-fatal: messages render fine without recipients.
+		slog.Warn("failed to fetch recipients",
+			"count", len(ids), "error", err,
+		)
+		return
+	}
+
+	// Group agent names by message ID.
+	byMsg := make(map[int64][]string)
+	for _, r := range rows {
+		if r.AgentName.Valid {
+			byMsg[r.MessageID] = append(
+				byMsg[r.MessageID], r.AgentName.String,
+			)
+		}
+	}
+
+	for _, m := range msgs {
+		if names, ok := byMsg[m.Id]; ok {
+			m.RecipientNames = names
+		}
+	}
 }
 
 // timeToTimestamp converts a *time.Time to a protobuf Timestamp.
