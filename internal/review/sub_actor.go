@@ -485,6 +485,17 @@ func (r *reviewSubActor) tryParseReviewYAML(
 			"review_id", r.reviewID, "decision", parsed.Decision,
 		)
 		client.Close()
+	} else {
+		// For non-terminal decisions (request_changes), reset
+		// earlyResult so the reviewer can output a new YAML
+		// result after processing follow-up messages during the
+		// back-and-forth conversation facilitated by the stop
+		// hook.
+		state.earlyResult = false
+
+		log.InfoS(ctx, "Reviewer allowing subsequent YAML parsing",
+			"review_id", r.reviewID, "decision", parsed.Decision,
+		)
 	}
 }
 

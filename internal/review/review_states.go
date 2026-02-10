@@ -345,6 +345,101 @@ func (s *StateChangesRequested) ProcessEvent(_ context.Context,
 			},
 		}, nil
 
+	case ApproveEvent:
+		// The reviewer updated its decision to approve after
+		// processing follow-up messages during back-and-forth.
+		return &ReviewTransition{
+			NextState: &StateApproved{
+				ReviewerID: e.ReviewerID,
+			},
+			OutboxEvents: []ReviewOutboxEvent{
+				PersistReviewState{
+					ReviewID: env.ReviewID,
+					NewState: "approved",
+				},
+				NotifyReviewStateChange{
+					ReviewID: env.ReviewID,
+					OldState: "changes_requested",
+					NewState: "approved",
+				},
+				RecordActivity{
+					AgentID:      env.RequesterID,
+					ActivityType: "review_approved",
+					Description: fmt.Sprintf(
+						"Review approved by %s "+
+							"(after changes requested)",
+						e.ReviewerID,
+					),
+					ReviewID: env.ReviewID,
+				},
+			},
+		}, nil
+
+	case RejectEvent:
+		// The reviewer updated its decision to reject after
+		// processing follow-up messages.
+		return &ReviewTransition{
+			NextState: &StateRejected{
+				ReviewerID: e.ReviewerID,
+				Reason:     e.Reason,
+			},
+			OutboxEvents: []ReviewOutboxEvent{
+				PersistReviewState{
+					ReviewID: env.ReviewID,
+					NewState: "rejected",
+				},
+				NotifyReviewStateChange{
+					ReviewID: env.ReviewID,
+					OldState: "changes_requested",
+					NewState: "rejected",
+				},
+				RecordActivity{
+					AgentID:      env.RequesterID,
+					ActivityType: "review_rejected",
+					Description: fmt.Sprintf(
+						"Review rejected by %s: %s",
+						e.ReviewerID, e.Reason,
+					),
+					ReviewID: env.ReviewID,
+				},
+			},
+		}, nil
+
+	case RequestChangesEvent:
+		// The reviewer issued another round of change requests
+		// during the same back-and-forth conversation.
+		return &ReviewTransition{
+			NextState: &StateChangesRequested{
+				ReviewerID: e.ReviewerID,
+			},
+			OutboxEvents: []ReviewOutboxEvent{
+				PersistReviewState{
+					ReviewID: env.ReviewID,
+					NewState: "changes_requested",
+				},
+				NotifyReviewStateChange{
+					ReviewID: env.ReviewID,
+					OldState: "changes_requested",
+					NewState: "changes_requested",
+				},
+				CreateReviewIssues{
+					ReviewID: env.ReviewID,
+					Issues:   e.Issues,
+				},
+				RecordActivity{
+					AgentID:      env.RequesterID,
+					ActivityType: "review_completed",
+					Description: fmt.Sprintf(
+						"Reviewer %s requested "+
+							"additional changes "+
+							"(%d issues)",
+						e.ReviewerID, len(e.Issues),
+					),
+					ReviewID: env.ReviewID,
+				},
+			},
+		}, nil
+
 	case CancelEvent:
 		return &ReviewTransition{
 			NextState: &StateCancelled{},
