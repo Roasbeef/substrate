@@ -173,7 +173,12 @@ export function ThreadMessage({
               {formatMessageDate(message.created_at)}
             </span>
             {/* Recipient (To) field. */}
-            {message.recipients && message.recipients.length > 0 ? (
+            {message.recipient_names && message.recipient_names.length > 0 ? (
+              <div className="text-sm text-gray-500">
+                <span className="text-gray-400">To: </span>
+                {message.recipient_names.join(', ')}
+              </div>
+            ) : message.recipients && message.recipients.length > 0 ? (
               <div className="text-sm text-gray-500">
                 <span className="text-gray-400">To: </span>
                 {message.recipients.map((r) => r.agent_name).join(', ')}

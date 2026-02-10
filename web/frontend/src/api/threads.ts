@@ -33,6 +33,7 @@ interface GatewayReadThreadResponse {
     body?: string;
     priority?: string;
     created_at?: string;
+    recipient_names?: string[];
   }>;
 }
 
@@ -56,6 +57,9 @@ function parseMessages(messages: GatewayReadThreadResponse['messages']): Message
     }
     if (msg.sender_git_branch !== undefined) {
       result.sender_git_branch = msg.sender_git_branch;
+    }
+    if (msg.recipient_names && msg.recipient_names.length > 0) {
+      result.recipient_names = msg.recipient_names;
     }
     return result;
   });

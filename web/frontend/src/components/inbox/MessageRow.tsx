@@ -310,7 +310,12 @@ export function MessageRow({
       </div>
 
       {/* Recipient names (To field). */}
-      {message.recipients && message.recipients.length > 0 ? (
+      {message.recipient_names && message.recipient_names.length > 0 ? (
+        <div className="w-32 flex-shrink-0 truncate text-sm text-gray-500">
+          <span className="text-gray-400">→ </span>
+          {message.recipient_names.join(', ')}
+        </div>
+      ) : message.recipients && message.recipients.length > 0 ? (
         <div className="w-32 flex-shrink-0 truncate text-sm text-gray-500">
           <span className="text-gray-400">→ </span>
           {message.recipients.map((r) => r.agent_name).join(', ')}

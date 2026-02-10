@@ -69,6 +69,7 @@ export interface Message {
   priority: MessagePriority;
   created_at: string;
   thread_id?: string;
+  recipient_names?: string[];
 }
 
 export type MessagePriority = 'low' | 'normal' | 'high' | 'urgent';

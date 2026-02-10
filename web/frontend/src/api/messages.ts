@@ -58,6 +58,7 @@ interface GatewayMessagesResponse {
     snoozed_until?: string;
     read_at?: string;
     acknowledged_at?: string;
+    recipient_names?: string[];
   }>;
 }
 
@@ -99,6 +100,9 @@ function parseMessagesResponse(response: GatewayMessagesResponse): APIResponse<M
     }
     if (msg.sender_git_branch) {
       result.sender_git_branch = msg.sender_git_branch;
+    }
+    if (msg.recipient_names && msg.recipient_names.length > 0) {
+      result.recipient_names = msg.recipient_names;
     }
     return result;
   });
