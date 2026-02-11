@@ -61,6 +61,8 @@ describe('SearchBar', () => {
     vi.useFakeTimers({ shouldAdvanceTime: true });
     vi.clearAllMocks();
     vi.mocked(searchApi.search).mockResolvedValue(mockResponse);
+    // Mock autocomplete to return empty so only search results appear.
+    vi.mocked(searchApi.autocompleteRecipients).mockResolvedValue([]);
     // Reset UI store.
     useUIStore.setState({
       searchOpen: true,

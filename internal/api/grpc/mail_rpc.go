@@ -4,7 +4,10 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"log/slog"
+	"strings"
 	"time"
+	"unicode/utf8"
 
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -135,8 +138,11 @@ func (s *Server) FetchInbox(ctx context.Context, req *FetchInboxRequest) (*Fetch
 			)
 		}
 
+		protoMsgs := convertMessagesForList(resp.Messages)
+		s.populateRecipients(ctx, protoMsgs)
+
 		return &FetchInboxResponse{
-			Messages: convertMessages(resp.Messages),
+			Messages: protoMsgs,
 		}, nil
 	}
 
@@ -157,10 +163,12 @@ func (s *Server) FetchInbox(ctx context.Context, req *FetchInboxRequest) (*Fetch
 	if resp.Error != nil {
 		return nil, status.Errorf(codes.Internal, "failed to fetch inbox: %v", resp.Error)
 	}
-	msgs := resp.Messages
+
+	protoMsgs := convertMessagesForList(resp.Messages)
+	s.populateRecipients(ctx, protoMsgs)
 
 	return &FetchInboxResponse{
-		Messages: convertMessages(msgs),
+		Messages: protoMsgs,
 	}, nil
 }
 
@@ -182,9 +190,11 @@ func (s *Server) ReadMessage(ctx context.Context, req *ReadMessageRequest) (*Rea
 		return nil, status.Errorf(codes.Internal, "failed to read message: %v", resp.Error)
 	}
 	msg := resp.Message
+	protoMsg := convertMessage(msg)
+	s.populateRecipients(ctx, []*InboxMessage{protoMsg})
 
 	return &ReadMessageResponse{
-		Message: convertMessage(msg),
+		Message: protoMsg,
 	}, nil
 }
 
@@ -209,8 +219,11 @@ func (s *Server) ReadThread(ctx context.Context, req *ReadThreadRequest) (*ReadT
 		return nil, status.Errorf(codes.Internal, "failed to read thread: %v", err)
 	}
 
+	protoMsgs := convertMessages(msgs)
+	s.populateRecipients(ctx, protoMsgs)
+
 	return &ReadThreadResponse{
-		Messages: convertMessages(msgs),
+		Messages: protoMsgs,
 	}, nil
 }
 
@@ -333,11 +346,13 @@ func (s *Server) PollChanges(ctx context.Context, req *PollChangesRequest) (*Pol
 	if resp.Error != nil {
 		return nil, status.Errorf(codes.Internal, "failed to poll changes: %v", resp.Error)
 	}
-	newMessages := resp.NewMessages
 	newOffsets := resp.NewOffsets
 
+	protoMsgs := convertMessages(resp.NewMessages)
+	s.populateRecipients(ctx, protoMsgs)
+
 	return &PollChangesResponse{
-		NewMessages: convertMessages(newMessages),
+		NewMessages: protoMsgs,
 		NewOffsets:  newOffsets,
 	}, nil
 }
@@ -393,7 +408,11 @@ func (s *Server) SubscribeInbox(req *SubscribeInboxRequest, stream Mail_Subscrib
 			if !ok {
 				return nil
 			}
-			if err := stream.Send(convertMessage(&msg)); err != nil {
+			protoMsg := convertMessage(&msg)
+			s.populateRecipients(
+				stream.Context(), []*InboxMessage{protoMsg},
+			)
+			if err := stream.Send(protoMsg); err != nil {
 				return err
 			}
 		}
@@ -529,6 +548,65 @@ func (s *Server) Search(ctx context.Context, req *SearchRequest) (*SearchRespons
 
 	return &SearchResponse{
 		Results: convertMessages(results),
+	}, nil
+}
+
+// AutocompleteRecipients returns matching agents for the recipient
+// autocomplete in the compose UI. Searches by name, project_key, and
+// git_branch.
+func (s *Server) AutocompleteRecipients(
+	ctx context.Context, req *AutocompleteRecipientsRequest,
+) (*AutocompleteRecipientsResponse, error) {
+
+	limit := int32(20)
+	if req.Limit > 0 {
+		limit = req.Limit
+	}
+
+	var agents []sqlc.Agent
+	var err error
+
+	if req.Query == "" {
+		// Return all agents when no query is provided.
+		agents, err = s.store.Queries().ListAgents(ctx)
+	} else {
+		agents, err = s.store.Queries().SearchAgents(
+			ctx, sqlc.SearchAgentsParams{
+				Query: sql.NullString{
+					String: req.Query,
+					Valid:  true,
+				},
+				MaxResults: int64(limit),
+			},
+		)
+	}
+	if err != nil {
+		return nil, status.Errorf(
+			codes.Internal,
+			"failed to search agents: %v", err,
+		)
+	}
+
+	// Limit results from ListAgents (which returns all).
+	if len(agents) > int(limit) {
+		agents = agents[:limit]
+	}
+
+	recipients := make([]*AutocompleteRecipient, len(agents))
+	for i, a := range agents {
+		agentStatus := s.heartbeatMgr.ComputeStatus(&a)
+
+		recipients[i] = &AutocompleteRecipient{
+			Id:         a.ID,
+			Name:       a.Name,
+			ProjectKey: a.ProjectKey.String,
+			GitBranch:  a.GitBranch.String,
+			Status:     string(agentStatus),
+		}
+	}
+
+	return &AutocompleteRecipientsResponse{
+		Recipients: recipients,
 	}, nil
 }
 
@@ -867,6 +945,30 @@ func stringToState(s string) MessageState {
 	}
 }
 
+// sanitizeUTF8 replaces invalid UTF-8 sequences with the Unicode
+// replacement character (U+FFFD). Protobuf string fields require valid
+// UTF-8, and database rows may contain corrupted data.
+func sanitizeUTF8(s string) string {
+	if utf8.ValidString(s) {
+		return s
+	}
+
+	var b strings.Builder
+	b.Grow(len(s))
+	for i := 0; i < len(s); {
+		r, size := utf8.DecodeRuneInString(s[i:])
+		if r == utf8.RuneError && size <= 1 {
+			b.WriteRune('\uFFFD')
+			i++
+		} else {
+			b.WriteRune(r)
+			i += size
+		}
+	}
+
+	return b.String()
+}
+
 func convertMessage(m *mail.InboxMessage) *InboxMessage {
 	if m == nil {
 		return nil
@@ -883,14 +985,14 @@ func convertMessage(m *mail.InboxMessage) *InboxMessage {
 
 	return &InboxMessage{
 		Id:               m.ID,
-		ThreadId:         m.ThreadID,
+		ThreadId:         sanitizeUTF8(m.ThreadID),
 		TopicId:          m.TopicID,
 		SenderId:         m.SenderID,
-		SenderName:       m.SenderName,
-		SenderProjectKey: m.SenderProjectKey,
-		SenderGitBranch:  m.SenderGitBranch,
-		Subject:          m.Subject,
-		Body:             m.Body,
+		SenderName:       sanitizeUTF8(m.SenderName),
+		SenderProjectKey: sanitizeUTF8(m.SenderProjectKey),
+		SenderGitBranch:  sanitizeUTF8(m.SenderGitBranch),
+		Subject:          sanitizeUTF8(m.Subject),
+		Body:             sanitizeUTF8(m.Body),
 		Priority:         priority,
 		State:            state,
 		CreatedAt:        timestamppb.New(m.CreatedAt),
@@ -901,12 +1003,81 @@ func convertMessage(m *mail.InboxMessage) *InboxMessage {
 	}
 }
 
+// maxListBodyLen is the maximum body length returned in list responses.
+// Full bodies are available via ReadMessage. This prevents enormous diff
+// payloads from blowing up the gRPC response size on inbox fetches.
+const maxListBodyLen = 4096
+
+// convertMessages converts a slice of internal inbox messages to proto
+// messages without any modification.
 func convertMessages(msgs []mail.InboxMessage) []*InboxMessage {
 	result := make([]*InboxMessage, len(msgs))
 	for i := range msgs {
 		result[i] = convertMessage(&msgs[i])
 	}
 	return result
+}
+
+// convertMessagesForList converts messages for list responses, truncating
+// oversized bodies to keep the response within gRPC message limits.
+func convertMessagesForList(msgs []mail.InboxMessage) []*InboxMessage {
+	result := make([]*InboxMessage, len(msgs))
+	for i := range msgs {
+		msg := msgs[i]
+		if len(msg.Body) > maxListBodyLen {
+			// Walk back to a valid UTF-8 character boundary so we
+			// don't split a multi-byte sequence.
+			truncAt := maxListBodyLen
+			for truncAt > 0 && !utf8.RuneStart(msg.Body[truncAt]) {
+				truncAt--
+			}
+			msg.Body = msg.Body[:truncAt] + "\n\n[… truncated — open message to see full content]"
+		}
+		result[i] = convertMessage(&msg)
+	}
+	return result
+}
+
+// populateRecipients fetches recipient names for a batch of proto
+// messages and sets the RecipientNames field on each one.
+func (s *Server) populateRecipients(
+	ctx context.Context, msgs []*InboxMessage,
+) {
+	if len(msgs) == 0 {
+		return
+	}
+
+	ids := make([]int64, len(msgs))
+	for i, m := range msgs {
+		ids[i] = m.Id
+	}
+
+	rows, err := s.store.Queries().GetMessageRecipientsWithAgentsBulk(
+		ctx, ids,
+	)
+	if err != nil {
+		// Non-fatal: messages render fine without recipients.
+		slog.Warn("failed to fetch recipients",
+			"count", len(ids), "error", err,
+		)
+		return
+	}
+
+	// Group agent names by message ID.
+	byMsg := make(map[int64][]string)
+	for _, r := range rows {
+		if r.AgentName.Valid {
+			byMsg[r.MessageID] = append(
+				byMsg[r.MessageID], r.AgentName.String,
+			)
+		}
+	}
+
+	for _, m := range msgs {
+		if names, ok := byMsg[m.Id]; ok {
+			m.RecipientNames = names
+		}
+	}
 }
 
 // timeToTimestamp converts a *time.Time to a protobuf Timestamp.
@@ -949,9 +1120,12 @@ func (s *Server) ListAgents(ctx context.Context, req *ListAgentsRequest) (*ListA
 	}
 	for i, a := range agents {
 		resp.Agents[i] = &GetAgentResponse{
-			Id:        a.ID,
-			Name:      a.Name,
-			CreatedAt: int64ToTimestamp(a.CreatedAt),
+			Id:           a.ID,
+			Name:         a.Name,
+			ProjectKey:   a.ProjectKey.String,
+			GitBranch:    a.GitBranch.String,
+			CreatedAt:    int64ToTimestamp(a.CreatedAt),
+			LastActiveAt: int64ToTimestamp(a.LastActiveAt),
 		}
 	}
 
@@ -992,31 +1166,34 @@ func (s *Server) RegisterAgent(ctx context.Context, req *RegisterAgentRequest) (
 
 // GetAgent retrieves an agent by ID or name.
 func (s *Server) GetAgent(ctx context.Context, req *GetAgentRequest) (*GetAgentResponse, error) {
-	if req.AgentId != 0 {
-		a, err := s.store.Queries().GetAgent(ctx, req.AgentId)
-		if err != nil {
-			return nil, status.Errorf(codes.NotFound, "agent not found: %v", err)
-		}
-		return &GetAgentResponse{
-			Id:        a.ID,
-			Name:      a.Name,
-			CreatedAt: int64ToTimestamp(a.CreatedAt),
-		}, nil
+	var a sqlc.Agent
+	var err error
+
+	switch {
+	case req.AgentId != 0:
+		a, err = s.store.Queries().GetAgent(ctx, req.AgentId)
+	case req.Name != "":
+		a, err = s.store.Queries().GetAgentByName(ctx, req.Name)
+	default:
+		return nil, status.Error(
+			codes.InvalidArgument,
+			"agent_id or name is required",
+		)
+	}
+	if err != nil {
+		return nil, status.Errorf(
+			codes.NotFound, "agent not found: %v", err,
+		)
 	}
 
-	if req.Name != "" {
-		a, err := s.store.Queries().GetAgentByName(ctx, req.Name)
-		if err != nil {
-			return nil, status.Errorf(codes.NotFound, "agent not found: %v", err)
-		}
-		return &GetAgentResponse{
-			Id:        a.ID,
-			Name:      a.Name,
-			CreatedAt: int64ToTimestamp(a.CreatedAt),
-		}, nil
-	}
-
-	return nil, status.Error(codes.InvalidArgument, "agent_id or name is required")
+	return &GetAgentResponse{
+		Id:           a.ID,
+		Name:         a.Name,
+		ProjectKey:   a.ProjectKey.String,
+		GitBranch:    a.GitBranch.String,
+		CreatedAt:    int64ToTimestamp(a.CreatedAt),
+		LastActiveAt: int64ToTimestamp(a.LastActiveAt),
+	}, nil
 }
 
 // EnsureIdentity creates or retrieves an agent identity for a session.

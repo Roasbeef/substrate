@@ -4,6 +4,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { ComposeModal, RecipientInput } from '@/components/inbox/index.js';
+import { useAuthStore } from '@/stores/auth.js';
 import type { AutocompleteRecipient } from '@/types/api.js';
 
 // Mock recipients for testing.
@@ -222,6 +223,15 @@ describe('ComposeModal', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    // Set up a current agent in the auth store for sender_id.
+    useAuthStore.setState({
+      currentAgent: {
+        id: 42,
+        name: 'TestUser',
+        createdAt: '2024-01-01T00:00:00Z',
+        lastActiveAt: '2024-01-01T00:00:00Z',
+      },
+    });
   });
 
   it('renders the form fields', () => {
@@ -277,11 +287,11 @@ describe('ComposeModal', () => {
 
     await waitFor(() => {
       expect(defaultProps.onSend).toHaveBeenCalledWith({
-        to: [1],
+        sender_id: 42,
+        recipient_names: ['Alice'],
         subject: 'Test Subject',
         body: 'Test message body',
-        priority: 'normal',
-        deadline: undefined,
+        priority: 'PRIORITY_NORMAL',
       });
     });
   });

@@ -105,6 +105,9 @@ type QueryStore interface {
 	UpdateAgentName(
 		ctx context.Context, arg sqlc.UpdateAgentNameParams,
 	) error
+	SearchAgents(
+		ctx context.Context, arg sqlc.SearchAgentsParams,
+	) ([]sqlc.Agent, error)
 	DeleteAgent(ctx context.Context, id int64) error
 
 	// Topic operations.
@@ -1065,6 +1068,27 @@ func (s *SqlcStore) UpdateAgentName(ctx context.Context, id int64,
 	})
 }
 
+// SearchAgents searches agents by name, project_key, or git_branch.
+func (s *SqlcStore) SearchAgents(ctx context.Context,
+	query string, limit int,
+) ([]Agent, error) {
+	rows, err := s.db.SearchAgents(ctx, sqlc.SearchAgentsParams{
+		Query: sql.NullString{
+			String: query, Valid: query != "",
+		},
+		MaxResults: int64(limit),
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	agents := make([]Agent, len(rows))
+	for i, r := range rows {
+		agents[i] = AgentFromSqlc(r)
+	}
+	return agents, nil
+}
+
 // DeleteAgent deletes an agent by its ID.
 func (s *SqlcStore) DeleteAgent(ctx context.Context, id int64) error {
 	return s.db.DeleteAgent(ctx, id)
@@ -1763,6 +1787,27 @@ func (s *txSqlcStore) UpdateSession(ctx context.Context, id int64,
 		CurrentSessionID: ToSqlcNullString(sessionID),
 		ID:               id,
 	})
+}
+
+// SearchAgents searches agents by name, project_key, or git_branch.
+func (s *txSqlcStore) SearchAgents(ctx context.Context,
+	query string, limit int,
+) ([]Agent, error) {
+	rows, err := s.queries.SearchAgents(ctx, sqlc.SearchAgentsParams{
+		Query: sql.NullString{
+			String: query, Valid: query != "",
+		},
+		MaxResults: int64(limit),
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	agents := make([]Agent, len(rows))
+	for i, r := range rows {
+		agents[i] = AgentFromSqlc(r)
+	}
+	return agents, nil
 }
 
 // DeleteAgent deletes an agent by its ID.

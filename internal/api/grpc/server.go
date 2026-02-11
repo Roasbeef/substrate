@@ -235,9 +235,15 @@ func (s *Server) buildServerOptions() []grpc.ServerOption {
 		PermitWithoutStream: s.cfg.ClientAllowPingWithoutStream,
 	}
 
+	// Raise message size limits from the 4MB default so that inboxes
+	// containing large diff attachments can be served without error.
+	const maxMsgSize = 100 * 1024 * 1024 // 100 MB
+
 	return []grpc.ServerOption{
 		grpc.KeepaliveParams(serverKeepalive),
 		grpc.KeepaliveEnforcementPolicy(clientKeepalive),
+		grpc.MaxRecvMsgSize(maxMsgSize),
+		grpc.MaxSendMsgSize(maxMsgSize),
 
 		// Chain unary interceptors: logging -> request validation.
 		grpc.ChainUnaryInterceptor(

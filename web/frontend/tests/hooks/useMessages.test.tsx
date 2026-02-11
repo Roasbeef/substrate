@@ -161,7 +161,8 @@ describe('useSendMessage', () => {
 
     await act(async () => {
       result.current.mutate({
-        to: [2],
+        sender_id: 1,
+        recipient_names: ['Bob'],
         subject: 'Test Subject',
         body: 'Test body',
       });
@@ -190,7 +191,8 @@ describe('useSendMessage', () => {
 
     await act(async () => {
       result.current.mutate({
-        to: [],
+        sender_id: 0,
+        recipient_names: [],
         subject: '',
         body: '',
       });
@@ -412,7 +414,8 @@ describe('useMessageMutations', () => {
     // Test sendMessage.
     await act(async () => {
       result.current.sendMessage.mutate({
-        to: [1],
+        sender_id: 1,
+        recipient_names: ['Alice'],
         subject: 'Test',
         body: 'Test body',
       });

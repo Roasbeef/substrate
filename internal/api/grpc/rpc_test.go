@@ -1942,3 +1942,147 @@ func TestAgentService_SaveIdentity_EmptySession(t *testing.T) {
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "session_id is required")
 }
+
+func TestAutocompleteRecipients(t *testing.T) {
+	h := newTestHarness(t)
+	defer h.Close()
+
+	ctx := context.Background()
+
+	// Create agents with project_key and git_branch via
+	// EnsureIdentity.
+	_, err := h.agentClient.EnsureIdentity(ctx, &EnsureIdentityRequest{
+		SessionId:  "sess-alpha",
+		ProjectDir: "/home/user/projects/subtrate",
+		GitBranch:  "main",
+	})
+	require.NoError(t, err)
+
+	_, err = h.agentClient.EnsureIdentity(ctx, &EnsureIdentityRequest{
+		SessionId:  "sess-beta",
+		ProjectDir: "/home/user/projects/lnd",
+		GitBranch:  "fix-channels",
+	})
+	require.NoError(t, err)
+
+	// Search by name fragment — the generated names are random, so
+	// query empty string to list all agents.
+	resp, err := h.mailClient.AutocompleteRecipients(
+		ctx, &AutocompleteRecipientsRequest{Query: ""},
+	)
+	require.NoError(t, err)
+	// At least "User" + 2 agents from EnsureIdentity.
+	require.GreaterOrEqual(t, len(resp.Recipients), 3)
+
+	// Search by project name "subtrate".
+	resp, err = h.mailClient.AutocompleteRecipients(
+		ctx, &AutocompleteRecipientsRequest{Query: "subtrate"},
+	)
+	require.NoError(t, err)
+	require.NotEmpty(t, resp.Recipients)
+	require.Equal(t, "/home/user/projects/subtrate",
+		resp.Recipients[0].ProjectKey)
+
+	// Search by git branch "fix-channels".
+	resp, err = h.mailClient.AutocompleteRecipients(
+		ctx, &AutocompleteRecipientsRequest{
+			Query: "fix-channels",
+		},
+	)
+	require.NoError(t, err)
+	require.NotEmpty(t, resp.Recipients)
+	require.Equal(t, "fix-channels", resp.Recipients[0].GitBranch)
+
+	// Search with no match returns empty.
+	resp, err = h.mailClient.AutocompleteRecipients(
+		ctx, &AutocompleteRecipientsRequest{
+			Query: "nonexistent-xyz",
+		},
+	)
+	require.NoError(t, err)
+	require.Empty(t, resp.Recipients)
+}
+
+func TestListAgents_ReturnsProjectAndBranch(t *testing.T) {
+	h := newTestHarness(t)
+	defer h.Close()
+
+	ctx := context.Background()
+
+	// Create an agent with project_key and git_branch via
+	// EnsureIdentity.
+	identResp, err := h.agentClient.EnsureIdentity(
+		ctx, &EnsureIdentityRequest{
+			SessionId:  "sess-ctx",
+			ProjectDir: "/home/user/projects/myrepo",
+			GitBranch:  "feature-xyz",
+		},
+	)
+	require.NoError(t, err)
+
+	// ListAgents should include the project_key and git_branch.
+	listResp, err := h.agentClient.ListAgents(
+		ctx, &ListAgentsRequest{},
+	)
+	require.NoError(t, err)
+
+	var found *GetAgentResponse
+	for _, a := range listResp.Agents {
+		if a.Id == identResp.AgentId {
+			found = a
+			break
+		}
+	}
+	require.NotNil(t, found, "agent not found in list")
+	require.Equal(t, "/home/user/projects/myrepo", found.ProjectKey)
+	require.Equal(t, "feature-xyz", found.GitBranch)
+	require.NotNil(t, found.LastActiveAt)
+}
+
+// TestSanitizeUTF8 verifies that invalid UTF-8 bytes are replaced with the
+// Unicode replacement character, while valid strings pass through unchanged.
+func TestSanitizeUTF8(t *testing.T) {
+	tests := []struct {
+		name  string
+		input string
+		want  string
+	}{
+		{
+			name:  "valid ASCII",
+			input: "hello world",
+			want:  "hello world",
+		},
+		{
+			name:  "valid unicode",
+			input: "hello \u2603 world",
+			want:  "hello \u2603 world",
+		},
+		{
+			name:  "empty string",
+			input: "",
+			want:  "",
+		},
+		{
+			name:  "invalid byte in middle",
+			input: "hello\x80world",
+			want:  "hello\uFFFDworld",
+		},
+		{
+			name:  "invalid bytes at end",
+			input: "hello\xff\xfe",
+			want:  "hello\uFFFD\uFFFD",
+		},
+		{
+			name:  "mixed valid and invalid",
+			input: "ok\xc0\xafok",
+			want:  "ok\uFFFD\uFFFDok",
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			got := sanitizeUTF8(tc.input)
+			require.Equal(t, tc.want, got)
+		})
+	}
+}

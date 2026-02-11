@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"strings"
 	"sync"
 	"time"
 )
@@ -950,6 +951,37 @@ func (m *MockStore) UpdateAgentName(
 	m.agentsByName[name] = id
 
 	return nil
+}
+
+// SearchAgents searches agents by name, project_key, or git_branch.
+func (m *MockStore) SearchAgents(ctx context.Context,
+	query string, limit int,
+) ([]Agent, error) {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+
+	lowerQuery := strings.ToLower(query)
+
+	var results []Agent
+	for _, agent := range m.agents {
+		nameMatch := strings.Contains(
+			strings.ToLower(agent.Name), lowerQuery,
+		)
+		projectMatch := strings.Contains(
+			strings.ToLower(agent.ProjectKey), lowerQuery,
+		)
+		branchMatch := strings.Contains(
+			strings.ToLower(agent.GitBranch), lowerQuery,
+		)
+
+		if nameMatch || projectMatch || branchMatch {
+			results = append(results, agent)
+			if len(results) >= limit {
+				break
+			}
+		}
+	}
+	return results, nil
 }
 
 func (m *MockStore) DeleteAgent(ctx context.Context, id int64) error {

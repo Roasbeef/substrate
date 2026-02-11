@@ -32,6 +32,14 @@ UPDATE agents SET current_session_id = ?, last_active_at = ? WHERE id = ?;
 -- name: UpdateAgentGitBranch :exec
 UPDATE agents SET git_branch = ?, project_key = ?, last_active_at = ? WHERE id = ?;
 
+-- name: SearchAgents :many
+SELECT * FROM agents
+WHERE name LIKE '%' || @query || '%'
+   OR project_key LIKE '%' || @query || '%'
+   OR git_branch LIKE '%' || @query || '%'
+ORDER BY last_active_at DESC
+LIMIT @max_results;
+
 -- name: DeleteAgent :exec
 DELETE FROM agents WHERE id = ?;
 

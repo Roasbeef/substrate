@@ -174,9 +174,15 @@ func (s *Server) registerGateway(ctx context.Context) error {
 		}),
 	)
 
-	// gRPC dial options for connecting to the gRPC server.
+	// gRPC dial options for connecting to the gRPC server. The default
+	// max receive size (4MB) is too small for inboxes with large diff
+	// attachments, so we raise the gateway client limit to 100MB.
+	const maxGatewayRecvSize = 100 * 1024 * 1024
 	opts := []grpc.DialOption{
 		grpc.WithTransportCredentials(insecure.NewCredentials()),
+		grpc.WithDefaultCallOptions(
+			grpc.MaxCallRecvMsgSize(maxGatewayRecvSize),
+		),
 	}
 
 	// Register Mail service handler.

@@ -385,6 +385,7 @@ type InboxMessage struct {
 	SnoozedUntil     *timestamppb.Timestamp `protobuf:"bytes,12,opt,name=snoozed_until,json=snoozedUntil,proto3" json:"snoozed_until,omitempty"`       // null if not snoozed
 	ReadAt           *timestamppb.Timestamp `protobuf:"bytes,13,opt,name=read_at,json=readAt,proto3" json:"read_at,omitempty"`                         // null if unread
 	AcknowledgedAt   *timestamppb.Timestamp `protobuf:"bytes,14,opt,name=acknowledged_at,json=acknowledgedAt,proto3" json:"acknowledged_at,omitempty"` // null if not acked
+	RecipientNames   []string               `protobuf:"bytes,17,rep,name=recipient_names,json=recipientNames,proto3" json:"recipient_names,omitempty"` // Names of all recipients.
 	unknownFields    protoimpl.UnknownFields
 	sizeCache        protoimpl.SizeCache
 }
@@ -527,6 +528,13 @@ func (x *InboxMessage) GetReadAt() *timestamppb.Timestamp {
 func (x *InboxMessage) GetAcknowledgedAt() *timestamppb.Timestamp {
 	if x != nil {
 		return x.AcknowledgedAt
+	}
+	return nil
+}
+
+func (x *InboxMessage) GetRecipientNames() []string {
+	if x != nil {
+		return x.RecipientNames
 	}
 	return nil
 }
@@ -2420,6 +2428,7 @@ type GetAgentResponse struct {
 	SessionId     string                 `protobuf:"bytes,4,opt,name=session_id,json=sessionId,proto3" json:"session_id,omitempty"` // Current session ID (renamed from current_session_id)
 	CreatedAt     *timestamppb.Timestamp `protobuf:"bytes,5,opt,name=created_at,json=createdAt,proto3" json:"created_at,omitempty"`
 	LastActiveAt  *timestamppb.Timestamp `protobuf:"bytes,6,opt,name=last_active_at,json=lastActiveAt,proto3" json:"last_active_at,omitempty"`
+	GitBranch     string                 `protobuf:"bytes,7,opt,name=git_branch,json=gitBranch,proto3" json:"git_branch,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -2494,6 +2503,13 @@ func (x *GetAgentResponse) GetLastActiveAt() *timestamppb.Timestamp {
 		return x.LastActiveAt
 	}
 	return nil
+}
+
+func (x *GetAgentResponse) GetGitBranch() string {
+	if x != nil {
+		return x.GitBranch
+	}
+	return ""
 }
 
 // ListAgentsRequest is the request for ListAgents.
@@ -8820,7 +8836,7 @@ var File_mail_proto protoreflect.FileDescriptor
 const file_mail_proto_rawDesc = "" +
 	"\n" +
 	"\n" +
-	"mail.proto\x12\vsubtraterpc\x1a\x1fgoogle/protobuf/timestamp.proto\"\xb3\x05\n" +
+	"mail.proto\x12\vsubtraterpc\x1a\x1fgoogle/protobuf/timestamp.proto\"\xdc\x05\n" +
 	"\fInboxMessage\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\x03R\x02id\x12\x1b\n" +
 	"\tthread_id\x18\x02 \x01(\tR\bthreadId\x12\x19\n" +
@@ -8841,7 +8857,8 @@ const file_mail_proto_rawDesc = "" +
 	"deadlineAt\x12?\n" +
 	"\rsnoozed_until\x18\f \x01(\v2\x1a.google.protobuf.TimestampR\fsnoozedUntil\x123\n" +
 	"\aread_at\x18\r \x01(\v2\x1a.google.protobuf.TimestampR\x06readAt\x12C\n" +
-	"\x0facknowledged_at\x18\x0e \x01(\v2\x1a.google.protobuf.TimestampR\x0eacknowledgedAt\"\x85\x03\n" +
+	"\x0facknowledged_at\x18\x0e \x01(\v2\x1a.google.protobuf.TimestampR\x0eacknowledgedAt\x12'\n" +
+	"\x0frecipient_names\x18\x11 \x03(\tR\x0erecipientNames\"\x85\x03\n" +
 	"\x0fSendMailRequest\x12\x1b\n" +
 	"\tsender_id\x18\x01 \x01(\x03R\bsenderId\x12'\n" +
 	"\x0frecipient_names\x18\x02 \x03(\tR\x0erecipientNames\x12\x1d\n" +
@@ -8980,7 +8997,7 @@ const file_mail_proto_rawDesc = "" +
 	"\x04name\x18\x02 \x01(\tR\x04name\"@\n" +
 	"\x0fGetAgentRequest\x12\x19\n" +
 	"\bagent_id\x18\x01 \x01(\x03R\aagentId\x12\x12\n" +
-	"\x04name\x18\x02 \x01(\tR\x04name\"\xf3\x01\n" +
+	"\x04name\x18\x02 \x01(\tR\x04name\"\x92\x02\n" +
 	"\x10GetAgentResponse\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\x03R\x02id\x12\x12\n" +
 	"\x04name\x18\x02 \x01(\tR\x04name\x12\x1f\n" +
@@ -8990,7 +9007,9 @@ const file_mail_proto_rawDesc = "" +
 	"session_id\x18\x04 \x01(\tR\tsessionId\x129\n" +
 	"\n" +
 	"created_at\x18\x05 \x01(\v2\x1a.google.protobuf.TimestampR\tcreatedAt\x12@\n" +
-	"\x0elast_active_at\x18\x06 \x01(\v2\x1a.google.protobuf.TimestampR\flastActiveAt\")\n" +
+	"\x0elast_active_at\x18\x06 \x01(\v2\x1a.google.protobuf.TimestampR\flastActiveAt\x12\x1d\n" +
+	"\n" +
+	"git_branch\x18\a \x01(\tR\tgitBranch\")\n" +
 	"\x11ListAgentsRequest\x12\x14\n" +
 	"\x05limit\x18\x01 \x01(\x05R\x05limit\"K\n" +
 	"\x12ListAgentsResponse\x125\n" +

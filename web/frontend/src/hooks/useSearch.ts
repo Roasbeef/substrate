@@ -3,7 +3,8 @@
 import { useQuery, queryOptions } from '@tanstack/react-query';
 import { useState, useEffect, useMemo } from 'react';
 import { search, autocompleteRecipients } from '@/api/search.js';
-import type { SearchResult } from '@/types/api.js';
+import type { AutocompleteRecipient, SearchResult } from '@/types/api.js';
+import { getAgentContext } from '@/lib/utils.js';
 
 // Search query keys.
 export const searchKeys = {
@@ -107,17 +108,45 @@ export function enrichSearchResult(result: SearchResult): SearchResultWithRoute 
   }
 }
 
+// Convert an autocomplete recipient to a search result with route.
+function recipientToSearchResult(
+  recipient: AutocompleteRecipient,
+): SearchResultWithRoute {
+  const context = getAgentContext({
+    name: recipient.name,
+    project_key: recipient.project_key,
+    git_branch: recipient.git_branch,
+  });
+
+  return {
+    type: 'agent',
+    id: recipient.id,
+    title: recipient.name,
+    snippet: context ?? '',
+    created_at: new Date().toISOString(),
+    route: `/agents/${recipient.id}`,
+  };
+}
+
 // Hook that returns enriched search results with routes.
+// Merges message search results with agent autocomplete results.
 export function useEnrichedSearch(query: string, debounceMs = 300) {
   const searchResult = useSearch(query, debounceMs);
+  const autocompleteResult = useAutocomplete(query, debounceMs);
 
-  const enrichedResults = useMemo(
-    () => searchResult.results.map(enrichSearchResult),
-    [searchResult.results],
-  );
+  const enrichedResults = useMemo(() => {
+    const messageResults = searchResult.results.map(enrichSearchResult);
+    const agentResults = (autocompleteResult.suggestions ?? []).map(
+      recipientToSearchResult,
+    );
+
+    // Show agents first, then messages.
+    return [...agentResults, ...messageResults];
+  }, [searchResult.results, autocompleteResult.suggestions]);
 
   return {
     ...searchResult,
     enrichedResults,
+    isSearching: searchResult.isSearching || autocompleteResult.isSearching,
   };
 }
