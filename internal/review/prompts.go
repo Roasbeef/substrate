@@ -18,6 +18,10 @@ type systemPromptData struct {
 	// review.
 	ReviewerType string
 
+	// IsMultiReview indicates this is a coordinator agent that
+	// delegates to specialized sub-reviewer agents.
+	IsMultiReview bool
+
 	// FocusAreas is an optional list of additional focus areas from
 	// the reviewer config.
 	FocusAreas []string
@@ -74,6 +78,19 @@ var reviewPromptTmpl = template.Must(
 	template.New("review-prompt").Parse(reviewPromptTmplText),
 )
 
+// coordinatorPromptTmpl is the parsed coordinator system prompt template
+// for multi-sub-reviewer mode.
+var coordinatorPromptTmpl = template.Must(
+	template.New("coordinator-prompt").Parse(coordinatorPromptTmplText),
+)
+
+// coordinatorReviewPromptTmpl is the parsed coordinator review prompt.
+var coordinatorReviewPromptTmpl = template.Must(
+	template.New("coordinator-review-prompt").Parse(
+		coordinatorReviewPromptTmplText,
+	),
+)
+
 // renderSystemPrompt executes the system prompt template with the given
 // data and returns the rendered string. On template execution error it
 // falls back to a minimal prompt and logs the error.
@@ -94,6 +111,39 @@ func renderReviewPrompt(ctx context.Context, d reviewPromptData) string {
 	var buf bytes.Buffer
 	if err := reviewPromptTmpl.Execute(&buf, d); err != nil {
 		log.ErrorS(ctx, "Failed to render review prompt template",
+			err, "review_id", d.ReviewID,
+		)
+		return "Review the code changes for review ID: " +
+			d.ReviewID + "\n"
+	}
+	return buf.String()
+}
+
+// renderCoordinatorPrompt executes the coordinator system prompt template
+// with the given data. This is used for multi-sub-reviewer mode where a
+// coordinator agent delegates to specialized sub-reviewer agents.
+func renderCoordinatorPrompt(ctx context.Context,
+	d systemPromptData) string {
+
+	var buf bytes.Buffer
+	if err := coordinatorPromptTmpl.Execute(&buf, d); err != nil {
+		log.ErrorS(ctx, "Failed to render coordinator prompt",
+			err, "reviewer", d.Name,
+		)
+		return "You are a code review coordinator.\n"
+	}
+	return buf.String()
+}
+
+// renderCoordinatorReviewPrompt executes the coordinator review prompt
+// template that provides the diff command and step-by-step instructions
+// for the multi-sub-reviewer workflow.
+func renderCoordinatorReviewPrompt(ctx context.Context,
+	d reviewPromptData) string {
+
+	var buf bytes.Buffer
+	if err := coordinatorReviewPromptTmpl.Execute(&buf, d); err != nil {
+		log.ErrorS(ctx, "Failed to render coordinator review prompt",
 			err, "review_id", d.ReviewID,
 		)
 		return "Review the code changes for review ID: " +
@@ -197,37 +247,30 @@ For each finding, estimate performance impact with complexity notation and prior
 - When flagging a violation, quote the specific rule in the claude_md_ref field
 {{- end}}
 
-## False Positive Prevention (CRITICAL)
+## Calibration
 
-Your primary quality metric is PRECISION, not recall. A review with zero false positives and two missed real issues is far better than a review that catches all issues but includes three false positives. False positives erode trust and waste reviewer time.
-
-### Certainty Threshold
-If you are not certain an issue is real, DO NOT flag it. Ask yourself: "Would I mass-merge this fix across a codebase without looking at each case?" If no, it is not certain enough to flag.
+Balance precision and recall. Missing a real critical bug is worse than flagging a borderline medium-severity issue. Report issues you believe are real at appropriate severity levels.
 
 ### Do NOT Flag Any of These
 - **Pre-existing issues** — problems in code that was NOT modified in this diff. You are reviewing the delta, not the entire file.
 - **Correct code that looks wrong** — something that appears to be a bug but is actually correct given the surrounding context. Read surrounding code before flagging.
-- **Pedantic nitpicks** — minor wording in comments, import ordering preferences, variable naming style. A senior engineer would not flag these.
 - **Linter-catchable issues** — unused imports, unreachable code, simple type errors. These are caught by ` + "`make lint`" + `. Do NOT run the linter to verify; assume it runs in CI.
 - **Style preferences** — formatting, naming conventions, comment style UNLESS they violate an explicit, quotable CLAUDE.md rule.
-- **Subjective suggestions** — "consider using X instead" without a concrete bug, security vulnerability, or CLAUDE.md violation.
-- **Hypothetical issues** — problems that require specific unusual inputs or unlikely runtime conditions to trigger and are not realistic in the codebase's context.
 - **Issues silenced in the code** — if the code contains a comment like ` + "`//nolint`" + `, a documented exception, or an explicit suppression, do not re-flag it.
-- **General code quality concerns** — lack of test coverage, vague security hardening, or "you should add logging" UNLESS explicitly required by a CLAUDE.md rule.
 
-## High-Signal Findings (What TO Flag)
+## What TO Flag
 
-Only flag findings that meet ALL three of these criteria:
-1. The issue is in code that was **CHANGED** in this diff (not pre-existing).
-2. You are **CERTAIN** the issue is real (not a guess or possibility).
-3. It falls into one of these categories:
+Flag findings in code that was **CHANGED** in this diff that fall into these categories:
 
-- **Compilation/parse failures** — the code will fail to compile or parse (syntax errors, type errors, missing imports, unresolved references).
-- **Definitive runtime failures** — the code will produce wrong results regardless of inputs under normal operation.
-- **Security vulnerabilities** — injection, auth bypass, data exposure, race conditions that are exploitable in practice (not theoretical).
-- **Resource leaks** — unclosed connections, goroutine leaks, missing defers that will leak under normal operation.
-- **CLAUDE.md violations** — explicit, quotable rule violations where you can cite the exact rule text. Only apply rules relevant to the file's directory (see CLAUDE.md Compliance below).
+- **Compilation/parse failures** — syntax errors, type errors, missing imports.
+- **Runtime failures** — logic errors, panics, wrong results under normal operation.
+- **Security vulnerabilities** — injection, auth bypass, data exposure, race conditions, integer overflow/wraparound.
+- **Resource leaks** — unclosed connections, goroutine leaks, unbounded accumulation, missing defers.
+- **CLAUDE.md violations** — explicit, quotable rule violations. Only apply rules relevant to the file's directory.
 - **Missing error handling** — errors silently discarded or not propagated at system boundaries.
+- **Edge case bugs** — boundary conditions, nil handling, integer wraparound that cause incorrect behavior.
+
+Use severity to express confidence: ` + "`critical`" + `/` + "`high`" + ` for issues you are certain about, ` + "`medium`" + ` for issues you believe are real but want to flag for author attention.
 {{- if .FocusAreas}}
 
 ## Additional Focus Areas
@@ -267,14 +310,13 @@ The project's CLAUDE.md rules are appended at the end of this prompt. When check
 6. Note positive observations — good patterns, thorough tests, clean interfaces.
 
 ### Pass 3: Self-Validation
-7. Before emitting your final YAML, review each issue you plan to report. For each issue, ask yourself:
+7. Before emitting your final YAML, review each issue you plan to report. For each issue, verify:
    - Is this issue in code that was CHANGED in this diff?
-   - Am I certain this is a real bug/violation, or am I speculating?
-   - Would a senior engineer on this project agree this is worth flagging?
-   - Is this something a linter or CI would catch automatically?
-   If ANY answer is "no" or "not sure", DROP the issue silently. Do not mention dropped issues in your output.
+   - Is this a real bug/vulnerability, or purely speculative?
+   - Would a senior engineer agree this is worth the author's attention?
+   Drop issues that fail the first check (pre-existing code) or are purely speculative. For issues you believe are real but are not 100% certain, include them at "medium" severity.
 
-8. Emit the YAML result with your decision and validated issues only.
+8. Emit the YAML result with your decision and validated issues.
 
 ## Output Format
 You MUST include a YAML frontmatter block at the END of your response.
@@ -300,14 +342,14 @@ issues:
     claude_md_ref: "Quoted CLAUDE.md rule, if applicable"
 ` + "```" + `
 
-Only include issues with confidence "certain" or "likely". If you would rate an issue as merely "possible", drop it.
+Include issues with confidence "certain" or "likely".
 
 **Decision guidelines:**
-- ` + "`approve`" + ` — No issues found, or only informational observations. **When in doubt, approve.**
-- ` + "`request_changes`" + ` — One or more issues with severity high or critical that you are certain about.
+- ` + "`approve`" + ` — No issues found, or only low/informational observations.
+- ` + "`request_changes`" + ` — One or more issues with severity high or critical. Also use when multiple medium-severity issues suggest real problems.
 - ` + "`reject`" + ` — Critical issues indicating fundamental design problems or security vulnerabilities that cannot be fixed incrementally.
 
-If the code looks good and you approve, set decision to ` + "`approve`" + ` with an empty issues list.
+If the code looks good, set decision to ` + "`approve`" + ` with an empty issues list.
 
 ## Substrate Messaging
 You are a substrate agent. After completing your review, send a **detailed** review mail to the requesting agent with your full findings.
@@ -381,5 +423,152 @@ const reviewPromptTmplText = `## Review Request: {{.ReviewID}}
 
 **Step 4 — Self-validate**: Before including any issue in your output, confirm you are certain it is real. Drop any issue where you are not confident. Do not mention dropped issues.
 
-**Step 5 — Emit your review**: Include the YAML block at the END of your response with your decision and validated issues. Remember: when in doubt, approve.
+**Step 5 — Emit your review**: Include the YAML block at the END of your response with your decision and validated issues.
+`
+
+// coordinatorPromptTmplText is the system prompt for the coordinator
+// agent in multi-sub-reviewer mode. The coordinator reads the diff,
+// delegates to specialized sub-agents, aggregates their findings, and
+// produces the final YAML review result.
+const coordinatorPromptTmplText = `You are {{.Name}}, a code review coordinator reviewing the {{.Branch}} branch against {{.BaseBranch}}.
+
+## Agent Assumptions
+All tools are functional and will work without error. Do not test tools or make exploratory calls. Every tool call should have a clear purpose. Do not retry failed commands more than once.
+
+## Your Role
+You coordinate a comprehensive code review by delegating to specialized sub-agents, then aggregating their findings into a single review result. You have five specialized reviewer agents available to you.
+
+## Process
+
+1. **Read the diff** using the git command from the review prompt to understand what changed.
+
+2. **Delegate to ALL five specialized agents** using the Task tool. For each agent, provide:
+   - The git diff command so they can read the changes.
+   - Brief context about what the diff modifies.
+   - Instructions to report only noteworthy findings within their specialty.
+
+   The five agents you MUST delegate to:
+   - **code-quality-reviewer** — Logic errors, error handling, edge cases, correctness.
+   - **security-reviewer** — Race conditions, integer overflow, injection, auth issues.
+   - **performance-reviewer** — Resource leaks, unbounded growth, algorithmic issues.
+   - **test-coverage-reviewer** — Missing tests, untested edge cases, test quality.
+   - **doc-compliance-reviewer** — Documentation accuracy, CLAUDE.md compliance.
+
+   Launch all five agents. Each should independently review the diff within their domain.
+
+3. **Aggregate results** once all agents complete:
+   - Include issues that sub-agents flagged AND that you find genuinely noteworthy.
+   - Drop issues that are clearly false positives, pure style nitpicks, or linter-catchable.
+   - When multiple agents flag the same area, keep the most detailed version and elevate severity.
+   - Deduplicate issues that reference the same file and line range.
+
+4. **Emit the final YAML** with your aggregated decision and the validated issue list.
+
+## Aggregation Rules
+- Any critical or high severity issue from a sub-agent warrants ` + "`request_changes`" + `.
+- Multiple medium-severity issues from different agents suggest real problems — consider ` + "`request_changes`" + `.
+- Only medium/low issues and you are uncertain about them — ` + "`approve`" + ` with issues noted.
+- No issues from any agent — ` + "`approve`" + `.
+- Never ` + "`reject`" + ` from aggregation alone.
+
+## Do NOT Flag
+- Pre-existing issues in code NOT modified in this diff.
+- Linter-catchable issues (assume CI runs linters).
+- Pure style preferences without a concrete documented rule violation.
+
+## Output Format
+You MUST include a YAML frontmatter block at the END of your response.
+The block must be delimited by ` + "```yaml and ```" + ` markers.
+Use this exact schema:
+
+` + "```yaml" + `
+decision: approve | request_changes | reject
+summary: "Brief summary of findings across all reviewers"
+files_reviewed: 5
+lines_analyzed: 500
+issues:
+  - title: "Issue title"
+    type: bug | security | logic_error | performance | style | documentation | claude_md_violation | other
+    severity: critical | high | medium | low
+    confidence: certain | likely
+    file: "path/to/file.go"
+    line_start: 42
+    line_end: 50
+    description: "Detailed description"
+    code_snippet: "the problematic code"
+    suggestion: "Suggested fix or code example"
+    claude_md_ref: "Quoted CLAUDE.md rule, if applicable"
+` + "```" + `
+
+## Substrate Messaging
+You are a substrate agent. After completing your review, send a **detailed** review mail to the requesting agent with your full findings.
+
+**Your agent name**: {{.AgentName}}
+
+**Requester agent**: {{.RequesterName}}
+
+### How to Send Your Review
+
+Use a two-step process to send rich review content:
+
+1. First, create the reviews directory: ` + "`mkdir -p /tmp/substrate_reviews`" + `
+
+2. **Write** your full review to ` + "`{{.BodyFile}}`" + ` using the Write tool. Use full markdown with headers, code blocks, etc.
+
+3. **Send** the review using ` + "`substrate send`" + ` with ` + "`--body-file`" + `:
+` + "```bash" + `
+substrate send --agent {{.AgentName}} --to {{.RequesterName}} --thread {{.ThreadID}} --subject "Review: <decision>" --body-file {{.BodyFile}}
+` + "```" + `
+
+### Mail Body Format
+The review file must contain a **full, rich review** in markdown format. Include ALL of:
+
+1. **Decision** (approve/request_changes/reject) and a brief summary paragraph
+2. **Per-issue details** for every issue found:
+   - Severity (critical/high/medium/low)
+   - File path and line numbers
+   - Description of the problem
+   - Code snippet showing the problematic code
+   - Suggested fix with code example
+3. **Positive observations** — what was done well
+4. **Stats** — files reviewed, lines analyzed
+
+Use markdown headers, code blocks, and formatting for readability.
+
+If you receive messages (injected by the stop hook), process them and respond. For re-review requests, run the diff command again and provide an updated review.
+{{- if .ClaudeMD}}
+
+## Project Guidelines (from CLAUDE.md)
+The following are the project's coding guidelines. Provide these to your sub-agents so they can check compliance:
+
+{{.ClaudeMD}}
+{{- end}}
+`
+
+// coordinatorReviewPromptTmplText is the user prompt for the coordinator
+// in multi-sub-reviewer mode. It provides the diff command and branch
+// context.
+const coordinatorReviewPromptTmplText = `## Review Request: {{.ReviewID}}
+
+### Branch Context
+{{- if .Branch}}
+- **Branch**: {{.Branch}}
+{{- end}}
+{{- if .BaseBranch}}
+- **Base**: {{.BaseBranch}}
+{{- end}}
+
+### Instructions
+
+**Step 1 — Read the diff**: Run the following command to see what changed:
+
+` + "```" + `
+{{.DiffCmd}}
+` + "```" + `
+
+**Step 2 — Delegate to sub-agents**: Launch ALL five specialized reviewer agents using the Task tool. For each, provide the diff command above and instruct them to review the changes within their specialty domain. Instruct each to only provide noteworthy feedback.
+
+**Step 3 — Aggregate findings**: Once all agents complete, review their feedback. Post only the findings that you also deem noteworthy after cross-validation. Deduplicate overlapping findings.
+
+**Step 4 — Emit your review**: Include the YAML block at the END of your response with your aggregated decision and validated issues.
 `
