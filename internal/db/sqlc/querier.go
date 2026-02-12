@@ -30,6 +30,7 @@ type Querier interface {
 	CreateAgent(ctx context.Context, arg CreateAgentParams) (Agent, error)
 	CreateMessage(ctx context.Context, arg CreateMessageParams) (Message, error)
 	CreateMessageRecipient(ctx context.Context, arg CreateMessageRecipientParams) error
+	CreatePlanReview(ctx context.Context, arg CreatePlanReviewParams) (PlanReview, error)
 	CreateReview(ctx context.Context, arg CreateReviewParams) (Review, error)
 	CreateReviewIssue(ctx context.Context, arg CreateReviewIssueParams) (ReviewIssue, error)
 	CreateReviewIteration(ctx context.Context, arg CreateReviewIterationParams) (ReviewIteration, error)
@@ -44,6 +45,7 @@ type Querier interface {
 	DeleteMessage(ctx context.Context, id int64) error
 	DeleteMessagesByTopicOlderThan(ctx context.Context, arg DeleteMessagesByTopicOlderThanParams) (int64, error)
 	DeleteOldActivities(ctx context.Context, createdAt int64) error
+	DeletePlanReview(ctx context.Context, planReviewID string) error
 	DeleteReview(ctx context.Context, reviewID string) error
 	DeleteReviewIssues(ctx context.Context, reviewID string) error
 	DeleteReviewIterations(ctx context.Context, reviewID string) error
@@ -92,6 +94,11 @@ type Querier interface {
 	GetOpenReviewIssues(ctx context.Context, reviewID string) ([]ReviewIssue, error)
 	GetOrCreateAgentInboxTopic(ctx context.Context, arg GetOrCreateAgentInboxTopicParams) (Topic, error)
 	GetOrCreateTopic(ctx context.Context, arg GetOrCreateTopicParams) (Topic, error)
+	GetPlanReview(ctx context.Context, planReviewID string) (PlanReview, error)
+	GetPlanReviewByID(ctx context.Context, id int64) (PlanReview, error)
+	GetPlanReviewByMessage(ctx context.Context, messageID sql.NullInt64) (PlanReview, error)
+	GetPlanReviewBySession(ctx context.Context, sessionID sql.NullString) (PlanReview, error)
+	GetPlanReviewByThread(ctx context.Context, threadID string) (PlanReview, error)
 	GetQueueStats(ctx context.Context) (GetQueueStatsRow, error)
 	GetReview(ctx context.Context, reviewID string) (Review, error)
 	GetReviewByID(ctx context.Context, id int64) (Review, error)
@@ -138,6 +145,9 @@ type Querier interface {
 	ListMessagesByPriority(ctx context.Context, arg ListMessagesByPriorityParams) ([]Message, error)
 	ListPendingOperations(ctx context.Context) ([]PendingOperation, error)
 	ListPendingTasks(ctx context.Context, agentID int64) ([]AgentTask, error)
+	ListPlanReviews(ctx context.Context, arg ListPlanReviewsParams) ([]PlanReview, error)
+	ListPlanReviewsByRequester(ctx context.Context, arg ListPlanReviewsByRequesterParams) ([]PlanReview, error)
+	ListPlanReviewsByState(ctx context.Context, arg ListPlanReviewsByStateParams) ([]PlanReview, error)
 	ListRecentActivities(ctx context.Context, limit int64) ([]Activity, error)
 	ListRecentCompletedTasks(ctx context.Context, arg ListRecentCompletedTasksParams) ([]AgentTask, error)
 	ListReviews(ctx context.Context, arg ListReviewsParams) ([]Review, error)
@@ -173,6 +183,7 @@ type Querier interface {
 	// Update the state of all message recipients in a thread for ALL agents.
 	// Used for global view archive/trash operations.
 	UpdateAllThreadRecipientState(ctx context.Context, arg UpdateAllThreadRecipientStateParams) (int64, error)
+	UpdatePlanReviewState(ctx context.Context, arg UpdatePlanReviewStateParams) error
 	UpdateRecipientAcked(ctx context.Context, arg UpdateRecipientAckedParams) error
 	UpdateRecipientSnoozed(ctx context.Context, arg UpdateRecipientSnoozedParams) error
 	UpdateRecipientState(ctx context.Context, arg UpdateRecipientStateParams) (int64, error)

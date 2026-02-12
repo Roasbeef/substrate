@@ -747,6 +747,8 @@ This installs:
 | **SubagentStop** | Subagent stopping | One-shot check - block if messages, then allow exit |
 | **PreCompact** | Before compaction | Save identity state for restoration after compaction |
 | **Notification** | Permission prompt, idle, etc. | Send mail to User so notifications appear in web UI |
+| **PostToolUse** (Write) | Plan file written | Track plan files in `.claude/.substrate-plan-context` |
+| **PreToolUse** (ExitPlanMode) | Agent exits plan mode | Submit plan for review, block up to 9m for approval |
 
 ### Persistent Agent Pattern
 
@@ -776,6 +778,47 @@ substrate status             # Show agent status
 substrate identity current   # Show your identity
 substrate send --to Agent --subject "Hi" --body "..."
 ```
+
+## Plan Mode Integration
+
+Subtrate intercepts Claude Code's plan mode exit flow to enable asynchronous
+human review of implementation plans before agents proceed with execution.
+
+### How It Works
+
+1. Agent writes a plan to `~/.claude/plans/` (PostToolUse hook tracks plan files)
+2. Agent calls ExitPlanMode
+3. PreToolUse hook intercepts and calls `substrate plan submit` (sends plan for review)
+4. Hook blocks for up to 9 minutes polling for approval via `substrate plan wait`
+5. If approved: ExitPlanMode proceeds, agent can implement
+6. If timeout (no response in 9 min): ExitPlanMode denied, agent falls to Stop hook
+7. Reviewer eventually approves via web UI plan viewer at `/plans/:id`
+8. Approval sends `[PLAN APPROVED]` mail; Stop hook picks it up and agent continues
+
+### Handling ExitPlanMode Denial
+
+When ExitPlanMode is denied due to timeout, the agent should not panic. The Stop
+hook will keep the agent alive, and when the reviewer responds, the agent receives
+a mail notification with the decision.
+
+### CLI Commands
+
+```bash
+substrate plan status                           # Check current plan review status
+substrate plan status <plan-review-id>          # Check specific plan review
+substrate plan wait --timeout 5m                # Manually wait for approval
+substrate plan approve <id> --comment "LGTM"    # Approve a plan
+substrate plan reject <id> --comment "Needs X"  # Reject a plan
+substrate plan request-changes <id>             # Request changes
+```
+
+### Web UI
+
+The plan review web UI is at `/plans` in the Subtrate web interface:
+- Lists pending/recent plan reviews with state filter tabs
+- Full markdown-rendered plan content in the detail view
+- Approve/Reject/Request Changes buttons with comment textarea
+- AI-generated plan summary displayed at the top
 
 ## JavaScript Tooling
 

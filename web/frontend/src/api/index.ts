@@ -10,3 +10,4 @@ export * from './topics.js';
 export * from './search.js';
 export * from './stats.js';
 export * from './reviews.js';
+export * from './plan-reviews.js';

@@ -106,6 +106,9 @@ func runHooksInstall(cmd *cobra.Command, args []string) error {
 
 	hooks.InstallHooks(settings)
 
+	// Always install plan mode hooks.
+	hooks.InstallPlanHooks(settings)
+
 	// Install task hooks if requested.
 	if installWithTasks && !installNoTasks {
 		hooks.InstallTaskHooks(settings)
@@ -130,6 +133,11 @@ func runHooksInstall(cmd *cobra.Command, args []string) error {
 	fmt.Println("Hooks installed:")
 	for event := range hooks.HookDefinitions {
 		fmt.Printf("  - %s\n", event)
+	}
+	fmt.Println()
+	fmt.Println("Plan mode hooks installed:")
+	for event, def := range hooks.PlanHookDefinitions {
+		fmt.Printf("  - %s (%s)\n", event, def.Matcher)
 	}
 	if installWithTasks && !installNoTasks {
 		fmt.Println()
@@ -162,6 +170,7 @@ func runHooksUninstall(cmd *cobra.Command, args []string) error {
 	}
 
 	hooks.UninstallHooks(settings)
+	hooks.UninstallPlanHooks(settings)
 	hooks.UninstallTaskHooks(settings)
 
 	if err := hooks.SaveSettings(claudeDir, settings); err != nil {
@@ -214,6 +223,9 @@ func runHooksStatus(cmd *cobra.Command, args []string) error {
 	// Check settings.
 	installedEvents := hooks.GetInstalledHookEvents(settings)
 
+	// Check plan hooks.
+	planHooksInstalled := hooks.IsPlanHooksInstalled(settings)
+
 	// Check task hooks.
 	taskHooksInstalled := hooks.IsTaskHooksInstalled(settings)
 
@@ -223,6 +235,7 @@ func runHooksStatus(cmd *cobra.Command, args []string) error {
 			"installed":            hooks.IsInstalled(settings),
 			"scripts_exist":        scriptFilesExist,
 			"skill_exists":         skillExists,
+			"plan_hooks_installed": planHooksInstalled,
 			"task_hooks_installed": taskHooksInstalled,
 			"hook_events":          installedEvents,
 			"scripts_dir":          scriptsDir,
@@ -266,6 +279,15 @@ func runHooksStatus(cmd *cobra.Command, args []string) error {
 			for _, event := range installedEvents {
 				fmt.Printf("  - %s\n", event)
 			}
+		}
+
+		fmt.Println()
+		fmt.Println("Plan Mode Hooks:")
+		if planHooksInstalled {
+			fmt.Println("  PostToolUse: INSTALLED (Write → track plan files)")
+			fmt.Println("  PreToolUse:  INSTALLED (ExitPlanMode → submit for review)")
+		} else {
+			fmt.Println("  Not installed")
 		}
 
 		fmt.Println()

@@ -272,6 +272,28 @@ export interface CreateReviewResponse {
   error?: string;
 }
 
+// Plan review types.
+export type PlanReviewState = 'pending' | 'approved' | 'rejected' | 'changes_requested';
+
+export interface PlanReview {
+  id: number;
+  plan_review_id: string;
+  thread_id: string;
+  requester_id: number;
+  reviewer_name: string;
+  plan_path: string;
+  plan_title: string;
+  plan_summary: string;
+  state: PlanReviewState;
+  reviewer_comment: string;
+  reviewed_by: number;
+  session_id: string;
+  message_id: number;
+  created_at: number;
+  updated_at: number;
+  reviewed_at: number;
+}
+
 // Create/update request types.
 // Proto priority enum values accepted by gRPC-gateway.
 export type ProtoPriority =

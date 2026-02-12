@@ -66,15 +66,16 @@ func DefaultServerConfig() ServerConfig {
 
 // Server is the gRPC server for Subtrate.
 type Server struct {
-	cfg          ServerConfig
-	store        *db.Store
-	taskStore    store.TaskStore            // Task CRUD via store interface.
-	mailSvc      *mail.Service              // Direct service for operations not via actor.
-	mailClient   *mailclient.Client         // Shared mail client (required).
-	actClient    *mailclient.ActivityClient // Shared activity client (required).
-	agentReg     *agent.Registry
-	identityMgr  *agent.IdentityManager
-	heartbeatMgr *agent.HeartbeatManager
+	cfg             ServerConfig
+	store           *db.Store
+	taskStore       store.TaskStore            // Task CRUD via store interface.
+	planReviewStore store.PlanReviewStore      // Plan review CRUD via store interface.
+	mailSvc         *mail.Service              // Direct service for operations not via actor.
+	mailClient      *mailclient.Client         // Shared mail client (required).
+	actClient       *mailclient.ActivityClient // Shared activity client (required).
+	agentReg        *agent.Registry
+	identityMgr     *agent.IdentityManager
+	heartbeatMgr    *agent.HeartbeatManager
 
 	// notificationHub is the actor reference for the notification hub.
 	// Used for event-driven message delivery to streaming clients.
@@ -104,6 +105,7 @@ type Server struct {
 	UnimplementedStatsServer
 	UnimplementedReviewServiceServer
 	UnimplementedTaskServiceServer
+	UnimplementedPlanReviewServiceServer
 }
 
 // NewServer creates a new gRPC server instance.
@@ -124,6 +126,7 @@ func NewServer(
 		cfg:             cfg,
 		store:           dbStore,
 		taskStore:       taskSt,
+		planReviewStore: taskSt,
 		mailSvc:         mailSvc,
 		mailClient:      mailclient.NewClient(cfg.MailRef),
 		actClient:       mailclient.NewActivityClient(cfg.ActivityRef),
@@ -178,6 +181,7 @@ func (s *Server) Start() error {
 	RegisterStatsServer(s.grpcServer, s)
 	RegisterReviewServiceServer(s.grpcServer, s)
 	RegisterTaskServiceServer(s.grpcServer, s)
+	RegisterPlanReviewServiceServer(s.grpcServer, s)
 
 	// Start serving in a goroutine.
 	s.wg.Add(1)

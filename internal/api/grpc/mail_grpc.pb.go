@@ -2941,3 +2941,351 @@ var ReviewService_ServiceDesc = grpc.ServiceDesc{
 	Streams:  []grpc.StreamDesc{},
 	Metadata: "mail.proto",
 }
+
+const (
+	PlanReviewService_CreatePlanReview_FullMethodName       = "/subtraterpc.PlanReviewService/CreatePlanReview"
+	PlanReviewService_GetPlanReview_FullMethodName          = "/subtraterpc.PlanReviewService/GetPlanReview"
+	PlanReviewService_GetPlanReviewByThread_FullMethodName  = "/subtraterpc.PlanReviewService/GetPlanReviewByThread"
+	PlanReviewService_GetPlanReviewBySession_FullMethodName = "/subtraterpc.PlanReviewService/GetPlanReviewBySession"
+	PlanReviewService_ListPlanReviews_FullMethodName        = "/subtraterpc.PlanReviewService/ListPlanReviews"
+	PlanReviewService_UpdatePlanReviewStatus_FullMethodName = "/subtraterpc.PlanReviewService/UpdatePlanReviewStatus"
+	PlanReviewService_DeletePlanReview_FullMethodName       = "/subtraterpc.PlanReviewService/DeletePlanReview"
+)
+
+// PlanReviewServiceClient is the client API for PlanReviewService service.
+//
+// For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
+//
+// PlanReviewService handles plan review operations for the plan mode workflow.
+type PlanReviewServiceClient interface {
+	// CreatePlanReview creates a new plan review record.
+	CreatePlanReview(ctx context.Context, in *CreatePlanReviewRequest, opts ...grpc.CallOption) (*PlanReviewProto, error)
+	// GetPlanReview retrieves a plan review by its UUID.
+	GetPlanReview(ctx context.Context, in *GetPlanReviewRequest, opts ...grpc.CallOption) (*PlanReviewProto, error)
+	// GetPlanReviewByThread retrieves the latest plan review for a thread.
+	GetPlanReviewByThread(ctx context.Context, in *GetPlanReviewByThreadRequest, opts ...grpc.CallOption) (*PlanReviewProto, error)
+	// GetPlanReviewBySession retrieves the pending plan review for a session.
+	GetPlanReviewBySession(ctx context.Context, in *GetPlanReviewBySessionRequest, opts ...grpc.CallOption) (*PlanReviewProto, error)
+	// ListPlanReviews lists plan reviews with optional filters.
+	ListPlanReviews(ctx context.Context, in *ListPlanReviewsRequest, opts ...grpc.CallOption) (*ListPlanReviewsResponse, error)
+	// UpdatePlanReviewStatus updates the status of a plan review.
+	UpdatePlanReviewStatus(ctx context.Context, in *UpdatePlanReviewStatusRequest, opts ...grpc.CallOption) (*PlanReviewProto, error)
+	// DeletePlanReview deletes a plan review by its UUID.
+	DeletePlanReview(ctx context.Context, in *DeletePlanReviewRequest, opts ...grpc.CallOption) (*DeletePlanReviewResponse, error)
+}
+
+type planReviewServiceClient struct {
+	cc grpc.ClientConnInterface
+}
+
+func NewPlanReviewServiceClient(cc grpc.ClientConnInterface) PlanReviewServiceClient {
+	return &planReviewServiceClient{cc}
+}
+
+func (c *planReviewServiceClient) CreatePlanReview(ctx context.Context, in *CreatePlanReviewRequest, opts ...grpc.CallOption) (*PlanReviewProto, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(PlanReviewProto)
+	err := c.cc.Invoke(ctx, PlanReviewService_CreatePlanReview_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *planReviewServiceClient) GetPlanReview(ctx context.Context, in *GetPlanReviewRequest, opts ...grpc.CallOption) (*PlanReviewProto, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(PlanReviewProto)
+	err := c.cc.Invoke(ctx, PlanReviewService_GetPlanReview_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *planReviewServiceClient) GetPlanReviewByThread(ctx context.Context, in *GetPlanReviewByThreadRequest, opts ...grpc.CallOption) (*PlanReviewProto, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(PlanReviewProto)
+	err := c.cc.Invoke(ctx, PlanReviewService_GetPlanReviewByThread_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *planReviewServiceClient) GetPlanReviewBySession(ctx context.Context, in *GetPlanReviewBySessionRequest, opts ...grpc.CallOption) (*PlanReviewProto, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(PlanReviewProto)
+	err := c.cc.Invoke(ctx, PlanReviewService_GetPlanReviewBySession_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *planReviewServiceClient) ListPlanReviews(ctx context.Context, in *ListPlanReviewsRequest, opts ...grpc.CallOption) (*ListPlanReviewsResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ListPlanReviewsResponse)
+	err := c.cc.Invoke(ctx, PlanReviewService_ListPlanReviews_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *planReviewServiceClient) UpdatePlanReviewStatus(ctx context.Context, in *UpdatePlanReviewStatusRequest, opts ...grpc.CallOption) (*PlanReviewProto, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(PlanReviewProto)
+	err := c.cc.Invoke(ctx, PlanReviewService_UpdatePlanReviewStatus_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *planReviewServiceClient) DeletePlanReview(ctx context.Context, in *DeletePlanReviewRequest, opts ...grpc.CallOption) (*DeletePlanReviewResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(DeletePlanReviewResponse)
+	err := c.cc.Invoke(ctx, PlanReviewService_DeletePlanReview_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+// PlanReviewServiceServer is the server API for PlanReviewService service.
+// All implementations must embed UnimplementedPlanReviewServiceServer
+// for forward compatibility.
+//
+// PlanReviewService handles plan review operations for the plan mode workflow.
+type PlanReviewServiceServer interface {
+	// CreatePlanReview creates a new plan review record.
+	CreatePlanReview(context.Context, *CreatePlanReviewRequest) (*PlanReviewProto, error)
+	// GetPlanReview retrieves a plan review by its UUID.
+	GetPlanReview(context.Context, *GetPlanReviewRequest) (*PlanReviewProto, error)
+	// GetPlanReviewByThread retrieves the latest plan review for a thread.
+	GetPlanReviewByThread(context.Context, *GetPlanReviewByThreadRequest) (*PlanReviewProto, error)
+	// GetPlanReviewBySession retrieves the pending plan review for a session.
+	GetPlanReviewBySession(context.Context, *GetPlanReviewBySessionRequest) (*PlanReviewProto, error)
+	// ListPlanReviews lists plan reviews with optional filters.
+	ListPlanReviews(context.Context, *ListPlanReviewsRequest) (*ListPlanReviewsResponse, error)
+	// UpdatePlanReviewStatus updates the status of a plan review.
+	UpdatePlanReviewStatus(context.Context, *UpdatePlanReviewStatusRequest) (*PlanReviewProto, error)
+	// DeletePlanReview deletes a plan review by its UUID.
+	DeletePlanReview(context.Context, *DeletePlanReviewRequest) (*DeletePlanReviewResponse, error)
+	mustEmbedUnimplementedPlanReviewServiceServer()
+}
+
+// UnimplementedPlanReviewServiceServer must be embedded to have
+// forward compatible implementations.
+//
+// NOTE: this should be embedded by value instead of pointer to avoid a nil
+// pointer dereference when methods are called.
+type UnimplementedPlanReviewServiceServer struct{}
+
+func (UnimplementedPlanReviewServiceServer) CreatePlanReview(context.Context, *CreatePlanReviewRequest) (*PlanReviewProto, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method CreatePlanReview not implemented")
+}
+func (UnimplementedPlanReviewServiceServer) GetPlanReview(context.Context, *GetPlanReviewRequest) (*PlanReviewProto, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method GetPlanReview not implemented")
+}
+func (UnimplementedPlanReviewServiceServer) GetPlanReviewByThread(context.Context, *GetPlanReviewByThreadRequest) (*PlanReviewProto, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method GetPlanReviewByThread not implemented")
+}
+func (UnimplementedPlanReviewServiceServer) GetPlanReviewBySession(context.Context, *GetPlanReviewBySessionRequest) (*PlanReviewProto, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method GetPlanReviewBySession not implemented")
+}
+func (UnimplementedPlanReviewServiceServer) ListPlanReviews(context.Context, *ListPlanReviewsRequest) (*ListPlanReviewsResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method ListPlanReviews not implemented")
+}
+func (UnimplementedPlanReviewServiceServer) UpdatePlanReviewStatus(context.Context, *UpdatePlanReviewStatusRequest) (*PlanReviewProto, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method UpdatePlanReviewStatus not implemented")
+}
+func (UnimplementedPlanReviewServiceServer) DeletePlanReview(context.Context, *DeletePlanReviewRequest) (*DeletePlanReviewResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method DeletePlanReview not implemented")
+}
+func (UnimplementedPlanReviewServiceServer) mustEmbedUnimplementedPlanReviewServiceServer() {}
+func (UnimplementedPlanReviewServiceServer) testEmbeddedByValue()                           {}
+
+// UnsafePlanReviewServiceServer may be embedded to opt out of forward compatibility for this service.
+// Use of this interface is not recommended, as added methods to PlanReviewServiceServer will
+// result in compilation errors.
+type UnsafePlanReviewServiceServer interface {
+	mustEmbedUnimplementedPlanReviewServiceServer()
+}
+
+func RegisterPlanReviewServiceServer(s grpc.ServiceRegistrar, srv PlanReviewServiceServer) {
+	// If the following call pancis, it indicates UnimplementedPlanReviewServiceServer was
+	// embedded by pointer and is nil.  This will cause panics if an
+	// unimplemented method is ever invoked, so we test this at initialization
+	// time to prevent it from happening at runtime later due to I/O.
+	if t, ok := srv.(interface{ testEmbeddedByValue() }); ok {
+		t.testEmbeddedByValue()
+	}
+	s.RegisterService(&PlanReviewService_ServiceDesc, srv)
+}
+
+func _PlanReviewService_CreatePlanReview_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(CreatePlanReviewRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(PlanReviewServiceServer).CreatePlanReview(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: PlanReviewService_CreatePlanReview_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(PlanReviewServiceServer).CreatePlanReview(ctx, req.(*CreatePlanReviewRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _PlanReviewService_GetPlanReview_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetPlanReviewRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(PlanReviewServiceServer).GetPlanReview(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: PlanReviewService_GetPlanReview_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(PlanReviewServiceServer).GetPlanReview(ctx, req.(*GetPlanReviewRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _PlanReviewService_GetPlanReviewByThread_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetPlanReviewByThreadRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(PlanReviewServiceServer).GetPlanReviewByThread(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: PlanReviewService_GetPlanReviewByThread_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(PlanReviewServiceServer).GetPlanReviewByThread(ctx, req.(*GetPlanReviewByThreadRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _PlanReviewService_GetPlanReviewBySession_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetPlanReviewBySessionRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(PlanReviewServiceServer).GetPlanReviewBySession(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: PlanReviewService_GetPlanReviewBySession_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(PlanReviewServiceServer).GetPlanReviewBySession(ctx, req.(*GetPlanReviewBySessionRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _PlanReviewService_ListPlanReviews_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ListPlanReviewsRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(PlanReviewServiceServer).ListPlanReviews(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: PlanReviewService_ListPlanReviews_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(PlanReviewServiceServer).ListPlanReviews(ctx, req.(*ListPlanReviewsRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _PlanReviewService_UpdatePlanReviewStatus_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(UpdatePlanReviewStatusRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(PlanReviewServiceServer).UpdatePlanReviewStatus(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: PlanReviewService_UpdatePlanReviewStatus_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(PlanReviewServiceServer).UpdatePlanReviewStatus(ctx, req.(*UpdatePlanReviewStatusRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _PlanReviewService_DeletePlanReview_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(DeletePlanReviewRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(PlanReviewServiceServer).DeletePlanReview(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: PlanReviewService_DeletePlanReview_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(PlanReviewServiceServer).DeletePlanReview(ctx, req.(*DeletePlanReviewRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+// PlanReviewService_ServiceDesc is the grpc.ServiceDesc for PlanReviewService service.
+// It's only intended for direct use with grpc.RegisterService,
+// and not to be introspected or modified (even as a copy)
+var PlanReviewService_ServiceDesc = grpc.ServiceDesc{
+	ServiceName: "subtraterpc.PlanReviewService",
+	HandlerType: (*PlanReviewServiceServer)(nil),
+	Methods: []grpc.MethodDesc{
+		{
+			MethodName: "CreatePlanReview",
+			Handler:    _PlanReviewService_CreatePlanReview_Handler,
+		},
+		{
+			MethodName: "GetPlanReview",
+			Handler:    _PlanReviewService_GetPlanReview_Handler,
+		},
+		{
+			MethodName: "GetPlanReviewByThread",
+			Handler:    _PlanReviewService_GetPlanReviewByThread_Handler,
+		},
+		{
+			MethodName: "GetPlanReviewBySession",
+			Handler:    _PlanReviewService_GetPlanReviewBySession_Handler,
+		},
+		{
+			MethodName: "ListPlanReviews",
+			Handler:    _PlanReviewService_ListPlanReviews_Handler,
+		},
+		{
+			MethodName: "UpdatePlanReviewStatus",
+			Handler:    _PlanReviewService_UpdatePlanReviewStatus_Handler,
+		},
+		{
+			MethodName: "DeletePlanReview",
+			Handler:    _PlanReviewService_DeletePlanReview_Handler,
+		},
+	},
+	Streams:  []grpc.StreamDesc{},
+	Metadata: "mail.proto",
+}
