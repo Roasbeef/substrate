@@ -101,6 +101,13 @@ type reviewSubActor struct {
 
 	spawnCfg *SpawnConfig
 
+	// isMultiReview indicates this reviewer is a coordinator that
+	// delegates to specialized sub-agents via WithAgents(). When
+	// true, the coordinator prompt template is used instead of the
+	// standard single-reviewer template, and the SDK client is
+	// configured with sub-agent definitions.
+	isMultiReview bool
+
 	// agentID is the database ID of this reviewer's agent identity,
 	// set during session start when the agent is registered with
 	// the substrate system.
@@ -813,6 +820,21 @@ func (r *reviewSubActor) buildClientOptions() ([]claudeagent.Option, string) {
 		)
 	}
 
+	// For multi-review mode, register the specialized sub-reviewer
+	// agent definitions. The coordinator agent will spawn these via
+	// the SDK Task tool to perform parallel domain-specific reviews.
+	if r.isMultiReview {
+		opts = append(
+			opts,
+			claudeagent.WithAgents(FullReviewSubAgents()),
+		)
+
+		log.Infof("Coordinator configured with %d sub-reviewer "+
+			"agents: review_id=%s",
+			len(FullReviewSubAgents()), r.reviewID,
+		)
+	}
+
 	return opts, configDir
 }
 
@@ -842,19 +864,30 @@ func (r *reviewSubActor) buildSystemPrompt() string {
 		shortID = shortID[:8]
 	}
 
-	return renderSystemPrompt(context.Background(), systemPromptData{
+	data := systemPromptData{
 		Name:           r.config.Name,
 		ReviewerType:   r.config.Name,
+		IsMultiReview:  r.isMultiReview,
 		FocusAreas:     r.config.FocusAreas,
 		IgnorePatterns: r.config.IgnorePatterns,
 		AgentName:      r.reviewerAgentName(),
 		RequesterName:  requesterName,
 		ThreadID:       r.threadID,
-		BodyFile:       "/tmp/substrate_reviews/review-" + shortID + ".md",
-		Branch:         r.branch,
-		BaseBranch:     r.baseBranch,
-		ClaudeMD:       r.loadProjectCLAUDEMD(),
-	})
+		BodyFile: "/tmp/substrate_reviews/review-" +
+			shortID + ".md",
+		Branch:     r.branch,
+		BaseBranch: r.baseBranch,
+		ClaudeMD:   r.loadProjectCLAUDEMD(),
+	}
+
+	// Use the coordinator prompt for multi-sub-reviewer mode.
+	if r.isMultiReview {
+		return renderCoordinatorPrompt(
+			context.Background(), data,
+		)
+	}
+
+	return renderSystemPrompt(context.Background(), data)
 }
 
 // loadProjectCLAUDEMD reads the CLAUDE.md file from the repo root. Returns
@@ -877,12 +910,21 @@ func (r *reviewSubActor) loadProjectCLAUDEMD() string {
 // The prompt templates the git diff command from the review's branch and
 // base branch so the reviewer examines exactly the right commit range.
 func (r *reviewSubActor) buildReviewPrompt() string {
-	return renderReviewPrompt(context.Background(), reviewPromptData{
+	data := reviewPromptData{
 		ReviewID:   r.reviewID,
 		DiffCmd:    r.buildDiffCommand(),
 		Branch:     r.branch,
 		BaseBranch: r.baseBranch,
-	})
+	}
+
+	// Use the coordinator review prompt for multi-sub-reviewer mode.
+	if r.isMultiReview {
+		return renderCoordinatorReviewPrompt(
+			context.Background(), data,
+		)
+	}
+
+	return renderReviewPrompt(context.Background(), data)
 }
 
 // buildDiffCommand constructs the appropriate git diff command based on the
@@ -937,7 +979,7 @@ func (r *reviewSubActor) reviewerAgentName() string {
 // CLI hook scripts but run as Go callbacks in the daemon process space,
 // giving them direct access to the store and mail service.
 func (r *reviewSubActor) buildSubstrateHooks() map[claudeagent.HookType][]claudeagent.HookConfig {
-	return map[claudeagent.HookType][]claudeagent.HookConfig{
+	hooks := map[claudeagent.HookType][]claudeagent.HookConfig{
 		claudeagent.HookTypeSessionStart: {{
 			Matcher:  "*",
 			Callback: r.hookSessionStart,
@@ -947,6 +989,49 @@ func (r *reviewSubActor) buildSubstrateHooks() map[claudeagent.HookType][]claude
 			Callback: r.hookStop,
 		}},
 	}
+
+	// For multi-review mode, add subagent lifecycle hooks to track
+	// when the coordinator spawns and completes sub-reviewer agents.
+	if r.isMultiReview {
+		hooks[claudeagent.HookTypeSubagentStart] = []claudeagent.HookConfig{{
+			Matcher: "*",
+			Callback: func(ctx context.Context,
+				input claudeagent.HookInput) (
+				claudeagent.HookResult, error) {
+
+				start := input.(claudeagent.SubagentStartInput)
+				log.InfoS(ctx,
+					"Sub-reviewer agent spawned",
+					"review_id", r.reviewID,
+					"agent_type", start.AgentType,
+					"agent_id", start.AgentID,
+				)
+				return claudeagent.HookResult{
+					Continue: true,
+				}, nil
+			},
+		}}
+		hooks[claudeagent.HookTypeSubagentStop] = []claudeagent.HookConfig{{
+			Matcher: "*",
+			Callback: func(ctx context.Context,
+				input claudeagent.HookInput) (
+				claudeagent.HookResult, error) {
+
+				stop := input.(claudeagent.SubagentStopInput)
+				log.InfoS(ctx,
+					"Sub-reviewer agent completed",
+					"review_id", r.reviewID,
+					"agent_name", stop.AgentName,
+					"status", stop.Status,
+				)
+				return claudeagent.HookResult{
+					Continue: true,
+				}, nil
+			},
+		}}
+	}
+
+	return hooks
 }
 
 // registerAgentIdentity creates or retrieves the reviewer's agent record
@@ -1849,6 +1934,19 @@ func (m *SubActorManager) SpawnReviewer(
 			callback(ctx, result)
 		},
 	)
+
+	// Enable multi-sub-reviewer mode for the coordinator config.
+	// The coordinator delegates to specialized sub-agents via the
+	// SDK's WithAgents() mechanism.
+	if config.Name == "CoordinatorReviewer" {
+		sub.isMultiReview = true
+
+		log.InfoS(ctx, "Sub-actor manager: multi-sub-reviewer "+
+			"mode enabled",
+			"review_id", reviewID,
+			"config", config.Name,
+		)
+	}
 
 	// Register as a proper actor in the system with extended cleanup
 	// timeout for subprocess shutdown (SDK uses 5s grace + SIGKILL).
