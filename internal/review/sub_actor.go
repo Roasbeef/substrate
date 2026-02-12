@@ -1057,12 +1057,21 @@ func (r *reviewSubActor) hookStop(
 		}, nil
 	}
 
+	// Use a dedicated context for store operations. The SDK
+	// context (ctx) may be canceled during shutdown while this
+	// hook is still polling in the messagePump goroutine,
+	// causing every store call to fail with "context canceled".
+	storeCtx, storeCancel := context.WithTimeout(
+		context.Background(), stopPollTimeout,
+	)
+	defer storeCancel()
+
 	// Poll for unread messages with a timeout.
 	deadline := time.Now().Add(stopPollTimeout)
 	for time.Now().Before(deadline) {
 		// Send heartbeat to keep agent active.
 		if err := r.store.UpdateLastActive(
-			ctx, r.agentID, time.Now(),
+			storeCtx, r.agentID, time.Now(),
 		); err != nil {
 			log.WarnS(ctx,
 				"Reviewer substrate hook: heartbeat "+
@@ -1077,7 +1086,7 @@ func (r *reviewSubActor) hookStop(
 		// immediately approving exit (which could cut a review
 		// short if the database is momentarily busy).
 		msgs, err := r.store.GetUnreadMessages(
-			ctx, r.agentID, 10,
+			storeCtx, r.agentID, 10,
 		)
 		if err != nil {
 			log.ErrorS(ctx,
@@ -1117,7 +1126,8 @@ func (r *reviewSubActor) hookStop(
 			}, nil
 		}
 
-		// No messages, wait before next poll.
+		// No messages, wait before next poll. Exit early if
+		// the SDK context is canceled (shutdown requested).
 		select {
 		case <-ctx.Done():
 			return claudeagent.HookResult{
