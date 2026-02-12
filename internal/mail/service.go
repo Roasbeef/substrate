@@ -157,6 +157,11 @@ func (s *Service) handleSendMail(ctx context.Context,
 	err := s.store.WithTx(ctx, func(ctx context.Context,
 		txStore store.Storage,
 	) error {
+		// Reset mutable state captured from the outer scope so
+		// that transaction retries (on SQLITE_BUSY) don't
+		// accumulate duplicate values from prior attempts.
+		recipientIDs = recipientIDs[:0]
+
 		// Generate thread ID if not provided.
 		threadID := req.ThreadID
 		if threadID == "" {
@@ -722,6 +727,10 @@ func (s *Service) handlePublish(ctx context.Context,
 	err := s.store.WithTx(ctx, func(ctx context.Context,
 		txStore store.Storage,
 	) error {
+		// Reset mutable state so transaction retries (on
+		// SQLITE_BUSY) don't accumulate stale values.
+		response.RecipientsCount = 0
+
 		// Get the topic.
 		topic, err := txStore.GetTopicByName(ctx, req.TopicName)
 		if err != nil {
