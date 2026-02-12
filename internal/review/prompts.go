@@ -581,3 +581,74 @@ const coordinatorReviewPromptTmplText = `## Review Request: {{.ReviewID}}
 
 **Step 5 — Emit your review**: Include the YAML block at the END of your response with your aggregated decision and validated issues.
 `
+
+// reReviewPromptData holds the template variables for the re-review
+// prompt injected by the stop hook when author feedback arrives.
+type reReviewPromptData struct {
+	// Messages is the list of feedback messages from the author.
+	Messages []reReviewMessage
+
+	// DiffCmd is the git diff command to re-read the changes.
+	DiffCmd string
+}
+
+// reReviewMessage represents a single feedback message for the
+// re-review prompt template.
+type reReviewMessage struct {
+	// Index is the 1-based message number.
+	Index int
+
+	// SenderName is the name of the message sender.
+	SenderName string
+
+	// Subject is the message subject line.
+	Subject string
+
+	// Body is the message body text.
+	Body string
+}
+
+// reReviewPromptTmplText is the template for the prompt injected when
+// the stop hook detects author feedback. It instructs the reviewer to
+// re-read the diff, address the feedback, drop false positives, and
+// emit an updated YAML review block.
+const reReviewPromptTmplText = `## Feedback on Your Review
+
+The author has responded to your review with the following feedback:
+
+{{range .Messages -}}
+### Message {{.Index}} (from {{.SenderName}})
+**Subject:** {{.Subject}}
+
+{{.Body}}
+
+{{end -}}
+## Instructions
+
+1. Read the feedback carefully. Some of your findings may have been
+   identified as false positives (e.g., flagging pre-existing code
+   not modified in this diff).
+2. Re-read the diff using: ` + "`{{.DiffCmd}}`" + `
+3. Produce an UPDATED review. Drop any findings the author correctly
+   identified as false positives. Keep findings that are genuinely
+   problematic.
+4. Emit the updated YAML review block at the end of your response
+   with the revised decision and issue list.
+`
+
+// reReviewPromptTmpl is the parsed re-review prompt template.
+var reReviewPromptTmpl = template.Must(
+	template.New("re-review-prompt").Parse(reReviewPromptTmplText),
+)
+
+// renderReReviewPrompt executes the re-review template and returns the
+// rendered string. On error it falls back to a minimal prompt.
+func renderReReviewPrompt(data reReviewPromptData) string {
+	var buf bytes.Buffer
+	if err := reReviewPromptTmpl.Execute(&buf, data); err != nil {
+		return "You have feedback on your review. " +
+			"Please re-read the diff and update your review."
+	}
+
+	return buf.String()
+}

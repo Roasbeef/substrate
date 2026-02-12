@@ -1176,8 +1176,28 @@ func (r *reviewSubActor) hookStop(
 		}
 
 		if len(msgs) > 0 {
-			// Format messages as a prompt for the reviewer.
-			reason := formatMailAsPrompt(msgs)
+			// Mark messages as read so they are not
+			// re-injected on subsequent stop hook
+			// invocations.
+			for _, msg := range msgs {
+				if err := r.store.MarkMessageRead(
+					storeCtx, msg.ID, r.agentID,
+				); err != nil {
+					log.WarnS(ctx,
+						"Reviewer substrate hook: "+
+							"mark read failed",
+						err,
+						"msg_id", msg.ID,
+					)
+				}
+			}
+
+			// Format messages as a prompt including the
+			// diff command for re-review context.
+			diffCmd := r.buildDiffCommand()
+			reason := formatMailAsReReviewPrompt(
+				msgs, diffCmd,
+			)
 
 			log.InfoS(ctx,
 				"Reviewer substrate hook: blocking "+
@@ -1190,11 +1210,13 @@ func (r *reviewSubActor) hookStop(
 				Decision: "block",
 				Reason:   reason,
 				SystemMessage: fmt.Sprintf(
-					"You have %d unread message(s) "+
-						"from the substrate "+
-						"messaging system. Process "+
-						"these messages and respond "+
-						"appropriately.",
+					"You have %d unread "+
+						"message(s) with "+
+						"feedback on your "+
+						"review. Re-read the "+
+						"diff, address the "+
+						"feedback, and emit an "+
+						"updated YAML review.",
 					len(msgs),
 				),
 			}, nil
@@ -1222,35 +1244,28 @@ func (r *reviewSubActor) hookStop(
 	return claudeagent.HookResult{Decision: "approve"}, nil
 }
 
-// formatMailAsPrompt converts unread inbox messages into a text prompt
-// that can be injected into the reviewer's conversation when the Stop
-// hook blocks exit.
-func formatMailAsPrompt(msgs []store.InboxMessage) string {
-	var sb strings.Builder
+// formatMailAsReReviewPrompt converts unread inbox messages into a
+// structured prompt for the reviewer using the re-review template. It
+// includes the feedback messages and the diff command so Claude can
+// re-review the code and emit an updated YAML review block.
+func formatMailAsReReviewPrompt(
+	msgs []store.InboxMessage, diffCmd string,
+) string {
 
-	sb.WriteString("You have new messages:\n\n")
-
+	tmplMsgs := make([]reReviewMessage, len(msgs))
 	for i, msg := range msgs {
-		sb.WriteString(fmt.Sprintf(
-			"--- Message %d ---\n", i+1,
-		))
-		sb.WriteString(fmt.Sprintf(
-			"From: %s\n", msg.SenderName,
-		))
-		sb.WriteString(fmt.Sprintf(
-			"Subject: %s\n", msg.Subject,
-		))
-		sb.WriteString(fmt.Sprintf("Body:\n%s\n\n", msg.Body))
+		tmplMsgs[i] = reReviewMessage{
+			Index:      i + 1,
+			SenderName: msg.SenderName,
+			Subject:    msg.Subject,
+			Body:       msg.Body,
+		}
 	}
 
-	sb.WriteString(
-		"Please process these messages and respond " +
-			"appropriately. If asked to re-review, run " +
-			"the diff command again and provide an updated " +
-			"review.\n",
-	)
-
-	return sb.String()
+	return renderReReviewPrompt(reReviewPromptData{
+		Messages: tmplMsgs,
+		DiffCmd:  diffCmd,
+	})
 }
 
 // persistResults saves the iteration and issue records to the database.

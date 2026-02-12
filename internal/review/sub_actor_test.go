@@ -1370,8 +1370,9 @@ func TestHookStop_NoMessages(t *testing.T) {
 	require.Equal(t, "approve", result.Decision)
 }
 
-// TestFormatMailAsPrompt tests formatting inbox messages for injection.
-func TestFormatMailAsPrompt(t *testing.T) {
+// TestFormatMailAsReReviewPrompt tests formatting inbox messages for
+// re-review injection with diff command context.
+func TestFormatMailAsReReviewPrompt(t *testing.T) {
 	msgs := []store.InboxMessage{
 		{
 			Message: store.Message{
@@ -1382,11 +1383,15 @@ func TestFormatMailAsPrompt(t *testing.T) {
 		},
 	}
 
-	prompt := formatMailAsPrompt(msgs)
+	diffCmd := "git diff main...feature-branch"
+	prompt := formatMailAsReReviewPrompt(msgs, diffCmd)
 	require.Contains(t, prompt, "dev-agent")
 	require.Contains(t, prompt, "Re-review requested")
 	require.Contains(t, prompt, "I fixed the issues")
 	require.Contains(t, prompt, "Message 1")
+	require.Contains(t, prompt, diffCmd)
+	require.Contains(t, prompt, "UPDATED review")
+	require.Contains(t, prompt, "false positives")
 }
 
 // TestBuildSystemPrompt_SubstrateSection verifies the system prompt
