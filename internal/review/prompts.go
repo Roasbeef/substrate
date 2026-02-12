@@ -442,9 +442,14 @@ You coordinate a comprehensive code review by delegating to specialized sub-agen
 
 1. **Read the diff** using the git command from the review prompt to understand what changed.
 
-2. **Delegate to ALL five specialized agents** using the Task tool. For each agent, provide:
-   - The git diff command so they can read the changes.
-   - Brief context about what the diff modifies.
+2. **Extract the changed file list** by running:
+   ` + "`" + `git diff --name-only {{.BaseBranch}}...{{.Branch}}` + "`" + `
+   This gives you the exact set of files modified in this branch. ONLY these files are in scope.
+
+3. **Delegate to ALL five specialized agents** using the Task tool. For each agent, you MUST provide:
+   - The exact git diff command so they can read the changes.
+   - The explicit list of changed files from step 2.
+   - A clear instruction: "ONLY flag issues in these changed files. You may read other files for context but must not flag issues in them."
    - Instructions to report only noteworthy findings within their specialty.
 
    The five agents you MUST delegate to:
@@ -454,17 +459,19 @@ You coordinate a comprehensive code review by delegating to specialized sub-agen
    - **test-coverage-reviewer** — Missing tests, untested edge cases, test quality.
    - **doc-compliance-reviewer** — Documentation accuracy, CLAUDE.md compliance.
 
-   Launch all five agents. Each should independently review the diff within their domain.
+   Launch all five agents. Each should independently review ONLY the diff within their domain.
 
-3. **Aggregate results** once all agents complete:
+4. **Aggregate results** once all agents complete:
+   - **FIRST**: Drop any finding that references a file NOT in the changed file list from step 2. This is the most important filter.
    - Include issues that sub-agents flagged AND that you find genuinely noteworthy.
    - Drop issues that are clearly false positives, pure style nitpicks, or linter-catchable.
    - When multiple agents flag the same area, keep the most detailed version and elevate severity.
    - Deduplicate issues that reference the same file and line range.
 
-4. **Emit the final YAML** with your aggregated decision and the validated issue list.
+5. **Emit the final YAML** with your aggregated decision and the validated issue list.
 
 ## Aggregation Rules
+- **Scope rule (CRITICAL)**: Drop ANY issue where the file path is not in the changed file list. Pre-existing code is out of scope even if a sub-agent flagged it.
 - Any critical or high severity issue from a sub-agent warrants ` + "`request_changes`" + `.
 - Multiple medium-severity issues from different agents suggest real problems — consider ` + "`request_changes`" + `.
 - Only medium/low issues and you are uncertain about them — ` + "`approve`" + ` with issues noted.
@@ -472,7 +479,7 @@ You coordinate a comprehensive code review by delegating to specialized sub-agen
 - Never ` + "`reject`" + ` from aggregation alone.
 
 ## Do NOT Flag
-- Pre-existing issues in code NOT modified in this diff.
+- **Pre-existing issues in code NOT modified in this diff. This is the #1 source of false positives. If a file is not in the diff, do not flag it.**
 - Linter-catchable issues (assume CI runs linters).
 - Pure style preferences without a concrete documented rule violation.
 
@@ -566,9 +573,11 @@ const coordinatorReviewPromptTmplText = `## Review Request: {{.ReviewID}}
 {{.DiffCmd}}
 ` + "```" + `
 
-**Step 2 — Delegate to sub-agents**: Launch ALL five specialized reviewer agents using the Task tool. For each, provide the diff command above and instruct them to review the changes within their specialty domain. Instruct each to only provide noteworthy feedback.
+**Step 2 — Get changed file list**: Run ` + "`" + `{{.DiffCmd}} --name-only` + "`" + ` (or ` + "`" + `git diff --name-only {{.BaseBranch}}...{{.Branch}}` + "`" + `) to get the exact list of files modified in this branch. This is the review scope — only these files should be flagged.
 
-**Step 3 — Aggregate findings**: Once all agents complete, review their feedback. Post only the findings that you also deem noteworthy after cross-validation. Deduplicate overlapping findings.
+**Step 3 — Delegate to sub-agents**: Launch ALL five specialized reviewer agents using the Task tool. For each, provide the diff command, the changed file list, and instruct them to only flag issues in the changed files. They may read other files for context.
 
-**Step 4 — Emit your review**: Include the YAML block at the END of your response with your aggregated decision and validated issues.
+**Step 4 — Aggregate findings**: Once all agents complete, review their feedback. Drop any finding that references a file NOT in the changed file list. Post only the remaining findings that you also deem noteworthy. Deduplicate overlapping findings.
+
+**Step 5 — Emit your review**: Include the YAML block at the END of your response with your aggregated decision and validated issues.
 `
