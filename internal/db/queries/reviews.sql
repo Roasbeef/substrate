@@ -10,6 +10,9 @@ RETURNING *;
 -- name: GetReview :one
 SELECT * FROM reviews WHERE review_id = ?;
 
+-- name: ResolveReviewID :one
+SELECT review_id FROM reviews WHERE review_id LIKE ? || '%' LIMIT 1;
+
 -- name: GetReviewByID :one
 SELECT * FROM reviews WHERE id = ?;
 

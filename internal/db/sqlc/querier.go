@@ -172,6 +172,7 @@ type Querier interface {
 	MarkTasksDeletedByList(ctx context.Context, arg MarkTasksDeletedByListParams) error
 	PruneOldTasks(ctx context.Context, completedAt sql.NullInt64) error
 	PurgeExpiredOperations(ctx context.Context, expiresAt int64) (int64, error)
+	ResolveReviewID(ctx context.Context, dollar_1 sql.NullString) (string, error)
 	SearchAgents(ctx context.Context, arg SearchAgentsParams) ([]Agent, error)
 	// Simple LIKE-based search on subject and body. FTS5 is available but this
 	// covers basic cases. The search term should be passed with wildcards.
