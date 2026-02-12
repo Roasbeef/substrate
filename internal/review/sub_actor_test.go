@@ -394,7 +394,6 @@ func TestBuildClientOptions(t *testing.T) {
 		},
 		spawnCfg: &SpawnConfig{
 			CLIPath:              "claude",
-			MaxTurns:             15,
 			NoSessionPersistence: true,
 			ConfigDir:            "/tmp/claude-config",
 		},
@@ -849,7 +848,6 @@ issues:
 func TestDefaultSubActorSpawnConfig(t *testing.T) {
 	cfg := DefaultSubActorSpawnConfig()
 	require.Equal(t, "claude", cfg.CLIPath)
-	require.Equal(t, 20, cfg.MaxTurns)
 }
 
 // TestNewSubActorManager verifies manager creation.
@@ -864,7 +862,7 @@ func TestNewSubActorManager(t *testing.T) {
 
 	// With custom config.
 	mgr2 := NewSubActorManager(as, mockStore, &SpawnConfig{
-		MaxTurns: 10,
+		CLIPath: "claude",
 	})
 	require.NotNil(t, mgr2)
 }
@@ -986,7 +984,7 @@ func TestServiceWithSubActorManager(t *testing.T) {
 		Store:       st,
 		ActorSystem: newTestActorSystem(t),
 		SpawnConfig: &SpawnConfig{
-			MaxTurns: 5,
+			CLIPath: "claude",
 		},
 	})
 	require.NotNil(t, svc2.subActorMgr)

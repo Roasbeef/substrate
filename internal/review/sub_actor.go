@@ -67,9 +67,6 @@ type SpawnConfig struct {
 	// CLIPath is the path to the claude CLI binary.
 	CLIPath string
 
-	// MaxTurns limits the number of conversation turns.
-	MaxTurns int
-
 	// NoSessionPersistence disables session saving.
 	NoSessionPersistence bool
 
@@ -80,8 +77,7 @@ type SpawnConfig struct {
 // DefaultSubActorSpawnConfig returns the default spawn config for reviewers.
 func DefaultSubActorSpawnConfig() *SpawnConfig {
 	return &SpawnConfig{
-		CLIPath:  "claude",
-		MaxTurns: 20,
+		CLIPath: "claude",
 	}
 }
 
@@ -810,13 +806,6 @@ func (r *reviewSubActor) buildClientOptions() ([]claudeagent.Option, string) {
 	if systemPrompt != "" {
 		opts = append(
 			opts, claudeagent.WithSystemPrompt(systemPrompt),
-		)
-	}
-
-	if r.spawnCfg.MaxTurns > 0 {
-		opts = append(
-			opts,
-			claudeagent.WithMaxTurns(r.spawnCfg.MaxTurns),
 		)
 	}
 
