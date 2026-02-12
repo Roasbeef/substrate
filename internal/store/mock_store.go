@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"slices"
 	"strings"
 	"sync"
 	"time"
@@ -208,6 +209,25 @@ func (m *MockStore) GetMessagesByThreadWithSender(
 			})
 		}
 	}
+
+	// Sort by created_at ascending to match SQL query ordering.
+	slices.SortFunc(result, func(a, b InboxMessage) int {
+		if a.CreatedAt.Before(b.CreatedAt) {
+			return -1
+		}
+		if a.CreatedAt.After(b.CreatedAt) {
+			return 1
+		}
+		// Break ties by ID for deterministic ordering.
+		if a.ID < b.ID {
+			return -1
+		}
+		if a.ID > b.ID {
+			return 1
+		}
+		return 0
+	})
+
 	return result, nil
 }
 
