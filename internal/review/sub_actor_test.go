@@ -251,6 +251,8 @@ func TestExtractYAMLBlock_Variants(t *testing.T) {
 }
 
 // TestBuildSystemPrompt_Default tests the default reviewer system prompt.
+// The default config is now CoordinatorReviewer, but without isMultiReview
+// set it falls back to the standard single-reviewer template.
 func TestBuildSystemPrompt_Default(t *testing.T) {
 	actor := &reviewSubActor{
 		reviewID: "test-review-1",
@@ -259,12 +261,36 @@ func TestBuildSystemPrompt_Default(t *testing.T) {
 
 	prompt := actor.buildSystemPrompt()
 
-	require.Contains(t, prompt, "CodeReviewer")
+	require.Contains(t, prompt, "CoordinatorReviewer")
 	require.Contains(t, prompt, "Focus Areas")
 	require.Contains(t, prompt, "bugs")
 	require.Contains(t, prompt, "security_vulnerabilities")
 	require.Contains(t, prompt, "YAML frontmatter")
 	require.Contains(t, prompt, "decision: approve")
+}
+
+// TestBuildSystemPrompt_Coordinator tests the multi-sub-reviewer coordinator
+// system prompt that delegates to specialized sub-agents.
+func TestBuildSystemPrompt_Coordinator(t *testing.T) {
+	actor := &reviewSubActor{
+		reviewID:      "test-review-1",
+		config:        DefaultReviewerConfig(),
+		isMultiReview: true,
+		branch:        "feature-x",
+		baseBranch:    "main",
+	}
+
+	prompt := actor.buildSystemPrompt()
+
+	require.Contains(t, prompt, "CoordinatorReviewer")
+	require.Contains(t, prompt, "code review coordinator")
+	require.Contains(t, prompt, "code-quality-reviewer")
+	require.Contains(t, prompt, "security-reviewer")
+	require.Contains(t, prompt, "performance-reviewer")
+	require.Contains(t, prompt, "test-coverage-reviewer")
+	require.Contains(t, prompt, "doc-compliance-reviewer")
+	require.Contains(t, prompt, "Aggregation Rules")
+	require.Contains(t, prompt, "YAML frontmatter")
 }
 
 // TestBuildSystemPrompt_CustomPrompt uses the config's SystemPrompt if set.
@@ -706,7 +732,7 @@ func TestPersistResults_CreatesIterationAndIssues(t *testing.T) {
 	require.NoError(t, err)
 	require.Len(t, iters, 1)
 	require.Equal(t, 1, iters[0].IterationNum)
-	require.Equal(t, "CodeReviewer", iters[0].ReviewerID)
+	require.Equal(t, "CoordinatorReviewer", iters[0].ReviewerID)
 	require.Equal(t, "request_changes", iters[0].Decision)
 	require.Equal(t, "Found some issues", iters[0].Summary)
 
