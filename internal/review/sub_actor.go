@@ -919,28 +919,32 @@ func (r *reviewSubActor) buildReviewPrompt() string {
 // buildDiffCommand constructs the appropriate git diff command based on the
 // review's branch configuration. It uses the three-dot diff syntax to show
 // only the changes unique to the feature branch relative to the base branch.
+// The trailing "--" prevents refs from being interpreted as git flags.
 func (r *reviewSubActor) buildDiffCommand() string {
 	// If we have both base and feature branches, use three-dot diff.
 	// This shows the diff of changes on the feature branch since it
 	// diverged from the base branch, which is what PR reviews need.
 	if r.baseBranch != "" && r.branch != "" {
 		return fmt.Sprintf(
-			"git diff %s...%s", r.baseBranch, r.branch,
+			"git diff %s...%s --",
+			r.baseBranch, r.branch,
 		)
 	}
 
 	// If we only have a base branch, diff against HEAD.
 	if r.baseBranch != "" {
-		return fmt.Sprintf("git diff %s...HEAD", r.baseBranch)
+		return fmt.Sprintf(
+			"git diff %s...HEAD --", r.baseBranch,
+		)
 	}
 
 	// If we have a specific commit SHA, show that commit's changes.
 	if r.commitSHA != "" {
-		return fmt.Sprintf("git show %s", r.commitSHA)
+		return fmt.Sprintf("git show %s --", r.commitSHA)
 	}
 
 	// Fallback: diff the last commit.
-	return "git diff HEAD~1"
+	return "git diff HEAD~1 --"
 }
 
 // reviewerAgentName returns the substrate agent name for this reviewer.

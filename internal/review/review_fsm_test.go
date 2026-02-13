@@ -854,6 +854,80 @@ func TestFSM_ResubmitEmitsSendMail(t *testing.T) {
 	t.Fatal("SendMailToReviewer not found in outbox")
 }
 
+// TestValidateGitRef tests branch name validation for safe git ref
+// characters.
+func TestValidateGitRef(t *testing.T) {
+	valid := []string{
+		"main",
+		"feature/my-branch",
+		"release-1.0",
+		"fix_issue_42",
+		"HEAD@{0}",
+		"v2.0.0",
+	}
+	for _, ref := range valid {
+		if err := validateGitRef(ref); err != nil {
+			t.Errorf("expected valid ref %q, got error: %v",
+				ref, err,
+			)
+		}
+	}
+
+	invalid := []struct {
+		ref    string
+		reason string
+	}{
+		{"", "empty ref"},
+		{"--flag", "starts with dash"},
+		{"-v", "starts with dash"},
+		{"branch..lock", "contains .."},
+		{"branch name", "contains space"},
+		{"branch;rm -rf /", "contains semicolon"},
+		{"$(evil)", "contains subshell"},
+		{"branch|pipe", "contains pipe"},
+	}
+	for _, tc := range invalid {
+		if err := validateGitRef(tc.ref); err == nil {
+			t.Errorf(
+				"expected error for ref %q (%s), got nil",
+				tc.ref, tc.reason,
+			)
+		}
+	}
+}
+
+// TestValidateCommitSHA tests commit SHA validation.
+func TestValidateCommitSHA(t *testing.T) {
+	valid := []string{
+		"abc1234",
+		"deadbeefdeadbeefdeadbeefdeadbeefdeadbeef",
+		"ABC1234",
+		"0123456789abcdef0123456789abcdef01234567",
+	}
+	for _, sha := range valid {
+		if err := validateCommitSHA(sha); err != nil {
+			t.Errorf("expected valid SHA %q, got error: %v",
+				sha, err,
+			)
+		}
+	}
+
+	invalid := []string{
+		"",
+		"abc",
+		"not-a-sha",
+		"abc1234;rm -rf /",
+		"ghijkl1234567",
+	}
+	for _, sha := range invalid {
+		if err := validateCommitSHA(sha); err == nil {
+			t.Errorf(
+				"expected error for SHA %q, got nil", sha,
+			)
+		}
+	}
+}
+
 // assertHasOutboxEvent checks that at least one outbox event matches the
 // given type.
 func assertHasOutboxEvent[T ReviewOutboxEvent](
