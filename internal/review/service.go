@@ -5,6 +5,7 @@ import (
 	"context"
 	"fmt"
 	"os/exec"
+	"regexp"
 	"strings"
 	"sync"
 
@@ -400,37 +401,74 @@ func (s *Service) handleGetDiff(
 		}
 	}
 
-	// Build the diff command matching the sub-actor's logic.
+	// Validate git refs before using them in commands. Although
+	// exec.Command does not use shell interpretation (so shell
+	// injection is not possible), malformed refs could confuse
+	// git or be interpreted as flags.
+	if rev.Branch != "" {
+		if err := validateGitRef(rev.Branch); err != nil {
+			return GetReviewDiffResp{
+				Error: fmt.Errorf(
+					"invalid branch: %w", err,
+				),
+			}
+		}
+	}
+	if rev.BaseBranch != "" {
+		if err := validateGitRef(rev.BaseBranch); err != nil {
+			return GetReviewDiffResp{
+				Error: fmt.Errorf(
+					"invalid base branch: %w", err,
+				),
+			}
+		}
+	}
+	if rev.CommitSHA != "" {
+		if err := validateCommitSHA(rev.CommitSHA); err != nil {
+			return GetReviewDiffResp{
+				Error: fmt.Errorf(
+					"invalid commit SHA: %w", err,
+				),
+			}
+		}
+	}
+
+	// Build the diff command matching the sub-actor's logic. The
+	// "--" separator prevents refs from being interpreted as flags.
 	var args []string
 	var cmdStr string
 
 	switch {
 	case rev.BaseBranch != "" && rev.Branch != "":
 		args = []string{
-			"diff", rev.BaseBranch + "..." + rev.Branch,
+			"diff",
+			rev.BaseBranch + "..." + rev.Branch,
+			"--",
 		}
 		cmdStr = fmt.Sprintf(
-			"git diff %s...%s",
+			"git diff %s...%s --",
 			rev.BaseBranch, rev.Branch,
 		)
 
 	case rev.BaseBranch != "":
 		args = []string{
-			"diff", rev.BaseBranch + "...HEAD",
+			"diff",
+			rev.BaseBranch + "...HEAD",
+			"--",
 		}
 		cmdStr = fmt.Sprintf(
-			"git diff %s...HEAD", rev.BaseBranch,
+			"git diff %s...HEAD --", rev.BaseBranch,
 		)
 
 	case rev.CommitSHA != "":
-		args = []string{"show", rev.CommitSHA}
+		args = []string{"show", rev.CommitSHA, "--"}
 		cmdStr = fmt.Sprintf(
-			"git show %s", rev.CommitSHA,
+			"git show %s --", rev.CommitSHA,
 		)
 
 	default:
-		args = []string{"diff", "HEAD~1"}
-		cmdStr = "git diff HEAD~1"
+		args = []string{"diff", "HEAD~1", "--"}
+		cmdStr = "git diff HEAD~1 --"
 	}
 
 	// Execute git diff in the review's repo directory.
@@ -534,6 +572,9 @@ func (s *Service) processOutbox(ctx context.Context,
 			// Issue records are persisted by the sub-actor
 			// directly in persistResults().
 
+		case SendMailToReviewer:
+			s.sendMailToReviewer(ctx, e)
+
 		case RecordActivity:
 			_ = s.store.CreateActivity(
 				ctx, store.CreateActivityParams{
@@ -548,6 +589,133 @@ func (s *Service) processOutbox(ctx context.Context,
 			)
 		}
 	}
+}
+
+// sendMailToReviewer delivers a message to the reviewer agent's inbox. If the
+// reviewer sub-actor is still active, the stop hook will pick up the message
+// on its next poll cycle. If the reviewer has exited, this falls back to
+// spawning a fresh reviewer.
+//
+// NOTE: There is a benign race between the IsActive check and mail delivery:
+// the reviewer could exit between these two steps. In that case the mail is
+// created for a now-dead reviewer. This is acceptable because the next
+// resubmit will detect the reviewer is inactive and spawn a fresh one. The
+// unread message simply goes unconsumed.
+func (s *Service) sendMailToReviewer(ctx context.Context,
+	e SendMailToReviewer,
+) {
+	// Check if the reviewer is still alive.
+	if !s.subActorMgr.IsActive(e.ReviewID) {
+		log.InfoS(ctx, "Review service: reviewer not active, "+
+			"falling back to spawn",
+			"review_id", e.ReviewID,
+		)
+
+		s.spawnReviewer(ctx, SpawnReviewerAgent{
+			ReviewID:  e.ReviewID,
+			ThreadID:  e.ThreadID,
+			RepoPath:  e.RepoPath,
+			Requester: e.Requester,
+		})
+
+		return
+	}
+
+	// Helper to fall back to spawning a fresh reviewer when mail
+	// delivery fails at any point.
+	spawnFallback := func(reason string, err error) {
+		log.WarnS(ctx, "Review service: mail delivery failed, "+
+			"falling back to spawn",
+			err,
+			"review_id", e.ReviewID,
+			"reason", reason,
+		)
+		s.spawnReviewer(ctx, SpawnReviewerAgent{
+			ReviewID:  e.ReviewID,
+			ThreadID:  e.ThreadID,
+			RepoPath:  e.RepoPath,
+			Requester: e.Requester,
+		})
+	}
+
+	// Look up the review to get the branch name for the reviewer
+	// agent name.
+	review, err := s.store.GetReview(ctx, e.ReviewID)
+	if err != nil {
+		spawnFallback("get review failed", err)
+		return
+	}
+
+	// Use the shared ReviewerAgentName function to construct the
+	// reviewer agent name consistently with the sub-actor.
+	reviewerName := ReviewerAgentName(review.Branch)
+
+	// Look up the reviewer agent to get the DB ID.
+	reviewerAgent, err := s.store.GetAgentByName(ctx, reviewerName)
+	if err != nil {
+		spawnFallback("reviewer agent not found", err)
+		return
+	}
+
+	// Look up or create the review thread topic for the message.
+	// Uses "direct" topic type since the schema constrains types
+	// to direct/broadcast/queue.
+	threadName := "review-" + e.ReviewID
+	topic, err := s.store.GetOrCreateTopic(
+		ctx, threadName, "direct",
+	)
+	if err != nil {
+		spawnFallback("topic creation failed", err)
+		return
+	}
+
+	// Create the message and recipient atomically within a
+	// transaction so we never have orphaned messages without
+	// recipients.
+	var msgID int64
+	txErr := s.store.WithTx(
+		ctx,
+		func(ctx context.Context, tx store.Storage) error {
+			msg, err := tx.CreateMessage(
+				ctx, store.CreateMessageParams{
+					ThreadID: e.ThreadID,
+					TopicID:  topic.ID,
+					SenderID: e.Requester,
+					Subject:  "Re-review requested",
+					Body:     e.Message,
+					Priority: "normal",
+				},
+			)
+			if err != nil {
+				return fmt.Errorf(
+					"create message: %w", err,
+				)
+			}
+
+			msgID = msg.ID
+
+			if err := tx.CreateMessageRecipient(
+				ctx, msg.ID, reviewerAgent.ID,
+			); err != nil {
+				return fmt.Errorf(
+					"create recipient: %w", err,
+				)
+			}
+
+			return nil
+		},
+	)
+	if txErr != nil {
+		spawnFallback("transaction failed", txErr)
+		return
+	}
+
+	log.InfoS(ctx, "Review service: sent mail to active reviewer",
+		"review_id", e.ReviewID,
+		"reviewer_name", reviewerName,
+		"reviewer_agent_id", reviewerAgent.ID,
+		"msg_id", msgID,
+	)
 }
 
 // spawnReviewer launches a reviewer sub-actor for the given review. The
@@ -787,4 +955,54 @@ func (s *Service) ActiveReviewCount() int {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 	return len(s.activeReviews)
+}
+
+// gitRefPattern matches valid git ref characters. Git refs may contain
+// alphanumerics, slashes, dashes, underscores, dots, and the at-sign
+// (for HEAD@{n} reflog syntax). This rejects shell metacharacters,
+// spaces, colons, tildes, carets, and other characters that could be
+// misinterpreted.
+var gitRefPattern = regexp.MustCompile(
+	`^[a-zA-Z0-9][a-zA-Z0-9/_.\-@{}]*$`,
+)
+
+// gitSHAPattern matches a hex commit SHA (short or full, 7-40 chars).
+var gitSHAPattern = regexp.MustCompile(`^[0-9a-fA-F]{7,40}$`)
+
+// validateGitRef checks that a branch or tag name contains only safe
+// characters for use as a git ref argument. This is defense-in-depth
+// since exec.Command does not use shell interpretation, but it prevents
+// refs that start with "--" from being interpreted as git flags.
+func validateGitRef(ref string) error {
+	if ref == "" {
+		return fmt.Errorf("empty ref")
+	}
+	if strings.HasPrefix(ref, "-") {
+		return fmt.Errorf(
+			"ref %q starts with dash (could be flag)", ref,
+		)
+	}
+	if strings.Contains(ref, "..") {
+		return fmt.Errorf(
+			"ref %q contains '..' (path traversal)", ref,
+		)
+	}
+	if !gitRefPattern.MatchString(ref) {
+		return fmt.Errorf(
+			"ref %q contains invalid characters", ref,
+		)
+	}
+
+	return nil
+}
+
+// validateCommitSHA checks that a string is a valid hex commit SHA.
+func validateCommitSHA(sha string) error {
+	if !gitSHAPattern.MatchString(sha) {
+		return fmt.Errorf(
+			"SHA %q is not a valid hex commit hash", sha,
+		)
+	}
+
+	return nil
 }

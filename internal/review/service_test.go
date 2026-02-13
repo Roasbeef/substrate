@@ -955,6 +955,190 @@ func TestService_HandleSubActorResultTwice(t *testing.T) {
 	require.False(t, stillActive)
 }
 
+// TestService_SendMailToReviewer_Success tests the happy path where a
+// message is delivered to an active reviewer agent's inbox within a
+// database transaction. The test sets up state directly in the store
+// and sub-actor manager to avoid racing with the automatic spawn path.
+func TestService_SendMailToReviewer_Success(t *testing.T) {
+	t.Parallel()
+
+	svc, storage, cleanup := newTestService(t)
+	defer cleanup()
+
+	ctx := context.Background()
+	requester := createTestAgent(t, storage, "MailSender")
+
+	// Create the review record directly in the store to avoid
+	// triggering the automatic spawn path.
+	reviewID := "review-mail-success"
+	threadID := "thread-mail-success"
+	_, err := storage.CreateReview(ctx, store.CreateReviewParams{
+		ReviewID:    reviewID,
+		ThreadID:    threadID,
+		RepoPath:    "/tmp/repo",
+		Branch:      "feature/mail-test",
+		BaseBranch:  "main",
+		ReviewType:  "full",
+		Priority:    "normal",
+		RequesterID: requester.ID,
+	})
+	require.NoError(t, err)
+
+	// Set up the FSM in the service.
+	fsm := NewReviewFSMFromDB(
+		reviewID, threadID, "/tmp/repo",
+		requester.ID, "re_review",
+	)
+	svc.mu.Lock()
+	svc.activeReviews[reviewID] = fsm
+	svc.mu.Unlock()
+
+	// Create the reviewer agent in the DB (matching the naming
+	// convention: reviewer-{branch with / replaced by -}).
+	reviewerAgent := createTestAgent(
+		t, storage, "reviewer-feature-mail-test",
+	)
+
+	// Register the review as "active" in the sub-actor manager so
+	// IsActive returns true without spawning a real Claude process.
+	svc.subActorMgr.mu.Lock()
+	svc.subActorMgr.actorIDs[reviewID] = "fake-actor"
+	svc.subActorMgr.mu.Unlock()
+
+	// Send mail to the reviewer.
+	svc.sendMailToReviewer(ctx, SendMailToReviewer{
+		ReviewID:  reviewID,
+		ThreadID:  threadID,
+		RepoPath:  "/tmp/repo",
+		Requester: requester.ID,
+		Message:   "Please re-review the changes.",
+	})
+
+	// Verify the message was created in the reviewer's inbox.
+	msgs, err := storage.GetUnreadMessages(
+		ctx, reviewerAgent.ID, 10,
+	)
+	require.NoError(t, err)
+	require.Len(t, msgs, 1,
+		"expected 1 unread message for reviewer",
+	)
+	require.Equal(t, "Re-review requested", msgs[0].Subject)
+	require.Contains(t, msgs[0].Body, "Please re-review")
+}
+
+// TestService_SendMailToReviewer_InactiveReviewer tests that when the
+// reviewer sub-actor is not active, sendMailToReviewer falls back to
+// spawning a fresh reviewer. State is set up directly to avoid racing
+// with automatic spawn goroutines.
+func TestService_SendMailToReviewer_InactiveReviewer(t *testing.T) {
+	t.Parallel()
+
+	svc, storage, cleanup := newTestService(t)
+	defer cleanup()
+
+	ctx := context.Background()
+	requester := createTestAgent(t, storage, "InactiveSender")
+
+	// Create the review record directly in the store.
+	reviewID := "review-inactive-test"
+	threadID := "thread-inactive-test"
+	_, err := storage.CreateReview(ctx, store.CreateReviewParams{
+		ReviewID:    reviewID,
+		ThreadID:    threadID,
+		RepoPath:    "/tmp/repo",
+		Branch:      "feature/inactive-test",
+		BaseBranch:  "main",
+		ReviewType:  "full",
+		Priority:    "normal",
+		RequesterID: requester.ID,
+	})
+	require.NoError(t, err)
+
+	// Set up an FSM in re_review state (the expected precondition
+	// for sendMailToReviewer).
+	fsm := NewReviewFSMFromDB(
+		reviewID, threadID, "/tmp/repo",
+		requester.ID, "re_review",
+	)
+	svc.mu.Lock()
+	svc.activeReviews[reviewID] = fsm
+	svc.mu.Unlock()
+
+	// Do NOT register the review in the sub-actor manager, so
+	// IsActive returns false and triggers the spawn fallback.
+
+	// Calling sendMailToReviewer should fall back to spawn since
+	// the reviewer is not active. The spawn drives the FSM from
+	// re_review → under_review.
+	svc.sendMailToReviewer(ctx, SendMailToReviewer{
+		ReviewID:  reviewID,
+		ThreadID:  threadID,
+		RepoPath:  "/tmp/repo",
+		Requester: requester.ID,
+		Message:   "Please re-review.",
+	})
+
+	require.Equal(t, "under_review", fsm.CurrentState())
+}
+
+// TestService_SendMailToReviewer_AgentNotFound tests that when the
+// reviewer agent is not found in the database, sendMailToReviewer falls
+// back to spawning a fresh reviewer. State is set up directly to avoid
+// racing with automatic spawn goroutines.
+func TestService_SendMailToReviewer_AgentNotFound(t *testing.T) {
+	t.Parallel()
+
+	svc, storage, cleanup := newTestService(t)
+	defer cleanup()
+
+	ctx := context.Background()
+	requester := createTestAgent(t, storage, "AgentNotFound")
+
+	// Create the review record directly in the store.
+	reviewID := "review-no-agent"
+	threadID := "thread-no-agent"
+	_, err := storage.CreateReview(ctx, store.CreateReviewParams{
+		ReviewID:    reviewID,
+		ThreadID:    threadID,
+		RepoPath:    "/tmp/repo",
+		Branch:      "feature/no-agent",
+		BaseBranch:  "main",
+		ReviewType:  "full",
+		Priority:    "normal",
+		RequesterID: requester.ID,
+	})
+	require.NoError(t, err)
+
+	// Set up an FSM in re_review state.
+	fsm := NewReviewFSMFromDB(
+		reviewID, threadID, "/tmp/repo",
+		requester.ID, "re_review",
+	)
+	svc.mu.Lock()
+	svc.activeReviews[reviewID] = fsm
+	svc.mu.Unlock()
+
+	// Mark the review as "active" in the sub-actor manager.
+	svc.subActorMgr.mu.Lock()
+	svc.subActorMgr.actorIDs[reviewID] = "fake-actor"
+	svc.subActorMgr.mu.Unlock()
+
+	// Do NOT create the reviewer agent in the DB. This means
+	// GetAgentByName will fail, triggering the spawn fallback.
+
+	// sendMailToReviewer should detect agent not found and spawn.
+	svc.sendMailToReviewer(ctx, SendMailToReviewer{
+		ReviewID:  reviewID,
+		ThreadID:  threadID,
+		RepoPath:  "/tmp/repo",
+		Requester: requester.ID,
+		Message:   "Re-review please.",
+	})
+
+	// The spawn fallback drives the FSM to under_review.
+	require.Equal(t, "under_review", fsm.CurrentState())
+}
+
 // unknownMsg is a test-only message type that the service doesn't handle.
 type unknownMsg struct {
 	actor.BaseMessage

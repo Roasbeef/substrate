@@ -59,6 +59,18 @@ var reviewIssuesCmd = &cobra.Command{
 	RunE:  runReviewIssues,
 }
 
+// reviewResubmitCmd resubmits a review after the author has pushed fixes.
+var reviewResubmitCmd = &cobra.Command{
+	Use:   "resubmit <review-id>",
+	Short: "Resubmit a review after pushing fixes",
+	Long: `Resubmit a review after the author has pushed fixes. This triggers
+the reviewer to re-review the changes. If the original reviewer is still
+active (stop hook polling), the feedback is delivered as mail. Otherwise
+a fresh reviewer is spawned.`,
+	Args: cobra.ExactArgs(1),
+	RunE: runReviewResubmit,
+}
+
 // reviewDeleteCmd deletes a review and all associated data.
 var reviewDeleteCmd = &cobra.Command{
 	Use:   "delete <review-id>",
@@ -148,6 +160,7 @@ func init() {
 	reviewCmd.AddCommand(reviewListCmd)
 	reviewCmd.AddCommand(reviewCancelCmd)
 	reviewCmd.AddCommand(reviewIssuesCmd)
+	reviewCmd.AddCommand(reviewResubmitCmd)
 	reviewCmd.AddCommand(reviewDeleteCmd)
 }
 
@@ -378,6 +391,45 @@ func runReviewCancel(cmd *cobra.Command, args []string) error {
 	}
 
 	fmt.Printf("Review %s cancelled.\n", reviewID)
+	return nil
+}
+
+// runReviewResubmit handles the `substrate review resubmit <id>` command.
+func runReviewResubmit(cmd *cobra.Command, args []string) error {
+	ctx := context.Background()
+	reviewID := args[0]
+
+	client, err := getClient()
+	if err != nil {
+		return err
+	}
+	defer client.Close()
+
+	// Auto-detect current commit SHA.
+	commitSHA := gitCommitSHA()
+	if commitSHA == "" {
+		return fmt.Errorf(
+			"could not detect commit SHA; " +
+				"run from within a git repository",
+		)
+	}
+
+	resp, err := client.ResubmitReview(ctx, reviewID, commitSHA)
+	if err != nil {
+		return fmt.Errorf("resubmit review: %w", err)
+	}
+	if resp.Error != "" {
+		return fmt.Errorf("resubmit error: %s", resp.Error)
+	}
+
+	switch outputFormat {
+	case "json":
+		return outputJSON(resp)
+	default:
+		fmt.Printf("Review %s resubmitted.\n", reviewID)
+		fmt.Printf("  New State: %s\n", resp.State)
+	}
+
 	return nil
 }
 

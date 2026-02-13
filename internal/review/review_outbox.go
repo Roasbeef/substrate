@@ -13,6 +13,7 @@ type ReviewOutboxEvent interface {
 func (PersistReviewState) isReviewOutboxEvent()      {}
 func (NotifyReviewStateChange) isReviewOutboxEvent() {}
 func (SpawnReviewerAgent) isReviewOutboxEvent()      {}
+func (SendMailToReviewer) isReviewOutboxEvent()      {}
 func (CreateReviewIteration) isReviewOutboxEvent()   {}
 func (CreateReviewIssues) isReviewOutboxEvent()      {}
 func (RecordActivity) isReviewOutboxEvent()          {}
@@ -38,6 +39,19 @@ type SpawnReviewerAgent struct {
 	ThreadID  string
 	RepoPath  string
 	Requester int64
+}
+
+// SendMailToReviewer requests sending a message to the existing reviewer
+// agent to trigger a re-review within the same session. The service layer
+// checks reviewer liveness: if the reviewer's stop hook is still polling,
+// the message is delivered via the store and the reviewer picks it up. If
+// the reviewer has exited, the service falls back to spawning a fresh one.
+type SendMailToReviewer struct {
+	ReviewID  string
+	ThreadID  string
+	RepoPath  string
+	Requester int64
+	Message   string
 }
 
 // CreateReviewIteration requests persistence of a review iteration result.

@@ -919,28 +919,32 @@ func (r *reviewSubActor) buildReviewPrompt() string {
 // buildDiffCommand constructs the appropriate git diff command based on the
 // review's branch configuration. It uses the three-dot diff syntax to show
 // only the changes unique to the feature branch relative to the base branch.
+// The trailing "--" prevents refs from being interpreted as git flags.
 func (r *reviewSubActor) buildDiffCommand() string {
 	// If we have both base and feature branches, use three-dot diff.
 	// This shows the diff of changes on the feature branch since it
 	// diverged from the base branch, which is what PR reviews need.
 	if r.baseBranch != "" && r.branch != "" {
 		return fmt.Sprintf(
-			"git diff %s...%s", r.baseBranch, r.branch,
+			"git diff %s...%s --",
+			r.baseBranch, r.branch,
 		)
 	}
 
 	// If we only have a base branch, diff against HEAD.
 	if r.baseBranch != "" {
-		return fmt.Sprintf("git diff %s...HEAD", r.baseBranch)
+		return fmt.Sprintf(
+			"git diff %s...HEAD --", r.baseBranch,
+		)
 	}
 
 	// If we have a specific commit SHA, show that commit's changes.
 	if r.commitSHA != "" {
-		return fmt.Sprintf("git show %s", r.commitSHA)
+		return fmt.Sprintf("git show %s --", r.commitSHA)
 	}
 
 	// Fallback: diff the last commit.
-	return "git diff HEAD~1"
+	return "git diff HEAD~1 --"
 }
 
 // reviewerAgentName returns the substrate agent name for this reviewer.
@@ -948,10 +952,15 @@ func (r *reviewSubActor) buildDiffCommand() string {
 // name and a short review ID suffix. Review aggregation happens via the
 // CodeReviewer topic, not the agent name.
 func (r *reviewSubActor) reviewerAgentName() string {
-	// Use branch name for agent identity so reviewers are grouped by
-	// what they're reviewing rather than by review ID. This allows
-	// the UI to aggregate all reviewer-* agents under "CodeReviewer".
-	branch := r.branch
+	return ReviewerAgentName(r.branch)
+}
+
+// ReviewerAgentName returns the substrate agent name for a reviewer of
+// the given branch. The branch name is sanitized (slashes replaced with
+// dashes) and prefixed with "reviewer-". This is the single source of
+// truth for reviewer agent naming, used by both the sub-actor and the
+// mail delivery path.
+func ReviewerAgentName(branch string) string {
 	if branch == "" {
 		branch = "unknown"
 	}
@@ -1859,7 +1868,7 @@ func extractYAMLBlock(text string) string {
 // with the actor system. Each reviewer is a proper actor with lifecycle
 // management, WaitGroup tracking, and OnStop cleanup hooks.
 type SubActorManager struct {
-	mu          sync.Mutex
+	mu          sync.RWMutex
 	actorIDs    map[string]string // reviewID → actor system ID.
 	store       store.Storage
 	spawnCfg    *SpawnConfig
@@ -2020,7 +2029,20 @@ func (m *SubActorManager) StopAll() {
 
 // ActiveCount returns the number of active reviewer sub-actors.
 func (m *SubActorManager) ActiveCount() int {
-	m.mu.Lock()
-	defer m.mu.Unlock()
+	m.mu.RLock()
+	defer m.mu.RUnlock()
 	return len(m.actorIDs)
+}
+
+// IsActive returns true if a reviewer sub-actor is currently running for
+// the given review ID. This is used by the resubmit flow to determine
+// whether to send mail to the existing reviewer (whose stop hook is
+// polling) or to spawn a fresh reviewer.
+func (m *SubActorManager) IsActive(reviewID string) bool {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+
+	_, ok := m.actorIDs[reviewID]
+
+	return ok
 }
