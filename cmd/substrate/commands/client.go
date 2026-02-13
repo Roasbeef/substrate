@@ -1353,6 +1353,13 @@ func (c *Client) ResubmitReview(
 		return nil, err
 	}
 
+	if reviewID == "" {
+		return nil, fmt.Errorf("review ID is required")
+	}
+	if commitSHA == "" {
+		return nil, fmt.Errorf("commit SHA is required")
+	}
+
 	return c.reviewClient.ResubmitReview(
 		ctx, &subtraterpc.ResubmitReviewRequest{
 			ReviewId:  reviewID,

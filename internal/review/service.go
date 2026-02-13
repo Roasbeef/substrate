@@ -662,9 +662,11 @@ func (s *Service) sendMailToReviewer(ctx context.Context,
 	}
 
 	// Look up or create the review thread topic for the message.
+	// Uses "direct" topic type since the schema constrains types
+	// to direct/broadcast/queue.
 	threadName := "review-" + e.ReviewID
 	topic, err := s.store.GetOrCreateTopic(
-		ctx, threadName, "review",
+		ctx, threadName, "direct",
 	)
 	if err != nil {
 		log.ErrorS(ctx, "Review service: failed to get review "+

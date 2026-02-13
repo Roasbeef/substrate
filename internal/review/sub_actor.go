@@ -1863,7 +1863,7 @@ func extractYAMLBlock(text string) string {
 // with the actor system. Each reviewer is a proper actor with lifecycle
 // management, WaitGroup tracking, and OnStop cleanup hooks.
 type SubActorManager struct {
-	mu          sync.Mutex
+	mu          sync.RWMutex
 	actorIDs    map[string]string // reviewID → actor system ID.
 	store       store.Storage
 	spawnCfg    *SpawnConfig
@@ -2024,8 +2024,8 @@ func (m *SubActorManager) StopAll() {
 
 // ActiveCount returns the number of active reviewer sub-actors.
 func (m *SubActorManager) ActiveCount() int {
-	m.mu.Lock()
-	defer m.mu.Unlock()
+	m.mu.RLock()
+	defer m.mu.RUnlock()
 	return len(m.actorIDs)
 }
 
@@ -2034,8 +2034,10 @@ func (m *SubActorManager) ActiveCount() int {
 // whether to send mail to the existing reviewer (whose stop hook is
 // polling) or to spawn a fresh reviewer.
 func (m *SubActorManager) IsActive(reviewID string) bool {
-	m.mu.Lock()
-	defer m.mu.Unlock()
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+
 	_, ok := m.actorIDs[reviewID]
+
 	return ok
 }
