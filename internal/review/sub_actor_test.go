@@ -251,6 +251,8 @@ func TestExtractYAMLBlock_Variants(t *testing.T) {
 }
 
 // TestBuildSystemPrompt_Default tests the default reviewer system prompt.
+// The default config is now CoordinatorReviewer, but without isMultiReview
+// set it falls back to the standard single-reviewer template.
 func TestBuildSystemPrompt_Default(t *testing.T) {
 	actor := &reviewSubActor{
 		reviewID: "test-review-1",
@@ -259,12 +261,36 @@ func TestBuildSystemPrompt_Default(t *testing.T) {
 
 	prompt := actor.buildSystemPrompt()
 
-	require.Contains(t, prompt, "CodeReviewer")
+	require.Contains(t, prompt, "CoordinatorReviewer")
 	require.Contains(t, prompt, "Focus Areas")
 	require.Contains(t, prompt, "bugs")
 	require.Contains(t, prompt, "security_vulnerabilities")
 	require.Contains(t, prompt, "YAML frontmatter")
 	require.Contains(t, prompt, "decision: approve")
+}
+
+// TestBuildSystemPrompt_Coordinator tests the multi-sub-reviewer coordinator
+// system prompt that delegates to specialized sub-agents.
+func TestBuildSystemPrompt_Coordinator(t *testing.T) {
+	actor := &reviewSubActor{
+		reviewID:      "test-review-1",
+		config:        DefaultReviewerConfig(),
+		isMultiReview: true,
+		branch:        "feature-x",
+		baseBranch:    "main",
+	}
+
+	prompt := actor.buildSystemPrompt()
+
+	require.Contains(t, prompt, "CoordinatorReviewer")
+	require.Contains(t, prompt, "code review coordinator")
+	require.Contains(t, prompt, "code-quality-reviewer")
+	require.Contains(t, prompt, "security-reviewer")
+	require.Contains(t, prompt, "performance-reviewer")
+	require.Contains(t, prompt, "test-coverage-reviewer")
+	require.Contains(t, prompt, "doc-compliance-reviewer")
+	require.Contains(t, prompt, "Aggregation Rules")
+	require.Contains(t, prompt, "YAML frontmatter")
 }
 
 // TestBuildSystemPrompt_CustomPrompt uses the config's SystemPrompt if set.
@@ -368,7 +394,6 @@ func TestBuildClientOptions(t *testing.T) {
 		},
 		spawnCfg: &SpawnConfig{
 			CLIPath:              "claude",
-			MaxTurns:             15,
 			NoSessionPersistence: true,
 			ConfigDir:            "/tmp/claude-config",
 		},
@@ -706,7 +731,7 @@ func TestPersistResults_CreatesIterationAndIssues(t *testing.T) {
 	require.NoError(t, err)
 	require.Len(t, iters, 1)
 	require.Equal(t, 1, iters[0].IterationNum)
-	require.Equal(t, "CodeReviewer", iters[0].ReviewerID)
+	require.Equal(t, "CoordinatorReviewer", iters[0].ReviewerID)
 	require.Equal(t, "request_changes", iters[0].Decision)
 	require.Equal(t, "Found some issues", iters[0].Summary)
 
@@ -823,7 +848,6 @@ issues:
 func TestDefaultSubActorSpawnConfig(t *testing.T) {
 	cfg := DefaultSubActorSpawnConfig()
 	require.Equal(t, "claude", cfg.CLIPath)
-	require.Equal(t, 20, cfg.MaxTurns)
 }
 
 // TestNewSubActorManager verifies manager creation.
@@ -838,7 +862,7 @@ func TestNewSubActorManager(t *testing.T) {
 
 	// With custom config.
 	mgr2 := NewSubActorManager(as, mockStore, &SpawnConfig{
-		MaxTurns: 10,
+		CLIPath: "claude",
 	})
 	require.NotNil(t, mgr2)
 }
@@ -960,7 +984,7 @@ func TestServiceWithSubActorManager(t *testing.T) {
 		Store:       st,
 		ActorSystem: newTestActorSystem(t),
 		SpawnConfig: &SpawnConfig{
-			MaxTurns: 5,
+			CLIPath: "claude",
 		},
 	})
 	require.NotNil(t, svc2.subActorMgr)
@@ -1346,8 +1370,9 @@ func TestHookStop_NoMessages(t *testing.T) {
 	require.Equal(t, "approve", result.Decision)
 }
 
-// TestFormatMailAsPrompt tests formatting inbox messages for injection.
-func TestFormatMailAsPrompt(t *testing.T) {
+// TestFormatMailAsReReviewPrompt tests formatting inbox messages for
+// re-review injection with diff command context.
+func TestFormatMailAsReReviewPrompt(t *testing.T) {
 	msgs := []store.InboxMessage{
 		{
 			Message: store.Message{
@@ -1358,11 +1383,15 @@ func TestFormatMailAsPrompt(t *testing.T) {
 		},
 	}
 
-	prompt := formatMailAsPrompt(msgs)
+	diffCmd := "git diff main...feature-branch"
+	prompt := formatMailAsReReviewPrompt(msgs, diffCmd)
 	require.Contains(t, prompt, "dev-agent")
 	require.Contains(t, prompt, "Re-review requested")
 	require.Contains(t, prompt, "I fixed the issues")
 	require.Contains(t, prompt, "Message 1")
+	require.Contains(t, prompt, diffCmd)
+	require.Contains(t, prompt, "UPDATED review")
+	require.Contains(t, prompt, "false positives")
 }
 
 // TestBuildSystemPrompt_SubstrateSection verifies the system prompt

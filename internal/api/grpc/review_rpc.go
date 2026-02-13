@@ -2,12 +2,39 @@ package subtraterpc
 
 import (
 	"context"
+	"database/sql"
 	"time"
 
 	"github.com/roasbeef/subtrate/internal/review"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 )
+
+// resolveReviewID resolves a potentially short review ID prefix to a full
+// UUID. If the input is already a full UUID (contains dashes and is 36+
+// chars), it is returned as-is. Otherwise a prefix match is attempted
+// against the database.
+func (s *Server) resolveReviewID(
+	ctx context.Context, id string,
+) (string, error) {
+
+	// If it looks like a full UUID already, skip the lookup.
+	if len(id) >= 36 {
+		return id, nil
+	}
+
+	resolved, err := s.store.Queries().ResolveReviewID(
+		ctx, sql.NullString{String: id, Valid: true},
+	)
+	if err != nil {
+		return "", status.Errorf(
+			codes.NotFound,
+			"no review matching prefix %q", id,
+		)
+	}
+
+	return resolved, nil
+}
 
 // CreateReview creates a new code review request via the review actor.
 func (s *Server) CreateReview(
@@ -155,8 +182,13 @@ func (s *Server) GetReview(
 		)
 	}
 
+	reviewID, err := s.resolveReviewID(ctx, req.ReviewId)
+	if err != nil {
+		return nil, err
+	}
+
 	resp, err := s.askReview(ctx, review.GetReviewMsg{
-		ReviewID: req.ReviewId,
+		ReviewID: reviewID,
 	})
 	if err != nil {
 		return nil, status.Errorf(
@@ -223,8 +255,13 @@ func (s *Server) ResubmitReview(
 		)
 	}
 
+	reviewID, err := s.resolveReviewID(ctx, req.ReviewId)
+	if err != nil {
+		return nil, err
+	}
+
 	resp, err := s.askReview(ctx, review.ResubmitMsg{
-		ReviewID:  req.ReviewId,
+		ReviewID:  reviewID,
 		CommitSHA: req.CommitSha,
 	})
 	if err != nil {
@@ -261,8 +298,13 @@ func (s *Server) CancelReview(
 		)
 	}
 
+	reviewID, err := s.resolveReviewID(ctx, req.ReviewId)
+	if err != nil {
+		return nil, err
+	}
+
 	resp, err := s.askReview(ctx, review.CancelReviewMsg{
-		ReviewID: req.ReviewId,
+		ReviewID: reviewID,
 		Reason:   req.Reason,
 	})
 	if err != nil {
@@ -296,8 +338,13 @@ func (s *Server) DeleteReview(
 		)
 	}
 
+	reviewID, err := s.resolveReviewID(ctx, req.ReviewId)
+	if err != nil {
+		return nil, err
+	}
+
 	resp, err := s.askReview(ctx, review.DeleteReviewMsg{
-		ReviewID: req.ReviewId,
+		ReviewID: reviewID,
 	})
 	if err != nil {
 		return nil, status.Errorf(
@@ -330,8 +377,13 @@ func (s *Server) ListReviewIssues(
 		)
 	}
 
+	reviewID, err := s.resolveReviewID(ctx, req.ReviewId)
+	if err != nil {
+		return nil, err
+	}
+
 	resp, err := s.askReview(ctx, review.GetIssuesMsg{
-		ReviewID: req.ReviewId,
+		ReviewID: reviewID,
 	})
 	if err != nil {
 		return nil, status.Errorf(
@@ -390,8 +442,13 @@ func (s *Server) UpdateIssueStatus(
 		)
 	}
 
+	reviewID, err := s.resolveReviewID(ctx, req.ReviewId)
+	if err != nil {
+		return nil, err
+	}
+
 	resp, err := s.askReview(ctx, review.UpdateIssueMsg{
-		ReviewID: req.ReviewId,
+		ReviewID: reviewID,
 		IssueID:  req.IssueId,
 		Status:   req.Status,
 	})
@@ -426,8 +483,13 @@ func (s *Server) GetReviewDiff(
 		)
 	}
 
+	reviewID, err := s.resolveReviewID(ctx, req.ReviewId)
+	if err != nil {
+		return nil, err
+	}
+
 	resp, err := s.askReview(ctx, review.GetReviewDiffMsg{
-		ReviewID: req.ReviewId,
+		ReviewID: reviewID,
 	})
 	if err != nil {
 		return nil, status.Errorf(

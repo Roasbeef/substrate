@@ -67,9 +67,6 @@ type SpawnConfig struct {
 	// CLIPath is the path to the claude CLI binary.
 	CLIPath string
 
-	// MaxTurns limits the number of conversation turns.
-	MaxTurns int
-
 	// NoSessionPersistence disables session saving.
 	NoSessionPersistence bool
 
@@ -80,8 +77,7 @@ type SpawnConfig struct {
 // DefaultSubActorSpawnConfig returns the default spawn config for reviewers.
 func DefaultSubActorSpawnConfig() *SpawnConfig {
 	return &SpawnConfig{
-		CLIPath:  "claude",
-		MaxTurns: 20,
+		CLIPath: "claude",
 	}
 }
 
@@ -100,6 +96,13 @@ type reviewSubActor struct {
 	store      store.Storage
 
 	spawnCfg *SpawnConfig
+
+	// isMultiReview indicates this reviewer is a coordinator that
+	// delegates to specialized sub-agents via WithAgents(). When
+	// true, the coordinator prompt template is used instead of the
+	// standard single-reviewer template, and the SDK client is
+	// configured with sub-agent definitions.
+	isMultiReview bool
 
 	// agentID is the database ID of this reviewer's agent identity,
 	// set during session start when the agent is registered with
@@ -806,10 +809,18 @@ func (r *reviewSubActor) buildClientOptions() ([]claudeagent.Option, string) {
 		)
 	}
 
-	if r.spawnCfg.MaxTurns > 0 {
+	// For multi-review mode, register the specialized sub-reviewer
+	// agent definitions. The coordinator agent will spawn these via
+	// the SDK Task tool to perform parallel domain-specific reviews.
+	if r.isMultiReview {
 		opts = append(
 			opts,
-			claudeagent.WithMaxTurns(r.spawnCfg.MaxTurns),
+			claudeagent.WithAgents(FullReviewSubAgents()),
+		)
+
+		log.Infof("Coordinator configured with %d sub-reviewer "+
+			"agents: review_id=%s",
+			len(FullReviewSubAgents()), r.reviewID,
 		)
 	}
 
@@ -842,19 +853,30 @@ func (r *reviewSubActor) buildSystemPrompt() string {
 		shortID = shortID[:8]
 	}
 
-	return renderSystemPrompt(context.Background(), systemPromptData{
+	data := systemPromptData{
 		Name:           r.config.Name,
 		ReviewerType:   r.config.Name,
+		IsMultiReview:  r.isMultiReview,
 		FocusAreas:     r.config.FocusAreas,
 		IgnorePatterns: r.config.IgnorePatterns,
 		AgentName:      r.reviewerAgentName(),
 		RequesterName:  requesterName,
 		ThreadID:       r.threadID,
-		BodyFile:       "/tmp/substrate_reviews/review-" + shortID + ".md",
-		Branch:         r.branch,
-		BaseBranch:     r.baseBranch,
-		ClaudeMD:       r.loadProjectCLAUDEMD(),
-	})
+		BodyFile: "/tmp/substrate_reviews/review-" +
+			shortID + ".md",
+		Branch:     r.branch,
+		BaseBranch: r.baseBranch,
+		ClaudeMD:   r.loadProjectCLAUDEMD(),
+	}
+
+	// Use the coordinator prompt for multi-sub-reviewer mode.
+	if r.isMultiReview {
+		return renderCoordinatorPrompt(
+			context.Background(), data,
+		)
+	}
+
+	return renderSystemPrompt(context.Background(), data)
 }
 
 // loadProjectCLAUDEMD reads the CLAUDE.md file from the repo root. Returns
@@ -877,12 +899,21 @@ func (r *reviewSubActor) loadProjectCLAUDEMD() string {
 // The prompt templates the git diff command from the review's branch and
 // base branch so the reviewer examines exactly the right commit range.
 func (r *reviewSubActor) buildReviewPrompt() string {
-	return renderReviewPrompt(context.Background(), reviewPromptData{
+	data := reviewPromptData{
 		ReviewID:   r.reviewID,
 		DiffCmd:    r.buildDiffCommand(),
 		Branch:     r.branch,
 		BaseBranch: r.baseBranch,
-	})
+	}
+
+	// Use the coordinator review prompt for multi-sub-reviewer mode.
+	if r.isMultiReview {
+		return renderCoordinatorReviewPrompt(
+			context.Background(), data,
+		)
+	}
+
+	return renderReviewPrompt(context.Background(), data)
 }
 
 // buildDiffCommand constructs the appropriate git diff command based on the
@@ -937,7 +968,7 @@ func (r *reviewSubActor) reviewerAgentName() string {
 // CLI hook scripts but run as Go callbacks in the daemon process space,
 // giving them direct access to the store and mail service.
 func (r *reviewSubActor) buildSubstrateHooks() map[claudeagent.HookType][]claudeagent.HookConfig {
-	return map[claudeagent.HookType][]claudeagent.HookConfig{
+	hooks := map[claudeagent.HookType][]claudeagent.HookConfig{
 		claudeagent.HookTypeSessionStart: {{
 			Matcher:  "*",
 			Callback: r.hookSessionStart,
@@ -947,6 +978,49 @@ func (r *reviewSubActor) buildSubstrateHooks() map[claudeagent.HookType][]claude
 			Callback: r.hookStop,
 		}},
 	}
+
+	// For multi-review mode, add subagent lifecycle hooks to track
+	// when the coordinator spawns and completes sub-reviewer agents.
+	if r.isMultiReview {
+		hooks[claudeagent.HookTypeSubagentStart] = []claudeagent.HookConfig{{
+			Matcher: "*",
+			Callback: func(ctx context.Context,
+				input claudeagent.HookInput) (
+				claudeagent.HookResult, error) {
+
+				start := input.(claudeagent.SubagentStartInput)
+				log.InfoS(ctx,
+					"Sub-reviewer agent spawned",
+					"review_id", r.reviewID,
+					"agent_type", start.AgentType,
+					"agent_id", start.AgentID,
+				)
+				return claudeagent.HookResult{
+					Continue: true,
+				}, nil
+			},
+		}}
+		hooks[claudeagent.HookTypeSubagentStop] = []claudeagent.HookConfig{{
+			Matcher: "*",
+			Callback: func(ctx context.Context,
+				input claudeagent.HookInput) (
+				claudeagent.HookResult, error) {
+
+				stop := input.(claudeagent.SubagentStopInput)
+				log.InfoS(ctx,
+					"Sub-reviewer agent completed",
+					"review_id", r.reviewID,
+					"agent_name", stop.AgentName,
+					"status", stop.Status,
+				)
+				return claudeagent.HookResult{
+					Continue: true,
+				}, nil
+			},
+		}}
+	}
+
+	return hooks
 }
 
 // registerAgentIdentity creates or retrieves the reviewer's agent record
@@ -1102,8 +1176,28 @@ func (r *reviewSubActor) hookStop(
 		}
 
 		if len(msgs) > 0 {
-			// Format messages as a prompt for the reviewer.
-			reason := formatMailAsPrompt(msgs)
+			// Mark messages as read so they are not
+			// re-injected on subsequent stop hook
+			// invocations.
+			for _, msg := range msgs {
+				if err := r.store.MarkMessageRead(
+					storeCtx, msg.ID, r.agentID,
+				); err != nil {
+					log.WarnS(ctx,
+						"Reviewer substrate hook: "+
+							"mark read failed",
+						err,
+						"msg_id", msg.ID,
+					)
+				}
+			}
+
+			// Format messages as a prompt including the
+			// diff command for re-review context.
+			diffCmd := r.buildDiffCommand()
+			reason := formatMailAsReReviewPrompt(
+				msgs, diffCmd,
+			)
 
 			log.InfoS(ctx,
 				"Reviewer substrate hook: blocking "+
@@ -1116,11 +1210,13 @@ func (r *reviewSubActor) hookStop(
 				Decision: "block",
 				Reason:   reason,
 				SystemMessage: fmt.Sprintf(
-					"You have %d unread message(s) "+
-						"from the substrate "+
-						"messaging system. Process "+
-						"these messages and respond "+
-						"appropriately.",
+					"You have %d unread "+
+						"message(s) with "+
+						"feedback on your "+
+						"review. Re-read the "+
+						"diff, address the "+
+						"feedback, and emit an "+
+						"updated YAML review.",
 					len(msgs),
 				),
 			}, nil
@@ -1148,35 +1244,28 @@ func (r *reviewSubActor) hookStop(
 	return claudeagent.HookResult{Decision: "approve"}, nil
 }
 
-// formatMailAsPrompt converts unread inbox messages into a text prompt
-// that can be injected into the reviewer's conversation when the Stop
-// hook blocks exit.
-func formatMailAsPrompt(msgs []store.InboxMessage) string {
-	var sb strings.Builder
+// formatMailAsReReviewPrompt converts unread inbox messages into a
+// structured prompt for the reviewer using the re-review template. It
+// includes the feedback messages and the diff command so Claude can
+// re-review the code and emit an updated YAML review block.
+func formatMailAsReReviewPrompt(
+	msgs []store.InboxMessage, diffCmd string,
+) string {
 
-	sb.WriteString("You have new messages:\n\n")
-
+	tmplMsgs := make([]reReviewMessage, len(msgs))
 	for i, msg := range msgs {
-		sb.WriteString(fmt.Sprintf(
-			"--- Message %d ---\n", i+1,
-		))
-		sb.WriteString(fmt.Sprintf(
-			"From: %s\n", msg.SenderName,
-		))
-		sb.WriteString(fmt.Sprintf(
-			"Subject: %s\n", msg.Subject,
-		))
-		sb.WriteString(fmt.Sprintf("Body:\n%s\n\n", msg.Body))
+		tmplMsgs[i] = reReviewMessage{
+			Index:      i + 1,
+			SenderName: msg.SenderName,
+			Subject:    msg.Subject,
+			Body:       msg.Body,
+		}
 	}
 
-	sb.WriteString(
-		"Please process these messages and respond " +
-			"appropriately. If asked to re-review, run " +
-			"the diff command again and provide an updated " +
-			"review.\n",
-	)
-
-	return sb.String()
+	return renderReReviewPrompt(reReviewPromptData{
+		Messages: tmplMsgs,
+		DiffCmd:  diffCmd,
+	})
 }
 
 // persistResults saves the iteration and issue records to the database.
@@ -1849,6 +1938,19 @@ func (m *SubActorManager) SpawnReviewer(
 			callback(ctx, result)
 		},
 	)
+
+	// Enable multi-sub-reviewer mode for the coordinator config.
+	// The coordinator delegates to specialized sub-agents via the
+	// SDK's WithAgents() mechanism.
+	if config.Name == "CoordinatorReviewer" {
+		sub.isMultiReview = true
+
+		log.InfoS(ctx, "Sub-actor manager: multi-sub-reviewer "+
+			"mode enabled",
+			"review_id", reviewID,
+			"config", config.Name,
+		)
+	}
 
 	// Register as a proper actor in the system with extended cleanup
 	// timeout for subprocess shutdown (SDK uses 5s grace + SIGKILL).

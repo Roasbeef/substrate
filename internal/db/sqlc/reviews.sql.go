@@ -829,6 +829,17 @@ func (q *Queries) ListReviewsByState(ctx context.Context, arg ListReviewsByState
 	return items, nil
 }
 
+const ResolveReviewID = `-- name: ResolveReviewID :one
+SELECT review_id FROM reviews WHERE review_id LIKE ? || '%' LIMIT 1
+`
+
+func (q *Queries) ResolveReviewID(ctx context.Context, dollar_1 sql.NullString) (string, error) {
+	row := q.db.QueryRowContext(ctx, ResolveReviewID, dollar_1)
+	var review_id string
+	err := row.Scan(&review_id)
+	return review_id, err
+}
+
 const UpdateReviewCompleted = `-- name: UpdateReviewCompleted :exec
 UPDATE reviews SET state = ?, updated_at = ?, completed_at = ? WHERE review_id = ?
 `

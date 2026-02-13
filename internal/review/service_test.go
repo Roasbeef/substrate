@@ -857,7 +857,7 @@ func TestService_ReviewerConfigs(t *testing.T) {
 	// The service should have the default "full" config plus specialized
 	// reviewers.
 	require.NotNil(t, svc.reviewers["full"])
-	require.Equal(t, "CodeReviewer", svc.reviewers["full"].Name)
+	require.Equal(t, "CoordinatorReviewer", svc.reviewers["full"].Name)
 
 	require.NotNil(t, svc.reviewers["security"])
 	require.Equal(t, "SecurityReviewer", svc.reviewers["security"].Name)
