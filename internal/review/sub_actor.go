@@ -2024,3 +2024,14 @@ func (m *SubActorManager) ActiveCount() int {
 	defer m.mu.Unlock()
 	return len(m.actorIDs)
 }
+
+// IsActive returns true if a reviewer sub-actor is currently running for
+// the given review ID. This is used by the resubmit flow to determine
+// whether to send mail to the existing reviewer (whose stop hook is
+// polling) or to spawn a fresh reviewer.
+func (m *SubActorManager) IsActive(reviewID string) bool {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	_, ok := m.actorIDs[reviewID]
+	return ok
+}
