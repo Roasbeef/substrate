@@ -621,43 +621,39 @@ func (s *Service) sendMailToReviewer(ctx context.Context,
 		return
 	}
 
-	// Look up the review to get the branch name for the reviewer
-	// agent name.
-	review, err := s.store.GetReview(ctx, e.ReviewID)
-	if err != nil {
-		log.ErrorS(ctx, "Review service: failed to get review "+
-			"for mail", err,
-			"review_id", e.ReviewID,
-		)
-		return
-	}
-
-	// Construct the reviewer agent name (matches
-	// reviewSubActor.reviewerAgentName()).
-	branch := review.Branch
-	if branch == "" {
-		branch = "unknown"
-	}
-	branch = strings.ReplaceAll(branch, "/", "-")
-	reviewerName := "reviewer-" + branch
-
-	// Look up the reviewer agent to get the DB ID.
-	reviewerAgent, err := s.store.GetAgentByName(ctx, reviewerName)
-	if err != nil {
-		log.WarnS(ctx, "Review service: reviewer agent not "+
-			"found, falling back to spawn",
+	// Helper to fall back to spawning a fresh reviewer when mail
+	// delivery fails at any point.
+	spawnFallback := func(reason string, err error) {
+		log.WarnS(ctx, "Review service: mail delivery failed, "+
+			"falling back to spawn",
 			err,
 			"review_id", e.ReviewID,
-			"reviewer_name", reviewerName,
+			"reason", reason,
 		)
-
 		s.spawnReviewer(ctx, SpawnReviewerAgent{
 			ReviewID:  e.ReviewID,
 			ThreadID:  e.ThreadID,
 			RepoPath:  e.RepoPath,
 			Requester: e.Requester,
 		})
+	}
 
+	// Look up the review to get the branch name for the reviewer
+	// agent name.
+	review, err := s.store.GetReview(ctx, e.ReviewID)
+	if err != nil {
+		spawnFallback("get review failed", err)
+		return
+	}
+
+	// Use the shared ReviewerAgentName function to construct the
+	// reviewer agent name consistently with the sub-actor.
+	reviewerName := ReviewerAgentName(review.Branch)
+
+	// Look up the reviewer agent to get the DB ID.
+	reviewerAgent, err := s.store.GetAgentByName(ctx, reviewerName)
+	if err != nil {
+		spawnFallback("reviewer agent not found", err)
 		return
 	}
 
@@ -669,11 +665,7 @@ func (s *Service) sendMailToReviewer(ctx context.Context,
 		ctx, threadName, "direct",
 	)
 	if err != nil {
-		log.ErrorS(ctx, "Review service: failed to get review "+
-			"topic", err,
-			"review_id", e.ReviewID,
-			"thread", threadName,
-		)
+		spawnFallback("topic creation failed", err)
 		return
 	}
 
@@ -714,10 +706,7 @@ func (s *Service) sendMailToReviewer(ctx context.Context,
 		},
 	)
 	if txErr != nil {
-		log.ErrorS(ctx, "Review service: failed to create mail "+
-			"for reviewer", txErr,
-			"review_id", e.ReviewID,
-		)
+		spawnFallback("transaction failed", txErr)
 		return
 	}
 
