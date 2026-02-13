@@ -336,11 +336,13 @@ func (s *StateChangesRequested) ProcessEvent(_ context.Context,
 					OldState: "changes_requested",
 					NewState: "re_review",
 				},
-				SpawnReviewerAgent{
+				SendMailToReviewer{
 					ReviewID:  env.ReviewID,
 					ThreadID:  env.ThreadID,
 					RepoPath:  env.RepoPath,
 					Requester: env.RequesterID,
+					Message: "Author has pushed fixes. " +
+						"Re-review the changes.",
 				},
 			},
 		}, nil
@@ -493,6 +495,96 @@ func (s *StateReReview) ProcessEvent(_ context.Context,
 					ReviewID: env.ReviewID,
 					OldState: "re_review",
 					NewState: "under_review",
+				},
+			},
+		}, nil
+
+	case ApproveEvent:
+		// The continuing reviewer approved during re-review.
+		return &ReviewTransition{
+			NextState: &StateApproved{ReviewerID: e.ReviewerID},
+			OutboxEvents: []ReviewOutboxEvent{
+				PersistReviewState{
+					ReviewID: env.ReviewID,
+					NewState: "approved",
+				},
+				NotifyReviewStateChange{
+					ReviewID: env.ReviewID,
+					OldState: "re_review",
+					NewState: "approved",
+				},
+				RecordActivity{
+					AgentID:      env.RequesterID,
+					ActivityType: "review_approved",
+					Description: fmt.Sprintf(
+						"Review approved by %s "+
+							"(re-review)",
+						e.ReviewerID,
+					),
+					ReviewID: env.ReviewID,
+				},
+			},
+		}, nil
+
+	case RequestChangesEvent:
+		// The reviewer found more issues during re-review.
+		return &ReviewTransition{
+			NextState: &StateChangesRequested{
+				ReviewerID: e.ReviewerID,
+			},
+			OutboxEvents: []ReviewOutboxEvent{
+				PersistReviewState{
+					ReviewID: env.ReviewID,
+					NewState: "changes_requested",
+				},
+				NotifyReviewStateChange{
+					ReviewID: env.ReviewID,
+					OldState: "re_review",
+					NewState: "changes_requested",
+				},
+				CreateReviewIssues{
+					ReviewID: env.ReviewID,
+					Issues:   e.Issues,
+				},
+				RecordActivity{
+					AgentID:      env.RequesterID,
+					ActivityType: "review_completed",
+					Description: fmt.Sprintf(
+						"Reviewer %s requested changes "+
+							"during re-review (%d issues)",
+						e.ReviewerID, len(e.Issues),
+					),
+					ReviewID: env.ReviewID,
+				},
+			},
+		}, nil
+
+	case RejectEvent:
+		// The reviewer rejected during re-review.
+		return &ReviewTransition{
+			NextState: &StateRejected{
+				ReviewerID: e.ReviewerID,
+				Reason:     e.Reason,
+			},
+			OutboxEvents: []ReviewOutboxEvent{
+				PersistReviewState{
+					ReviewID: env.ReviewID,
+					NewState: "rejected",
+				},
+				NotifyReviewStateChange{
+					ReviewID: env.ReviewID,
+					OldState: "re_review",
+					NewState: "rejected",
+				},
+				RecordActivity{
+					AgentID:      env.RequesterID,
+					ActivityType: "review_rejected",
+					Description: fmt.Sprintf(
+						"Review rejected by %s "+
+							"(re-review): %s",
+						e.ReviewerID, e.Reason,
+					),
+					ReviewID: env.ReviewID,
 				},
 			},
 		}, nil
