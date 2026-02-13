@@ -1345,6 +1345,22 @@ func (c *Client) ListReviewIssues(
 	)
 }
 
+// ResubmitReview re-requests review after the author has pushed changes.
+func (c *Client) ResubmitReview(
+	ctx context.Context, reviewID, commitSHA string,
+) (*subtraterpc.CreateReviewResponse, error) {
+	if err := c.requireGRPC(); err != nil {
+		return nil, err
+	}
+
+	return c.reviewClient.ResubmitReview(
+		ctx, &subtraterpc.ResubmitReviewRequest{
+			ReviewId:  reviewID,
+			CommitSha: commitSHA,
+		},
+	)
+}
+
 // UpdateIssueStatus updates the status of a review issue.
 func (c *Client) UpdateIssueStatus(
 	ctx context.Context, reviewID string, issueID int64, status string,

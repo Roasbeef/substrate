@@ -867,6 +867,7 @@ agents that analyze diffs and return structured YAML results.
   - Flags: `--branch`, `--base`, `--commit`, `--type`, `--priority`, `--pr`, `--description`
 - `substrate review status <id>` — Show review status and details
 - `substrate review list` — List reviews (`--state`, `--limit` filters)
+- `substrate review resubmit <id>` — Resubmit after fixing issues (sends mail to active reviewer or spawns new one)
 - `substrate review cancel <id>` — Cancel active review (`--reason`)
 - `substrate review issues <id>` — List issues found
 
