@@ -114,7 +114,7 @@ func TestFSM_ChangesRequested(t *testing.T) {
 	if fsm.CurrentState() != "re_review" {
 		t.Fatalf("expected 're_review', got %q", fsm.CurrentState())
 	}
-	assertHasOutboxEvent[SpawnReviewerAgent](t, outbox)
+	assertHasOutboxEvent[SendMailToReviewer](t, outbox)
 
 	// Re-review starts: re_review → under_review.
 	_, err = fsm.ProcessEvent(ctx, StartReviewEvent{
@@ -341,9 +341,9 @@ func TestFSM_InvalidTransitions(t *testing.T) {
 			event: ResubmitEvent{NewCommitSHA: "abc"},
 		},
 		{
-			name:  "approve in re_review",
+			name:  "resubmit in re_review",
 			state: &StateReReview{},
-			event: ApproveEvent{ReviewerID: "R"},
+			event: ResubmitEvent{NewCommitSHA: "abc"},
 		},
 	}
 
@@ -638,6 +638,220 @@ func TestStateFromString_Unknown(t *testing.T) {
 			"expected fallback to 'new', got %q", state.String(),
 		)
 	}
+}
+
+// TestFSM_ReReviewDirectApprove tests that a reviewer can approve directly
+// from the re_review state during a back-and-forth session (via stop hook).
+func TestFSM_ReReviewDirectApprove(t *testing.T) {
+	ctx := context.Background()
+	fsm := newTestFSM()
+
+	// Drive to re_review.
+	_, _ = fsm.ProcessEvent(ctx, SubmitForReviewEvent{RequesterID: 1})
+	_, _ = fsm.ProcessEvent(ctx, StartReviewEvent{ReviewerID: "R"})
+	_, _ = fsm.ProcessEvent(ctx, RequestChangesEvent{
+		ReviewerID: "R",
+		Issues: []ReviewIssueSummary{
+			{Title: "Bug", Severity: "high"},
+		},
+	})
+	_, _ = fsm.ProcessEvent(ctx, ResubmitEvent{NewCommitSHA: "def456"})
+
+	if fsm.CurrentState() != "re_review" {
+		t.Fatalf(
+			"expected 're_review', got %q", fsm.CurrentState(),
+		)
+	}
+
+	// Approve directly from re_review.
+	outbox, err := fsm.ProcessEvent(ctx, ApproveEvent{
+		ReviewerID: "R",
+	})
+	if err != nil {
+		t.Fatalf("Approve from re_review failed: %v", err)
+	}
+	if fsm.CurrentState() != "approved" {
+		t.Fatalf("expected 'approved', got %q", fsm.CurrentState())
+	}
+	if !fsm.IsTerminal() {
+		t.Fatal("approved state should be terminal")
+	}
+
+	assertHasOutboxEvent[PersistReviewState](t, outbox)
+	assertHasOutboxEvent[NotifyReviewStateChange](t, outbox)
+	assertHasOutboxEvent[RecordActivity](t, outbox)
+
+	// Verify the old state is re_review in the notification.
+	for _, evt := range outbox {
+		if notify, ok := evt.(NotifyReviewStateChange); ok {
+			if notify.OldState != "re_review" {
+				t.Fatalf(
+					"expected OldState 're_review', got %q",
+					notify.OldState,
+				)
+			}
+		}
+	}
+}
+
+// TestFSM_ReReviewRequestChanges tests that a reviewer can request further
+// changes from the re_review state.
+func TestFSM_ReReviewRequestChanges(t *testing.T) {
+	ctx := context.Background()
+	fsm := newTestFSM()
+
+	// Drive to re_review.
+	_, _ = fsm.ProcessEvent(ctx, SubmitForReviewEvent{RequesterID: 1})
+	_, _ = fsm.ProcessEvent(ctx, StartReviewEvent{ReviewerID: "R"})
+	_, _ = fsm.ProcessEvent(ctx, RequestChangesEvent{
+		ReviewerID: "R",
+		Issues: []ReviewIssueSummary{
+			{Title: "First issue", Severity: "high"},
+		},
+	})
+	_, _ = fsm.ProcessEvent(ctx, ResubmitEvent{NewCommitSHA: "def456"})
+
+	if fsm.CurrentState() != "re_review" {
+		t.Fatalf(
+			"expected 're_review', got %q", fsm.CurrentState(),
+		)
+	}
+
+	// Request more changes from re_review.
+	newIssues := []ReviewIssueSummary{
+		{Title: "Still broken", Severity: "medium"},
+	}
+	outbox, err := fsm.ProcessEvent(ctx, RequestChangesEvent{
+		ReviewerID: "R",
+		Issues:     newIssues,
+	})
+	if err != nil {
+		t.Fatalf(
+			"RequestChanges from re_review failed: %v", err,
+		)
+	}
+	if fsm.CurrentState() != "changes_requested" {
+		t.Fatalf(
+			"expected 'changes_requested', got %q",
+			fsm.CurrentState(),
+		)
+	}
+	if fsm.IsTerminal() {
+		t.Fatal("changes_requested should not be terminal")
+	}
+
+	assertHasOutboxEvent[PersistReviewState](t, outbox)
+	assertHasOutboxEvent[NotifyReviewStateChange](t, outbox)
+	assertHasOutboxEvent[CreateReviewIssues](t, outbox)
+	assertHasOutboxEvent[RecordActivity](t, outbox)
+}
+
+// TestFSM_ReReviewReject tests that a reviewer can reject from the re_review
+// state.
+func TestFSM_ReReviewReject(t *testing.T) {
+	ctx := context.Background()
+	fsm := newTestFSM()
+
+	// Drive to re_review.
+	_, _ = fsm.ProcessEvent(ctx, SubmitForReviewEvent{RequesterID: 1})
+	_, _ = fsm.ProcessEvent(ctx, StartReviewEvent{ReviewerID: "R"})
+	_, _ = fsm.ProcessEvent(ctx, RequestChangesEvent{
+		ReviewerID: "R",
+		Issues: []ReviewIssueSummary{
+			{Title: "Critical flaw", Severity: "critical"},
+		},
+	})
+	_, _ = fsm.ProcessEvent(ctx, ResubmitEvent{NewCommitSHA: "def456"})
+
+	if fsm.CurrentState() != "re_review" {
+		t.Fatalf(
+			"expected 're_review', got %q", fsm.CurrentState(),
+		)
+	}
+
+	// Reject from re_review.
+	outbox, err := fsm.ProcessEvent(ctx, RejectEvent{
+		ReviewerID: "R",
+		Reason:     "fundamental issue persists",
+	})
+	if err != nil {
+		t.Fatalf("Reject from re_review failed: %v", err)
+	}
+	if fsm.CurrentState() != "rejected" {
+		t.Fatalf("expected 'rejected', got %q", fsm.CurrentState())
+	}
+	if !fsm.IsTerminal() {
+		t.Fatal("rejected state should be terminal")
+	}
+
+	assertHasOutboxEvent[PersistReviewState](t, outbox)
+	assertHasOutboxEvent[NotifyReviewStateChange](t, outbox)
+	assertHasOutboxEvent[RecordActivity](t, outbox)
+}
+
+// TestFSM_ResubmitEmitsSendMail tests that the resubmit transition emits
+// SendMailToReviewer instead of SpawnReviewerAgent.
+func TestFSM_ResubmitEmitsSendMail(t *testing.T) {
+	ctx := context.Background()
+	fsm := NewReviewFSM("r-mail", "t-mail", "/repo", 1)
+
+	// Drive to changes_requested.
+	_, _ = fsm.ProcessEvent(ctx, SubmitForReviewEvent{RequesterID: 1})
+	_, _ = fsm.ProcessEvent(ctx, StartReviewEvent{ReviewerID: "R"})
+	_, _ = fsm.ProcessEvent(ctx, RequestChangesEvent{
+		ReviewerID: "R",
+		Issues: []ReviewIssueSummary{
+			{Title: "Issue", Severity: "high"},
+		},
+	})
+
+	// Resubmit should emit SendMailToReviewer.
+	outbox, err := fsm.ProcessEvent(ctx, ResubmitEvent{
+		NewCommitSHA: "abc123",
+	})
+	if err != nil {
+		t.Fatalf("Resubmit failed: %v", err)
+	}
+
+	assertHasOutboxEvent[SendMailToReviewer](t, outbox)
+
+	// Verify it does NOT emit SpawnReviewerAgent.
+	for _, evt := range outbox {
+		if _, ok := evt.(SpawnReviewerAgent); ok {
+			t.Fatal(
+				"resubmit should not emit SpawnReviewerAgent",
+			)
+		}
+	}
+
+	// Verify SendMailToReviewer fields.
+	for _, evt := range outbox {
+		if mail, ok := evt.(SendMailToReviewer); ok {
+			if mail.ReviewID != "r-mail" {
+				t.Fatalf(
+					"expected ReviewID 'r-mail', got %q",
+					mail.ReviewID,
+				)
+			}
+			if mail.ThreadID != "t-mail" {
+				t.Fatalf(
+					"expected ThreadID 't-mail', got %q",
+					mail.ThreadID,
+				)
+			}
+			if mail.RepoPath != "/repo" {
+				t.Fatalf(
+					"expected RepoPath '/repo', got %q",
+					mail.RepoPath,
+				)
+			}
+			if mail.Message == "" {
+				t.Fatal("expected non-empty Message")
+			}
+			return
+		}
+	}
+	t.Fatal("SendMailToReviewer not found in outbox")
 }
 
 // assertHasOutboxEvent checks that at least one outbox event matches the

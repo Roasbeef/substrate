@@ -534,6 +534,9 @@ func (s *Service) processOutbox(ctx context.Context,
 			// Issue records are persisted by the sub-actor
 			// directly in persistResults().
 
+		case SendMailToReviewer:
+			s.sendMailToReviewer(ctx, e)
+
 		case RecordActivity:
 			_ = s.store.CreateActivity(
 				ctx, store.CreateActivityParams{
@@ -548,6 +551,121 @@ func (s *Service) processOutbox(ctx context.Context,
 			)
 		}
 	}
+}
+
+// sendMailToReviewer delivers a message to the reviewer agent's inbox. If the
+// reviewer sub-actor is still active, the stop hook will pick up the message
+// on its next poll cycle. If the reviewer has exited, this falls back to
+// spawning a fresh reviewer.
+func (s *Service) sendMailToReviewer(ctx context.Context,
+	e SendMailToReviewer,
+) {
+	// Check if the reviewer is still alive.
+	if !s.subActorMgr.IsActive(e.ReviewID) {
+		log.InfoS(ctx, "Review service: reviewer not active, "+
+			"falling back to spawn",
+			"review_id", e.ReviewID,
+		)
+
+		s.spawnReviewer(ctx, SpawnReviewerAgent{
+			ReviewID:  e.ReviewID,
+			ThreadID:  e.ThreadID,
+			RepoPath:  e.RepoPath,
+			Requester: e.Requester,
+		})
+
+		return
+	}
+
+	// Look up the review to get the branch name for the reviewer
+	// agent name.
+	review, err := s.store.GetReview(ctx, e.ReviewID)
+	if err != nil {
+		log.ErrorS(ctx, "Review service: failed to get review "+
+			"for mail", err,
+			"review_id", e.ReviewID,
+		)
+		return
+	}
+
+	// Construct the reviewer agent name (matches
+	// reviewSubActor.reviewerAgentName()).
+	branch := review.Branch
+	if branch == "" {
+		branch = "unknown"
+	}
+	branch = strings.ReplaceAll(branch, "/", "-")
+	reviewerName := "reviewer-" + branch
+
+	// Look up the reviewer agent to get the DB ID.
+	reviewerAgent, err := s.store.GetAgentByName(ctx, reviewerName)
+	if err != nil {
+		log.WarnS(ctx, "Review service: reviewer agent not "+
+			"found, falling back to spawn",
+			err,
+			"review_id", e.ReviewID,
+			"reviewer_name", reviewerName,
+		)
+
+		s.spawnReviewer(ctx, SpawnReviewerAgent{
+			ReviewID:  e.ReviewID,
+			ThreadID:  e.ThreadID,
+			RepoPath:  e.RepoPath,
+			Requester: e.Requester,
+		})
+
+		return
+	}
+
+	// Look up or create the review thread topic for the message.
+	threadName := "review-" + e.ReviewID
+	topic, err := s.store.GetOrCreateTopic(
+		ctx, threadName, "review",
+	)
+	if err != nil {
+		log.ErrorS(ctx, "Review service: failed to get review "+
+			"topic", err,
+			"review_id", e.ReviewID,
+			"thread", threadName,
+		)
+		return
+	}
+
+	// Create the mail message addressed to the reviewer.
+	msg, err := s.store.CreateMessage(ctx, store.CreateMessageParams{
+		ThreadID: e.ThreadID,
+		TopicID:  topic.ID,
+		SenderID: e.Requester,
+		Subject:  "Re-review requested",
+		Body:     e.Message,
+		Priority: "normal",
+	})
+	if err != nil {
+		log.ErrorS(ctx, "Review service: failed to create mail "+
+			"for reviewer", err,
+			"review_id", e.ReviewID,
+		)
+		return
+	}
+
+	// Add the reviewer as recipient so their inbox query picks it up.
+	if err := s.store.CreateMessageRecipient(
+		ctx, msg.ID, reviewerAgent.ID,
+	); err != nil {
+		log.ErrorS(ctx, "Review service: failed to create "+
+			"recipient", err,
+			"review_id", e.ReviewID,
+			"msg_id", msg.ID,
+		)
+		return
+	}
+
+	log.InfoS(ctx, "Review service: sent mail to active reviewer",
+		"review_id", e.ReviewID,
+		"reviewer_name", reviewerName,
+		"reviewer_agent_id", reviewerAgent.ID,
+		"msg_id", msg.ID,
+	)
 }
 
 // spawnReviewer launches a reviewer sub-actor for the given review. The
