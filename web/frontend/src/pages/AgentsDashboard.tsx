@@ -122,7 +122,7 @@ export default function AgentsDashboard({
   onRegisterClick,
   className,
 }: AgentsDashboardProps) {
-  const [filter, setFilter] = useState<FilterTab>('all');
+  const [filter, setFilter] = useState<FilterTab>('active');
   const { data, isLoading, error, refetch } = useAgentsStatus();
 
   // Enable real-time updates via WebSocket.
