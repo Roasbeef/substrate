@@ -246,6 +246,49 @@ Show current agent identity.
 substrate agent whoami
 ```
 
+### agent discover
+
+Discover all agents with rich metadata including status, working directory,
+git branch, purpose, hostname, and unread message counts.
+
+```bash
+substrate agent discover [flags]
+```
+
+| Flag | Description | Default |
+|------|-------------|---------|
+| `--status` | Filter by status (comma-separated: active,busy,idle,offline) | — |
+| `--project` | Filter by project key prefix | — |
+| `--name` | Filter by agent name substring | — |
+
+Agent status is derived from heartbeat timing:
+- **busy**: Active session and heartbeat < 5 minutes ago
+- **active**: No session but heartbeat < 5 minutes ago
+- **idle**: Heartbeat between 5-30 minutes ago
+- **offline**: No heartbeat for > 30 minutes
+
+Examples:
+
+```bash
+# Discover all agents
+substrate agent discover --session-id "$CLAUDE_SESSION_ID"
+
+# Show only active and busy agents
+substrate agent discover --status active,busy
+
+# Filter by project
+substrate agent discover --project subtrate
+
+# Filter by name substring
+substrate agent discover --name Alpha
+
+# JSON output for programmatic use
+substrate agent discover --format json
+
+# Compact format for hook integration
+substrate agent discover --format context
+```
+
 ## Identity Commands
 
 ### identity current
