@@ -46,7 +46,6 @@ type Querier interface {
 	CreateTaskList(ctx context.Context, arg CreateTaskListParams) (TaskList, error)
 	CreateTopic(ctx context.Context, arg CreateTopicParams) (Topic, error)
 	DeleteAgent(ctx context.Context, id int64) error
-	DiscoverAgents(ctx context.Context) ([]DiscoverAgentsRow, error)
 	DeleteMessage(ctx context.Context, id int64) error
 	DeleteMessagesByTopicOlderThan(ctx context.Context, arg DeleteMessagesByTopicOlderThanParams) (int64, error)
 	DeleteOldActivities(ctx context.Context, createdAt int64) error
@@ -61,6 +60,7 @@ type Querier interface {
 	DeleteTaskList(ctx context.Context, listID string) error
 	DeleteTasksByList(ctx context.Context, listID string) error
 	DeleteTopic(ctx context.Context, id int64) error
+	DiscoverAgents(ctx context.Context) ([]DiscoverAgentsRow, error)
 	DrainPendingOperations(ctx context.Context) ([]PendingOperation, error)
 	EnqueueOperation(ctx context.Context, arg EnqueueOperationParams) (PendingOperation, error)
 	GetActivity(ctx context.Context, id int64) (Activity, error)

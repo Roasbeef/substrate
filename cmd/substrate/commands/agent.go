@@ -208,6 +208,8 @@ func runAgentWhoami(cmd *cobra.Command, args []string) error {
 	return nil
 }
 
+// runAgentDiscover executes the discover subcommand, fetching all agents
+// with rich metadata and applying optional client-side filters.
 func runAgentDiscover(cmd *cobra.Command, args []string) error {
 	ctx := context.Background()
 

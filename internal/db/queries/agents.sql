@@ -69,18 +69,20 @@ SELECT * FROM session_identities WHERE agent_id = ? ORDER BY last_active_at DESC
 
 -- name: UpdateAgentDiscoveryInfo :exec
 UPDATE agents SET
-    purpose = COALESCE(NULLIF(?, ''), purpose),
-    working_dir = COALESCE(NULLIF(?, ''), working_dir),
-    hostname = COALESCE(NULLIF(?, ''), hostname),
-    last_active_at = ?
-WHERE id = ?;
+    purpose = CASE WHEN @purpose = '' THEN purpose ELSE @purpose END,
+    working_dir = CASE WHEN @working_dir = '' THEN working_dir ELSE @working_dir END,
+    hostname = CASE WHEN @hostname = '' THEN hostname ELSE @hostname END,
+    last_active_at = @last_active_at
+WHERE id = @id;
 
 -- name: DiscoverAgents :many
 SELECT
-    a.*,
-    COALESCE(
-        (SELECT COUNT(*) FROM message_recipients mr
-         WHERE mr.agent_id = a.id AND mr.state = 'unread'), 0
-    ) AS unread_count
+    a.id, a.name, a.project_key, a.git_branch,
+    a.current_session_id, a.created_at, a.last_active_at,
+    a.purpose, a.working_dir, a.hostname,
+    CAST(COALESCE(COUNT(mr.message_id), 0) AS INTEGER) AS unread_count
 FROM agents a
+LEFT JOIN message_recipients mr
+    ON a.id = mr.agent_id AND mr.state = 'unread'
+GROUP BY a.id
 ORDER BY a.last_active_at DESC;
