@@ -6,7 +6,7 @@ import { clsx } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 import { useAgentsStatus } from '@/hooks/useAgents.js';
 import { useAgentsRealtime } from '@/hooks/useAgentsRealtime.js';
-import { useAgentSummaries } from '@/hooks/useSummaries.js';
+import { useAgentSummaries, useSummaryRealtime } from '@/hooks/useSummaries.js';
 import {
   AgentCard,
   AgentCardSkeleton,
@@ -132,6 +132,9 @@ export default function AgentsDashboard({
   // Enable real-time updates via WebSocket.
   const { isConnected: wsConnected } = useAgentsRealtime();
 
+  // Invalidate summary cache when WebSocket summary_updated arrives.
+  useSummaryRealtime();
+
   // Fetch summaries for all agents (independent query, graceful
   // degradation if summary service unavailable).
   const { data: summaries, isLoading: summariesLoading } =
@@ -177,16 +180,17 @@ export default function AgentsDashboard({
     ? data?.agents.find((a) => a.id === selectedAgentId)
     : null;
 
-  // If an agent is selected, show the detail panel.
-  if (selectedAgent) {
-    return (
-      <div className={cn('p-6', className)}>
-        <AgentDetailPanel agent={selectedAgent} onBack={handleBack} />
-      </div>
-    );
-  }
-
   return (
+    <>
+      {/* Agent detail modal overlay. */}
+      {selectedAgent ? (
+        <AgentDetailPanel
+          agent={selectedAgent}
+          onBack={handleBack}
+          isOpen={selectedAgent !== null}
+        />
+      ) : null}
+
     <div className={cn('space-y-6 p-6', className)}>
       {/* Page header. */}
       <div className="flex items-center justify-between">
@@ -306,7 +310,7 @@ export default function AgentsDashboard({
             <AgentCard
               key={agent.id}
               agent={agent}
-              summary={summaryMap.get(agent.id)}
+              summary={summaryMap.get(agent.id) ?? null}
               summaryLoading={summariesLoading}
               onClick={() => handleAgentClick(agent.id)}
             />
@@ -316,5 +320,6 @@ export default function AgentsDashboard({
         <EmptyState filter={filter} />
       )}
     </div>
+    </>
   );
 }

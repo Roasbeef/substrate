@@ -300,6 +300,21 @@ func main() {
 			log.Fatalf("Failed to create web server: %v", err)
 		}
 
+		// Wire summary update notifications from the summary service to
+		// WebSocket hub so the UI refreshes when summaries are generated.
+		if summarySvc != nil && webServer.GetHub() != nil {
+			summarySvc.OnSummaryGenerated = func(
+				agentID int64, summaryText, delta string,
+			) {
+				webServer.GetHub().BroadcastSummaryUpdate(
+					agentID, map[string]any{
+						"summary": summaryText,
+						"delta":   delta,
+					},
+				)
+			}
+		}
+
 		// Wire task change notifications from gRPC server to WebSocket hub
 		// so the UI updates in real time when tasks are created or modified.
 		if grpcServer != nil && webServer.GetHub() != nil {

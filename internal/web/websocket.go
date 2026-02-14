@@ -330,6 +330,22 @@ func (h *Hub) BroadcastTaskUpdate(action string, payload map[string]any) {
 	})
 }
 
+// BroadcastSummaryUpdate notifies all clients that an agent's activity
+// summary has been refreshed.
+func (h *Hub) BroadcastSummaryUpdate(
+	agentID int64, payload map[string]any,
+) {
+	if payload == nil {
+		payload = make(map[string]any)
+	}
+	payload["agent_id"] = agentID
+
+	h.BroadcastToAll(&WSMessage{
+		Type:    WSMsgTypeSummary,
+		Payload: payload,
+	})
+}
+
 // BroadcastNewMessage notifies clients of a new message.
 // This broadcasts to both the specific recipient and to "global" viewers (agent_id=0).
 func (h *Hub) BroadcastNewMessage(recipientID int64, msg map[string]any) {

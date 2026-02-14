@@ -86,7 +86,7 @@ function ActivitySummarySection({ summary }: { summary: AgentSummary }) {
           </span>
         </div>
       </div>
-      <p className="text-sm text-gray-700 leading-snug">{summary.summary}</p>
+      <p className="text-sm text-gray-700 leading-snug line-clamp-2">{summary.summary}</p>
       {summary.delta && summary.delta !== 'Initial summary' ? (
         <p className="mt-1.5 text-xs text-gray-500">
           <span className="font-medium text-blue-600">&#916;</span>{' '}
@@ -164,6 +164,14 @@ export function AgentCard({
             {getAgentContext(agent) ? (
               <p className="text-xs text-gray-500 truncate" title={getAgentContext(agent) ?? ''}>
                 {getAgentContext(agent)}
+              </p>
+            ) : null}
+            {agent.git_branch ? (
+              <p className="flex items-center gap-1 text-xs text-gray-500 truncate" title={agent.git_branch}>
+                <svg className="h-3 w-3 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 3v12M18 9a3 3 0 01-3 3H6m12-6a3 3 0 10-6 0 3 3 0 006 0zM6 21a3 3 0 100-6 3 3 0 000 6z" />
+                </svg>
+                <code className="truncate">{agent.git_branch}</code>
               </p>
             ) : null}
             <p className="text-sm text-gray-500">

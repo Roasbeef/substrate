@@ -156,6 +156,18 @@ func (s *Server) handleGetAgentSummary(
 
 	result, err := s.summarySvc.GetSummary(ctx, agentID)
 	if err != nil {
+		// Return a null summary for benign errors (disabled
+		// service, missing transcript) instead of a 500.
+		if strings.Contains(err.Error(), "disabled") ||
+			strings.Contains(err.Error(), "transcript") ||
+			strings.Contains(err.Error(), "missing project_key") {
+
+			writeJSON(w, http.StatusOK, map[string]interface{}{
+				"summary": nil,
+			})
+			return
+		}
+
 		writeJSON(w, http.StatusInternalServerError, map[string]string{
 			"error": err.Error(),
 		})

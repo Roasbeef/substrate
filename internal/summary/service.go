@@ -30,6 +30,11 @@ type Service struct {
 
 	// semaphore limits concurrent Haiku calls.
 	sem chan struct{}
+
+	// OnSummaryGenerated is an optional callback invoked after a new
+	// summary is generated and persisted. Used to broadcast WebSocket
+	// updates.
+	OnSummaryGenerated func(agentID int64, summary, delta string)
 }
 
 // NewService creates a new summary service.
@@ -155,8 +160,10 @@ func (s *Service) RefreshAgent(
 	return s.generateSummary(ctx, agentID, projectKey, sessionID)
 }
 
-// triggerRefresh launches a background summary generation.
-func (s *Service) triggerRefresh(ctx context.Context, agentID int64) {
+// triggerRefresh launches a background summary generation. Uses a
+// detached context so the goroutine survives after the originating
+// HTTP request completes.
+func (s *Service) triggerRefresh(_ context.Context, agentID int64) {
 	s.mu.Lock()
 	if c, ok := s.cache[agentID]; ok && c.generating {
 		s.mu.Unlock()
@@ -177,8 +184,12 @@ func (s *Service) triggerRefresh(ctx context.Context, agentID int64) {
 			s.mu.Unlock()
 		}()
 
+		// Use a background context so this goroutine is not
+		// canceled when the originating HTTP request ends.
+		bgCtx := context.Background()
+
 		// Look up agent info to get project key and session ID.
-		agent, err := s.store.GetAgent(ctx, agentID)
+		agent, err := s.store.GetAgent(bgCtx, agentID)
 		if err != nil {
 			s.log.Warn("Failed to get agent for summary",
 				"agent_id", agentID, "error", err,
@@ -186,9 +197,37 @@ func (s *Service) triggerRefresh(ctx context.Context, agentID int64) {
 			return
 		}
 
+		// Skip agents without a project key — can't locate
+		// transcripts without it.
+		if agent.ProjectKey == "" {
+			return
+		}
+
+		// If the agent has no session ID persisted, try to
+		// discover the most recently modified session file
+		// from the transcript directory.
+		sessID := agent.CurrentSessionID
+		if sessID == "" {
+			discovered, discErr := s.reader.FindActiveSession(
+				agent.ProjectKey,
+			)
+			if discErr != nil {
+				s.log.Warn("No session found for agent",
+					"agent_id", agentID,
+					"project_key", agent.ProjectKey,
+					"error", discErr,
+				)
+				return
+			}
+			sessID = discovered
+			s.log.Info("Discovered session for agent",
+				"agent_id", agentID,
+				"session_id", sessID,
+			)
+		}
+
 		err = s.generateSummary(
-			ctx, agentID, agent.ProjectKey,
-			agent.CurrentSessionID,
+			bgCtx, agentID, agent.ProjectKey, sessID,
 		)
 		if err != nil {
 			s.log.Warn("Failed to generate summary",
@@ -211,6 +250,12 @@ func (s *Service) generateSummary(
 		)
 	}
 
+	s.log.Info("Generating summary",
+		"agent_id", agentID,
+		"project_key", projectKey,
+		"session_id", sessionID,
+	)
+
 	// Read the transcript.
 	transcript, err := s.reader.ReadRecentTranscript(
 		projectKey, sessionID,
@@ -218,6 +263,12 @@ func (s *Service) generateSummary(
 	if err != nil {
 		return fmt.Errorf("read transcript: %w", err)
 	}
+
+	s.log.Info("Transcript read",
+		"agent_id", agentID,
+		"hash", transcript.Hash[:12],
+		"content_len", len(transcript.Content),
+	)
 
 	// Check if content changed since last summary.
 	s.mu.RLock()
@@ -228,6 +279,9 @@ func (s *Service) generateSummary(
 		cached.transcriptHash == transcript.Hash &&
 		cached.isValid(s.cfg.CacheTTL) {
 
+		s.log.Info("Summary cache hit, skipping",
+			"agent_id", agentID,
+		)
 		return nil
 	}
 
@@ -245,6 +299,10 @@ func (s *Service) generateSummary(
 		return ctx.Err()
 	}
 
+	s.log.Info("Calling Haiku for summary",
+		"agent_id", agentID,
+	)
+
 	// Call Haiku via Agent SDK.
 	summaryText, deltaText, err := s.callHaiku(
 		ctx, transcript.Content, prevSummary,
@@ -252,6 +310,12 @@ func (s *Service) generateSummary(
 	if err != nil {
 		return fmt.Errorf("haiku summarization: %w", err)
 	}
+
+	s.log.Info("Summary generated",
+		"agent_id", agentID,
+		"summary_len", len(summaryText),
+		"delta_len", len(deltaText),
+	)
 
 	now := time.Now()
 	result := &SummaryResult{
@@ -262,13 +326,19 @@ func (s *Service) generateSummary(
 		GeneratedAt:    now,
 	}
 
-	// Update cache.
+	// Update cache. Preserve the generating flag so that the
+	// triggerRefresh defer correctly clears it on the same entry.
 	s.mu.Lock()
-	s.cache[agentID] = &cachedSummary{
+	existing := s.cache[agentID]
+	updated := &cachedSummary{
 		result:         result,
 		transcriptHash: transcript.Hash,
 		cachedAt:       now,
 	}
+	if existing != nil {
+		updated.generating = existing.generating
+	}
+	s.cache[agentID] = updated
 	s.mu.Unlock()
 
 	// Persist to DB.
@@ -282,6 +352,11 @@ func (s *Service) generateSummary(
 		s.log.Warn("Failed to persist summary",
 			"agent_id", agentID, "error", dbErr,
 		)
+	}
+
+	// Notify listeners (e.g., WebSocket broadcast) of the new summary.
+	if s.OnSummaryGenerated != nil {
+		s.OnSummaryGenerated(agentID, summaryText, deltaText)
 	}
 
 	return nil
@@ -303,15 +378,52 @@ func (s *Service) callHaiku(
 		return "", "", fmt.Errorf("create config dir: %w", err)
 	}
 
+	// Capture subprocess stderr for debugging.
+	var stderrBuf strings.Builder
+	stderrCb := func(data string) {
+		stderrBuf.WriteString(data)
+	}
+
 	opts := []claudeagent.Option{
 		claudeagent.WithModel(s.cfg.Model),
 		claudeagent.WithSystemPrompt(summarizerSystemPrompt),
 		claudeagent.WithMaxTurns(1),
 		claudeagent.WithConfigDir(configDir),
+		// Don't load user/project filesystem settings (which
+		// include hooks that interfere with subprocess lifecycle).
 		claudeagent.WithSettingSources(nil),
+		// Disable skills to prevent --setting-sources from being
+		// passed to the CLI (the default SkillsConfig sends
+		// --setting-sources user,project which loads project
+		// hooks from .claude/settings.json).
 		claudeagent.WithSkillsDisabled(),
 		claudeagent.WithNoSessionPersistence(),
 		claudeagent.WithCanUseTool(denyAllToolPolicy),
+		claudeagent.WithStderr(stderrCb),
+		// Pass empty hooks map to override any shell hooks the
+		// CLI subprocess might discover. Without this, the
+		// subprocess may pick up substrate hooks that try to
+		// call EnsureIdentity RPC on session start.
+		claudeagent.WithHooks(
+			map[claudeagent.HookType][]claudeagent.HookConfig{},
+		),
+	}
+
+	// Explicitly forward authentication tokens to the subprocess.
+	// Without these, the Haiku subprocess inherits an empty env
+	// and fails with auth errors. Matches the isolation pattern
+	// used by the reviewer sub-actor.
+	authEnv := make(map[string]string)
+	for _, key := range []string{
+		"CLAUDE_CODE_OAUTH_TOKEN",
+		"ANTHROPIC_API_KEY",
+	} {
+		if val := os.Getenv(key); val != "" {
+			authEnv[key] = val
+		}
+	}
+	if len(authEnv) > 0 {
+		opts = append(opts, claudeagent.WithEnv(authEnv))
 	}
 
 	client, err := claudeagent.NewClient(opts...)
@@ -322,10 +434,14 @@ func (s *Service) callHaiku(
 
 	prompt := buildSummaryPrompt(transcript, previousSummary)
 
+	// Use a tight timeout — Haiku should respond in seconds.
+	queryCtx, cancel := context.WithTimeout(ctx, 30*time.Second)
+	defer cancel()
+
 	// Stream the response via single message channel.
 	var responseText strings.Builder
 
-	for msg := range client.Query(ctx, prompt) {
+	for msg := range client.Query(queryCtx, prompt) {
 		switch m := msg.(type) {
 		case claudeagent.AssistantMessage:
 			text := m.ContentText()
@@ -334,14 +450,42 @@ func (s *Service) callHaiku(
 			}
 
 		case claudeagent.ResultMessage:
-			// Terminal message — break out of loop.
+			// Log result details for debugging.
+			s.log.Info("Haiku result",
+				"status", m.Status,
+				"subtype", m.Subtype,
+				"is_error", m.IsError,
+				"result_len", len(m.Result),
+				"errors", m.Errors,
+				"cost_usd", m.TotalCostUSD,
+				"turns", m.NumTurns,
+			)
+
+			// Use Result field if assistant stream was empty.
+			if responseText.Len() == 0 && m.Result != "" {
+				responseText.WriteString(m.Result)
+			}
 
 		default:
 			// UserMessage or other types — skip.
 		}
 	}
 
-	return parseSummaryResponse(responseText.String())
+	raw := responseText.String()
+	stderr := stderrBuf.String()
+
+	s.log.Info("Haiku raw response",
+		"response_len", len(raw),
+		"response_preview", truncate(raw, 200),
+	)
+	if stderr != "" {
+		s.log.Warn("Haiku stderr output",
+			"stderr_len", len(stderr),
+			"stderr_preview", truncate(stderr, 500),
+		)
+	}
+
+	return parseSummaryResponse(raw)
 }
 
 // parseSummaryResponse extracts summary and delta from the Haiku
@@ -377,6 +521,15 @@ func parseSummaryResponse(
 	}
 
 	return summary, delta, nil
+}
+
+// truncate returns the first n characters of s, appending "..." if
+// truncated.
+func truncate(s string, n int) string {
+	if len(s) <= n {
+		return s
+	}
+	return s[:n] + "..."
 }
 
 // denyAllToolPolicy denies all tool access — summarization is pure
@@ -420,8 +573,12 @@ func (s *Service) refreshActiveAgents(ctx context.Context) {
 		return
 	}
 
+	var refreshCount int
 	for _, agent := range agents {
-		if agent.CurrentSessionID == "" || agent.ProjectKey == "" {
+		// Skip agents without a project key — can't locate
+		// transcripts. Session ID is optional here because
+		// triggerRefresh will auto-discover the session file.
+		if agent.ProjectKey == "" {
 			continue
 		}
 
@@ -430,6 +587,12 @@ func (s *Service) refreshActiveAgents(ctx context.Context) {
 			continue
 		}
 
+		refreshCount++
 		s.triggerRefresh(ctx, agent.ID)
 	}
+
+	s.log.Info("Background refresh cycle",
+		"total_agents", len(agents),
+		"eligible", refreshCount,
+	)
 }

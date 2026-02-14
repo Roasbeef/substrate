@@ -3,12 +3,17 @@ package summary
 import (
 	"crypto/sha256"
 	"encoding/hex"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
 	"sort"
 	"strings"
 )
+
+// ErrTranscriptNotFound is returned when no transcript file exists
+// for the requested session.
+var ErrTranscriptNotFound = errors.New("transcript not found")
 
 // TranscriptReader reads Claude Code session transcripts from disk.
 type TranscriptReader struct {
@@ -155,14 +160,32 @@ func (r *TranscriptReader) findTranscriptPath(
 	}
 
 	return "", fmt.Errorf(
-		"transcript not found for session %s in project %s",
-		sessionID, projectKey,
+		"%w for session %s in project %s",
+		ErrTranscriptNotFound, sessionID, projectKey,
 	)
 }
 
-// projectDir returns the directory for a project key.
+// projectDir returns the directory for a project key. Claude Code
+// stores project data in ~/.claude/projects/ using a mangled form of
+// the working directory path where "/" is replaced with "-". If the
+// given project key is already in mangled form, it is used as-is;
+// otherwise we convert it.
 func (r *TranscriptReader) projectDir(projectKey string) string {
-	return filepath.Join(r.basePath, "projects", projectKey)
+	// If the key already looks like a Claude project key (starts
+	// with "-" and contains no "/"), use it directly.
+	if strings.HasPrefix(projectKey, "-") &&
+		!strings.Contains(projectKey, "/") {
+
+		return filepath.Join(r.basePath, "projects", projectKey)
+	}
+
+	// Convert working directory path to Claude's mangled format.
+	// Claude replaces both "/" and "." with "-":
+	// /Users/roasbeef/github.com/foo → -Users-roasbeef-github-com-foo
+	mangled := strings.ReplaceAll(projectKey, "/", "-")
+	mangled = strings.ReplaceAll(mangled, ".", "-")
+
+	return filepath.Join(r.basePath, "projects", mangled)
 }
 
 // isSessionFile checks if a filename looks like a session transcript.

@@ -7,14 +7,17 @@ const (
 	DefaultModel = "claude-haiku-4-5-20251001"
 
 	// DefaultCacheTTL is how long a cached summary remains valid.
-	DefaultCacheTTL = 30 * time.Second
+	// Set high enough to avoid rapid re-generation since each call
+	// costs ~$0.004 via Haiku.
+	DefaultCacheTTL = 2 * time.Minute
 
 	// DefaultRefreshInterval is the background refresh period.
-	DefaultRefreshInterval = 45 * time.Second
+	DefaultRefreshInterval = 3 * time.Minute
 
 	// DefaultMaxTranscriptLines is the max lines read from a
-	// session transcript for summarization.
-	DefaultMaxTranscriptLines = 200
+	// session transcript for summarization. Each JSONL line is a
+	// full message, so a small window captures recent activity.
+	DefaultMaxTranscriptLines = 5
 
 	// DefaultMaxConcurrent is the max simultaneous Haiku calls.
 	DefaultMaxConcurrent = 3

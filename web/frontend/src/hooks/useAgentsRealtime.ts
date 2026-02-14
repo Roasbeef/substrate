@@ -24,23 +24,31 @@ export function useAgentsRealtime(): RealtimeAgentState {
   const isConnected = state === 'connected';
 
   // Handle agent update received via WebSocket.
+  // Merges WS payload into existing cache to preserve fields not
+  // included in the lightweight WS broadcast (project_key, git_branch,
+  // session_id). This prevents flicker from incomplete data replacement.
   const handleAgentUpdate = useCallback(
     (payload: AgentUpdatePayload) => {
-      // Update the agents status cache directly.
       queryClient.setQueryData<AgentsStatusResponse>(
         agentKeys.status(),
-        () => {
-          // Map the payload to the expected format.
-          return {
-            agents: payload.agents.map((a) => ({
+        (prev) => {
+          const existingMap = new Map(
+            (prev?.agents ?? []).map((a) => [a.id, a]),
+          );
+
+          const merged = payload.agents.map((a) => {
+            const existing = existingMap.get(a.id);
+            return {
+              ...existing,
               id: a.id,
               name: a.name,
               status: a.status as AgentsStatusResponse['agents'][0]['status'],
               last_active_at: a.last_active_at,
               seconds_since_heartbeat: a.seconds_since_heartbeat,
-            })),
-            counts: payload.counts,
-          };
+            };
+          });
+
+          return { agents: merged, counts: payload.counts };
         },
       );
     },
