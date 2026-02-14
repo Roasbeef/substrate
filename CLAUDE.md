@@ -715,6 +715,59 @@ substrate heartbeat --format context
 - `POST /api/heartbeat` - Record agent heartbeat (JSON body: `{"agent_name": "..."}`)
 - `GET /api/agents/status` - Get status of all agents
 
+## Agent Discovery
+
+The `agent discover` command provides a unified view of all agents with
+rich metadata. Discovery metadata (working directory, hostname) is
+automatically captured during identity saves.
+
+### CLI Usage
+```bash
+# Discover all agents with full metadata
+substrate agent discover --session-id "$CLAUDE_SESSION_ID"
+
+# Filter by status (comma-separated)
+substrate agent discover --status active,busy
+
+# Filter by project key prefix
+substrate agent discover --project subtrate
+
+# Filter by agent name substring
+substrate agent discover --name Alpha
+
+# JSON output for programmatic use
+substrate agent discover --format json
+```
+
+### Discovery Metadata
+Each agent exposes:
+- **Status**: Derived from heartbeat timing (busy/active/idle/offline)
+- **Project key**: The project the agent is working on
+- **Git branch**: Current branch
+- **Working directory**: Filesystem path (auto-captured)
+- **Hostname**: Machine name (auto-captured)
+- **Purpose**: Agent's role/task description
+- **Unread count**: Number of unread messages
+
+### Updating Discovery Info
+Discovery metadata is set via `UpdateAgentDiscoveryInfo`. Empty strings
+preserve existing values (partial update semantics):
+```go
+registry.UpdateDiscoveryInfo(ctx, agentID,
+    "reviewing PRs",  // purpose
+    "/path/to/repo",  // working_dir
+    "dev-machine",    // hostname
+)
+```
+
+### Database
+- Migration `000007_agent_discovery` adds `purpose`, `working_dir`, and
+  `hostname` columns to the `agents` table
+- Adds compound index `idx_recipients_agent_state` on
+  `message_recipients(agent_id, state)` for efficient unread count queries
+- `DiscoverAgents` query uses LEFT JOIN (not correlated subquery) for
+  O(1) join performance
+
 ## Claude Code Hooks Integration
 
 Subtrate provides deep integration with Claude Code through hooks. Run `substrate hooks install` to set up automatic integration.
