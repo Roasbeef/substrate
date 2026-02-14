@@ -149,6 +149,31 @@ func (r *Registry) DeleteAgent(ctx context.Context, id int64) error {
 	return r.store.Queries().DeleteAgent(ctx, id)
 }
 
+// DiscoverAgents returns all agents with unread message counts. This is
+// used by the heartbeat manager to build the full discovery response.
+func (r *Registry) DiscoverAgents(
+	ctx context.Context,
+) ([]sqlc.DiscoverAgentsRow, error) {
+	return r.store.Queries().DiscoverAgents(ctx)
+}
+
+// UpdateDiscoveryInfo updates an agent's discovery metadata (purpose,
+// working directory, hostname). Empty strings are ignored (existing
+// values are preserved).
+func (r *Registry) UpdateDiscoveryInfo(ctx context.Context, id int64,
+	purpose, workingDir, hostname string,
+) error {
+	return r.store.Queries().UpdateAgentDiscoveryInfo(
+		ctx, sqlc.UpdateAgentDiscoveryInfoParams{
+			Purpose:      purpose,
+			WorkingDir:   workingDir,
+			Hostname:     hostname,
+			LastActiveAt: time.Now().Unix(),
+			ID:           id,
+		},
+	)
+}
+
 // GenerateMemoableName generates a unique, memorable agent name.
 // Uses adjective + noun combination for easy recall.
 func GenerateMemoableName() string {

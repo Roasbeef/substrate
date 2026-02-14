@@ -224,6 +224,69 @@ func (h *HeartbeatManager) ListAgentsWithStatus(
 	return result, nil
 }
 
+// DiscoveredAgent extends AgentWithStatus with discovery-specific metadata.
+type DiscoveredAgent struct {
+	AgentWithStatus
+	Purpose     string
+	WorkingDir  string
+	Hostname    string
+	UnreadCount int64
+}
+
+// DiscoverAgents returns all agents with discovery metadata including
+// status, purpose, working directory, hostname, and unread counts.
+func (h *HeartbeatManager) DiscoverAgents(
+	ctx context.Context,
+) ([]DiscoveredAgent, *StatusCounts, error) {
+	rows, err := h.registry.DiscoverAgents(ctx)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	counts := &StatusCounts{Total: len(rows)}
+	result := make([]DiscoveredAgent, len(rows))
+
+	for i := range rows {
+		row := &rows[i]
+
+		// Build a temporary sqlc.Agent for status computation.
+		agent := &sqlc.Agent{
+			ID:               row.ID,
+			Name:             row.Name,
+			CurrentSessionID: row.CurrentSessionID,
+			LastActiveAt:     row.LastActiveAt,
+		}
+
+		agentStatus := h.ComputeStatus(agent)
+
+		switch agentStatus {
+		case StatusActive:
+			counts.Active++
+		case StatusBusy:
+			counts.Busy++
+		case StatusIdle:
+			counts.Idle++
+		case StatusOffline:
+			counts.Offline++
+		}
+
+		result[i] = DiscoveredAgent{
+			AgentWithStatus: AgentWithStatus{
+				Agent:           agent,
+				Status:          agentStatus,
+				ActiveSessionID: h.GetActiveSessionID(row.ID),
+				LastActive:      time.Unix(row.LastActiveAt, 0),
+			},
+			Purpose:     row.Purpose.String,
+			WorkingDir:  row.WorkingDir.String,
+			Hostname:    row.Hostname.String,
+			UnreadCount: row.UnreadCount,
+		}
+	}
+
+	return result, counts, nil
+}
+
 // CountByStatus returns counts of agents by status.
 type StatusCounts struct {
 	Active  int

@@ -288,7 +288,7 @@ func (q *Queries) ListSubscriptionsByAgent(ctx context.Context, agentID int64) (
 }
 
 const ListSubscriptionsByTopic = `-- name: ListSubscriptionsByTopic :many
-SELECT a.id, a.name, a.project_key, a.git_branch, a.current_session_id, a.created_at, a.last_active_at FROM agents a
+SELECT a.id, a.name, a.project_key, a.git_branch, a.current_session_id, a.created_at, a.last_active_at, a.purpose, a.working_dir, a.hostname FROM agents a
 JOIN subscriptions s ON a.id = s.agent_id
 WHERE s.topic_id = ?
 ORDER BY a.name
@@ -311,6 +311,9 @@ func (q *Queries) ListSubscriptionsByTopic(ctx context.Context, topicID int64) (
 			&i.CurrentSessionID,
 			&i.CreatedAt,
 			&i.LastActiveAt,
+			&i.Purpose,
+			&i.WorkingDir,
+			&i.Hostname,
 		); err != nil {
 			return nil, err
 		}

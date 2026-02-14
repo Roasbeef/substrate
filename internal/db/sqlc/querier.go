@@ -56,6 +56,7 @@ type Querier interface {
 	DeleteTaskList(ctx context.Context, listID string) error
 	DeleteTasksByList(ctx context.Context, listID string) error
 	DeleteTopic(ctx context.Context, id int64) error
+	DiscoverAgents(ctx context.Context) ([]DiscoverAgentsRow, error)
 	DrainPendingOperations(ctx context.Context) ([]PendingOperation, error)
 	EnqueueOperation(ctx context.Context, arg EnqueueOperationParams) (PendingOperation, error)
 	GetActivity(ctx context.Context, id int64) (Activity, error)
@@ -177,6 +178,7 @@ type Querier interface {
 	// Simple LIKE-based search on subject and body. FTS5 is available but this
 	// covers basic cases. The search term should be passed with wildcards.
 	SearchMessages(ctx context.Context, arg SearchMessagesParams) ([]SearchMessagesRow, error)
+	UpdateAgentDiscoveryInfo(ctx context.Context, arg UpdateAgentDiscoveryInfoParams) error
 	UpdateAgentGitBranch(ctx context.Context, arg UpdateAgentGitBranchParams) error
 	UpdateAgentLastActive(ctx context.Context, arg UpdateAgentLastActiveParams) error
 	UpdateAgentName(ctx context.Context, arg UpdateAgentNameParams) error
