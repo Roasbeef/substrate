@@ -227,9 +227,9 @@ func (h *HeartbeatManager) ListAgentsWithStatus(
 // DiscoveredAgent extends AgentWithStatus with discovery-specific metadata.
 type DiscoveredAgent struct {
 	AgentWithStatus
-	Purpose    string
-	WorkingDir string
-	Hostname   string
+	Purpose     string
+	WorkingDir  string
+	Hostname    string
 	UnreadCount int64
 }
 

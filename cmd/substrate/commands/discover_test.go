@@ -106,7 +106,6 @@ func TestComputeAgentStatus(t *testing.T) {
 // project prefix, and agent name substring. Subtests run sequentially
 // because filterDiscoveredAgents reads package-level flag vars.
 func TestFilterDiscoveredAgents(t *testing.T) {
-
 	agents := []DiscoveredAgentInfo{
 		{
 			Name:       "AlphaAgent",
