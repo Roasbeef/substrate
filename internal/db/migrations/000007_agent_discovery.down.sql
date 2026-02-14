@@ -1,3 +1,6 @@
+-- Drop the compound index added by the up migration.
+DROP INDEX IF EXISTS idx_recipients_agent_state;
+
 -- SQLite doesn't support DROP COLUMN before 3.35.0, so we recreate the table.
 CREATE TABLE agents_backup AS SELECT
     id, name, project_key, git_branch, current_session_id,

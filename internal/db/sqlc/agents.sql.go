@@ -101,12 +101,14 @@ func (q *Queries) DeleteSessionIdentity(ctx context.Context, sessionID string) e
 
 const DiscoverAgents = `-- name: DiscoverAgents :many
 SELECT
-    a.id, a.name, a.project_key, a.git_branch, a.current_session_id, a.created_at, a.last_active_at, a.purpose, a.working_dir, a.hostname,
-    COALESCE(
-        (SELECT COUNT(*) FROM message_recipients mr
-         WHERE mr.agent_id = a.id AND mr.state = 'unread'), 0
-    ) AS unread_count
+    a.id, a.name, a.project_key, a.git_branch,
+    a.current_session_id, a.created_at, a.last_active_at,
+    a.purpose, a.working_dir, a.hostname,
+    CAST(COALESCE(COUNT(mr.message_id), 0) AS INTEGER) AS unread_count
 FROM agents a
+LEFT JOIN message_recipients mr
+    ON a.id = mr.agent_id AND mr.state = 'unread'
+GROUP BY a.id
 ORDER BY a.last_active_at DESC
 `
 
@@ -423,17 +425,17 @@ func (q *Queries) SearchAgents(ctx context.Context, arg SearchAgentsParams) ([]A
 
 const UpdateAgentDiscoveryInfo = `-- name: UpdateAgentDiscoveryInfo :exec
 UPDATE agents SET
-    purpose = COALESCE(NULLIF(?, ''), purpose),
-    working_dir = COALESCE(NULLIF(?, ''), working_dir),
-    hostname = COALESCE(NULLIF(?, ''), hostname),
-    last_active_at = ?
-WHERE id = ?
+    purpose = CASE WHEN ?1 = '' THEN purpose ELSE ?1 END,
+    working_dir = CASE WHEN ?2 = '' THEN working_dir ELSE ?2 END,
+    hostname = CASE WHEN ?3 = '' THEN hostname ELSE ?3 END,
+    last_active_at = ?4
+WHERE id = ?5
 `
 
 type UpdateAgentDiscoveryInfoParams struct {
-	Purpose      string
-	WorkingDir   string
-	Hostname     string
+	Purpose      interface{}
+	WorkingDir   interface{}
+	Hostname     interface{}
 	LastActiveAt int64
 	ID           int64
 }

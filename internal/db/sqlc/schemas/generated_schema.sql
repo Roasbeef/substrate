@@ -58,7 +58,7 @@ CREATE TABLE agents (
     current_session_id TEXT,
     created_at INTEGER NOT NULL,
     last_active_at INTEGER NOT NULL
-);
+, purpose TEXT DEFAULT '', working_dir TEXT DEFAULT '', hostname TEXT DEFAULT '');
 
 CREATE TABLE consumer_offsets (
     agent_id INTEGER NOT NULL REFERENCES agents(id) ON DELETE CASCADE,
@@ -327,6 +327,9 @@ CREATE INDEX idx_plan_reviews_state ON plan_reviews(state);
 CREATE INDEX idx_plan_reviews_thread ON plan_reviews(thread_id);
 
 CREATE INDEX idx_recipients_agent ON message_recipients(agent_id);
+
+CREATE INDEX idx_recipients_agent_state
+    ON message_recipients(agent_id, state);
 
 CREATE INDEX idx_recipients_snoozed ON message_recipients(snoozed_until) WHERE snoozed_until IS NOT NULL;
 
