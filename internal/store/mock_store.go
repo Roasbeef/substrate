@@ -25,6 +25,7 @@ type MockStore struct {
 	topicsByName      map[string]int64
 	subscriptions     map[int64]map[int64]bool // [topicID][agentID]
 	activities        []Activity
+	summaries         []AgentSummary
 	sessionIdentities map[string]SessionIdentity
 
 	// Task data stores.
@@ -39,6 +40,7 @@ type MockStore struct {
 	nextActivityID int64
 	nextTaskListID int64
 	nextTaskID     int64
+	nextSummaryID  int64
 }
 
 // NewMockStore creates a new in-memory mock store.
@@ -53,6 +55,7 @@ func NewMockStore() *MockStore {
 		topicsByName:      make(map[string]int64),
 		subscriptions:     make(map[int64]map[int64]bool),
 		activities:        make([]Activity, 0),
+		summaries:         make([]AgentSummary, 0),
 		sessionIdentities: make(map[string]SessionIdentity),
 		taskLists:         make(map[string]TaskList),
 		tasks:             make(map[int64]Task),
@@ -63,6 +66,7 @@ func NewMockStore() *MockStore {
 		nextActivityID:    1,
 		nextTaskListID:    1,
 		nextTaskID:        1,
+		nextSummaryID:     1,
 	}
 }
 
@@ -1275,6 +1279,79 @@ func (m *MockStore) DeleteOldActivities(
 		}
 	}
 	m.activities = remaining
+	return nil
+}
+
+// SummaryStore implementation.
+
+// CreateSummary persists a new agent activity summary.
+func (m *MockStore) CreateSummary(
+	ctx context.Context, params CreateSummaryParams,
+) (AgentSummary, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	summary := AgentSummary{
+		ID:             m.nextSummaryID,
+		AgentID:        params.AgentID,
+		Summary:        params.Summary,
+		Delta:          params.Delta,
+		TranscriptHash: params.TranscriptHash,
+		CostUSD:        params.CostUSD,
+		CreatedAt:      time.Now(),
+	}
+
+	m.nextSummaryID++
+	m.summaries = append(m.summaries, summary)
+
+	return summary, nil
+}
+
+// GetLatestSummary retrieves the most recent summary for an agent.
+func (m *MockStore) GetLatestSummary(
+	ctx context.Context, agentID int64,
+) (AgentSummary, error) {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+
+	for i := len(m.summaries) - 1; i >= 0; i-- {
+		if m.summaries[i].AgentID == agentID {
+			return m.summaries[i], nil
+		}
+	}
+	return AgentSummary{}, sql.ErrNoRows
+}
+
+// GetSummaryHistory retrieves recent summaries for an agent.
+func (m *MockStore) GetSummaryHistory(
+	ctx context.Context, agentID int64, limit int,
+) ([]AgentSummary, error) {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+
+	var result []AgentSummary
+	for i := len(m.summaries) - 1; i >= 0 && len(result) < limit; i-- {
+		if m.summaries[i].AgentID == agentID {
+			result = append(result, m.summaries[i])
+		}
+	}
+	return result, nil
+}
+
+// DeleteOldSummaries removes summaries older than a given time.
+func (m *MockStore) DeleteOldSummaries(
+	ctx context.Context, olderThan time.Time,
+) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	var remaining []AgentSummary
+	for _, s := range m.summaries {
+		if s.CreatedAt.After(olderThan) {
+			remaining = append(remaining, s)
+		}
+	}
+	m.summaries = remaining
 	return nil
 }
 

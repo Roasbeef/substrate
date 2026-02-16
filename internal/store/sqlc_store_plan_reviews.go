@@ -16,7 +16,6 @@ import (
 func (s *SqlcStore) CreatePlanReview(ctx context.Context,
 	params CreatePlanReviewParams,
 ) (PlanReview, error) {
-
 	now := time.Now().Unix()
 
 	var msgID sql.NullInt64
@@ -48,7 +47,6 @@ func (s *SqlcStore) CreatePlanReview(ctx context.Context,
 func (s *SqlcStore) GetPlanReview(ctx context.Context,
 	planReviewID string,
 ) (PlanReview, error) {
-
 	row, err := s.db.GetPlanReview(ctx, planReviewID)
 	if err != nil {
 		return PlanReview{}, err
@@ -60,7 +58,6 @@ func (s *SqlcStore) GetPlanReview(ctx context.Context,
 func (s *SqlcStore) GetPlanReviewByMessage(ctx context.Context,
 	messageID int64,
 ) (PlanReview, error) {
-
 	row, err := s.db.GetPlanReviewByMessage(
 		ctx, sql.NullInt64{Int64: messageID, Valid: true},
 	)
@@ -74,7 +71,6 @@ func (s *SqlcStore) GetPlanReviewByMessage(ctx context.Context,
 func (s *SqlcStore) GetPlanReviewByThread(ctx context.Context,
 	threadID string,
 ) (PlanReview, error) {
-
 	row, err := s.db.GetPlanReviewByThread(ctx, threadID)
 	if err != nil {
 		return PlanReview{}, err
@@ -86,7 +82,6 @@ func (s *SqlcStore) GetPlanReviewByThread(ctx context.Context,
 func (s *SqlcStore) GetPlanReviewBySession(ctx context.Context,
 	sessionID string,
 ) (PlanReview, error) {
-
 	row, err := s.db.GetPlanReviewBySession(
 		ctx, ToSqlcNullString(sessionID),
 	)
@@ -100,7 +95,6 @@ func (s *SqlcStore) GetPlanReviewBySession(ctx context.Context,
 func (s *SqlcStore) ListPlanReviews(ctx context.Context,
 	limit, offset int,
 ) ([]PlanReview, error) {
-
 	rows, err := s.db.ListPlanReviews(ctx, sqlc.ListPlanReviewsParams{
 		Limit:  int64(limit),
 		Offset: int64(offset),
@@ -119,7 +113,6 @@ func (s *SqlcStore) ListPlanReviews(ctx context.Context,
 func (s *SqlcStore) ListPlanReviewsByState(ctx context.Context,
 	state string, limit int,
 ) ([]PlanReview, error) {
-
 	rows, err := s.db.ListPlanReviewsByState(
 		ctx, sqlc.ListPlanReviewsByStateParams{
 			State: state,
@@ -140,7 +133,6 @@ func (s *SqlcStore) ListPlanReviewsByState(ctx context.Context,
 func (s *SqlcStore) ListPlanReviewsByRequester(ctx context.Context,
 	requesterID int64, limit int,
 ) ([]PlanReview, error) {
-
 	rows, err := s.db.ListPlanReviewsByRequester(
 		ctx, sqlc.ListPlanReviewsByRequesterParams{
 			RequesterID: requesterID,
@@ -161,7 +153,6 @@ func (s *SqlcStore) ListPlanReviewsByRequester(ctx context.Context,
 func (s *SqlcStore) UpdatePlanReviewState(ctx context.Context,
 	params UpdatePlanReviewStateParams,
 ) error {
-
 	now := time.Now().Unix()
 
 	var reviewedBy sql.NullInt64
@@ -185,7 +176,6 @@ func (s *SqlcStore) UpdatePlanReviewState(ctx context.Context,
 func (s *SqlcStore) DeletePlanReview(ctx context.Context,
 	planReviewID string,
 ) error {
-
 	return s.db.DeletePlanReview(ctx, planReviewID)
 }
 
@@ -197,7 +187,6 @@ func (s *SqlcStore) DeletePlanReview(ctx context.Context,
 func (s *txSqlcStore) CreatePlanReview(ctx context.Context,
 	params CreatePlanReviewParams,
 ) (PlanReview, error) {
-
 	now := time.Now().Unix()
 
 	var msgID sql.NullInt64
@@ -231,7 +220,6 @@ func (s *txSqlcStore) CreatePlanReview(ctx context.Context,
 func (s *txSqlcStore) GetPlanReview(ctx context.Context,
 	planReviewID string,
 ) (PlanReview, error) {
-
 	row, err := s.queries.GetPlanReview(ctx, planReviewID)
 	if err != nil {
 		return PlanReview{}, err
@@ -243,7 +231,6 @@ func (s *txSqlcStore) GetPlanReview(ctx context.Context,
 func (s *txSqlcStore) GetPlanReviewByMessage(ctx context.Context,
 	messageID int64,
 ) (PlanReview, error) {
-
 	row, err := s.queries.GetPlanReviewByMessage(
 		ctx, sql.NullInt64{Int64: messageID, Valid: true},
 	)
@@ -257,7 +244,6 @@ func (s *txSqlcStore) GetPlanReviewByMessage(ctx context.Context,
 func (s *txSqlcStore) GetPlanReviewByThread(ctx context.Context,
 	threadID string,
 ) (PlanReview, error) {
-
 	row, err := s.queries.GetPlanReviewByThread(ctx, threadID)
 	if err != nil {
 		return PlanReview{}, err
@@ -269,7 +255,6 @@ func (s *txSqlcStore) GetPlanReviewByThread(ctx context.Context,
 func (s *txSqlcStore) GetPlanReviewBySession(ctx context.Context,
 	sessionID string,
 ) (PlanReview, error) {
-
 	row, err := s.queries.GetPlanReviewBySession(
 		ctx, ToSqlcNullString(sessionID),
 	)
@@ -283,7 +268,6 @@ func (s *txSqlcStore) GetPlanReviewBySession(ctx context.Context,
 func (s *txSqlcStore) ListPlanReviews(ctx context.Context,
 	limit, offset int,
 ) ([]PlanReview, error) {
-
 	rows, err := s.queries.ListPlanReviews(
 		ctx, sqlc.ListPlanReviewsParams{
 			Limit:  int64(limit),
@@ -304,7 +288,6 @@ func (s *txSqlcStore) ListPlanReviews(ctx context.Context,
 func (s *txSqlcStore) ListPlanReviewsByState(ctx context.Context,
 	state string, limit int,
 ) ([]PlanReview, error) {
-
 	rows, err := s.queries.ListPlanReviewsByState(
 		ctx, sqlc.ListPlanReviewsByStateParams{
 			State: state,
@@ -325,7 +308,6 @@ func (s *txSqlcStore) ListPlanReviewsByState(ctx context.Context,
 func (s *txSqlcStore) ListPlanReviewsByRequester(ctx context.Context,
 	requesterID int64, limit int,
 ) ([]PlanReview, error) {
-
 	rows, err := s.queries.ListPlanReviewsByRequester(
 		ctx, sqlc.ListPlanReviewsByRequesterParams{
 			RequesterID: requesterID,
@@ -346,7 +328,6 @@ func (s *txSqlcStore) ListPlanReviewsByRequester(ctx context.Context,
 func (s *txSqlcStore) UpdatePlanReviewState(ctx context.Context,
 	params UpdatePlanReviewStateParams,
 ) error {
-
 	now := time.Now().Unix()
 
 	var reviewedBy sql.NullInt64
@@ -372,6 +353,5 @@ func (s *txSqlcStore) UpdatePlanReviewState(ctx context.Context,
 func (s *txSqlcStore) DeletePlanReview(ctx context.Context,
 	planReviewID string,
 ) error {
-
 	return s.queries.DeletePlanReview(ctx, planReviewID)
 }

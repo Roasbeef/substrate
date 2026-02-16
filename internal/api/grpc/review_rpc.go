@@ -17,7 +17,6 @@ import (
 func (s *Server) resolveReviewID(
 	ctx context.Context, id string,
 ) (string, error) {
-
 	// If it looks like a full UUID already, skip the lookup.
 	if len(id) >= 36 {
 		return id, nil

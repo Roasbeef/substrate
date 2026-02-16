@@ -20,6 +20,7 @@ const (
 	WSMsgTypeAgentUpdate = "agent_update"
 	WSMsgTypeActivity    = "activity"
 	WSMsgTypeTaskUpdate  = "task_update"
+	WSMsgTypeSummary     = "summary_updated"
 	WSMsgTypePong        = "pong"
 	WSMsgTypeConnected   = "connected"
 	WSMsgTypeError       = "error"
@@ -325,6 +326,22 @@ func (h *Hub) BroadcastTaskUpdate(action string, payload map[string]any) {
 
 	h.BroadcastToAll(&WSMessage{
 		Type:    WSMsgTypeTaskUpdate,
+		Payload: payload,
+	})
+}
+
+// BroadcastSummaryUpdate notifies all clients that an agent's activity
+// summary has been refreshed.
+func (h *Hub) BroadcastSummaryUpdate(
+	agentID int64, payload map[string]any,
+) {
+	if payload == nil {
+		payload = make(map[string]any)
+	}
+	payload["agent_id"] = agentID
+
+	h.BroadcastToAll(&WSMessage{
+		Type:    WSMsgTypeSummary,
 		Payload: payload,
 	})
 }

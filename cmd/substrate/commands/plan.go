@@ -374,7 +374,6 @@ func cleanSubject(s string) string {
 func formatPlanMessage(
 	content, path, summary string,
 ) string {
-
 	var b strings.Builder
 
 	if summary != "" {
@@ -687,7 +686,6 @@ func runPlanWait(cmd *cobra.Command, args []string) error {
 func checkThreadForKeywords(
 	ctx context.Context, client *Client, review store.PlanReview,
 ) string {
-
 	agentID := review.RequesterID
 	messages, err := client.ReadThread(ctx, agentID, review.ThreadID)
 	if err != nil {
@@ -1013,7 +1011,6 @@ func updatePlanReview(prID, state string) error {
 func (c *Client) CreatePlanReview(
 	ctx context.Context, params store.CreatePlanReviewParams,
 ) (store.PlanReview, error) {
-
 	if c.mode == ModeDirect {
 		s := store.FromDB(c.store.DB())
 		defer s.Close()
@@ -1048,7 +1045,6 @@ func (c *Client) CreatePlanReview(
 func (c *Client) GetPlanReview(
 	ctx context.Context, planReviewID string,
 ) (store.PlanReview, error) {
-
 	if c.mode == ModeDirect {
 		s := store.FromDB(c.store.DB())
 		defer s.Close()
@@ -1072,7 +1068,6 @@ func (c *Client) GetPlanReview(
 func (c *Client) GetPlanReviewBySession(
 	ctx context.Context, sessionID string,
 ) (store.PlanReview, error) {
-
 	if c.mode == ModeDirect {
 		s := store.FromDB(c.store.DB())
 		defer s.Close()
@@ -1096,7 +1091,6 @@ func (c *Client) GetPlanReviewBySession(
 func (c *Client) UpdatePlanReviewState(
 	ctx context.Context, params store.UpdatePlanReviewStateParams,
 ) error {
-
 	if c.mode == ModeDirect {
 		s := store.FromDB(c.store.DB())
 		defer s.Close()

@@ -41,7 +41,6 @@ func getPlanReviewData(m *MockStore) *mockPlanReviewData {
 func (m *MockStore) CreatePlanReview(ctx context.Context,
 	params CreatePlanReviewParams,
 ) (PlanReview, error) {
-
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
@@ -73,7 +72,6 @@ func (m *MockStore) CreatePlanReview(ctx context.Context,
 func (m *MockStore) GetPlanReview(ctx context.Context,
 	planReviewID string,
 ) (PlanReview, error) {
-
 	m.mu.RLock()
 	defer m.mu.RUnlock()
 
@@ -92,7 +90,6 @@ func (m *MockStore) GetPlanReview(ctx context.Context,
 func (m *MockStore) GetPlanReviewByMessage(ctx context.Context,
 	messageID int64,
 ) (PlanReview, error) {
-
 	m.mu.RLock()
 	defer m.mu.RUnlock()
 
@@ -112,7 +109,6 @@ func (m *MockStore) GetPlanReviewByMessage(ctx context.Context,
 func (m *MockStore) GetPlanReviewByThread(ctx context.Context,
 	threadID string,
 ) (PlanReview, error) {
-
 	m.mu.RLock()
 	defer m.mu.RUnlock()
 
@@ -142,7 +138,6 @@ func (m *MockStore) GetPlanReviewByThread(ctx context.Context,
 func (m *MockStore) GetPlanReviewBySession(ctx context.Context,
 	sessionID string,
 ) (PlanReview, error) {
-
 	m.mu.RLock()
 	defer m.mu.RUnlock()
 
@@ -172,7 +167,6 @@ func (m *MockStore) GetPlanReviewBySession(ctx context.Context,
 func (m *MockStore) ListPlanReviews(ctx context.Context,
 	limit, offset int,
 ) ([]PlanReview, error) {
-
 	m.mu.RLock()
 	defer m.mu.RUnlock()
 
@@ -201,7 +195,6 @@ func (m *MockStore) ListPlanReviews(ctx context.Context,
 func (m *MockStore) ListPlanReviewsByState(ctx context.Context,
 	state string, limit int,
 ) ([]PlanReview, error) {
-
 	m.mu.RLock()
 	defer m.mu.RUnlock()
 
@@ -223,7 +216,6 @@ func (m *MockStore) ListPlanReviewsByState(ctx context.Context,
 func (m *MockStore) ListPlanReviewsByRequester(ctx context.Context,
 	requesterID int64, limit int,
 ) ([]PlanReview, error) {
-
 	m.mu.RLock()
 	defer m.mu.RUnlock()
 
@@ -245,7 +237,6 @@ func (m *MockStore) ListPlanReviewsByRequester(ctx context.Context,
 func (m *MockStore) UpdatePlanReviewState(ctx context.Context,
 	params UpdatePlanReviewStateParams,
 ) error {
-
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
@@ -272,7 +263,6 @@ func (m *MockStore) UpdatePlanReviewState(ctx context.Context,
 func (m *MockStore) DeletePlanReview(ctx context.Context,
 	planReviewID string,
 ) error {
-
 	m.mu.Lock()
 	defer m.mu.Unlock()
 

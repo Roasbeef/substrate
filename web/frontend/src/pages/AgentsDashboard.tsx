@@ -1,16 +1,19 @@
-// Agents dashboard page - displays agent status overview and management.
+// Agents dashboard page - displays agent status overview, activity summaries,
+// and click-to-focus detail view.
 
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { clsx } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 import { useAgentsStatus } from '@/hooks/useAgents.js';
 import { useAgentsRealtime } from '@/hooks/useAgentsRealtime.js';
+import { useAgentSummaries, useSummaryRealtime } from '@/hooks/useSummaries.js';
 import {
   AgentCard,
   AgentCardSkeleton,
+  AgentDetailPanel,
   DashboardStats,
 } from '@/components/agents/index.js';
-import type { AgentStatusType } from '@/types/api.js';
+import type { AgentStatusType, AgentSummary } from '@/types/api.js';
 
 // Combine clsx and tailwind-merge for class name handling.
 function cn(...inputs: (string | undefined | null | false)[]) {
@@ -123,10 +126,30 @@ export default function AgentsDashboard({
   className,
 }: AgentsDashboardProps) {
   const [filter, setFilter] = useState<FilterTab>('active');
+  const [selectedAgentId, setSelectedAgentId] = useState<number | null>(null);
   const { data, isLoading, error, refetch } = useAgentsStatus();
 
   // Enable real-time updates via WebSocket.
   const { isConnected: wsConnected } = useAgentsRealtime();
+
+  // Invalidate summary cache when WebSocket summary_updated arrives.
+  useSummaryRealtime();
+
+  // Fetch summaries for all agents (independent query, graceful
+  // degradation if summary service unavailable).
+  const { data: summaries, isLoading: summariesLoading } =
+    useAgentSummaries(false);
+
+  // Build a lookup map from agent_id -> summary.
+  const summaryMap = useMemo(() => {
+    const map = new Map<number, AgentSummary>();
+    if (summaries) {
+      for (const s of summaries) {
+        map.set(s.agent_id, s);
+      }
+    }
+    return map;
+  }, [summaries]);
 
   // Filter agents based on selected tab.
   const filteredAgents =
@@ -135,11 +158,39 @@ export default function AgentsDashboard({
       : data?.agents.filter((agent) => agent.status === filter);
 
   // Handle stat card click to filter.
-  const handleStatClick = (status: 'active' | 'busy' | 'idle' | 'offline') => {
+  const handleStatClick = (
+    status: 'active' | 'busy' | 'idle' | 'offline',
+  ) => {
     setFilter(status);
   };
 
+  // Handle agent card click — open detail view.
+  const handleAgentClick = (agentId: number) => {
+    setSelectedAgentId(agentId);
+    onAgentClick?.(agentId);
+  };
+
+  // Handle back from detail view.
+  const handleBack = () => {
+    setSelectedAgentId(null);
+  };
+
+  // Find the selected agent for the detail view.
+  const selectedAgent = selectedAgentId
+    ? data?.agents.find((a) => a.id === selectedAgentId)
+    : null;
+
   return (
+    <>
+      {/* Agent detail modal overlay. */}
+      {selectedAgent ? (
+        <AgentDetailPanel
+          agent={selectedAgent}
+          onBack={handleBack}
+          isOpen={selectedAgent !== null}
+        />
+      ) : null}
+
     <div className={cn('space-y-6 p-6', className)}>
       {/* Page header. */}
       <div className="flex items-center justify-between">
@@ -148,11 +199,17 @@ export default function AgentsDashboard({
             <h1 className="text-2xl font-bold text-gray-900">Agents</h1>
             <div
               className="flex items-center gap-1.5 text-xs"
-              title={wsConnected ? 'Real-time updates active' : 'Connecting...'}
+              title={
+                wsConnected
+                  ? 'Real-time updates active'
+                  : 'Connecting...'
+              }
             >
               <span
                 className={`inline-block h-2 w-2 rounded-full ${
-                  wsConnected ? 'bg-green-400' : 'bg-yellow-400 animate-pulse'
+                  wsConnected
+                    ? 'bg-green-400'
+                    : 'bg-yellow-400 animate-pulse'
                 }`}
               />
               <span className="text-gray-500">
@@ -196,7 +253,10 @@ export default function AgentsDashboard({
 
       {/* Filter tabs. */}
       <div className="border-b border-gray-200">
-        <nav className="-mb-px flex space-x-8" aria-label="Filter agents">
+        <nav
+          className="-mb-px flex space-x-8"
+          aria-label="Filter agents"
+        >
           {filterTabs.map((tab) => (
             <button
               key={tab.id}
@@ -207,7 +267,9 @@ export default function AgentsDashboard({
                   ? 'border-blue-500 text-blue-600'
                   : 'border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700',
               )}
-              aria-current={filter === tab.id ? 'page' : undefined}
+              aria-current={
+                filter === tab.id ? 'page' : undefined
+              }
             >
               {tab.label}
               {/* Show count badge for non-all tabs. */}
@@ -231,7 +293,9 @@ export default function AgentsDashboard({
       {/* Content area. */}
       {error ? (
         <ErrorDisplay
-          message={error instanceof Error ? error.message : 'Unknown error'}
+          message={
+            error instanceof Error ? error.message : 'Unknown error'
+          }
           onRetry={() => void refetch()}
         />
       ) : isLoading ? (
@@ -246,7 +310,9 @@ export default function AgentsDashboard({
             <AgentCard
               key={agent.id}
               agent={agent}
-              {...(onAgentClick && { onClick: () => onAgentClick(agent.id) })}
+              summary={summaryMap.get(agent.id) ?? null}
+              summaryLoading={summariesLoading}
+              onClick={() => handleAgentClick(agent.id)}
             />
           ))}
         </div>
@@ -254,5 +320,6 @@ export default function AgentsDashboard({
         <EmptyState filter={filter} />
       )}
     </div>
+    </>
   );
 }

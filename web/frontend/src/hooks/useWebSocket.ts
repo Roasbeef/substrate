@@ -240,6 +240,28 @@ export function useNewMessages(handler: (payload: NewMessagePayload) => void): v
   }, [client, handler]);
 }
 
+// Summary update payload type.
+export interface SummaryUpdatePayload {
+  agent_id: number;
+  summary: string;
+  delta: string;
+}
+
+// Hook to subscribe to summary updates.
+export function useSummaryUpdates(
+  handler: (payload: SummaryUpdatePayload) => void,
+): void {
+  const client = useWebSocketClient();
+
+  useEffect(() => {
+    const unsubscribe = client.on<SummaryUpdatePayload>(
+      'summary_updated',
+      handler,
+    );
+    return unsubscribe;
+  }, [client, handler]);
+}
+
 // Combined hook for common WebSocket operations.
 export function useWebSocket(options: { autoConnect?: boolean } = {}): {
   state: ConnectionState;
