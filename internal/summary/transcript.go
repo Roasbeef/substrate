@@ -218,33 +218,34 @@ func (r *TranscriptReader) findTranscriptPath(
 // given project key is already in mangled form, it is used as-is;
 // otherwise we convert it.
 func (r *TranscriptReader) projectDir(projectKey string) string {
+	var mangled string
+
 	// If the key already looks like a Claude project key (starts
 	// with "-" and contains no "/"), use it directly.
 	if strings.HasPrefix(projectKey, "-") &&
 		!strings.Contains(projectKey, "/") {
 
-		return filepath.Join(
-			r.basePath, "projects",
-			filepath.Clean(projectKey),
-		)
+		mangled = projectKey
+	} else {
+		// Convert working directory path to Claude's mangled
+		// format. Claude replaces both "/" and "." with "-":
+		// /Users/foo/github.com/x → -Users-foo-github-com-x
+		mangled = strings.ReplaceAll(projectKey, "/", "-")
+		mangled = strings.ReplaceAll(mangled, ".", "-")
 	}
 
-	// Convert working directory path to Claude's mangled format.
-	// Claude replaces both "/" and "." with "-":
-	// /Users/roasbeef/github.com/foo → -Users-roasbeef-github-com-foo
-	mangled := strings.ReplaceAll(projectKey, "/", "-")
-	mangled = strings.ReplaceAll(mangled, ".", "-")
-
-	// Sanitize against path traversal: the resulting directory
-	// must remain under basePath/projects/.
-	dir := filepath.Join(r.basePath, "projects", mangled)
-	if !strings.HasPrefix(
-		filepath.Clean(dir),
+	// Sanitize against path traversal: clean the mangled name and
+	// ensure the result stays under basePath/projects/.
+	base := filepath.Clean(
 		filepath.Join(r.basePath, "projects"),
-	) {
-		// Fall back to a safe directory that won't exist,
-		// causing transcript reads to return NotFound.
-		return filepath.Join(r.basePath, "projects", "_invalid")
+	)
+	dir := filepath.Clean(
+		filepath.Join(base, filepath.Clean(mangled)),
+	)
+	if !strings.HasPrefix(dir, base+string(filepath.Separator)) &&
+		dir != base {
+
+		return filepath.Join(base, "_invalid")
 	}
 
 	return dir

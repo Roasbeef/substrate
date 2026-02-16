@@ -344,11 +344,11 @@ func (s *Service) generateSummary(
 	if entry == nil {
 		entry = &cachedSummary{}
 		s.cache[agentID] = entry
-		s.evictOldestLocked()
 	}
 	entry.result = result
 	entry.transcriptHash = transcript.Hash
 	entry.cachedAt = now
+	s.evictOldestLocked()
 	s.mu.Unlock()
 
 	// Skip DB persist and WS broadcast for duplicate summaries.
