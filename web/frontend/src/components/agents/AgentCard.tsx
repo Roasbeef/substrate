@@ -135,7 +135,7 @@ export function AgentCard({
   return (
     <div
       className={cn(
-        'rounded-lg border bg-white p-4 transition-all',
+        'rounded-lg border bg-white p-4 transition-all overflow-hidden',
         onClick ? 'cursor-pointer hover:shadow-md' : '',
         isSelected
           ? 'border-blue-300 ring-2 ring-blue-100'
@@ -156,8 +156,8 @@ export function AgentCard({
           : undefined
       }
     >
-      <div className="flex items-start justify-between">
-        <div className="flex items-center gap-3">
+      <div className="flex items-start justify-between gap-2">
+        <div className="flex items-center gap-3 min-w-0 flex-1">
           <Avatar name={agent.name} size="md" />
           <div className="min-w-0 flex-1">
             <h3 className="font-medium text-gray-900">{agent.name}</h3>
@@ -179,7 +179,7 @@ export function AgentCard({
             </p>
           </div>
         </div>
-        <StatusBadge status={agent.status} size="sm" />
+        <StatusBadge status={agent.status} size="sm" className="shrink-0" />
       </div>
 
       {/* Activity summary section. */}

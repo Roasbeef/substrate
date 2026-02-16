@@ -311,10 +311,20 @@ func (s *Service) generateSummary(
 		return fmt.Errorf("haiku summarization: %w", err)
 	}
 
+	// Check if the new summary is meaningfully different from the
+	// previous one. If Haiku reports no change or the text is nearly
+	// identical, update the cache (to prevent re-generation) but
+	// skip persisting to DB and broadcasting — this keeps the
+	// timeline free of duplicate "standing by" entries.
+	isDuplicate := isSummaryDuplicate(
+		summaryText, deltaText, prevSummary,
+	)
+
 	s.log.Info("Summary generated",
 		"agent_id", agentID,
 		"summary_len", len(summaryText),
 		"delta_len", len(deltaText),
+		"duplicate", isDuplicate,
 	)
 
 	now := time.Now()
@@ -340,6 +350,11 @@ func (s *Service) generateSummary(
 	}
 	s.cache[agentID] = updated
 	s.mu.Unlock()
+
+	// Skip DB persist and WS broadcast for duplicate summaries.
+	if isDuplicate {
+		return nil
+	}
 
 	// Persist to DB.
 	_, dbErr := s.store.CreateSummary(ctx, store.CreateSummaryParams{
@@ -521,6 +536,41 @@ func parseSummaryResponse(
 	}
 
 	return summary, delta, nil
+}
+
+// isSummaryDuplicate returns true when the new summary is not
+// meaningfully different from the previous one. This prevents the
+// timeline from filling up with near-identical "standing by" entries.
+func isSummaryDuplicate(
+	newSummary, delta, prevSummary string,
+) bool {
+	if prevSummary == "" {
+		return false
+	}
+
+	deltaLower := strings.ToLower(delta)
+
+	// If the delta explicitly says nothing changed, it's a duplicate.
+	if strings.Contains(deltaLower, "no change") ||
+		strings.Contains(deltaLower, "no new") ||
+		strings.Contains(deltaLower, "unchanged") ||
+		strings.Contains(deltaLower, "remains idle") ||
+		strings.Contains(deltaLower, "still idle") ||
+		strings.Contains(deltaLower, "same as") ||
+		strings.Contains(deltaLower, "no update") {
+
+		return true
+	}
+
+	// If the summary text is identical to the previous, skip.
+	if strings.EqualFold(
+		strings.TrimSpace(newSummary),
+		strings.TrimSpace(prevSummary),
+	) {
+		return true
+	}
+
+	return false
 }
 
 // truncate returns the first n characters of s, appending "..." if
