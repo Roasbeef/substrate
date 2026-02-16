@@ -46,7 +46,7 @@ func NewService(
 	}
 
 	return &Service{
-		cfg: cfg,
+		cfg:   cfg,
 		store: storage,
 		reader: NewTranscriptReader(
 			cfg.TranscriptBasePath, cfg.MaxTranscriptLines,
@@ -336,19 +336,19 @@ func (s *Service) generateSummary(
 		GeneratedAt:    now,
 	}
 
-	// Update cache. Preserve the generating flag so that the
-	// triggerRefresh defer correctly clears it on the same entry.
+	// Update cache in-place rather than replacing the entry. This
+	// ensures the generating flag set by triggerRefresh is preserved
+	// and the defer in triggerRefresh clears it on the same object.
 	s.mu.Lock()
-	existing := s.cache[agentID]
-	updated := &cachedSummary{
-		result:         result,
-		transcriptHash: transcript.Hash,
-		cachedAt:       now,
+	entry := s.cache[agentID]
+	if entry == nil {
+		entry = &cachedSummary{}
+		s.cache[agentID] = entry
+		s.evictOldestLocked()
 	}
-	if existing != nil {
-		updated.generating = existing.generating
-	}
-	s.cache[agentID] = updated
+	entry.result = result
+	entry.transcriptHash = transcript.Hash
+	entry.cachedAt = now
 	s.mu.Unlock()
 
 	// Skip DB persist and WS broadcast for duplicate summaries.
@@ -364,14 +364,20 @@ func (s *Service) generateSummary(
 		TranscriptHash: transcript.Hash,
 	})
 	if dbErr != nil {
-		s.log.Warn("Failed to persist summary",
+		s.log.Error("Failed to persist summary",
 			"agent_id", agentID, "error", dbErr,
 		)
 	}
 
-	// Notify listeners (e.g., WebSocket broadcast) of the new summary.
+	// Notify listeners (e.g., WebSocket broadcast) of the new
+	// summary regardless of DB persistence outcome. The cache is
+	// already updated, so clients will see the new data.
 	if s.OnSummaryGenerated != nil {
 		s.OnSummaryGenerated(agentID, summaryText, deltaText)
+	}
+
+	if dbErr != nil {
+		return fmt.Errorf("persist summary: %w", dbErr)
 	}
 
 	return nil
@@ -513,14 +519,10 @@ func parseSummaryResponse(
 	for _, line := range lines {
 		line = strings.TrimSpace(line)
 
-		if strings.HasPrefix(line, "SUMMARY:") {
-			summary = strings.TrimSpace(
-				strings.TrimPrefix(line, "SUMMARY:"),
-			)
-		} else if strings.HasPrefix(line, "DELTA:") {
-			delta = strings.TrimSpace(
-				strings.TrimPrefix(line, "DELTA:"),
-			)
+		if val, ok := strings.CutPrefix(line, "SUMMARY:"); ok {
+			summary = strings.TrimSpace(val)
+		} else if val, ok := strings.CutPrefix(line, "DELTA:"); ok {
+			delta = strings.TrimSpace(val)
 		}
 	}
 
@@ -571,6 +573,34 @@ func isSummaryDuplicate(
 	}
 
 	return false
+}
+
+// evictOldestLocked removes the oldest cache entry when the cache
+// exceeds MaxCacheEntries. Must be called with s.mu held.
+func (s *Service) evictOldestLocked() {
+	if len(s.cache) <= DefaultMaxCacheEntries {
+		return
+	}
+
+	var (
+		oldestID   int64
+		oldestTime time.Time
+		found      bool
+	)
+	for id, c := range s.cache {
+		// Don't evict entries that are currently generating.
+		if c.generating {
+			continue
+		}
+		if !found || c.cachedAt.Before(oldestTime) {
+			oldestID = id
+			oldestTime = c.cachedAt
+			found = true
+		}
+	}
+	if found {
+		delete(s.cache, oldestID)
+	}
 }
 
 // truncate returns the first n characters of s, appending "..." if

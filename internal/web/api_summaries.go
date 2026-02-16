@@ -10,12 +10,12 @@ import (
 
 // SummaryResponse is the JSON response for a single agent summary.
 type SummaryResponse struct {
-	AgentID     int64  `json:"agent_id"`
-	AgentName   string `json:"agent_name"`
-	Summary     string `json:"summary"`
-	Delta       string `json:"delta"`
-	GeneratedAt string `json:"generated_at"`
-	IsStale     bool   `json:"is_stale"`
+	AgentID     int64   `json:"agent_id"`
+	AgentName   string  `json:"agent_name"`
+	Summary     string  `json:"summary"`
+	Delta       string  `json:"delta"`
+	GeneratedAt string  `json:"generated_at"`
+	IsStale     bool    `json:"is_stale"`
 	CostUSD     float64 `json:"cost_usd"`
 }
 

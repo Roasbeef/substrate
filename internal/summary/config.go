@@ -25,6 +25,10 @@ const (
 	// DefaultHistoryLimit is the default number of summary history
 	// entries returned.
 	DefaultHistoryLimit = 20
+
+	// DefaultMaxCacheEntries is the maximum number of agents to keep
+	// in the in-memory summary cache.
+	DefaultMaxCacheEntries = 200
 )
 
 // Config holds configuration for the summary service.

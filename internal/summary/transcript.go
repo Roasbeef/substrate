@@ -5,6 +5,7 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"sort"
@@ -45,6 +46,10 @@ type TranscriptData struct {
 	Hash    string
 }
 
+// maxTranscriptBytes is the maximum transcript file size we'll read
+// into memory. Files larger than this are tail-read from the end.
+const maxTranscriptBytes = 10 * 1024 * 1024 // 10 MB
+
 // ReadRecentTranscript reads the tail of a session transcript file and
 // returns both the content and a hash for cache invalidation.
 func (r *TranscriptReader) ReadRecentTranscript(
@@ -57,11 +62,53 @@ func (r *TranscriptReader) ReadRecentTranscript(
 		)
 	}
 
-	data, err := os.ReadFile(path)
+	// Check file size before reading to avoid unbounded memory
+	// usage from very large transcript files.
+	fi, err := os.Stat(path)
 	if err != nil {
 		return TranscriptData{}, fmt.Errorf(
-			"read transcript %s: %w", path, err,
+			"stat transcript %s: %w", path, err,
 		)
+	}
+
+	var data []byte
+	if fi.Size() > maxTranscriptBytes {
+		// For oversized files, read just the tail. Open the
+		// file and seek to the last maxTranscriptBytes.
+		f, fErr := os.Open(path)
+		if fErr != nil {
+			return TranscriptData{}, fmt.Errorf(
+				"open transcript %s: %w", path, fErr,
+			)
+		}
+		defer f.Close()
+
+		if _, sErr := f.Seek(
+			-maxTranscriptBytes, 2,
+		); sErr != nil {
+			return TranscriptData{}, fmt.Errorf(
+				"seek transcript %s: %w", path, sErr,
+			)
+		}
+
+		data, err = io.ReadAll(f)
+		if err != nil {
+			return TranscriptData{}, fmt.Errorf(
+				"read transcript tail %s: %w", path, err,
+			)
+		}
+
+		// Skip the first partial line after seeking.
+		if idx := strings.IndexByte(string(data), '\n'); idx >= 0 {
+			data = data[idx+1:]
+		}
+	} else {
+		data, err = os.ReadFile(path)
+		if err != nil {
+			return TranscriptData{}, fmt.Errorf(
+				"read transcript %s: %w", path, err,
+			)
+		}
 	}
 
 	content := string(data)
@@ -176,7 +223,10 @@ func (r *TranscriptReader) projectDir(projectKey string) string {
 	if strings.HasPrefix(projectKey, "-") &&
 		!strings.Contains(projectKey, "/") {
 
-		return filepath.Join(r.basePath, "projects", projectKey)
+		return filepath.Join(
+			r.basePath, "projects",
+			filepath.Clean(projectKey),
+		)
 	}
 
 	// Convert working directory path to Claude's mangled format.
@@ -185,7 +235,19 @@ func (r *TranscriptReader) projectDir(projectKey string) string {
 	mangled := strings.ReplaceAll(projectKey, "/", "-")
 	mangled = strings.ReplaceAll(mangled, ".", "-")
 
-	return filepath.Join(r.basePath, "projects", mangled)
+	// Sanitize against path traversal: the resulting directory
+	// must remain under basePath/projects/.
+	dir := filepath.Join(r.basePath, "projects", mangled)
+	if !strings.HasPrefix(
+		filepath.Clean(dir),
+		filepath.Join(r.basePath, "projects"),
+	) {
+		// Fall back to a safe directory that won't exist,
+		// causing transcript reads to return NotFound.
+		return filepath.Join(r.basePath, "projects", "_invalid")
+	}
+
+	return dir
 }
 
 // isSessionFile checks if a filename looks like a session transcript.
