@@ -123,8 +123,8 @@ func renderReviewPrompt(ctx context.Context, d reviewPromptData) string {
 // with the given data. This is used for multi-sub-reviewer mode where a
 // coordinator agent delegates to specialized sub-reviewer agents.
 func renderCoordinatorPrompt(ctx context.Context,
-	d systemPromptData) string {
-
+	d systemPromptData,
+) string {
 	var buf bytes.Buffer
 	if err := coordinatorPromptTmpl.Execute(&buf, d); err != nil {
 		log.ErrorS(ctx, "Failed to render coordinator prompt",
@@ -139,8 +139,8 @@ func renderCoordinatorPrompt(ctx context.Context,
 // template that provides the diff command and step-by-step instructions
 // for the multi-sub-reviewer workflow.
 func renderCoordinatorReviewPrompt(ctx context.Context,
-	d reviewPromptData) string {
-
+	d reviewPromptData,
+) string {
 	var buf bytes.Buffer
 	if err := coordinatorReviewPromptTmpl.Execute(&buf, d); err != nil {
 		log.ErrorS(ctx, "Failed to render coordinator review prompt",

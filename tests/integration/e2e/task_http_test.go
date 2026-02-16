@@ -15,7 +15,6 @@ import (
 func (e *httpTestEnv) doRequest(
 	method, path string, data any,
 ) *http.Response {
-
 	e.t.Helper()
 
 	var body *strings.Reader
@@ -44,7 +43,6 @@ func (e *httpTestEnv) doRequest(
 func (e *httpTestEnv) patchJSON(
 	path string, data any,
 ) *http.Response {
-
 	e.t.Helper()
 	return e.doRequest(http.MethodPatch, path, data)
 }

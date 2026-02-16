@@ -557,7 +557,6 @@ func (s *Server) Search(ctx context.Context, req *SearchRequest) (*SearchRespons
 func (s *Server) AutocompleteRecipients(
 	ctx context.Context, req *AutocompleteRecipientsRequest,
 ) (*AutocompleteRecipientsResponse, error) {
-
 	limit := int32(20)
 	if req.Limit > 0 {
 		limit = req.Limit

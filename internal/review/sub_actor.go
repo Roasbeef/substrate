@@ -995,8 +995,8 @@ func (r *reviewSubActor) buildSubstrateHooks() map[claudeagent.HookType][]claude
 			Matcher: "*",
 			Callback: func(ctx context.Context,
 				input claudeagent.HookInput) (
-				claudeagent.HookResult, error) {
-
+				claudeagent.HookResult, error,
+			) {
 				start := input.(claudeagent.SubagentStartInput)
 				log.InfoS(ctx,
 					"Sub-reviewer agent spawned",
@@ -1013,8 +1013,8 @@ func (r *reviewSubActor) buildSubstrateHooks() map[claudeagent.HookType][]claude
 			Matcher: "*",
 			Callback: func(ctx context.Context,
 				input claudeagent.HookInput) (
-				claudeagent.HookResult, error) {
-
+				claudeagent.HookResult, error,
+			) {
 				stop := input.(claudeagent.SubagentStopInput)
 				log.InfoS(ctx,
 					"Sub-reviewer agent completed",
@@ -1260,7 +1260,6 @@ func (r *reviewSubActor) hookStop(
 func formatMailAsReReviewPrompt(
 	msgs []store.InboxMessage, diffCmd string,
 ) string {
-
 	tmplMsgs := make([]reReviewMessage, len(msgs))
 	for i, msg := range msgs {
 		tmplMsgs[i] = reReviewMessage{
