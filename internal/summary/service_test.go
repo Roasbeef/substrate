@@ -3,6 +3,7 @@ package summary
 import (
 	"context"
 	"database/sql"
+	"fmt"
 	"sync"
 	"testing"
 	"time"
@@ -537,5 +538,77 @@ func TestOnSummaryGeneratedCallback(t *testing.T) {
 	svc.OnSummaryGenerated(42, "test", "delta")
 	if !called || callbackAgent != 42 {
 		t.Error("callback was not invoked correctly")
+	}
+}
+
+// TestGetSummaryConcurrent tests that concurrent GetSummary calls on
+// the same agent don't race on shared cache entries.
+func TestGetSummaryConcurrent(t *testing.T) {
+	ms := &mockSummaryStore{
+		summaries: []store.AgentSummary{
+			{
+				ID:             1,
+				AgentID:        42,
+				Summary:        "Concurrent test.",
+				Delta:          "Initial.",
+				TranscriptHash: "hash123",
+				CreatedAt:      time.Now().Add(-10 * time.Second),
+			},
+		},
+	}
+
+	svc := NewService(
+		Config{
+			Enabled:       true,
+			CacheTTL:      time.Minute,
+			Model:         "test",
+			MaxConcurrent: 3,
+		},
+		ms, nil,
+	)
+
+	// Seed cache so concurrent reads exercise the snapshot path.
+	svc.mu.Lock()
+	svc.cache[42] = &cachedSummary{
+		result: &SummaryResult{
+			AgentID: 42,
+			Summary: "Cached value.",
+		},
+		cachedAt: time.Now(),
+	}
+	svc.mu.Unlock()
+
+	var wg sync.WaitGroup
+	errs := make(chan error, 50)
+
+	for i := 0; i < 50; i++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			result, err := svc.GetSummary(
+				context.Background(), 42,
+			)
+			if err != nil {
+				errs <- err
+				return
+			}
+			if result == nil {
+				errs <- fmt.Errorf("expected non-nil result")
+				return
+			}
+			if result.Summary != "Cached value." {
+				errs <- fmt.Errorf(
+					"unexpected summary: %q",
+					result.Summary,
+				)
+			}
+		}()
+	}
+
+	wg.Wait()
+	close(errs)
+
+	for err := range errs {
+		t.Errorf("concurrent GetSummary error: %v", err)
 	}
 }

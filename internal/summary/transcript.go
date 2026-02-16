@@ -182,18 +182,16 @@ func (r *TranscriptReader) FindActiveSession(
 func (r *TranscriptReader) findTranscriptPath(
 	projectKey, sessionID string,
 ) (string, error) {
+	// Sanitize session ID: strip directory components so a
+	// malicious value like "../../etc/passwd" can't escape.
+	sessionID = filepath.Base(sessionID)
+
 	// Try several known locations for session data.
+	projDir := r.projectDir(projectKey)
 	candidates := []string{
-		filepath.Join(
-			r.projectDir(projectKey), sessionID+".jsonl",
-		),
-		filepath.Join(
-			r.projectDir(projectKey), sessionID+".json",
-		),
-		filepath.Join(
-			r.projectDir(projectKey),
-			"sessions", sessionID+".jsonl",
-		),
+		filepath.Join(projDir, sessionID+".jsonl"),
+		filepath.Join(projDir, sessionID+".json"),
+		filepath.Join(projDir, "sessions", sessionID+".jsonl"),
 		filepath.Join(
 			r.basePath, "projects",
 			projectKey, sessionID+".jsonl",

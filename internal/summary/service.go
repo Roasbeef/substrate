@@ -66,22 +66,39 @@ func (s *Service) GetSummary(
 		return nil, fmt.Errorf("summary service disabled")
 	}
 
+	// Snapshot cache entry fields under the lock so we don't
+	// access shared state after releasing it.
 	s.mu.RLock()
 	cached := s.cache[agentID]
+	var (
+		hasCache   bool
+		valid      bool
+		generating bool
+		result     *SummaryResult
+	)
+	if cached != nil {
+		hasCache = true
+		valid = cached.isValid(s.cfg.CacheTTL)
+		generating = cached.generating
+		if cached.result != nil {
+			// Deep copy so we own the value outside the lock.
+			r := *cached.result
+			result = &r
+		}
+	}
 	s.mu.RUnlock()
 
-	if cached != nil && cached.isValid(s.cfg.CacheTTL) {
-		return cached.result, nil
+	if hasCache && valid {
+		return result, nil
 	}
 
 	// Try to return a stale cached value while triggering a
 	// background refresh.
-	if cached != nil && cached.result != nil && !cached.generating {
+	if hasCache && result != nil && !generating {
 		s.triggerRefresh(ctx, agentID)
 
-		stale := *cached.result
-		stale.IsStale = true
-		return &stale, nil
+		result.IsStale = true
+		return result, nil
 	}
 
 	// No cache at all — try DB.
@@ -91,7 +108,7 @@ func (s *Service) GetSummary(
 	}
 
 	if err == nil {
-		result := &SummaryResult{
+		dbResult := &SummaryResult{
 			AgentID:        dbSummary.AgentID,
 			Summary:        dbSummary.Summary,
 			Delta:          dbSummary.Delta,
@@ -102,15 +119,18 @@ func (s *Service) GetSummary(
 		}
 
 		s.mu.Lock()
-		s.cache[agentID] = &cachedSummary{
-			result:         result,
-			transcriptHash: dbSummary.TranscriptHash,
-			cachedAt:       dbSummary.CreatedAt,
+		entry := s.cache[agentID]
+		if entry == nil {
+			entry = &cachedSummary{}
+			s.cache[agentID] = entry
 		}
+		entry.result = dbResult
+		entry.transcriptHash = dbSummary.TranscriptHash
+		entry.cachedAt = dbSummary.CreatedAt
 		s.mu.Unlock()
 
 		s.triggerRefresh(ctx, agentID)
-		return result, nil
+		return dbResult, nil
 	}
 
 	// No summary exists at all — trigger generation.
@@ -270,25 +290,29 @@ func (s *Service) generateSummary(
 		"content_len", len(transcript.Content),
 	)
 
-	// Check if content changed since last summary.
+	// Snapshot cache fields under lock for the hash check and
+	// previous summary extraction.
 	s.mu.RLock()
-	cached := s.cache[agentID]
+	var (
+		cachedHash  string
+		cacheValid  bool
+		prevSummary string
+	)
+	if c := s.cache[agentID]; c != nil {
+		cachedHash = c.transcriptHash
+		cacheValid = c.isValid(s.cfg.CacheTTL)
+		if c.result != nil {
+			prevSummary = c.result.Summary
+		}
+	}
 	s.mu.RUnlock()
 
-	if cached != nil &&
-		cached.transcriptHash == transcript.Hash &&
-		cached.isValid(s.cfg.CacheTTL) {
-
+	// Check if content changed since last summary.
+	if cachedHash == transcript.Hash && cacheValid {
 		s.log.Info("Summary cache hit, skipping",
 			"agent_id", agentID,
 		)
 		return nil
-	}
-
-	// Get previous summary for delta tracking.
-	var prevSummary string
-	if cached != nil && cached.result != nil {
-		prevSummary = cached.result.Summary
 	}
 
 	// Acquire semaphore.
