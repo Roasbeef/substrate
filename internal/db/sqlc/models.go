@@ -8,16 +8,6 @@ import (
 	"database/sql"
 )
 
-type AgentSummary struct {
-	ID             int64
-	AgentID        int64
-	Summary        string
-	Delta          string
-	TranscriptHash string
-	CostUsd        float64
-	CreatedAt      int64
-}
-
 type Activity struct {
 	ID           int64
 	AgentID      int64
@@ -38,6 +28,16 @@ type Agent struct {
 	Purpose          sql.NullString
 	WorkingDir       sql.NullString
 	Hostname         sql.NullString
+}
+
+type AgentSummary struct {
+	ID             int64
+	AgentID        int64
+	Summary        string
+	Delta          string
+	TranscriptHash string
+	CostUsd        float64
+	CreatedAt      int64
 }
 
 type AgentTask struct {
