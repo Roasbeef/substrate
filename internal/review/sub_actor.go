@@ -115,6 +115,17 @@ type reviewSubActor struct {
 
 	// cancel stops the sub-actor's context.
 	cancel context.CancelFunc
+
+	// mu protects the client field for concurrent access between
+	// Run() (which sets it) and Stop() (which calls Close() on it).
+	mu sync.Mutex
+
+	// client is the Claude Agent SDK client for the active review
+	// session. It is set by Run() after creating the client and
+	// cleared after Close() completes. Stop() calls Close() on it
+	// directly to initiate subprocess cleanup immediately, without
+	// waiting for the Query loop to exit first.
+	client *claudeagent.Client
 }
 
 // SubActorResult contains the outcome of a reviewer sub-actor run.
@@ -275,7 +286,20 @@ func (r *reviewSubActor) Run(parentCtx context.Context) {
 		r.callback(ctx, result)
 		return
 	}
-	defer client.Close()
+
+	// Store the client reference so Stop() can initiate subprocess
+	// cleanup immediately without waiting for the Query loop to exit.
+	r.mu.Lock()
+	r.client = client
+	r.mu.Unlock()
+
+	defer func() {
+		client.Close()
+
+		r.mu.Lock()
+		r.client = nil
+		r.mu.Unlock()
+	}()
 
 	log.InfoS(ctx, "Reviewer connecting to Claude CLI subprocess",
 		"review_id", r.reviewID,
@@ -354,14 +378,35 @@ func (r *reviewSubActor) Run(parentCtx context.Context) {
 	r.processPostLoop(ctx, state, result, startTime)
 }
 
-// Stop cancels the sub-actor's context, triggering Claude CLI subprocess
-// cleanup (stdin close → 5s grace period → SIGKILL).
+// Stop cancels the sub-actor's context and proactively closes the
+// Claude SDK client to initiate subprocess cleanup immediately. The
+// client.Close() call starts stdin close → 5s grace → SIGKILL
+// without waiting for the Query loop to exit first. Both the context
+// cancellation and client.Close() are idempotent and concurrency-safe.
 func (r *reviewSubActor) Stop() {
+	log.Infof("Reviewer sub-actor stopping: review_id=%s",
+		r.reviewID,
+	)
+
 	if r.cancel != nil {
-		log.Infof("Reviewer sub-actor stopping, cancelling "+
-			"context: review_id=%s", r.reviewID,
-		)
 		r.cancel()
+	}
+
+	// Proactively close the client to start subprocess cleanup
+	// immediately. This is safe to call concurrently with the
+	// defer in Run() because Client.Close() uses an internal
+	// mutex and transport.Close() uses atomic.CompareAndSwap.
+	r.mu.Lock()
+	client := r.client
+	r.mu.Unlock()
+
+	if client != nil {
+		if err := client.Close(); err != nil {
+			log.Warnf("Reviewer sub-actor client close "+
+				"error: review_id=%s, err=%v",
+				r.reviewID, err,
+			)
+		}
 	}
 }
 

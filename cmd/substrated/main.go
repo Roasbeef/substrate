@@ -162,7 +162,24 @@ func main() {
 
 	// Create the actor system.
 	actorSystem := actor.NewActorSystem()
-	defer actorSystem.Shutdown(context.Background())
+	defer func() {
+		// Use a bounded timeout to prevent indefinite blocking
+		// if actor cleanup stalls (e.g., reviewer subprocess
+		// shutdown). 30s allows headroom for the reviewer's 15s
+		// WithCleanupTimeout plus the SDK's 5s transport SIGKILL.
+		shutdownCtx, shutdownCancel := context.WithTimeout(
+			context.Background(), 30*time.Second,
+		)
+		defer shutdownCancel()
+
+		if err := actorSystem.Shutdown(shutdownCtx); err != nil {
+			log.Printf(
+				"Actor system shutdown incomplete: %v "+
+					"(some goroutines may have leaked)",
+				err,
+			)
+		}
+	}()
 
 	// Create and register the notification hub for real-time notifications.
 	// This hub receives notifications from the mail service and delivers them
@@ -253,9 +270,22 @@ func main() {
 	signal.Notify(sigCh, syscall.SIGINT, syscall.SIGTERM)
 
 	go func() {
-		<-sigCh
-		log.Println("Shutting down...")
+		sig := <-sigCh
+		log.Printf(
+			"Received %v, initiating graceful shutdown "+
+				"(send again to force exit)...", sig,
+		)
 		cancel()
+
+		// Wait for a second signal to force-exit. The goroutine
+		// stays alive so subsequent Ctrl+C signals are consumed
+		// rather than silently dropped by the buffered channel.
+		sig = <-sigCh
+		log.Printf(
+			"Received %v again, forcing immediate exit",
+			sig,
+		)
+		os.Exit(1)
 	}()
 
 	// Start gRPC server if enabled.
