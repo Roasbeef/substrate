@@ -364,3 +364,104 @@ func TestGetAgentWithStatusByName_NotFound(t *testing.T) {
 		t.Error("expected error for non-existent agent")
 	}
 }
+
+func TestDiscoverAgents(t *testing.T) {
+	t.Parallel()
+
+	store, cleanup := testDB(t)
+	defer cleanup()
+
+	registry := NewRegistry(store)
+	hm := NewHeartbeatManager(registry, DefaultHeartbeatConfig())
+
+	ctx := context.Background()
+
+	// Register agents and set up discovery info.
+	ag1, _ := registry.RegisterAgent(
+		ctx, "discover-agent-1", "/project/alpha", "main",
+	)
+	ag2, _ := registry.RegisterAgent(
+		ctx, "discover-agent-2", "/project/beta", "feature",
+	)
+
+	// Make agent 1 active.
+	hm.RecordHeartbeat(ctx, ag1.ID)
+
+	// Make agent 2 busy.
+	hm.RecordHeartbeat(ctx, ag2.ID)
+	hm.StartSession(ag2.ID, "sess-abc")
+
+	// Set discovery info.
+	registry.UpdateDiscoveryInfo(
+		ctx, ag1.ID, "backend dev", "/work/alpha", "host-a",
+	)
+	registry.UpdateDiscoveryInfo(
+		ctx, ag2.ID, "frontend dev", "/work/beta", "host-b",
+	)
+
+	// Discover agents.
+	agents, counts, err := hm.DiscoverAgents(ctx)
+	if err != nil {
+		t.Fatalf("DiscoverAgents: %v", err)
+	}
+
+	if len(agents) != 2 {
+		t.Fatalf("expected 2 agents, got %d", len(agents))
+	}
+
+	if counts.Total != 2 {
+		t.Errorf("expected total count 2, got %d", counts.Total)
+	}
+
+	// Verify discovery metadata is present.
+	for _, da := range agents {
+		if da.Purpose == "" {
+			t.Errorf("agent %s missing purpose", da.Agent.Name)
+		}
+		if da.WorkingDir == "" {
+			t.Errorf("agent %s missing working_dir", da.Agent.Name)
+		}
+		if da.Hostname == "" {
+			t.Errorf("agent %s missing hostname", da.Agent.Name)
+		}
+	}
+
+	// Check that we have at least one active and one busy.
+	statusMap := make(map[AgentStatus]int)
+	for _, da := range agents {
+		statusMap[da.Status]++
+	}
+
+	if statusMap[StatusActive] < 1 {
+		t.Error("expected at least 1 active agent")
+	}
+	if statusMap[StatusBusy] != 1 {
+		t.Errorf("expected 1 busy agent, got %d", statusMap[StatusBusy])
+	}
+}
+
+func TestDiscoverAgents_Empty(t *testing.T) {
+	t.Parallel()
+
+	store, cleanup := testDB(t)
+	defer cleanup()
+
+	registry := NewRegistry(store)
+	hm := NewHeartbeatManager(registry, DefaultHeartbeatConfig())
+
+	ctx := context.Background()
+
+	// Discover with no agents.
+	agents, counts, err := hm.DiscoverAgents(ctx)
+	if err != nil {
+		t.Fatalf("DiscoverAgents: %v", err)
+	}
+
+	if len(agents) != 0 {
+		t.Errorf("expected 0 agents, got %d", len(agents))
+	}
+
+	if counts.Total != 0 {
+		t.Errorf("expected total count 0, got %d", counts.Total)
+	}
+}

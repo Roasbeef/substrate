@@ -619,6 +619,16 @@ type Agent struct {
 	CurrentSessionID string
 	CreatedAt        time.Time
 	LastActiveAt     time.Time
+	Purpose          string
+	WorkingDir       string
+	Hostname         string
+}
+
+// DiscoveredAgent extends Agent with discovery-specific metadata like unread
+// message count and computed liveness status.
+type DiscoveredAgent struct {
+	Agent
+	UnreadCount int64
 }
 
 // Topic represents a message topic for pub/sub.
@@ -831,6 +841,29 @@ func AgentFromSqlc(a sqlc.Agent) Agent {
 		CurrentSessionID: a.CurrentSessionID.String,
 		CreatedAt:        time.Unix(a.CreatedAt, 0),
 		LastActiveAt:     time.Unix(a.LastActiveAt, 0),
+		Purpose:          a.Purpose.String,
+		WorkingDir:       a.WorkingDir.String,
+		Hostname:         a.Hostname.String,
+	}
+}
+
+// DiscoveredAgentFromSqlc converts a sqlc.DiscoverAgentsRow to a
+// store.DiscoveredAgent.
+func DiscoveredAgentFromSqlc(r sqlc.DiscoverAgentsRow) DiscoveredAgent {
+	return DiscoveredAgent{
+		Agent: Agent{
+			ID:               r.ID,
+			Name:             r.Name,
+			ProjectKey:       r.ProjectKey.String,
+			GitBranch:        r.GitBranch.String,
+			CurrentSessionID: r.CurrentSessionID.String,
+			CreatedAt:        time.Unix(r.CreatedAt, 0),
+			LastActiveAt:     time.Unix(r.LastActiveAt, 0),
+			Purpose:          r.Purpose.String,
+			WorkingDir:       r.WorkingDir.String,
+			Hostname:         r.Hostname.String,
+		},
+		UnreadCount: r.UnreadCount,
 	}
 }
 

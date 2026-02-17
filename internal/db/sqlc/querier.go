@@ -11,10 +11,6 @@ import (
 
 type Querier interface {
 	ClearAllOperations(ctx context.Context) error
-	CreateAgentSummary(ctx context.Context, arg CreateAgentSummaryParams) (AgentSummary, error)
-	DeleteOldAgentSummaries(ctx context.Context, createdAt int64) error
-	GetAgentSummaryHistory(ctx context.Context, arg GetAgentSummaryHistoryParams) ([]AgentSummary, error)
-	GetLatestAgentSummary(ctx context.Context, agentID int64) (AgentSummary, error)
 	CountActivitiesByAgentToday(ctx context.Context, arg CountActivitiesByAgentTodayParams) (int64, error)
 	CountArchivedByAgent(ctx context.Context, agentID int64) (int64, error)
 	CountOpenIssues(ctx context.Context, reviewID string) (int64, error)
@@ -32,6 +28,7 @@ type Querier interface {
 	CountUnreadUrgentByAgent(ctx context.Context, agentID int64) (int64, error)
 	CreateActivity(ctx context.Context, arg CreateActivityParams) (Activity, error)
 	CreateAgent(ctx context.Context, arg CreateAgentParams) (Agent, error)
+	CreateAgentSummary(ctx context.Context, arg CreateAgentSummaryParams) (AgentSummary, error)
 	CreateMessage(ctx context.Context, arg CreateMessageParams) (Message, error)
 	CreateMessageRecipient(ctx context.Context, arg CreateMessageRecipientParams) error
 	CreatePlanReview(ctx context.Context, arg CreatePlanReviewParams) (PlanReview, error)
@@ -49,6 +46,7 @@ type Querier interface {
 	DeleteMessage(ctx context.Context, id int64) error
 	DeleteMessagesByTopicOlderThan(ctx context.Context, arg DeleteMessagesByTopicOlderThanParams) (int64, error)
 	DeleteOldActivities(ctx context.Context, createdAt int64) error
+	DeleteOldAgentSummaries(ctx context.Context, createdAt int64) error
 	DeletePlanReview(ctx context.Context, planReviewID string) error
 	DeleteReview(ctx context.Context, reviewID string) error
 	DeleteReviewIssues(ctx context.Context, reviewID string) error
@@ -60,12 +58,14 @@ type Querier interface {
 	DeleteTaskList(ctx context.Context, listID string) error
 	DeleteTasksByList(ctx context.Context, listID string) error
 	DeleteTopic(ctx context.Context, id int64) error
+	DiscoverAgents(ctx context.Context) ([]DiscoverAgentsRow, error)
 	DrainPendingOperations(ctx context.Context) ([]PendingOperation, error)
 	EnqueueOperation(ctx context.Context, arg EnqueueOperationParams) (PendingOperation, error)
 	GetActivity(ctx context.Context, id int64) (Activity, error)
 	GetAgent(ctx context.Context, id int64) (Agent, error)
 	GetAgentByName(ctx context.Context, name string) (Agent, error)
 	GetAgentBySessionID(ctx context.Context, sessionID string) (Agent, error)
+	GetAgentSummaryHistory(ctx context.Context, arg GetAgentSummaryHistoryParams) ([]AgentSummary, error)
 	GetAllAgentTaskStats(ctx context.Context) ([]GetAllAgentTaskStatsRow, error)
 	// Global inbox view: all messages across all agents, not archived or trashed.
 	GetAllInboxMessages(ctx context.Context, limit int64) ([]GetAllInboxMessagesRow, error)
@@ -77,6 +77,7 @@ type Querier interface {
 	GetArchivedMessages(ctx context.Context, arg GetArchivedMessagesParams) ([]GetArchivedMessagesRow, error)
 	GetConsumerOffset(ctx context.Context, arg GetConsumerOffsetParams) (int64, error)
 	GetInboxMessages(ctx context.Context, arg GetInboxMessagesParams) ([]GetInboxMessagesRow, error)
+	GetLatestAgentSummary(ctx context.Context, agentID int64) (AgentSummary, error)
 	GetLatestIteration(ctx context.Context, reviewID string) (ReviewIteration, error)
 	GetMaxLogOffset(ctx context.Context, topicID int64) (interface{}, error)
 	GetMessage(ctx context.Context, id int64) (Message, error)
@@ -181,6 +182,7 @@ type Querier interface {
 	// Simple LIKE-based search on subject and body. FTS5 is available but this
 	// covers basic cases. The search term should be passed with wildcards.
 	SearchMessages(ctx context.Context, arg SearchMessagesParams) ([]SearchMessagesRow, error)
+	UpdateAgentDiscoveryInfo(ctx context.Context, arg UpdateAgentDiscoveryInfoParams) error
 	UpdateAgentGitBranch(ctx context.Context, arg UpdateAgentGitBranchParams) error
 	UpdateAgentLastActive(ctx context.Context, arg UpdateAgentLastActiveParams) error
 	UpdateAgentName(ctx context.Context, arg UpdateAgentNameParams) error

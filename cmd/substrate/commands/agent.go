@@ -3,6 +3,7 @@ package commands
 import (
 	"context"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/spf13/cobra"
@@ -45,9 +46,24 @@ var agentDeleteCmd = &cobra.Command{
 	RunE:  runAgentDelete,
 }
 
+var agentDiscoverCmd = &cobra.Command{
+	Use:   "discover",
+	Short: "Discover all agents with status and metadata",
+	Long: `Show all agents with rich discovery metadata including status,
+working directory, git branch, purpose, hostname, and unread message counts.
+
+Use --status to filter by agent status (active, busy, idle, offline).
+Use --project to filter by project key prefix.
+Use --name to filter by agent name substring.`,
+	RunE: runAgentDiscover,
+}
+
 var (
 	registerProject string
 	forceDelete     bool
+	discoverStatus  string
+	discoverProject string
+	discoverName    string
 )
 
 func init() {
@@ -55,12 +71,26 @@ func init() {
 	agentCmd.AddCommand(agentListCmd)
 	agentCmd.AddCommand(agentWhoamiCmd)
 	agentCmd.AddCommand(agentDeleteCmd)
+	agentCmd.AddCommand(agentDiscoverCmd)
 
 	agentRegisterCmd.Flags().StringVar(&registerProject, "project", "",
 		"Project key to associate with the agent")
 
 	agentDeleteCmd.Flags().BoolVarP(&forceDelete, "force", "f", false,
 		"Skip confirmation prompt")
+
+	agentDiscoverCmd.Flags().StringVar(
+		&discoverStatus, "status", "",
+		"Filter by status (comma-separated: active,busy,idle,offline)",
+	)
+	agentDiscoverCmd.Flags().StringVar(
+		&discoverProject, "project", "",
+		"Filter by project key prefix",
+	)
+	agentDiscoverCmd.Flags().StringVar(
+		&discoverName, "name", "",
+		"Filter by agent name substring",
+	)
 }
 
 func runAgentRegister(cmd *cobra.Command, args []string) error {
@@ -176,6 +206,126 @@ func runAgentWhoami(cmd *cobra.Command, args []string) error {
 	}
 
 	return nil
+}
+
+// runAgentDiscover executes the discover subcommand, fetching all agents
+// with rich metadata and applying optional client-side filters.
+func runAgentDiscover(cmd *cobra.Command, args []string) error {
+	ctx := context.Background()
+
+	client, err := getClient()
+	if err != nil {
+		return err
+	}
+	defer client.Close()
+
+	agents, err := client.DiscoverAgents(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to discover agents: %w", err)
+	}
+
+	// Apply client-side filters.
+	agents = filterDiscoveredAgents(agents)
+
+	switch outputFormat {
+	case "json":
+		return outputJSON(agents)
+
+	case "context":
+		if len(agents) == 0 {
+			fmt.Println("[Subtrate Discovery] No agents found")
+			return nil
+		}
+		parts := make([]string, len(agents))
+		for i, a := range agents {
+			parts[i] = fmt.Sprintf("%s(%s)", a.Name, a.Status)
+		}
+		fmt.Printf(
+			"[Subtrate Discovery] %d agents: %s\n",
+			len(agents), strings.Join(parts, ", "),
+		)
+		return nil
+
+	default:
+		if len(agents) == 0 {
+			fmt.Println("No agents discovered.")
+			return nil
+		}
+
+		fmt.Printf("Discovered %d agents:\n", len(agents))
+
+		for _, a := range agents {
+			elapsed := formatDuration(
+				time.Duration(a.SecondsSince) * time.Second,
+			)
+			fmt.Printf(
+				"\n  %s [%s] (%s ago)\n",
+				a.Name, a.Status, elapsed,
+			)
+			if a.ProjectKey != "" {
+				fmt.Printf("    Project:  %s\n", a.ProjectKey)
+			}
+			if a.GitBranch != "" {
+				fmt.Printf("    Branch:   %s\n", a.GitBranch)
+			}
+			if a.WorkingDir != "" {
+				fmt.Printf("    Dir:      %s\n", a.WorkingDir)
+			}
+			if a.Purpose != "" {
+				fmt.Printf("    Purpose:  %s\n", a.Purpose)
+			}
+			if a.Hostname != "" {
+				fmt.Printf("    Host:     %s\n", a.Hostname)
+			}
+			if a.SessionID != "" {
+				fmt.Printf(
+					"    Session:  %s\n", a.SessionID,
+				)
+			}
+			fmt.Printf("    Unread:   %d messages\n", a.UnreadCount)
+		}
+	}
+
+	return nil
+}
+
+// filterDiscoveredAgents applies the --status, --project, and --name
+// flags to filter the discovered agents list.
+func filterDiscoveredAgents(
+	agents []DiscoveredAgentInfo,
+) []DiscoveredAgentInfo {
+	if discoverStatus == "" && discoverProject == "" &&
+		discoverName == "" {
+		return agents
+	}
+
+	// Parse status filter into a set.
+	statusSet := make(map[string]bool)
+	if discoverStatus != "" {
+		for _, s := range strings.Split(discoverStatus, ",") {
+			statusSet[strings.TrimSpace(strings.ToLower(s))] = true
+		}
+	}
+
+	filtered := make([]DiscoveredAgentInfo, 0, len(agents))
+	for _, a := range agents {
+		if len(statusSet) > 0 && !statusSet[strings.ToLower(a.Status)] {
+			continue
+		}
+		if discoverProject != "" &&
+			!strings.HasPrefix(a.ProjectKey, discoverProject) {
+			continue
+		}
+		if discoverName != "" &&
+			!strings.Contains(
+				strings.ToLower(a.Name),
+				strings.ToLower(discoverName),
+			) {
+			continue
+		}
+		filtered = append(filtered, a)
+	}
+	return filtered
 }
 
 func runAgentDelete(cmd *cobra.Command, args []string) error {

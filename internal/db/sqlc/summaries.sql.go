@@ -26,32 +26,33 @@ type CreateAgentSummaryParams struct {
 
 func (q *Queries) CreateAgentSummary(ctx context.Context, arg CreateAgentSummaryParams) (AgentSummary, error) {
 	row := q.db.QueryRowContext(ctx, CreateAgentSummary,
-		arg.AgentID, arg.Summary, arg.Delta,
-		arg.TranscriptHash, arg.CostUsd, arg.CreatedAt,
+		arg.AgentID,
+		arg.Summary,
+		arg.Delta,
+		arg.TranscriptHash,
+		arg.CostUsd,
+		arg.CreatedAt,
 	)
 	var i AgentSummary
 	err := row.Scan(
-		&i.ID, &i.AgentID, &i.Summary, &i.Delta,
-		&i.TranscriptHash, &i.CostUsd, &i.CreatedAt,
+		&i.ID,
+		&i.AgentID,
+		&i.Summary,
+		&i.Delta,
+		&i.TranscriptHash,
+		&i.CostUsd,
+		&i.CreatedAt,
 	)
 	return i, err
 }
 
-const GetLatestAgentSummary = `-- name: GetLatestAgentSummary :one
-SELECT id, agent_id, summary, delta, transcript_hash, cost_usd, created_at FROM agent_summaries
-WHERE agent_id = ?
-ORDER BY created_at DESC
-LIMIT 1
+const DeleteOldAgentSummaries = `-- name: DeleteOldAgentSummaries :exec
+DELETE FROM agent_summaries WHERE created_at < ?
 `
 
-func (q *Queries) GetLatestAgentSummary(ctx context.Context, agentID int64) (AgentSummary, error) {
-	row := q.db.QueryRowContext(ctx, GetLatestAgentSummary, agentID)
-	var i AgentSummary
-	err := row.Scan(
-		&i.ID, &i.AgentID, &i.Summary, &i.Delta,
-		&i.TranscriptHash, &i.CostUsd, &i.CreatedAt,
-	)
-	return i, err
+func (q *Queries) DeleteOldAgentSummaries(ctx context.Context, createdAt int64) error {
+	_, err := q.db.ExecContext(ctx, DeleteOldAgentSummaries, createdAt)
+	return err
 }
 
 const GetAgentSummaryHistory = `-- name: GetAgentSummaryHistory :many
@@ -67,9 +68,7 @@ type GetAgentSummaryHistoryParams struct {
 }
 
 func (q *Queries) GetAgentSummaryHistory(ctx context.Context, arg GetAgentSummaryHistoryParams) ([]AgentSummary, error) {
-	rows, err := q.db.QueryContext(
-		ctx, GetAgentSummaryHistory, arg.AgentID, arg.Limit,
-	)
+	rows, err := q.db.QueryContext(ctx, GetAgentSummaryHistory, arg.AgentID, arg.Limit)
 	if err != nil {
 		return nil, err
 	}
@@ -78,8 +77,13 @@ func (q *Queries) GetAgentSummaryHistory(ctx context.Context, arg GetAgentSummar
 	for rows.Next() {
 		var i AgentSummary
 		if err := rows.Scan(
-			&i.ID, &i.AgentID, &i.Summary, &i.Delta,
-			&i.TranscriptHash, &i.CostUsd, &i.CreatedAt,
+			&i.ID,
+			&i.AgentID,
+			&i.Summary,
+			&i.Delta,
+			&i.TranscriptHash,
+			&i.CostUsd,
+			&i.CreatedAt,
 		); err != nil {
 			return nil, err
 		}
@@ -94,11 +98,24 @@ func (q *Queries) GetAgentSummaryHistory(ctx context.Context, arg GetAgentSummar
 	return items, nil
 }
 
-const DeleteOldAgentSummaries = `-- name: DeleteOldAgentSummaries :exec
-DELETE FROM agent_summaries WHERE created_at < ?
+const GetLatestAgentSummary = `-- name: GetLatestAgentSummary :one
+SELECT id, agent_id, summary, delta, transcript_hash, cost_usd, created_at FROM agent_summaries
+WHERE agent_id = ?
+ORDER BY created_at DESC
+LIMIT 1
 `
 
-func (q *Queries) DeleteOldAgentSummaries(ctx context.Context, createdAt int64) error {
-	_, err := q.db.ExecContext(ctx, DeleteOldAgentSummaries, createdAt)
-	return err
+func (q *Queries) GetLatestAgentSummary(ctx context.Context, agentID int64) (AgentSummary, error) {
+	row := q.db.QueryRowContext(ctx, GetLatestAgentSummary, agentID)
+	var i AgentSummary
+	err := row.Scan(
+		&i.ID,
+		&i.AgentID,
+		&i.Summary,
+		&i.Delta,
+		&i.TranscriptHash,
+		&i.CostUsd,
+		&i.CreatedAt,
+	)
+	return i, err
 }

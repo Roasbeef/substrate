@@ -149,6 +149,54 @@ func (r *Registry) DeleteAgent(ctx context.Context, id int64) error {
 	return r.store.Queries().DeleteAgent(ctx, id)
 }
 
+// DiscoverAgents returns all agents with unread message counts. This is
+// used by the heartbeat manager to build the full discovery response.
+func (r *Registry) DiscoverAgents(
+	ctx context.Context,
+) ([]sqlc.DiscoverAgentsRow, error) {
+	return r.store.Queries().DiscoverAgents(ctx)
+}
+
+// UpdateDiscoveryInfo updates an agent's discovery metadata (purpose,
+// working directory, hostname). Empty strings preserve existing values
+// by reading the current agent row first.
+func (r *Registry) UpdateDiscoveryInfo(ctx context.Context, id int64,
+	purpose, workingDir, hostname string,
+) error {
+	// If any field is empty, read existing values to preserve them.
+	if purpose == "" || workingDir == "" || hostname == "" {
+		agent, err := r.store.Queries().GetAgent(ctx, id)
+		if err != nil {
+			return err
+		}
+		if purpose == "" {
+			purpose = agent.Purpose.String
+		}
+		if workingDir == "" {
+			workingDir = agent.WorkingDir.String
+		}
+		if hostname == "" {
+			hostname = agent.Hostname.String
+		}
+	}
+
+	return r.store.Queries().UpdateAgentDiscoveryInfo(
+		ctx, sqlc.UpdateAgentDiscoveryInfoParams{
+			Purpose:      toNullString(purpose),
+			WorkingDir:   toNullString(workingDir),
+			Hostname:     toNullString(hostname),
+			LastActiveAt: time.Now().Unix(),
+			ID:           id,
+		},
+	)
+}
+
+// toNullString converts a string to sql.NullString, treating empty
+// strings as valid empty values rather than NULL.
+func toNullString(s string) sql.NullString {
+	return sql.NullString{String: s, Valid: true}
+}
+
 // GenerateMemoableName generates a unique, memorable agent name.
 // Uses adjective + noun combination for easy recall.
 func GenerateMemoableName() string {

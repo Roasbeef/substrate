@@ -37,32 +37,6 @@ function InboxIcon() {
   );
 }
 
-function StarIcon() {
-  return (
-    <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-      <path
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        strokeWidth={2}
-        d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z"
-      />
-    </svg>
-  );
-}
-
-function ClockIcon() {
-  return (
-    <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-      <path
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        strokeWidth={2}
-        d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"
-      />
-    </svg>
-  );
-}
-
 function SendIcon() {
   return (
     <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -76,19 +50,6 @@ function SendIcon() {
   );
 }
 
-function ArchiveIcon() {
-  return (
-    <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-      <path
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        strokeWidth={2}
-        d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4"
-      />
-    </svg>
-  );
-}
-
 function UsersIcon() {
   return (
     <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -97,19 +58,6 @@ function UsersIcon() {
         strokeLinejoin="round"
         strokeWidth={2}
         d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z"
-      />
-    </svg>
-  );
-}
-
-function TerminalIcon() {
-  return (
-    <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-      <path
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        strokeWidth={2}
-        d="M8 9l3 3-3 3m5 0h3M5 20h14a2 2 0 002-2V6a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"
       />
     </svg>
   );
@@ -226,12 +174,8 @@ function SmallPlusIcon() {
 // Default navigation items.
 const navItems: NavItem[] = [
   { id: 'inbox', label: 'Inbox', path: routes.inbox, icon: <InboxIcon /> },
-  { id: 'starred', label: 'Starred', path: routes.starred, icon: <StarIcon /> },
-  { id: 'snoozed', label: 'Snoozed', path: routes.snoozed, icon: <ClockIcon /> },
   { id: 'sent', label: 'Sent', path: routes.sent, icon: <SendIcon /> },
-  { id: 'archive', label: 'Archive', path: routes.archive, icon: <ArchiveIcon /> },
   { id: 'agents', label: 'Agents', path: routes.agents, icon: <UsersIcon /> },
-  { id: 'sessions', label: 'Sessions', path: routes.sessions, icon: <TerminalIcon /> },
   { id: 'reviews', label: 'Reviews', path: routes.reviews, icon: <CodeReviewIcon /> },
   { id: 'tasks', label: 'Tasks', path: routes.tasks, icon: <TasksIcon /> },
   { id: 'plans', label: 'Plans', path: routes.plans, icon: <PlansIcon /> },
@@ -425,14 +369,10 @@ function useActiveSection(): SidebarSection {
   const path = location.pathname;
 
   if (path.startsWith('/agents')) return 'agents';
-  if (path.startsWith('/sessions')) return 'sessions';
   if (path.startsWith('/reviews')) return 'reviews';
   if (path.startsWith('/tasks')) return 'tasks';
   if (path.startsWith('/plans')) return 'plans';
-  if (path.startsWith('/starred')) return 'starred';
-  if (path.startsWith('/snoozed')) return 'snoozed';
   if (path.startsWith('/sent')) return 'sent';
-  if (path.startsWith('/archive')) return 'archive';
   return 'inbox';
 }
 

@@ -13,6 +13,16 @@ CREATE TABLE activities (
     created_at INTEGER NOT NULL
 );
 
+CREATE TABLE agent_summaries (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    agent_id INTEGER NOT NULL REFERENCES agents(id),
+    summary TEXT NOT NULL,
+    delta TEXT NOT NULL DEFAULT '',
+    transcript_hash TEXT NOT NULL DEFAULT '',
+    cost_usd REAL NOT NULL DEFAULT 0.0,
+    created_at INTEGER NOT NULL DEFAULT (unixepoch())
+);
+
 CREATE TABLE agent_tasks (
     id INTEGER PRIMARY KEY,
 
@@ -58,7 +68,7 @@ CREATE TABLE agents (
     current_session_id TEXT,
     created_at INTEGER NOT NULL,
     last_active_at INTEGER NOT NULL
-);
+, purpose TEXT DEFAULT '', working_dir TEXT DEFAULT '', hostname TEXT DEFAULT '');
 
 CREATE TABLE consumer_offsets (
     agent_id INTEGER NOT NULL REFERENCES agents(id) ON DELETE CASCADE,
@@ -281,6 +291,9 @@ CREATE INDEX idx_activities_created ON activities(created_at DESC);
 
 CREATE INDEX idx_activities_type ON activities(activity_type);
 
+CREATE INDEX idx_agent_summaries_agent
+    ON agent_summaries(agent_id, created_at DESC);
+
 CREATE INDEX idx_agent_tasks_agent_status ON agent_tasks(agent_id, status);
 
 CREATE INDEX idx_agent_tasks_list ON agent_tasks(list_id);
@@ -327,6 +340,9 @@ CREATE INDEX idx_plan_reviews_state ON plan_reviews(state);
 CREATE INDEX idx_plan_reviews_thread ON plan_reviews(thread_id);
 
 CREATE INDEX idx_recipients_agent ON message_recipients(agent_id);
+
+CREATE INDEX idx_recipients_agent_state
+    ON message_recipients(agent_id, state);
 
 CREATE INDEX idx_recipients_snoozed ON message_recipients(snoozed_until) WHERE snoozed_until IS NOT NULL;
 
