@@ -106,7 +106,7 @@ Key features:
 
 ## Data Model
 
-The database has 12 tables across 4 migrations. The core relationships:
+The database has 16 tables across 8 migrations. The core relationships:
 
 ```mermaid
 erDiagram
@@ -204,7 +204,7 @@ subtrate/
 │   ├── baselib/actor/      # Core actor system (mailbox, futures)
 │   ├── build/              # Build info and log handler setup
 │   ├── db/                 # Database layer
-│   │   ├── migrations/     # SQL migrations (000001-000004)
+│   │   ├── migrations/     # SQL migrations (000001-000008)
 │   │   ├── queries/        # sqlc query files
 │   │   └── sqlc/           # Generated code (do not edit)
 │   ├── hooks/              # Hook scripts and skill installer

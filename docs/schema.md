@@ -1,7 +1,7 @@
 # Database Schema
 
 SQLite database with WAL mode, FTS5 full-text search, and automatic
-migrations applied on server start. The schema is defined across 4
+migrations applied on server start. The schema is defined across 8
 migration files in `internal/db/migrations/`.
 
 ## Entity Relationship Diagram
@@ -15,6 +15,10 @@ erDiagram
     agents ||--o{ session_identities : "identified by"
     agents ||--o{ activities : generates
     agents ||--o{ reviews : requests
+    agents ||--o{ task_lists : owns
+    agents ||--o{ agent_tasks : assigned
+    agents ||--o{ plan_reviews : requests
+    agents ||--o{ agent_summaries : summarized
 
     messages ||--o{ message_recipients : "delivered to"
     messages }o--|| topics : "published to"
@@ -25,12 +29,17 @@ erDiagram
     reviews ||--o{ review_iterations : "reviewed in"
     reviews ||--o{ review_issues : "produces"
 
+    task_lists ||--o{ agent_tasks : contains
+
     agents {
         int id PK
         text name UK
         text project_key
         text git_branch
         text current_session_id
+        text purpose
+        text working_dir
+        text hostname
         int created_at
         int last_active_at
     }
@@ -171,6 +180,60 @@ erDiagram
         text last_error
         text status "pending|delivering|delivered|expired|failed"
     }
+
+    task_lists {
+        int id PK
+        text list_id UK
+        int agent_id FK
+        text watch_path
+        int created_at
+        int last_synced_at
+    }
+
+    agent_tasks {
+        int id PK
+        int agent_id FK
+        text list_id FK
+        text claude_task_id
+        text subject
+        text description
+        text active_form
+        text metadata
+        text status "pending|in_progress|completed|deleted"
+        text owner
+        text blocked_by
+        text blocks
+        int created_at
+        int updated_at
+    }
+
+    plan_reviews {
+        int id PK
+        text plan_review_id UK
+        int message_id FK
+        text thread_id
+        int requester_id FK
+        text reviewer_name
+        text plan_path
+        text plan_title
+        text plan_summary
+        text state "pending|approved|rejected|changes_requested"
+        text reviewer_comment
+        text session_id
+        int created_at
+        int updated_at
+        int reviewed_at
+    }
+
+    agent_summaries {
+        int id PK
+        int agent_id FK
+        text summary
+        text delta
+        text transcript_hash
+        real cost_usd
+        int created_at
+    }
 ```
 
 ## Review State Machine
@@ -254,6 +317,10 @@ table on INSERT, UPDATE, and DELETE. Search queries use SQLite's FTS5
 | 2 | `sender_deleted` | messages.deleted_by_sender |
 | 3 | `reviews` | reviews, review_iterations, review_issues, messages.metadata |
 | 4 | `queue_and_idempotency` | pending_operations, messages.idempotency_key |
+| 5 | `agent_tasks` | task_lists, agent_tasks, available_tasks (view) |
+| 6 | `plan_reviews` | plan_reviews |
+| 7 | `agent_summaries` | agent_summaries |
+| 8 | `agent_discovery` | agents.purpose, agents.working_dir, agents.hostname, idx_recipients_agent_state |
 
 Schema files: `internal/db/migrations/`, queries: `internal/db/queries/`,
 generated code: `internal/db/sqlc/` (do not edit directly).
