@@ -309,7 +309,7 @@ func filterDiscoveredAgents(
 
 	filtered := make([]DiscoveredAgentInfo, 0, len(agents))
 	for _, a := range agents {
-		if len(statusSet) > 0 && !statusSet[a.Status] {
+		if len(statusSet) > 0 && !statusSet[strings.ToLower(a.Status)] {
 			continue
 		}
 		if discoverProject != "" &&

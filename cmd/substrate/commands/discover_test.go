@@ -127,6 +127,11 @@ func TestFilterDiscoveredAgents(t *testing.T) {
 			Status:     "offline",
 			ProjectKey: "lnd-next",
 		},
+		{
+			Name:       "UpperAgent",
+			Status:     "ACTIVE",
+			ProjectKey: "grpc-project",
+		},
 	}
 
 	tests := []struct {
@@ -141,17 +146,18 @@ func TestFilterDiscoveredAgents(t *testing.T) {
 			want: []string{
 				"AlphaAgent", "BetaAgent",
 				"GammaAgent", "DeltaAgent",
+				"UpperAgent",
 			},
 		},
 		{
 			name:   "filter by single status",
 			status: "active",
-			want:   []string{"AlphaAgent"},
+			want:   []string{"AlphaAgent", "UpperAgent"},
 		},
 		{
 			name:   "filter by multiple statuses",
 			status: "active,busy",
-			want:   []string{"AlphaAgent", "BetaAgent"},
+			want:   []string{"AlphaAgent", "BetaAgent", "UpperAgent"},
 		},
 		{
 			name:    "filter by project prefix",
@@ -174,6 +180,7 @@ func TestFilterDiscoveredAgents(t *testing.T) {
 			want: []string{
 				"AlphaAgent", "BetaAgent",
 				"GammaAgent", "DeltaAgent",
+				"UpperAgent",
 			},
 		},
 		{
@@ -198,7 +205,12 @@ func TestFilterDiscoveredAgents(t *testing.T) {
 		{
 			name:   "status with spaces trimmed",
 			status: " active , busy ",
-			want:   []string{"AlphaAgent", "BetaAgent"},
+			want:   []string{"AlphaAgent", "BetaAgent", "UpperAgent"},
+		},
+		{
+			name:   "status comparison is case insensitive",
+			status: "active",
+			want:   []string{"AlphaAgent", "UpperAgent"},
 		},
 	}
 
