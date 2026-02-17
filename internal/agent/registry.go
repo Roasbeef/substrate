@@ -158,20 +158,43 @@ func (r *Registry) DiscoverAgents(
 }
 
 // UpdateDiscoveryInfo updates an agent's discovery metadata (purpose,
-// working directory, hostname). Empty strings are ignored (existing
-// values are preserved).
+// working directory, hostname). Empty strings preserve existing values
+// by reading the current agent row first.
 func (r *Registry) UpdateDiscoveryInfo(ctx context.Context, id int64,
 	purpose, workingDir, hostname string,
 ) error {
+	// If any field is empty, read existing values to preserve them.
+	if purpose == "" || workingDir == "" || hostname == "" {
+		agent, err := r.store.Queries().GetAgent(ctx, id)
+		if err != nil {
+			return err
+		}
+		if purpose == "" {
+			purpose = agent.Purpose.String
+		}
+		if workingDir == "" {
+			workingDir = agent.WorkingDir.String
+		}
+		if hostname == "" {
+			hostname = agent.Hostname.String
+		}
+	}
+
 	return r.store.Queries().UpdateAgentDiscoveryInfo(
 		ctx, sqlc.UpdateAgentDiscoveryInfoParams{
-			Purpose:      purpose,
-			WorkingDir:   workingDir,
-			Hostname:     hostname,
+			Purpose:      toNullString(purpose),
+			WorkingDir:   toNullString(workingDir),
+			Hostname:     toNullString(hostname),
 			LastActiveAt: time.Now().Unix(),
 			ID:           id,
 		},
 	)
+}
+
+// toNullString converts a string to sql.NullString, treating empty
+// strings as valid empty values rather than NULL.
+func toNullString(s string) sql.NullString {
+	return sql.NullString{String: s, Valid: true}
 }
 
 // GenerateMemoableName generates a unique, memorable agent name.

@@ -425,17 +425,17 @@ func (q *Queries) SearchAgents(ctx context.Context, arg SearchAgentsParams) ([]A
 
 const UpdateAgentDiscoveryInfo = `-- name: UpdateAgentDiscoveryInfo :exec
 UPDATE agents SET
-    purpose = CASE WHEN ?1 = '' THEN purpose ELSE ?1 END,
-    working_dir = CASE WHEN ?2 = '' THEN working_dir ELSE ?2 END,
-    hostname = CASE WHEN ?3 = '' THEN hostname ELSE ?3 END,
+    purpose = ?1,
+    working_dir = ?2,
+    hostname = ?3,
     last_active_at = ?4
 WHERE id = ?5
 `
 
 type UpdateAgentDiscoveryInfoParams struct {
-	Purpose      interface{}
-	WorkingDir   interface{}
-	Hostname     interface{}
+	Purpose      sql.NullString
+	WorkingDir   sql.NullString
+	Hostname     sql.NullString
 	LastActiveAt int64
 	ID           int64
 }

@@ -554,14 +554,9 @@ func (m *IdentityManager) updateAgentContext(ctx context.Context,
 	workingDir := projectKey // projectKey is the raw directory path.
 
 	if workingDir != "" || hostname != "" {
-		err := m.store.Queries().UpdateAgentDiscoveryInfo(
-			ctx, sqlc.UpdateAgentDiscoveryInfoParams{
-				Purpose:      "", // Preserve existing.
-				WorkingDir:   workingDir,
-				Hostname:     hostname,
-				LastActiveAt: time.Now().Unix(),
-				ID:           identity.AgentID,
-			},
+		err := m.registry.UpdateDiscoveryInfo(
+			ctx, identity.AgentID,
+			"", workingDir, hostname,
 		)
 		if err != nil {
 			// Non-fatal: discovery info is supplementary.

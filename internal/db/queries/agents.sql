@@ -69,9 +69,9 @@ SELECT * FROM session_identities WHERE agent_id = ? ORDER BY last_active_at DESC
 
 -- name: UpdateAgentDiscoveryInfo :exec
 UPDATE agents SET
-    purpose = CASE WHEN @purpose = '' THEN purpose ELSE @purpose END,
-    working_dir = CASE WHEN @working_dir = '' THEN working_dir ELSE @working_dir END,
-    hostname = CASE WHEN @hostname = '' THEN hostname ELSE @hostname END,
+    purpose = @purpose,
+    working_dir = @working_dir,
+    hostname = @hostname,
     last_active_at = @last_active_at
 WHERE id = @id;
 

@@ -761,7 +761,7 @@ registry.UpdateDiscoveryInfo(ctx, agentID,
 ```
 
 ### Database
-- Migration `000007_agent_discovery` adds `purpose`, `working_dir`, and
+- Migration `000008_agent_discovery` adds `purpose`, `working_dir`, and
   `hostname` columns to the `agents` table
 - Adds compound index `idx_recipients_agent_state` on
   `message_recipients(agent_id, state)` for efficient unread count queries
