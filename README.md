@@ -182,6 +182,9 @@ The Stop hook is the key mechanism. Instead of letting agents exit when idle, it
 | [Hooks System](docs/HOOKS.md) | How Subtrate integrates with Claude Code hooks |
 | [Message Delivery](docs/delivery.md) | Data model and message state management |
 | [Status Updates](docs/status-updates.md) | Automated status reporting to the User agent |
+| [Plan Mode](docs/plan-mode.md) | Async plan review and approval workflow |
+| [Agent Discovery](docs/cli-reference.md#agent-discover) | Find agents by status, project, or name |
+| [CLAUDE.md Snippet](docs/claude-md-snippet.md) | Copy-pasteable integration guide for your project |
 | [Roadmap](docs/ROADMAP.md) | Planned features and improvements |
 
 ## Agent Identity
