@@ -1,8 +1,11 @@
 package commands
 
 import (
+	"bufio"
 	"bytes"
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"fmt"
 	"os"
 	"os/exec"
@@ -18,6 +21,7 @@ var (
 	sendDiffBase     string
 	sendDiffRepoPath string
 	sendDiffSubject  string
+	sendDiffForce    bool
 )
 
 // sendDiffCmd sends a git diff summary as a message.
@@ -48,6 +52,12 @@ func init() {
 	sendDiffCmd.Flags().StringVar(
 		&sendDiffSubject, "subject", "",
 		"Custom subject (default: auto-generated from branch)",
+	)
+	sendDiffCmd.Flags().BoolVar(
+		&sendDiffForce, "force", false,
+		"Send even if an identical diff (same raw patch bytes) "+
+			"was already sent; subject and branch metadata "+
+			"are not part of the dedup key",
 	)
 }
 
@@ -140,12 +150,23 @@ func runSendDiff(cmd *cobra.Command, args []string) error {
 	body.WriteString("<!-- substrate:diff -->\n")
 	body.WriteString(patch)
 
+	// Build a content-based idempotency key from the diff patch.
+	// If the exact same diff was already sent, the mail service
+	// returns the original message instead of creating a duplicate.
+	idempotencyKey := ""
+	if !sendDiffForce {
+		idempotencyKey = diffIdempotencyKey(
+			agentID, sendDiffTo, patch,
+		)
+	}
+
 	req := mail.SendMailRequest{
 		SenderID:       agentID,
 		RecipientNames: []string{sendDiffTo},
 		Subject:        subject,
 		Body:           body.String(),
 		Priority:       mail.PriorityNormal,
+		IdempotencyKey: idempotencyKey,
 	}
 
 	msgID, threadID, err := client.SendMail(ctx, req)
@@ -156,9 +177,10 @@ func runSendDiff(cmd *cobra.Command, args []string) error {
 	switch outputFormat {
 	case "json":
 		return outputJSON(map[string]any{
-			"message_id": msgID,
-			"thread_id":  threadID,
-			"stats":      stats,
+			"message_id":      msgID,
+			"thread_id":       threadID,
+			"stats":           stats,
+			"idempotency_key": idempotencyKey,
 		})
 	default:
 		fmt.Printf(
@@ -168,6 +190,25 @@ func runSendDiff(cmd *cobra.Command, args []string) error {
 	}
 
 	return nil
+}
+
+// diffIdempotencyKey builds a deterministic idempotency key from the diff
+// content. The key is derived from a SHA-256 hash of the patch text, scoped
+// to the sender and recipient so that different agents sending the same
+// patch don't collide.
+func diffIdempotencyKey(
+	senderID int64, recipient, patch string,
+) string {
+	h := sha256.New()
+
+	// Use length-prefixed encoding to prevent ambiguity when the
+	// recipient name contains colons or other delimiters.
+	fmt.Fprintf(
+		h, "diff:%d:%d:%s:", senderID, len(recipient), recipient,
+	)
+	h.Write([]byte(patch))
+
+	return "diff:" + hex.EncodeToString(h.Sum(nil))
 }
 
 // diffStats holds summary statistics for a diff.
@@ -185,12 +226,24 @@ func (s diffStats) summary() string {
 	)
 }
 
-// computeDiffStats computes basic stats from a unified diff patch.
+// computeDiffStats computes basic stats from a unified diff patch. It
+// streams through the patch line-by-line with a scanner to avoid
+// allocating a full slice of every line for large diffs.
 func computeDiffStats(patch string) diffStats {
 	var s diffStats
 	files := make(map[string]bool)
 
-	for _, line := range strings.Split(patch, "\n") {
+	scanner := bufio.NewScanner(strings.NewReader(patch))
+
+	// Increase buffer to 1 MiB to handle long lines (minified JS,
+	// binary blobs). The default 64 KiB limit would silently truncate
+	// stats for patches with oversized lines.
+	const maxLine = 1 << 20
+	scanner.Buffer(make([]byte, maxLine), maxLine)
+
+	for scanner.Scan() {
+		line := scanner.Text()
+
 		if strings.HasPrefix(line, "diff --git ") {
 			// Extract file name from "diff --git a/foo b/foo".
 			parts := strings.Fields(line)
@@ -209,6 +262,10 @@ func computeDiffStats(patch string) diffStats {
 			s.Deletions++
 		}
 	}
+
+	// strings.Reader never produces I/O errors, but checking
+	// scanner.Err is good practice for correctness.
+	_ = scanner.Err()
 
 	s.Files = len(files)
 

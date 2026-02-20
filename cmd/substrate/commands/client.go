@@ -589,6 +589,7 @@ func (c *Client) SendMail(ctx context.Context, req mail.SendMailRequest) (int64,
 			Subject:        req.Subject,
 			Body:           req.Body,
 			Priority:       convertPriorityToProto(req.Priority),
+			IdempotencyKey: req.IdempotencyKey,
 		}
 		if req.Deadline != nil {
 			grpcReq.DeadlineAt = timestamppb.New(*req.Deadline)
