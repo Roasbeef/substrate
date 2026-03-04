@@ -166,10 +166,14 @@ export interface MessageListProps {
   onStar?: (id: number, starred: boolean) => void;
   /** Handler for archiving a message. */
   onArchive?: (id: number) => void;
+  /** Handler for archiving an entire thread (by thread ID). */
+  onThreadArchive?: (threadId: string) => void;
   /** Handler for snoozing a message. */
   onSnooze?: (id: number) => void;
   /** Handler for deleting a message. */
   onDelete?: (id: number) => void;
+  /** Handler for deleting an entire thread (by thread ID). */
+  onThreadDelete?: (threadId: string) => void;
   /** Whether data is loading. */
   isLoading?: boolean;
   /** Number of skeleton rows to show when loading. */
@@ -199,8 +203,10 @@ export function MessageList({
   onThreadGroupClick,
   onStar,
   onArchive,
+  onThreadArchive,
   onSnooze,
   onDelete,
+  onThreadDelete,
   isLoading = false,
   loadingRows = 5,
   isEmpty = false,
@@ -317,18 +323,23 @@ export function MessageList({
         {...(onStar && {
           onStar: (starred: boolean) => onStar(group.latestMessage.id, starred),
         })}
-        {...(onArchive && {
-          onArchive: () => onArchive(group.latestMessage.id),
+        {...((onThreadArchive || onArchive) && {
+          onArchive: () => onThreadArchive
+            ? onThreadArchive(group.threadId)
+            : onArchive?.(group.latestMessage.id),
         })}
         {...(onSnooze && {
           onSnooze: () => onSnooze(group.latestMessage.id),
         })}
-        {...(onDelete && {
-          onDelete: () => onDelete(group.latestMessage.id),
+        {...((onThreadDelete || onDelete) && {
+          onDelete: () => onThreadDelete
+            ? onThreadDelete(group.threadId)
+            : onDelete?.(group.latestMessage.id),
         })}
         showCheckbox={showCheckboxes}
         threadMessageCount={group.messageCount}
         threadHasUnread={group.hasUnread}
+        threadHasStarred={group.hasStarred}
       />
     );
   };

@@ -352,6 +352,22 @@ export default function InboxPage() {
     }
   }, [selectedThreadId, markThreadUnread]);
 
+  // Handle archiving an entire thread from the inbox row.
+  const handleThreadRowArchive = useCallback(
+    (threadId: string) => {
+      archiveThread.mutate(threadId);
+    },
+    [archiveThread],
+  );
+
+  // Handle deleting an entire thread from the inbox row.
+  const handleThreadRowDelete = useCallback(
+    (threadId: string) => {
+      deleteThread.mutate(threadId);
+    },
+    [deleteThread],
+  );
+
   // Handle star toggle.
   const handleStar = useCallback(
     (id: number, starred: boolean) => {
@@ -523,8 +539,10 @@ export default function InboxPage() {
           onThreadGroupClick={handleThreadGroupClick}
           onStar={handleStar}
           onArchive={handleArchive}
+          onThreadArchive={handleThreadRowArchive}
           onSnooze={handleSnooze}
           onDelete={handleDelete}
+          onThreadDelete={handleThreadRowDelete}
           isLoading={isLoading}
           isEmpty={!isLoading && threadGroups.length === 0}
           emptyTitle={

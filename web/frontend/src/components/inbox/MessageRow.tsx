@@ -180,6 +180,8 @@ export interface MessageRowProps {
   threadMessageCount?: number;
   /** Override for unread indicator (used for thread groups). */
   threadHasUnread?: boolean;
+  /** Override for starred indicator (used for thread groups). */
+  threadHasStarred?: boolean;
   /** Additional class name. */
   className?: string;
 }
@@ -196,12 +198,13 @@ export function MessageRow({
   showCheckbox = true,
   threadMessageCount,
   threadHasUnread,
+  threadHasStarred,
   className,
 }: MessageRowProps) {
   // Get recipient state for current user (assuming first recipient for now).
   const recipientState = message.recipients[0];
   const isUnread = threadHasUnread ?? (recipientState?.state === 'unread');
-  const isStarred = recipientState?.is_starred ?? false;
+  const isStarred = threadHasStarred ?? (recipientState?.is_starred ?? false);
 
   const handleCheckboxChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     e.stopPropagation();
