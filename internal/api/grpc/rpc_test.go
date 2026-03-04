@@ -2086,3 +2086,239 @@ func TestSanitizeUTF8(t *testing.T) {
 		})
 	}
 }
+
+// ============================================================================
+// ReplyToThread Tests
+// ============================================================================
+
+// TestReplyToThread_UserInitiatedThread tests that a User can reply to a
+// thread they started. This was the original bug: when User sent the first
+// message, ReplyToThread failed with "no recipients" because it only checked
+// msgs[0].SenderID which equaled the User's own ID.
+func TestReplyToThread_UserInitiatedThread(t *testing.T) {
+	h := newTestHarness(t)
+	defer h.Close()
+
+	ctx := context.Background()
+
+	// Look up the built-in "User" agent (created by newTestHarness).
+	userAgent, err := h.storage.GetAgentByName(ctx, "User")
+	require.NoError(t, err)
+	userID := userAgent.ID
+
+	agentID := h.createTestAgent("ReplyTestAgent")
+
+	// Step 1: User sends the first message to the agent.
+	initialResp, err := h.mailClient.SendMail(ctx, &SendMailRequest{
+		SenderId:       userID,
+		RecipientNames: []string{"ReplyTestAgent"},
+		Subject:        "Question for you",
+		Body:           "What's the status?",
+	})
+	require.NoError(t, err)
+	threadID := initialResp.ThreadId
+	require.NotEmpty(t, threadID)
+
+	// Step 2: Agent replies in the same thread.
+	_, err = h.mailClient.SendMail(ctx, &SendMailRequest{
+		SenderId:       agentID,
+		RecipientNames: []string{"User"},
+		Subject:        "Re: Question for you",
+		Body:           "Everything is green.",
+		ThreadId:       threadID,
+	})
+	require.NoError(t, err)
+
+	// Step 3: User replies via ReplyToThread (the web UI path).
+	// This is the scenario that was broken — sender_id=0 defaults to
+	// User, and User was also the first message sender.
+	replyResp, err := h.mailClient.ReplyToThread(ctx, &ReplyToThreadRequest{
+		ThreadId: threadID,
+		Body:     "Great, thanks!",
+	})
+	require.NoError(t, err, "User should be able to reply to their own thread")
+	require.NotZero(t, replyResp.MessageId)
+
+	// Verify the thread now has 3 messages.
+	threadResp, err := h.mailClient.ReadThread(ctx, &ReadThreadRequest{
+		ThreadId: threadID,
+		AgentId:  userID,
+	})
+	require.NoError(t, err)
+	require.Len(t, threadResp.Messages, 3)
+	require.Equal(t, "Great, thanks!", threadResp.Messages[2].Body)
+
+	// Verify the reply was delivered to the agent's inbox.
+	inboxResp, err := h.mailClient.FetchInbox(ctx, &FetchInboxRequest{
+		AgentId: agentID,
+	})
+	require.NoError(t, err)
+
+	var found bool
+	for _, msg := range inboxResp.Messages {
+		if msg.Body == "Great, thanks!" {
+			found = true
+			break
+		}
+	}
+	require.True(t, found, "reply should appear in agent's inbox")
+}
+
+// TestReplyToThread_AgentInitiatedThread tests that a User can reply to a
+// thread that an agent started (the simpler case that already worked).
+func TestReplyToThread_AgentInitiatedThread(t *testing.T) {
+	h := newTestHarness(t)
+	defer h.Close()
+
+	ctx := context.Background()
+
+	userAgent, err := h.storage.GetAgentByName(ctx, "User")
+	require.NoError(t, err)
+	userID := userAgent.ID
+
+	agentID := h.createTestAgent("InitiatorAgent")
+
+	// Agent sends the first message to User.
+	initialResp, err := h.mailClient.SendMail(ctx, &SendMailRequest{
+		SenderId:       agentID,
+		RecipientNames: []string{"User"},
+		Subject:        "Status update",
+		Body:           "Build completed successfully.",
+	})
+	require.NoError(t, err)
+	threadID := initialResp.ThreadId
+
+	// User replies via ReplyToThread.
+	replyResp, err := h.mailClient.ReplyToThread(ctx, &ReplyToThreadRequest{
+		ThreadId: threadID,
+		Body:     "Acknowledged.",
+	})
+	require.NoError(t, err)
+	require.NotZero(t, replyResp.MessageId)
+
+	// Verify thread has both messages.
+	threadResp, err := h.mailClient.ReadThread(ctx, &ReadThreadRequest{
+		ThreadId: threadID,
+		AgentId:  userID,
+	})
+	require.NoError(t, err)
+	require.Len(t, threadResp.Messages, 2)
+	require.Equal(t, "Acknowledged.", threadResp.Messages[1].Body)
+}
+
+// TestReplyToThread_MultiParticipant tests that ReplyToThread includes all
+// thread participants (not just the first message sender) as recipients.
+func TestReplyToThread_MultiParticipant(t *testing.T) {
+	h := newTestHarness(t)
+	defer h.Close()
+
+	ctx := context.Background()
+
+	userAgent, err := h.storage.GetAgentByName(ctx, "User")
+	require.NoError(t, err)
+	userID := userAgent.ID
+
+	agent1ID := h.createTestAgent("MultiAgent1")
+	agent2ID := h.createTestAgent("MultiAgent2")
+
+	// User sends to Agent1.
+	initialResp, err := h.mailClient.SendMail(ctx, &SendMailRequest{
+		SenderId:       userID,
+		RecipientNames: []string{"MultiAgent1"},
+		Subject:        "Group discussion",
+		Body:           "Let's coordinate.",
+	})
+	require.NoError(t, err)
+	threadID := initialResp.ThreadId
+
+	// Agent1 replies in the thread.
+	_, err = h.mailClient.SendMail(ctx, &SendMailRequest{
+		SenderId:       agent1ID,
+		RecipientNames: []string{"User"},
+		Subject:        "Re: Group discussion",
+		Body:           "Sounds good.",
+		ThreadId:       threadID,
+	})
+	require.NoError(t, err)
+
+	// Agent2 also replies in the thread.
+	_, err = h.mailClient.SendMail(ctx, &SendMailRequest{
+		SenderId:       agent2ID,
+		RecipientNames: []string{"User"},
+		Subject:        "Re: Group discussion",
+		Body:           "I'm in.",
+		ThreadId:       threadID,
+	})
+	require.NoError(t, err)
+
+	// User replies via ReplyToThread — should reach both agents.
+	replyResp, err := h.mailClient.ReplyToThread(ctx, &ReplyToThreadRequest{
+		ThreadId: threadID,
+		Body:     "Perfect, let's go.",
+	})
+	require.NoError(t, err)
+	require.NotZero(t, replyResp.MessageId)
+
+	// Verify both agents received the reply.
+	for _, id := range []struct {
+		agentID int64
+		name    string
+	}{
+		{agent1ID, "MultiAgent1"},
+		{agent2ID, "MultiAgent2"},
+	} {
+		inbox, err := h.mailClient.FetchInbox(ctx, &FetchInboxRequest{
+			AgentId: id.agentID,
+		})
+		require.NoError(t, err)
+
+		var found bool
+		for _, msg := range inbox.Messages {
+			if msg.Body == "Perfect, let's go." {
+				found = true
+				break
+			}
+		}
+		require.True(t, found,
+			"%s should have received the reply", id.name,
+		)
+	}
+
+	// Thread should have 4 messages total.
+	threadResp, err := h.mailClient.ReadThread(ctx, &ReadThreadRequest{
+		ThreadId: threadID,
+		AgentId:  userID,
+	})
+	require.NoError(t, err)
+	require.Len(t, threadResp.Messages, 4)
+}
+
+// TestReplyToThread_ValidationErrors tests error cases for ReplyToThread.
+func TestReplyToThread_ValidationErrors(t *testing.T) {
+	h := newTestHarness(t)
+	defer h.Close()
+
+	ctx := context.Background()
+
+	// Missing thread_id.
+	_, err := h.mailClient.ReplyToThread(ctx, &ReplyToThreadRequest{
+		Body: "orphaned reply",
+	})
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "thread_id is required")
+
+	// Missing body.
+	_, err = h.mailClient.ReplyToThread(ctx, &ReplyToThreadRequest{
+		ThreadId: "some-thread-id",
+	})
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "body is required")
+
+	// Non-existent thread.
+	_, err = h.mailClient.ReplyToThread(ctx, &ReplyToThreadRequest{
+		ThreadId: "nonexistent-thread-id",
+		Body:     "reply to nowhere",
+	})
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "thread not found")
+}

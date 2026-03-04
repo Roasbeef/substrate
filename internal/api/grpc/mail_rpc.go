@@ -673,13 +673,23 @@ func (s *Server) ReplyToThread(
 		subject = "Re: " + subject
 	}
 
-	// Build recipient list - reply to the original sender.
+	// Build recipient list from all thread participants (excluding
+	// the current sender). This handles the case where the user sent
+	// the first message — we still need to reply to the other
+	// participants who responded later in the thread.
+	seen := make(map[int64]struct{})
+	seen[senderID] = struct{}{}
+
 	var recipientNames []string
-	if origMsg.SenderID != senderID {
-		// Look up the sender's name.
-		sender, err := s.store.Queries().GetAgent(ctx, origMsg.SenderID)
+	for _, m := range msgs {
+		if _, ok := seen[m.SenderID]; ok {
+			continue
+		}
+		seen[m.SenderID] = struct{}{}
+
+		agent, err := s.store.Queries().GetAgent(ctx, m.SenderID)
 		if err == nil {
-			recipientNames = append(recipientNames, sender.Name)
+			recipientNames = append(recipientNames, agent.Name)
 		}
 	}
 
