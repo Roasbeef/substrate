@@ -125,7 +125,7 @@ export default function AgentsDashboard({
   onRegisterClick,
   className,
 }: AgentsDashboardProps) {
-  const [filter, setFilter] = useState<FilterTab>('active');
+  const [filter, setFilter] = useState<FilterTab>('all');
   const [selectedAgentId, setSelectedAgentId] = useState<number | null>(null);
   const { data, isLoading, error, refetch } = useAgentsStatus();
 
