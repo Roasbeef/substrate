@@ -176,6 +176,10 @@ export interface MessageRowProps {
   onDelete?: () => void;
   /** Whether to show checkbox. */
   showCheckbox?: boolean;
+  /** Number of messages in the thread (shows count badge if > 1). */
+  threadMessageCount?: number;
+  /** Override for unread indicator (used for thread groups). */
+  threadHasUnread?: boolean;
   /** Additional class name. */
   className?: string;
 }
@@ -190,11 +194,13 @@ export function MessageRow({
   onSnooze,
   onDelete,
   showCheckbox = true,
+  threadMessageCount,
+  threadHasUnread,
   className,
 }: MessageRowProps) {
   // Get recipient state for current user (assuming first recipient for now).
   const recipientState = message.recipients[0];
-  const isUnread = recipientState?.state === 'unread';
+  const isUnread = threadHasUnread ?? (recipientState?.state === 'unread');
   const isStarred = recipientState?.is_starred ?? false;
 
   const handleCheckboxChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -308,6 +314,18 @@ export function MessageRow({
           </span>
         ) : null}
       </div>
+
+      {/* Thread count badge (shown when thread has multiple messages). */}
+      {threadMessageCount !== undefined && threadMessageCount > 1 ? (
+        <span
+          className="flex-shrink-0 inline-flex items-center justify-center
+            rounded-full bg-gray-100 text-gray-600 text-xs font-medium
+            h-5 min-w-[20px] px-1.5"
+          title={`${threadMessageCount} messages in thread`}
+        >
+          {threadMessageCount}
+        </span>
+      ) : null}
 
       {/* Recipient names (To field). */}
       {message.recipient_names && message.recipient_names.length > 0 ? (

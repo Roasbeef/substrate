@@ -31,6 +31,7 @@ import {
   useMarkThreadUnread,
 } from '@/hooks/useThreads.js';
 import { useMessagesRealtime } from '@/hooks/useMessagesRealtime.js';
+import { groupMessagesByThread, type ThreadGroup } from '@/lib/threadGrouping.js';
 import type { MessageWithRecipients } from '@/types/api.js';
 
 // Inbox page state.
@@ -176,10 +177,16 @@ export default function InboxPage() {
     return allMessages.filter((m) => m.sender_name === state.senderFilter);
   }, [allMessages, state.senderFilter]);
 
-  // Selection state.
-  const messageIds = useMemo(
-    () => messages.map((m) => m.id),
+  // Group messages by thread for collapsed inbox view.
+  const threadGroups = useMemo(
+    () => groupMessagesByThread(messages),
     [messages],
+  );
+
+  // Selection state (uses all message IDs across all thread groups).
+  const messageIds = useMemo(
+    () => threadGroups.flatMap((g) => g.messageIds),
+    [threadGroups],
   );
   const selection = useMessageSelection({ messageIds });
 
@@ -297,6 +304,16 @@ export default function InboxPage() {
     // Open thread view with the message's thread_id (or message id as string fallback).
     const threadId = message.thread_id ?? String(message.id);
     setSelectedThreadId(threadId);
+  }, [markRead]);
+
+  // Handle thread group click - open thread view for the group.
+  const handleThreadGroupClick = useCallback((group: ThreadGroup) => {
+    // Mark the latest message as read when opened.
+    const latestMsg = group.latestMessage;
+    if (latestMsg.recipients[0]?.state === 'unread') {
+      markRead.mutate(latestMsg.id);
+    }
+    setSelectedThreadId(group.threadId);
   }, [markRead]);
 
   // Handle closing thread view.
@@ -484,7 +501,7 @@ export default function InboxPage() {
         filter={state.filter}
         onFilterChange={handleFilterChange}
         selectedCount={selection.selectedCount}
-        totalCount={messages.length}
+        totalCount={threadGroups.length}
         allSelected={selection.allSelected}
         isIndeterminate={selection.isIndeterminate}
         onSelectAll={selection.selectAll}
@@ -499,15 +516,17 @@ export default function InboxPage() {
       <div className="flex-1 overflow-auto">
         <MessageList
           messages={messages}
+          threadGroups={threadGroups}
           selectedIds={selection.selectedIds}
           onSelectionChange={selection.setSelection}
           onMessageClick={handleMessageClick}
+          onThreadGroupClick={handleThreadGroupClick}
           onStar={handleStar}
           onArchive={handleArchive}
           onSnooze={handleSnooze}
           onDelete={handleDelete}
           isLoading={isLoading}
-          isEmpty={!isLoading && messages.length === 0}
+          isEmpty={!isLoading && threadGroups.length === 0}
           emptyTitle={
             state.filter === 'unread'
               ? 'All caught up!'
