@@ -31,6 +31,7 @@ import {
   useMarkThreadUnread,
 } from '@/hooks/useThreads.js';
 import { useMessagesRealtime } from '@/hooks/useMessagesRealtime.js';
+import { groupMessagesByThread, type ThreadGroup } from '@/lib/threadGrouping.js';
 import type { MessageWithRecipients } from '@/types/api.js';
 
 // Inbox page state.
@@ -176,10 +177,16 @@ export default function InboxPage() {
     return allMessages.filter((m) => m.sender_name === state.senderFilter);
   }, [allMessages, state.senderFilter]);
 
-  // Selection state.
-  const messageIds = useMemo(
-    () => messages.map((m) => m.id),
+  // Group messages by thread for collapsed inbox view.
+  const threadGroups = useMemo(
+    () => groupMessagesByThread(messages),
     [messages],
+  );
+
+  // Selection state (uses all message IDs across all thread groups).
+  const messageIds = useMemo(
+    () => threadGroups.flatMap((g) => g.messageIds),
+    [threadGroups],
   );
   const selection = useMessageSelection({ messageIds });
 
@@ -299,6 +306,21 @@ export default function InboxPage() {
     setSelectedThreadId(threadId);
   }, [markRead]);
 
+  // Handle thread group click - open thread view for the group.
+  const handleThreadGroupClick = useCallback((group: ThreadGroup) => {
+    // Mark ALL unread messages in the thread as read so the
+    // aggregate hasUnread indicator clears properly.
+    if (group.hasUnread) {
+      const unreadIds = new Set(group.messageIds);
+      for (const msg of messages) {
+        if (unreadIds.has(msg.id) && msg.recipients.some((r) => r.state === 'unread')) {
+          markRead.mutate(msg.id);
+        }
+      }
+    }
+    setSelectedThreadId(group.threadId);
+  }, [markRead, messages]);
+
   // Handle closing thread view.
   const handleCloseThread = useCallback(() => {
     setSelectedThreadId(null);
@@ -334,6 +356,22 @@ export default function InboxPage() {
       setSelectedThreadId(null);
     }
   }, [selectedThreadId, markThreadUnread]);
+
+  // Handle archiving an entire thread from the inbox row.
+  const handleThreadRowArchive = useCallback(
+    (threadId: string) => {
+      archiveThread.mutate(threadId);
+    },
+    [archiveThread],
+  );
+
+  // Handle deleting an entire thread from the inbox row.
+  const handleThreadRowDelete = useCallback(
+    (threadId: string) => {
+      deleteThread.mutate(threadId);
+    },
+    [deleteThread],
+  );
 
   // Handle star toggle.
   const handleStar = useCallback(
@@ -484,7 +522,7 @@ export default function InboxPage() {
         filter={state.filter}
         onFilterChange={handleFilterChange}
         selectedCount={selection.selectedCount}
-        totalCount={messages.length}
+        totalCount={threadGroups.length}
         allSelected={selection.allSelected}
         isIndeterminate={selection.isIndeterminate}
         onSelectAll={selection.selectAll}
@@ -499,15 +537,19 @@ export default function InboxPage() {
       <div className="flex-1 overflow-auto">
         <MessageList
           messages={messages}
+          threadGroups={threadGroups}
           selectedIds={selection.selectedIds}
           onSelectionChange={selection.setSelection}
           onMessageClick={handleMessageClick}
+          onThreadGroupClick={handleThreadGroupClick}
           onStar={handleStar}
           onArchive={handleArchive}
+          onThreadArchive={handleThreadRowArchive}
           onSnooze={handleSnooze}
           onDelete={handleDelete}
+          onThreadDelete={handleThreadRowDelete}
           isLoading={isLoading}
-          isEmpty={!isLoading && messages.length === 0}
+          isEmpty={!isLoading && threadGroups.length === 0}
           emptyTitle={
             state.filter === 'unread'
               ? 'All caught up!'

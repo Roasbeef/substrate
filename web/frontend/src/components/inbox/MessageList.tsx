@@ -5,6 +5,7 @@ import { clsx } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 import { MessageRow, CompactMessageRow } from './MessageRow.js';
 import type { MessageWithRecipients } from '@/types/api.js';
+import type { ThreadGroup } from '@/lib/threadGrouping.js';
 
 // Combine clsx and tailwind-merge for class name handling.
 function cn(...inputs: (string | undefined | null | false)[]) {
@@ -46,6 +47,20 @@ function groupMessagesByDate(messages: MessageWithRecipients[]): Map<string, Mes
     const label = getDateLabel(message.created_at);
     const group = groups.get(label) ?? [];
     group.push(message);
+    groups.set(label, group);
+  }
+
+  return groups;
+}
+
+// Group thread groups by date (using latest message timestamp).
+function groupThreadsByDate(threadGroups: ThreadGroup[]): Map<string, ThreadGroup[]> {
+  const groups = new Map<string, ThreadGroup[]>();
+
+  for (const tg of threadGroups) {
+    const label = getDateLabel(tg.latestMessage.created_at);
+    const group = groups.get(label) ?? [];
+    group.push(tg);
     groups.set(label, group);
   }
 
@@ -135,22 +150,30 @@ function MessageSkeleton({ compact = false }: { compact?: boolean }) {
 
 // Props for MessageList component.
 export interface MessageListProps {
-  /** Array of messages to display. */
+  /** Array of messages to display (used when threadGroups is not provided). */
   messages: MessageWithRecipients[];
+  /** Thread groups to display (takes priority over messages when provided). */
+  threadGroups?: ThreadGroup[];
   /** IDs of currently selected messages. */
   selectedIds?: Set<number>;
   /** Handler for selection changes. */
   onSelectionChange?: (selectedIds: Set<number>) => void;
   /** Handler for clicking a message. */
   onMessageClick?: (message: MessageWithRecipients) => void;
+  /** Handler for clicking a thread group row. */
+  onThreadGroupClick?: (group: ThreadGroup) => void;
   /** Handler for starring/unstarring a message. */
   onStar?: (id: number, starred: boolean) => void;
   /** Handler for archiving a message. */
   onArchive?: (id: number) => void;
+  /** Handler for archiving an entire thread (by thread ID). */
+  onThreadArchive?: (threadId: string) => void;
   /** Handler for snoozing a message. */
   onSnooze?: (id: number) => void;
   /** Handler for deleting a message. */
   onDelete?: (id: number) => void;
+  /** Handler for deleting an entire thread (by thread ID). */
+  onThreadDelete?: (threadId: string) => void;
   /** Whether data is loading. */
   isLoading?: boolean;
   /** Number of skeleton rows to show when loading. */
@@ -173,13 +196,17 @@ export interface MessageListProps {
 
 export function MessageList({
   messages,
+  threadGroups,
   selectedIds = new Set<number>(),
   onSelectionChange,
   onMessageClick,
+  onThreadGroupClick,
   onStar,
   onArchive,
+  onThreadArchive,
   onSnooze,
   onDelete,
+  onThreadDelete,
   isLoading = false,
   loadingRows = 5,
   isEmpty = false,
@@ -206,6 +233,29 @@ export function MessageList({
     [selectedIds, onSelectionChange],
   );
 
+  // Handle thread group selection (adds/removes ALL message IDs in group).
+  const handleThreadGroupSelect = useCallback(
+    (group: ThreadGroup, selected: boolean) => {
+      if (!onSelectionChange) return;
+
+      const newSelected = new Set(selectedIds);
+      for (const id of group.messageIds) {
+        if (selected) {
+          newSelected.add(id);
+        } else {
+          newSelected.delete(id);
+        }
+      }
+      onSelectionChange(newSelected);
+    },
+    [selectedIds, onSelectionChange],
+  );
+
+  // Determine effective emptiness accounting for thread groups.
+  const effectiveEmpty = threadGroups
+    ? threadGroups.length === 0
+    : messages.length === 0;
+
   // Show loading skeletons.
   if (isLoading) {
     return (
@@ -218,11 +268,11 @@ export function MessageList({
   }
 
   // Show empty state.
-  if (isEmpty || messages.length === 0) {
+  if (isEmpty || effectiveEmpty) {
     return <EmptyState title={emptyTitle} description={emptyDescription} />;
   }
 
-  // Render compact variant.
+  // Render compact variant (no thread grouping in compact mode).
   if (compact) {
     return (
       <div className={cn('divide-y divide-gray-100', className)}>
@@ -237,7 +287,7 @@ export function MessageList({
     );
   }
 
-  // Helper to render a message row.
+  // Helper to render a single message row (non-grouped fallback).
   const renderMessageRow = (message: MessageWithRecipients) => (
     <MessageRow
       key={message.id}
@@ -255,7 +305,70 @@ export function MessageList({
     />
   );
 
-  // Render with date grouping.
+  // Helper to render a thread group row.
+  const renderThreadGroupRow = (group: ThreadGroup) => {
+    const isGroupSelected = group.messageIds.some((id) => selectedIds.has(id));
+
+    return (
+      <MessageRow
+        key={group.threadId}
+        message={group.latestMessage}
+        isSelected={isGroupSelected}
+        {...(onSelectionChange && {
+          onSelect: (selected: boolean) => handleThreadGroupSelect(group, selected),
+        })}
+        {...(onThreadGroupClick && {
+          onClick: () => onThreadGroupClick(group),
+        })}
+        {...(onStar && {
+          onStar: (starred: boolean) => onStar(group.latestMessage.id, starred),
+        })}
+        {...((onThreadArchive || onArchive) && {
+          onArchive: () => onThreadArchive
+            ? onThreadArchive(group.threadId)
+            : onArchive?.(group.latestMessage.id),
+        })}
+        {...(onSnooze && {
+          onSnooze: () => onSnooze(group.latestMessage.id),
+        })}
+        {...((onThreadDelete || onDelete) && {
+          onDelete: () => onThreadDelete
+            ? onThreadDelete(group.threadId)
+            : onDelete?.(group.latestMessage.id),
+        })}
+        showCheckbox={showCheckboxes}
+        threadMessageCount={group.messageCount}
+        threadHasUnread={group.hasUnread}
+        threadHasStarred={group.hasStarred}
+      />
+    );
+  };
+
+  // When thread groups are provided, use the thread-grouped rendering path.
+  if (threadGroups) {
+    if (showDateGroups) {
+      const grouped = groupThreadsByDate(threadGroups);
+
+      return (
+        <div className={cn('divide-y divide-gray-100', className)}>
+          {Array.from(grouped.entries()).map(([dateLabel, groups]) => (
+            <div key={dateLabel}>
+              <DateDivider label={dateLabel} />
+              {groups.map(renderThreadGroupRow)}
+            </div>
+          ))}
+        </div>
+      );
+    }
+
+    return (
+      <div className={cn('divide-y divide-gray-100', className)}>
+        {threadGroups.map(renderThreadGroupRow)}
+      </div>
+    );
+  }
+
+  // Fallback: render with date grouping (original non-threaded path).
   if (showDateGroups) {
     const groupedMessages = groupMessagesByDate(messages);
 
