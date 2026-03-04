@@ -308,13 +308,18 @@ export default function InboxPage() {
 
   // Handle thread group click - open thread view for the group.
   const handleThreadGroupClick = useCallback((group: ThreadGroup) => {
-    // Mark the latest message as read when opened.
-    const latestMsg = group.latestMessage;
-    if (latestMsg.recipients[0]?.state === 'unread') {
-      markRead.mutate(latestMsg.id);
+    // Mark ALL unread messages in the thread as read so the
+    // aggregate hasUnread indicator clears properly.
+    if (group.hasUnread) {
+      const unreadIds = new Set(group.messageIds);
+      for (const msg of messages) {
+        if (unreadIds.has(msg.id) && msg.recipients.some((r) => r.state === 'unread')) {
+          markRead.mutate(msg.id);
+        }
+      }
     }
     setSelectedThreadId(group.threadId);
-  }, [markRead]);
+  }, [markRead, messages]);
 
   // Handle closing thread view.
   const handleCloseThread = useCallback(() => {
