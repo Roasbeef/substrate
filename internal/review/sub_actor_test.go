@@ -283,13 +283,14 @@ func TestBuildSystemPrompt_Coordinator(t *testing.T) {
 	prompt := actor.buildSystemPrompt()
 
 	require.Contains(t, prompt, "CoordinatorReviewer")
-	require.Contains(t, prompt, "code review coordinator")
-	require.Contains(t, prompt, "code-quality-reviewer")
-	require.Contains(t, prompt, "security-reviewer")
+	require.Contains(t, prompt, "code review orchestrator")
+	require.Contains(t, prompt, "code-reviewer")
+	require.Contains(t, prompt, "security-auditor")
+	require.Contains(t, prompt, "differential-reviewer")
 	require.Contains(t, prompt, "performance-reviewer")
 	require.Contains(t, prompt, "test-coverage-reviewer")
 	require.Contains(t, prompt, "doc-compliance-reviewer")
-	require.Contains(t, prompt, "Aggregation Rules")
+	require.Contains(t, prompt, "Tiered Agent Dispatch")
 	require.Contains(t, prompt, "YAML frontmatter")
 }
 
@@ -471,6 +472,7 @@ func TestSubActorManager_DuplicateSpawnPrevented(t *testing.T) {
 		context.Background(),
 		"test-review-1", "thread-1", "/tmp/repo",
 		1, "feature-branch", "main", "abc123",
+		"deep",
 		DefaultReviewerConfig(), callback,
 	)
 
