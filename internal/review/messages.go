@@ -86,8 +86,9 @@ type CreateReviewMsg struct {
 	CommitSHA   string
 	RepoPath    string
 	RemoteURL   string
-	ReviewType  string // full, incremental, security, performance.
-	Priority    string // urgent, normal, low.
+	ReviewType    string // full, incremental, security, performance.
+	SecurityDepth string // standard, deep, full (defaults based on ReviewType).
+	Priority      string // urgent, normal, low.
 	Reviewers   []string
 	Description string
 }
