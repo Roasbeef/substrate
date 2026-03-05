@@ -65,13 +65,6 @@ func SingleReviewerConfig() *ReviewerConfig {
 	}
 }
 
-// subAgentTools is the standard tool set available to all review
-// sub-agents. Read, Grep, Glob, and LS provide code navigation while
-// Bash enables git blame, ast-grep, and other analysis commands.
-var subAgentTools = []string{
-	"Read", "Grep", "Glob", "LS", "Bash",
-}
-
 // Tier1SubAgents returns the Tier 1 sub-agent definitions that always
 // run during deep and full security depth reviews. These cover the
 // core review dimensions: code quality, offensive security, differential
@@ -82,37 +75,31 @@ func Tier1SubAgents() map[string]claudeagent.AgentDefinition {
 			Name:        "code-reviewer",
 			Description: "Senior staff engineer review: 8-phase methodology with Bitcoin/Lightning expertise, Go patterns, and production readiness",
 			Prompt:      codeReviewerPrompt,
-			Tools:       subAgentTools,
 		},
 		"security-auditor": {
 			Name:        "security-auditor",
 			Description: "Offensive security audit: exploit development, Bitcoin attack patterns, CVSS classification, and proof-of-concept exploits",
 			Prompt:      securityAuditorPrompt,
-			Tools:       subAgentTools,
 		},
 		"differential-reviewer": {
 			Name:        "differential-reviewer",
 			Description: "Trail of Bits differential review: blast radius calculation, git blame regression detection, and adversarial analysis",
 			Prompt:      differentialReviewPrompt,
-			Tools:       subAgentTools,
 		},
 		"performance-reviewer": {
 			Name:        "performance-reviewer",
 			Description: "Performance analysis: resource leaks, algorithmic efficiency, Go-specific perf issues, and allocation optimization",
 			Prompt:      performanceSubReviewerPrompt,
-			Tools:       subAgentTools,
 		},
 		"test-coverage-reviewer": {
 			Name:        "test-coverage-reviewer",
 			Description: "Test quality: missing tests, untested edge cases, fuzz candidates, table-driven patterns, and race detector coverage",
 			Prompt:      testCoveragePrompt,
-			Tools:       subAgentTools,
 		},
 		"doc-compliance-reviewer": {
 			Name:        "doc-compliance-reviewer",
 			Description: "Documentation accuracy and CLAUDE.md compliance: comment correctness, API docs, and explicit rule violations",
 			Prompt:      docCompliancePrompt,
-			Tools:       subAgentTools,
 		},
 	}
 }
@@ -127,25 +114,21 @@ func Tier2SubAgents() map[string]claudeagent.AgentDefinition {
 			Name:        "function-analyzer",
 			Description: "Trail of Bits deep function analysis: ultra-granular line-by-line analysis with First Principles, 5 Whys, invariant mapping",
 			Prompt:      functionAnalyzerPrompt,
-			Tools:       subAgentTools,
 		},
 		"spec-compliance-checker": {
 			Name:        "spec-compliance-checker",
 			Description: "BIP/BOLT specification compliance: spec-to-code mapping, divergence classification, anti-hallucination verification",
 			Prompt:      specCompliancePrompt,
-			Tools:       subAgentTools,
 		},
 		"api-safety-reviewer": {
 			Name:        "api-safety-reviewer",
 			Description: "API safety and insecure defaults: sharp edges analysis, footgun detection, fail-open patterns, three adversary threat model",
 			Prompt:      apiSafetyPrompt,
-			Tools:       subAgentTools,
 		},
 		"variant-analyzer": {
 			Name:        "variant-analyzer",
 			Description: "Variant analysis: find similar bugs across the codebase using pattern-based search with ast-grep and ripgrep",
 			Prompt:      variantAnalyzerPrompt,
-			Tools:       subAgentTools,
 		},
 	}
 }
