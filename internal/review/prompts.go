@@ -467,6 +467,8 @@ You orchestrate a comprehensive, multi-agent code review using a tiered dispatch
 
 Launch agents using the **Task tool**. All agents in a tier MUST be launched in a **single message** with multiple Task calls so they run in parallel.
 
+**CRITICAL — Avoiding Stop Hook Blocking**: When you launch agents, they run asynchronously and return output file paths. You MUST immediately read those output files in the SAME turn using the Read tool (one Read call per agent output file). Do NOT emit any text between launching agents and reading their results. If you pause between launching and reading, the stop hook will fire and block you for minutes. The pattern is: launch all agents + read all output files = one single message with all tool calls.
+
 For EACH agent, you MUST provide:
 - The exact git diff command so they can read the changes.
 - The explicit list of changed files.
@@ -665,15 +667,13 @@ const coordinatorReviewPromptTmplText = `## Review Request: {{.ReviewID}}
 
 **Step 2 — Get changed file list and classify**: Run ` + "`" + `git diff --name-only {{.BaseBranch}}...{{.Branch}}` + "`" + ` to get the exact list of files modified. Then classify each file into risk categories (Crypto/Auth, Consensus/Protocol, API/Config, Value Transfer, General) by scanning filenames and diff content.
 
-**Step 3 — Launch Tier 1 agents**: Launch ALL Tier 1 specialized reviewer agents in a SINGLE message using the Task tool. For each, provide the diff command, the changed file list, and instruct them to only flag issues in the changed files. They may read other files for context.
+**Step 3 — Launch ALL agents and collect results in ONE turn**: Launch ALL applicable agents (Tier 1 + any triggered Tier 2) in a SINGLE message using the Task tool. Each Task call returns an output file path. In the SAME message, also issue a Read call for each agent's output file. This ensures you launch and collect results without any idle gap (an idle gap triggers the stop hook and blocks you). Do NOT emit any text between launching and reading. Do NOT split launching and reading into separate turns.
 
-**Step 4 — Launch Tier 2 agents**: Based on file classification from Step 2, launch applicable Tier 2 agents in a SINGLE message. If no Tier 2 triggers are met, skip this step. Do NOT wait for Tier 1 to complete — launch Tier 2 immediately if triggers are known from Step 2.
+**Step 4 — Aggregate findings**: Once you have all agent outputs from Step 3, aggregate their findings. Apply the scope filter (drop findings in files not in the changed list), deduplicate overlapping findings, cross-reference complementary findings, and escalate severity where multiple agents agree.
 
-**Step 5 — Aggregate findings**: Once ALL agents (both tiers) complete, aggregate their findings. Apply the scope filter (drop findings in files not in the changed list), deduplicate overlapping findings, cross-reference complementary findings, and escalate severity where multiple agents agree.
+**Step 5 — Generate report**: Write the full review report including Agent Summary table, findings grouped by severity, Quality Scorecard, and Executive Summary with verdict.
 
-**Step 6 — Generate report**: Write the full review report including Agent Summary table, findings grouped by severity, Quality Scorecard, and Executive Summary with verdict.
-
-**Step 7 — Emit your review**: Include the YAML block at the END of your response with your aggregated decision and validated issues.
+**Step 6 — Emit your review**: Include the YAML block at the END of your response with your aggregated decision and validated issues.
 `
 
 // reReviewPromptData holds the template variables for the re-review
