@@ -91,9 +91,10 @@ type reviewSubActor struct {
 	requester  int64
 	branch     string
 	baseBranch string
-	commitSHA  string
-	config     *ReviewerConfig
-	store      store.Storage
+	commitSHA     string
+	securityDepth string
+	config        *ReviewerConfig
+	store         store.Storage
 
 	spawnCfg *SpawnConfig
 
@@ -205,6 +206,7 @@ func newReviewSubActor(
 	reviewID, threadID, repoPath string,
 	requester int64,
 	branch, baseBranch, commitSHA string,
+	securityDepth string,
 	config *ReviewerConfig,
 	st store.Storage,
 	spawnCfg *SpawnConfig,
@@ -215,17 +217,18 @@ func newReviewSubActor(
 	}
 
 	return &reviewSubActor{
-		reviewID:   reviewID,
-		threadID:   threadID,
-		repoPath:   repoPath,
-		requester:  requester,
-		branch:     branch,
-		baseBranch: baseBranch,
-		commitSHA:  commitSHA,
-		config:     config,
-		store:      st,
-		spawnCfg:   spawnCfg,
-		callback:   callback,
+		reviewID:      reviewID,
+		threadID:      threadID,
+		repoPath:      repoPath,
+		requester:     requester,
+		branch:        branch,
+		baseBranch:    baseBranch,
+		commitSHA:     commitSHA,
+		securityDepth: securityDepth,
+		config:        config,
+		store:         st,
+		spawnCfg:      spawnCfg,
+		callback:      callback,
 	}
 }
 
@@ -898,10 +901,17 @@ func (r *reviewSubActor) buildSystemPrompt() string {
 		shortID = shortID[:8]
 	}
 
+	// Default security depth to "deep" if not explicitly set.
+	secDepth := r.securityDepth
+	if secDepth == "" {
+		secDepth = "deep"
+	}
+
 	data := systemPromptData{
 		Name:           r.config.Name,
 		ReviewerType:   r.config.Name,
 		IsMultiReview:  r.isMultiReview,
+		SecurityDepth:  secDepth,
 		FocusAreas:     r.config.FocusAreas,
 		IgnorePatterns: r.config.IgnorePatterns,
 		AgentName:      r.reviewerAgentName(),
@@ -1946,6 +1956,7 @@ func (m *SubActorManager) SpawnReviewer(
 	reviewID, threadID, repoPath string,
 	requester int64,
 	branch, baseBranch, commitSHA string,
+	securityDepth string,
 	config *ReviewerConfig,
 	callback func(ctx context.Context, result *SubActorResult),
 ) {
@@ -1974,6 +1985,7 @@ func (m *SubActorManager) SpawnReviewer(
 	sub := newReviewSubActor(
 		reviewID, threadID, repoPath, requester,
 		branch, baseBranch, commitSHA,
+		securityDepth,
 		config, m.store, m.spawnCfg,
 		func(ctx context.Context, result *SubActorResult) {
 			// Remove from tracking when done.

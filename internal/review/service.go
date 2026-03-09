@@ -772,11 +772,24 @@ func (s *Service) spawnReviewer(ctx context.Context,
 	}
 	s.processOutbox(ctx, outbox)
 
+	// Derive security depth from review type. Security reviews get
+	// full depth (all Tier 2 agents unconditionally), performance
+	// and architecture reviews get standard depth (code-reviewer
+	// only), and full reviews get deep depth (all Tier 1 agents).
+	securityDepth := "deep"
+	switch review.ReviewType {
+	case "security":
+		securityDepth = "full"
+	case "performance", "architecture":
+		securityDepth = "standard"
+	}
+
 	// Spawn the sub-actor with branch info for the diff command.
 	s.subActorMgr.SpawnReviewer(
 		ctx, e.ReviewID, e.ThreadID, e.RepoPath,
 		e.Requester,
 		review.Branch, review.BaseBranch, review.CommitSHA,
+		securityDepth,
 		config, s.handleSubActorResult,
 	)
 }
