@@ -31,6 +31,10 @@ export interface ModalProps {
   initialFocus?: React.RefObject<HTMLElement | null> | undefined;
   /** When true, content is rendered directly without padding wrapper. */
   rawContent?: boolean | undefined;
+  /** Extra action buttons rendered in the header, before the close button. */
+  headerActions?: ReactNode | undefined;
+  /** When true, the modal can be resized by dragging its edges. */
+  resizable?: boolean | undefined;
 }
 
 // Size styles mapping.
@@ -77,6 +81,8 @@ export function Modal({
   className,
   initialFocus,
   rawContent = false,
+  headerActions,
+  resizable = false,
 }: ModalProps) {
   const handleClose = () => {
     if (closeOnOverlayClick) {
@@ -121,6 +127,7 @@ export function Modal({
                 className={cn(
                   'w-full transform rounded-lg bg-white shadow-xl transition-all',
                   !rawContent && 'overflow-hidden',
+                  resizable && 'resize overflow-auto min-w-[320px] min-h-[200px]',
                   sizeStyles[size],
                   className,
                 )}
@@ -141,16 +148,19 @@ export function Modal({
                         <p className="mt-1 text-sm text-gray-500">{description}</p>
                       ) : null}
                     </div>
-                    {showCloseButton ? (
-                      <button
-                        type="button"
-                        className="ml-4 rounded-md p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
-                        onClick={onClose}
-                        aria-label="Close modal"
-                      >
-                        <CloseIcon />
-                      </button>
-                    ) : null}
+                    <div className="ml-4 flex items-center gap-1">
+                      {headerActions}
+                      {showCloseButton ? (
+                        <button
+                          type="button"
+                          className="rounded-md p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
+                          onClick={onClose}
+                          aria-label="Close modal"
+                        >
+                          <CloseIcon />
+                        </button>
+                      ) : null}
+                    </div>
                   </div>
                 ) : null}
 
