@@ -343,6 +343,40 @@ describe('ComposeModal', () => {
     window.confirm = originalConfirm;
   });
 
+  it('renders fullscreen toggle button', () => {
+    render(<ComposeModal {...defaultProps} />);
+
+    expect(screen.getByLabelText('Fullscreen')).toBeInTheDocument();
+  });
+
+  it('toggles fullscreen mode when expand button is clicked', async () => {
+    const user = userEvent.setup();
+
+    render(<ComposeModal {...defaultProps} />);
+
+    const expandBtn = screen.getByLabelText('Fullscreen');
+    await user.click(expandBtn);
+
+    // After clicking, the button label should change to exit fullscreen.
+    expect(screen.getByLabelText('Exit fullscreen')).toBeInTheDocument();
+  });
+
+  it('toggles back to normal mode on second click', async () => {
+    const user = userEvent.setup();
+
+    render(<ComposeModal {...defaultProps} />);
+
+    const expandBtn = screen.getByLabelText('Fullscreen');
+    await user.click(expandBtn);
+
+    // Now in fullscreen, click again to collapse.
+    const collapseBtn = screen.getByLabelText('Exit fullscreen');
+    await user.click(collapseBtn);
+
+    // Should be back to normal mode.
+    expect(screen.getByLabelText('Fullscreen')).toBeInTheDocument();
+  });
+
   it('accepts custom title', () => {
     render(<ComposeModal {...defaultProps} title="Reply to Thread" />);
 

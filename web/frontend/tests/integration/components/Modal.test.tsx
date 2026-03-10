@@ -212,6 +212,87 @@ describe('Modal', () => {
     });
   });
 
+  describe('headerActions', () => {
+    it('renders headerActions in the header', async () => {
+      render(
+        <Modal isOpen onClose={() => {}} title="Title" headerActions={
+          <button aria-label="Fullscreen">Expand</button>
+        }>
+          <div>Content</div>
+        </Modal>,
+      );
+
+      await waitFor(() => {
+        expect(screen.getByLabelText('Fullscreen')).toBeInTheDocument();
+        expect(screen.getByText('Expand')).toBeInTheDocument();
+      });
+    });
+
+    it('renders headerActions next to close button', async () => {
+      render(
+        <Modal isOpen onClose={() => {}} title="Title" headerActions={
+          <button aria-label="Fullscreen">Expand</button>
+        }>
+          <div>Content</div>
+        </Modal>,
+      );
+
+      await waitFor(() => {
+        const expandBtn = screen.getByLabelText('Fullscreen');
+        const closeBtn = screen.getByLabelText('Close modal');
+        // Both should share the same parent container.
+        expect(expandBtn.parentElement).toBe(closeBtn.parentElement);
+      });
+    });
+
+    it('does not render headerActions wrapper when not provided', async () => {
+      render(
+        <Modal isOpen onClose={() => {}} title="Title">
+          <div>Content</div>
+        </Modal>,
+      );
+
+      await waitFor(() => {
+        expect(screen.getByLabelText('Close modal')).toBeInTheDocument();
+      });
+      // The close button should still render normally.
+      expect(screen.queryByLabelText('Fullscreen')).not.toBeInTheDocument();
+    });
+  });
+
+  describe('resizable', () => {
+    it('applies resize class when resizable is true', async () => {
+      render(
+        <Modal isOpen onClose={() => {}} resizable>
+          <div>Content</div>
+        </Modal>,
+      );
+
+      await waitFor(() => {
+        const panel = screen.getByText('Content').closest('[class*="resize"]');
+        expect(panel).toBeInTheDocument();
+        expect(panel?.className).toContain('resize');
+      });
+    });
+
+    it('does not apply resize class by default', async () => {
+      render(
+        <Modal isOpen onClose={() => {}}>
+          <div>Content</div>
+        </Modal>,
+      );
+
+      await waitFor(() => {
+        expect(screen.getByText('Content')).toBeInTheDocument();
+      });
+
+      const panel = screen.getByText('Content').closest('[role="dialog"]');
+      // The dialog panel should not have resize class.
+      const dialogPanel = panel?.querySelector('[class*="transform"]');
+      expect(dialogPanel?.className).not.toContain('resize');
+    });
+  });
+
   describe('custom className', () => {
     it('applies custom className to modal panel', async () => {
       render(
