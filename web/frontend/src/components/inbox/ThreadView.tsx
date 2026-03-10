@@ -262,6 +262,9 @@ export function ThreadView({
   const [isReplying, setIsReplying] = useState(false);
   const [isExpanded, setIsExpanded] = useState(false);
 
+  // State for fullscreen modal.
+  const [isFullscreen, setIsFullscreen] = useState(false);
+
   // State for focused message index.
   const [focusedIndex, setFocusedIndex] = useState<number | null>(null);
 
@@ -347,9 +350,15 @@ export function ThreadView({
     <Modal
       isOpen={isOpen}
       onClose={onClose}
-      size="3xl"
-      className="flex h-[80vh] flex-col overflow-hidden"
+      size={isFullscreen ? 'full' : '3xl'}
+      className={cn(
+        'flex flex-col overflow-hidden',
+        isFullscreen
+          ? 'max-w-[calc(100vw-2rem)] !w-[calc(100vw-2rem)] h-[calc(100vh-2rem)]'
+          : 'h-[80vh]',
+      )}
       rawContent
+      resizable={!isFullscreen}
       showCloseButton={false}
     >
       {/* Toolbar. */}
@@ -413,6 +422,11 @@ export function ThreadView({
             disabled={!hasNext || isActionLoading}
           />
           <div className="ml-2 h-5 w-px bg-gray-300" />
+          <ToolbarButton
+            onClick={() => setIsFullscreen(!isFullscreen)}
+            icon={isFullscreen ? <CollapseIcon /> : <ExpandIcon />}
+            label={isFullscreen ? 'Exit fullscreen' : 'Fullscreen'}
+          />
           <button
             type="button"
             onClick={onClose}
