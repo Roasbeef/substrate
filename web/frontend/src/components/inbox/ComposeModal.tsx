@@ -98,10 +98,11 @@ export function ComposeModal({
     );
   }, [form, initialValues]);
 
-  // Reset form when modal opens.
+  // Reset form and UI state when modal opens or closes.
   const handleReset = useCallback(() => {
     setForm({ ...initialFormState, ...initialValues });
     setErrors({});
+    setIsExpanded(false);
   }, [initialValues]);
 
   // Handle field change.
@@ -220,6 +221,7 @@ export function ComposeModal({
         onSubmit={(e) => void handleSubmit(e)}
         className={
           isExpanded
+            // 10rem accounts for: modal padding (2rem) + header (4rem) + footer (4rem).
             ? 'flex flex-col gap-4 h-[calc(100vh-10rem)]'
             : 'space-y-4'
         }

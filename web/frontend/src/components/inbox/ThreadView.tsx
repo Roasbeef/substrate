@@ -262,8 +262,11 @@ export function ThreadView({
   const [isReplying, setIsReplying] = useState(false);
   const [isExpanded, setIsExpanded] = useState(false);
 
-  // State for fullscreen modal.
+  // State for fullscreen modal, reset when the modal closes.
   const [isFullscreen, setIsFullscreen] = useState(false);
+  useEffect(() => {
+    if (!isOpen) setIsFullscreen(false);
+  }, [isOpen]);
 
   // State for focused message index.
   const [focusedIndex, setFocusedIndex] = useState<number | null>(null);

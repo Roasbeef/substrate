@@ -27,12 +27,6 @@ function getSenderAsAgent(message: Message) {
   };
 }
 
-// Configure marked options for safe rendering.
-marked.setOptions({
-  gfm: true,
-  breaks: true,
-});
-
 // Combine clsx and tailwind-merge for class name handling.
 function cn(...inputs: (string | undefined | null | false)[]) {
   return twMerge(clsx(inputs));
@@ -99,6 +93,8 @@ function renderMarkdownToHtml(text: string): string {
       'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'a', 'blockquote', 'hr',
       'table', 'thead', 'tbody', 'tr', 'th', 'td',
     ],
+    // Note: style intentionally excluded to prevent CSS injection.
+    // GFM column alignment (:---:) is lost as a security trade-off.
     ALLOWED_ATTR: ['href', 'target', 'rel'],
   });
 }

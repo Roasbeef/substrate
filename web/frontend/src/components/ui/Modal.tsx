@@ -146,7 +146,7 @@ export function Modal({
                 {...(resizable ? { style: { width: resizableInitialWidths[size] } } : {})}
               >
                 {/* Header - only show if not using rawContent mode. */}
-                {!rawContent && (title || showCloseButton) ? (
+                {!rawContent && (title || showCloseButton || headerActions) ? (
                   <div className="flex items-start justify-between border-b border-gray-200 px-6 py-4">
                     <div>
                       {title ? (
