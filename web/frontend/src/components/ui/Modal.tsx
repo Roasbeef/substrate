@@ -37,7 +37,7 @@ export interface ModalProps {
   resizable?: boolean | undefined;
 }
 
-// Size styles mapping.
+// Size styles mapping for non-resizable modals.
 const sizeStyles: Record<ModalSize, string> = {
   sm: 'max-w-sm',
   md: 'max-w-md',
@@ -46,6 +46,17 @@ const sizeStyles: Record<ModalSize, string> = {
   '2xl': 'max-w-2xl',
   '3xl': 'max-w-3xl',
   full: 'max-w-4xl',
+};
+
+// Initial widths (px) for resizable modals so they start at a reasonable size.
+const resizableInitialWidths: Record<ModalSize, number> = {
+  sm: 384,
+  md: 448,
+  lg: 512,
+  xl: 576,
+  '2xl': 672,
+  '3xl': 768,
+  full: 896,
 };
 
 // Close button icon.
@@ -125,12 +136,14 @@ export function Modal({
             >
               <DialogPanel
                 className={cn(
-                  'w-full transform rounded-lg bg-white shadow-xl transition-all',
-                  !rawContent && 'overflow-hidden',
-                  resizable && 'resize overflow-auto min-w-[320px] min-h-[200px]',
-                  sizeStyles[size],
+                  'transform rounded-lg bg-white shadow-xl transition-all',
+                  !resizable && 'w-full',
+                  !rawContent && !resizable && 'overflow-hidden',
+                  resizable && 'resize overflow-auto min-w-[320px] min-h-[200px] max-w-[calc(100vw-2rem)] max-h-[calc(100vh-2rem)]',
+                  !resizable && sizeStyles[size],
                   className,
                 )}
+                {...(resizable ? { style: { width: resizableInitialWidths[size] } } : {})}
               >
                 {/* Header - only show if not using rawContent mode. */}
                 {!rawContent && (title || showCloseButton) ? (

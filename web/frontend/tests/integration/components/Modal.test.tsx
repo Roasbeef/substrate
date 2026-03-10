@@ -275,6 +275,36 @@ describe('Modal', () => {
       });
     });
 
+    it('sets inline width style for initial size when resizable', async () => {
+      render(
+        <Modal isOpen onClose={() => {}} resizable size="3xl">
+          <div>Content</div>
+        </Modal>,
+      );
+
+      await waitFor(() => {
+        const panel = screen.getByText('Content').closest('[class*="resize"]');
+        expect(panel).toBeInTheDocument();
+        // Should have an inline width style (768px for 3xl).
+        expect((panel as HTMLElement)?.style.width).toBe('768px');
+      });
+    });
+
+    it('does not set inline width when not resizable', async () => {
+      render(
+        <Modal isOpen onClose={() => {}} size="3xl">
+          <div>Content</div>
+        </Modal>,
+      );
+
+      await waitFor(() => {
+        expect(screen.getByText('Content')).toBeInTheDocument();
+      });
+
+      const panel = screen.getByText('Content').closest('[class*="max-w"]');
+      expect((panel as HTMLElement)?.style.width).toBe('');
+    });
+
     it('does not apply resize class by default', async () => {
       render(
         <Modal isOpen onClose={() => {}}>
