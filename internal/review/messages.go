@@ -79,18 +79,18 @@ func (ResumeReviewMsg) MessageType() string { return "ResumeReviewMsg" }
 type CreateReviewMsg struct {
 	actor.BaseMessage
 
-	RequesterID int64
-	PRNumber    int
-	Branch      string
-	BaseBranch  string
-	CommitSHA   string
-	RepoPath    string
-	RemoteURL   string
+	RequesterID   int64
+	PRNumber      int
+	Branch        string
+	BaseBranch    string
+	CommitSHA     string
+	RepoPath      string
+	RemoteURL     string
 	ReviewType    string // full, incremental, security, performance.
 	SecurityDepth string // standard, deep, full (defaults based on ReviewType).
 	Priority      string // urgent, normal, low.
-	Reviewers   []string
-	Description string
+	Reviewers     []string
+	Description   string
 }
 
 // MessageType implements actor.Message.
