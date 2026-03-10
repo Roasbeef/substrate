@@ -24,7 +24,9 @@ function formatTimestamp(ts: number): string {
 
 // Render markdown safely using marked and DOMPurify.
 function renderMarkdown(text: string): string {
-  const rawHtml = marked.parse(text, { async: false }) as string;
+  const rawHtml = marked.parse(text, {
+    async: false, gfm: true, breaks: true,
+  }) as string;
   return DOMPurify.sanitize(rawHtml, {
     ALLOWED_TAGS: [
       'p', 'br', 'strong', 'em', 'code', 'pre', 'ul', 'ol', 'li',

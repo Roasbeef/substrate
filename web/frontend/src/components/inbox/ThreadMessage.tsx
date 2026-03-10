@@ -89,12 +89,15 @@ function splitBodyAndDiff(body: string): { text: string; patch: string | null } 
 // Render markdown text safely using marked and DOMPurify.
 function renderMarkdownToHtml(text: string): string {
   // Parse markdown to HTML.
-  const rawHtml = marked.parse(text, { async: false }) as string;
+  const rawHtml = marked.parse(text, {
+    async: false, gfm: true, breaks: true,
+  }) as string;
   // Sanitize HTML to prevent XSS.
   return DOMPurify.sanitize(rawHtml, {
     ALLOWED_TAGS: [
       'p', 'br', 'strong', 'em', 'code', 'pre', 'ul', 'ol', 'li',
       'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'a', 'blockquote', 'hr',
+      'table', 'thead', 'tbody', 'tr', 'th', 'td',
     ],
     ALLOWED_ATTR: ['href', 'target', 'rel'],
   });
