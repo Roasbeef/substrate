@@ -84,6 +84,34 @@ describe('ThreadMessage', () => {
     expect(article).toHaveClass('border-blue-300');
   });
 
+  it('renders markdown tables in message body', () => {
+    const tableMessage: Message = {
+      ...mockMessages[0],
+      body: '| Name | Value |\n|------|-------|\n| Alpha | 100 |\n| Beta | 200 |',
+    };
+
+    render(<ThreadMessage message={tableMessage} />);
+
+    // Table elements should be rendered, not stripped.
+    const article = document.querySelector('[role="article"]');
+    expect(article?.querySelector('table')).toBeInTheDocument();
+    expect(article?.querySelector('th')).toBeInTheDocument();
+    expect(article?.querySelector('td')).toBeInTheDocument();
+  });
+
+  it('renders single newlines as line breaks', () => {
+    const newlineMessage: Message = {
+      ...mockMessages[0],
+      body: 'Line one\nLine two\nLine three',
+    };
+
+    render(<ThreadMessage message={newlineMessage} />);
+
+    const article = document.querySelector('[role="article"]');
+    const brs = article?.querySelectorAll('br');
+    expect(brs?.length).toBeGreaterThanOrEqual(2);
+  });
+
   it('renders priority badge for non-normal priority', () => {
     const urgentMessage: Message = {
       ...mockMessages[0],
@@ -331,6 +359,34 @@ describe('ThreadView', () => {
     // Focus should move (we check by class change - focused message has blue border).
     // Since this is internal state, just verify no errors occur.
     expect(container).toBeInTheDocument();
+  });
+
+  it('renders fullscreen toggle button in toolbar', () => {
+    render(<ThreadView {...defaultProps} thread={mockThread} />);
+
+    expect(screen.getByLabelText('Fullscreen')).toBeInTheDocument();
+  });
+
+  it('toggles fullscreen mode when expand button is clicked', async () => {
+    const user = userEvent.setup();
+
+    render(<ThreadView {...defaultProps} thread={mockThread} />);
+
+    await user.click(screen.getByLabelText('Fullscreen'));
+
+    // After clicking, label should change to exit fullscreen.
+    expect(screen.getByLabelText('Exit fullscreen')).toBeInTheDocument();
+  });
+
+  it('toggles back from fullscreen on second click', async () => {
+    const user = userEvent.setup();
+
+    render(<ThreadView {...defaultProps} thread={mockThread} />);
+
+    await user.click(screen.getByLabelText('Fullscreen'));
+    await user.click(screen.getByLabelText('Exit fullscreen'));
+
+    expect(screen.getByLabelText('Fullscreen')).toBeInTheDocument();
   });
 
   it('closes on Escape key', () => {

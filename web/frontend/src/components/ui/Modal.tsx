@@ -31,9 +31,13 @@ export interface ModalProps {
   initialFocus?: React.RefObject<HTMLElement | null> | undefined;
   /** When true, content is rendered directly without padding wrapper. */
   rawContent?: boolean | undefined;
+  /** Extra action buttons rendered in the header, before the close button. */
+  headerActions?: ReactNode | undefined;
+  /** When true, the modal can be resized by dragging its edges. */
+  resizable?: boolean | undefined;
 }
 
-// Size styles mapping.
+// Size styles mapping for non-resizable modals.
 const sizeStyles: Record<ModalSize, string> = {
   sm: 'max-w-sm',
   md: 'max-w-md',
@@ -42,6 +46,17 @@ const sizeStyles: Record<ModalSize, string> = {
   '2xl': 'max-w-2xl',
   '3xl': 'max-w-3xl',
   full: 'max-w-4xl',
+};
+
+// Initial widths (px) for resizable modals so they start at a reasonable size.
+const resizableInitialWidths: Record<ModalSize, number> = {
+  sm: 384,
+  md: 448,
+  lg: 512,
+  xl: 576,
+  '2xl': 672,
+  '3xl': 768,
+  full: 896,
 };
 
 // Close button icon.
@@ -77,6 +92,8 @@ export function Modal({
   className,
   initialFocus,
   rawContent = false,
+  headerActions,
+  resizable = false,
 }: ModalProps) {
   const handleClose = () => {
     if (closeOnOverlayClick) {
@@ -119,14 +136,17 @@ export function Modal({
             >
               <DialogPanel
                 className={cn(
-                  'w-full transform rounded-lg bg-white shadow-xl transition-all',
-                  !rawContent && 'overflow-hidden',
-                  sizeStyles[size],
+                  'transform rounded-lg bg-white shadow-xl transition-all',
+                  !resizable && 'w-full',
+                  !rawContent && !resizable && 'overflow-hidden',
+                  resizable && 'resize overflow-auto min-w-[320px] min-h-[200px] max-w-[calc(100vw-2rem)] max-h-[calc(100vh-2rem)]',
+                  !resizable && sizeStyles[size],
                   className,
                 )}
+                {...(resizable ? { style: { width: resizableInitialWidths[size] } } : {})}
               >
                 {/* Header - only show if not using rawContent mode. */}
-                {!rawContent && (title || showCloseButton) ? (
+                {!rawContent && (title || showCloseButton || headerActions) ? (
                   <div className="flex items-start justify-between border-b border-gray-200 px-6 py-4">
                     <div>
                       {title ? (
@@ -141,16 +161,19 @@ export function Modal({
                         <p className="mt-1 text-sm text-gray-500">{description}</p>
                       ) : null}
                     </div>
-                    {showCloseButton ? (
-                      <button
-                        type="button"
-                        className="ml-4 rounded-md p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
-                        onClick={onClose}
-                        aria-label="Close modal"
-                      >
-                        <CloseIcon />
-                      </button>
-                    ) : null}
+                    <div className="ml-4 flex items-center gap-1">
+                      {headerActions}
+                      {showCloseButton ? (
+                        <button
+                          type="button"
+                          className="rounded-md p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
+                          onClick={onClose}
+                          aria-label="Close modal"
+                        >
+                          <CloseIcon />
+                        </button>
+                      ) : null}
+                    </div>
                   </div>
                 ) : null}
 

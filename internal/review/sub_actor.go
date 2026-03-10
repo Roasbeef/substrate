@@ -85,12 +85,12 @@ func DefaultSubActorSpawnConfig() *SpawnConfig {
 // goroutine per review, creates a Claude Agent SDK client, sends the review
 // prompt, processes the response, and feeds events back to the service.
 type reviewSubActor struct {
-	reviewID   string
-	threadID   string
-	repoPath   string
-	requester  int64
-	branch     string
-	baseBranch string
+	reviewID      string
+	threadID      string
+	repoPath      string
+	requester     int64
+	branch        string
+	baseBranch    string
 	commitSHA     string
 	securityDepth string
 	config        *ReviewerConfig

@@ -80,6 +80,9 @@ export function ComposeModal({
     ...initialValues,
   }));
 
+  // Whether the modal is expanded to fullscreen.
+  const [isExpanded, setIsExpanded] = useState(false);
+
   // Validation errors.
   const [errors, setErrors] = useState<Partial<Record<keyof ComposeFormState, string>>>({});
 
@@ -95,10 +98,11 @@ export function ComposeModal({
     );
   }, [form, initialValues]);
 
-  // Reset form when modal opens.
+  // Reset form and UI state when modal opens or closes.
   const handleReset = useCallback(() => {
     setForm({ ...initialFormState, ...initialValues });
     setErrors({});
+    setIsExpanded(false);
   }, [initialValues]);
 
   // Handle field change.
@@ -177,9 +181,51 @@ export function ComposeModal({
     onClose();
   }, [isDirty, handleReset, onClose]);
 
+  // Expand/collapse toggle button rendered in the modal header.
+  const expandButton = (
+    <button
+      type="button"
+      className="rounded-md p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
+      onClick={() => setIsExpanded((prev) => !prev)}
+      aria-label={isExpanded ? 'Exit fullscreen' : 'Fullscreen'}
+      title={isExpanded ? 'Exit fullscreen' : 'Fullscreen'}
+    >
+      {isExpanded ? (
+        // Collapse icon (arrows pointing inward).
+        <svg className="h-5 w-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 9L4 4m0 0v4m0-4h4m6 6l5 5m0 0v-4m0 4h-4M9 15l-5 5m0 0v-4m0 4h4m6-6l5-5m0 0v4m0-4h-4" />
+        </svg>
+      ) : (
+        // Expand icon (arrows pointing outward).
+        <svg className="h-5 w-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 8V4m0 0h4M4 4l5 5m11-5h-4m4 0v4m0-4l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5h-4m4 0v-4m0 4l-5-5" />
+        </svg>
+      )}
+    </button>
+  );
+
   return (
-    <Modal isOpen={isOpen} onClose={handleClose} size="3xl" title={title}>
-      <form onSubmit={(e) => void handleSubmit(e)} className="space-y-4">
+    <Modal
+      isOpen={isOpen}
+      onClose={handleClose}
+      size={isExpanded ? 'full' : '3xl'}
+      title={title}
+      headerActions={expandButton}
+      resizable={!isExpanded}
+      className={isExpanded
+        ? 'max-w-[calc(100vw-2rem)] !w-[calc(100vw-2rem)] h-[calc(100vh-2rem)]'
+        : undefined
+      }
+    >
+      <form
+        onSubmit={(e) => void handleSubmit(e)}
+        className={
+          isExpanded
+            // 10rem accounts for: modal padding (2rem) + header (4rem) + footer (4rem).
+            ? 'flex flex-col gap-4 h-[calc(100vh-10rem)]'
+            : 'space-y-4'
+        }
+      >
         {/* Recipients. */}
         <RecipientInput
           label="To"
@@ -201,16 +247,25 @@ export function ComposeModal({
           error={errors.subject}
         />
 
-        {/* Body. */}
-        <Textarea
-          label="Message"
-          value={form.body}
-          onChange={(e) => handleChange('body', e.target.value)}
-          placeholder="Write your message... (Markdown supported)"
-          rows={12}
-          disabled={isSending}
-          error={errors.body}
-        />
+        {/* Body - grows to fill available space when expanded. */}
+        <div
+          className={
+            isExpanded
+              ? 'flex-1 flex flex-col min-h-0 [&_div.w-full]:flex-1 [&_div.w-full]:flex [&_div.w-full]:flex-col [&_textarea]:flex-1'
+              : ''
+          }
+        >
+          <Textarea
+            label="Message"
+            value={form.body}
+            onChange={(e) => handleChange('body', e.target.value)}
+            placeholder="Write your message... (Markdown supported)"
+            rows={isExpanded ? undefined : 12}
+            disabled={isSending}
+            error={errors.body}
+            className={isExpanded ? 'resize-none' : ''}
+          />
+        </div>
 
         {/* Priority and Deadline row. */}
         <div className="grid grid-cols-2 gap-4">
