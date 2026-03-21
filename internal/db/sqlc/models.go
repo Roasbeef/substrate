@@ -102,6 +102,7 @@ type DiffAnnotation struct {
 	Text           sql.NullString
 	SuggestedCode  sql.NullString
 	OriginalCode   sql.NullString
+	CreatedBy      sql.NullInt64
 	CreatedAt      int64
 	UpdatedAt      int64
 }
@@ -162,6 +163,7 @@ type PlanAnnotation struct {
 	StartOffset    int64
 	EndOffset      int64
 	DiffContext    sql.NullString
+	CreatedBy      sql.NullInt64
 	CreatedAt      int64
 	UpdatedAt      int64
 }

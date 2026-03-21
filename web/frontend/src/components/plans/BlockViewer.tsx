@@ -2,7 +2,7 @@
 // inline annotation highlighting. Handles text selection for annotation
 // creation via the AnnotationToolbar popover.
 
-import { useRef, useState, useCallback, useEffect } from 'react';
+import { useRef, useState, useCallback, useEffect, useMemo } from 'react';
 import type { Block, PlanAnnotation } from '@/types/annotations.js';
 import { PlanAnnotationType } from '@/types/annotations.js';
 import { AnnotationToolbar } from './AnnotationToolbar.js';
@@ -169,12 +169,19 @@ export function BlockViewer({
     [commentState, addPlanAnnotation],
   );
 
-  // Get annotations for a specific block.
-  const getBlockAnnotations = useCallback(
-    (blockId: string) =>
-      annotations.filter((a) => a.blockId === blockId),
-    [annotations],
-  );
+  // Build a map of block ID → annotations for O(1) lookup per block.
+  const blockAnnotationMap = useMemo(() => {
+    const map = new Map<string, PlanAnnotation[]>();
+    for (const ann of annotations) {
+      const existing = map.get(ann.blockId);
+      if (existing) {
+        existing.push(ann);
+      } else {
+        map.set(ann.blockId, [ann]);
+      }
+    }
+    return map;
+  }, [annotations]);
 
   return (
     <div
@@ -186,7 +193,7 @@ export function BlockViewer({
         <BlockRenderer
           key={block.id}
           block={block}
-          annotations={getBlockAnnotations(block.id)}
+          annotations={blockAnnotationMap.get(block.id) ?? []}
           selectedAnnotationId={selectedPlanAnnotationId}
           onSelectAnnotation={selectPlanAnnotation}
         />

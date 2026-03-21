@@ -1,7 +1,7 @@
 -- Plan annotations table: stores inline annotations on plan review content.
 CREATE TABLE plan_annotations (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
-    plan_review_id TEXT NOT NULL REFERENCES plan_reviews(plan_review_id),
+    plan_review_id TEXT NOT NULL REFERENCES plan_reviews(plan_review_id) ON DELETE CASCADE,
     annotation_id TEXT NOT NULL UNIQUE,
     block_id TEXT NOT NULL,
     annotation_type TEXT NOT NULL
@@ -17,6 +17,7 @@ CREATE TABLE plan_annotations (
         CHECK (diff_context IS NULL OR diff_context IN (
             'added', 'removed', 'modified'
         )),
+    created_by INTEGER REFERENCES agents(id),
     created_at INTEGER NOT NULL,
     updated_at INTEGER NOT NULL
 );
@@ -30,7 +31,7 @@ CREATE INDEX idx_plan_annotations_block
 CREATE TABLE diff_annotations (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     annotation_id TEXT NOT NULL UNIQUE,
-    message_id INTEGER NOT NULL REFERENCES messages(id),
+    message_id INTEGER NOT NULL REFERENCES messages(id) ON DELETE CASCADE,
     annotation_type TEXT NOT NULL
         CHECK (annotation_type IN ('comment', 'suggestion', 'concern')),
     scope TEXT NOT NULL DEFAULT 'line'
@@ -43,6 +44,7 @@ CREATE TABLE diff_annotations (
     text TEXT,
     suggested_code TEXT,
     original_code TEXT,
+    created_by INTEGER REFERENCES agents(id),
     created_at INTEGER NOT NULL,
     updated_at INTEGER NOT NULL
 );

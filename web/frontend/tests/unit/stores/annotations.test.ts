@@ -22,7 +22,7 @@ describe('useAnnotationStore', () => {
         endOffset: 13,
       });
 
-      expect(ann.id).toMatch(/^plan-ann-/);
+      expect(ann.id).toMatch(/^[0-9a-f]{8}-/);
       expect(ann.type).toBe(PlanAnnotationType.COMMENT);
       expect(ann.text).toBe('needs work');
 
@@ -115,7 +115,7 @@ describe('useAnnotationStore', () => {
         text: 'fragile logic',
       });
 
-      expect(ann.id).toMatch(/^diff-ann-/);
+      expect(ann.id).toMatch(/^[0-9a-f]{8}-/);
       expect(ann.type).toBe('comment');
       expect(ann.filePath).toBe('main.go');
 

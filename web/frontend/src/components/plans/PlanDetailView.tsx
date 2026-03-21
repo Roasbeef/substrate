@@ -23,6 +23,7 @@ import {
   wrapFeedbackForAgent,
 } from '@/lib/feedback-export.js';
 import { useAnnotationStore } from '@/stores/annotations.js';
+import { fetchPlanAnnotations } from '@/api/annotations.js';
 import { BlockViewer } from './BlockViewer.js';
 import { AnnotationSidebar } from './AnnotationSidebar.js';
 import { PlanToc } from './PlanToc.js';
@@ -52,21 +53,35 @@ export function PlanDetailView({ planReview }: PlanDetailViewProps) {
   const {
     planAnnotations,
     setPlanReviewId,
+    loadPlanAnnotations,
     loadPlanDraft,
     reset: resetAnnotations,
   } = useAnnotationStore();
 
-  // Initialize annotation store with the plan review ID.
+  // Initialize annotation store: fetch from server, fall back to draft.
   useEffect(() => {
-    setPlanReviewId(planReview.plan_review_id);
-    loadPlanDraft(planReview.plan_review_id);
+    const prId = planReview.plan_review_id;
+    setPlanReviewId(prId);
+
+    // Try server first, fall back to localStorage draft.
+    fetchPlanAnnotations(prId)
+      .then((serverAnnotations) => {
+        if (serverAnnotations.length > 0) {
+          loadPlanAnnotations(serverAnnotations);
+        } else {
+          loadPlanDraft(prId);
+        }
+      })
+      .catch(() => {
+        loadPlanDraft(prId);
+      });
 
     return () => {
       resetAnnotations();
     };
   }, [
-    planReview.plan_review_id, setPlanReviewId, loadPlanDraft,
-    resetAnnotations,
+    planReview.plan_review_id, setPlanReviewId, loadPlanAnnotations,
+    loadPlanDraft, resetAnnotations,
   ]);
 
   // Fetch the plan thread to get the full plan body from the mail message.

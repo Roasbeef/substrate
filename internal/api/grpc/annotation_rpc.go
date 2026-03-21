@@ -131,9 +131,10 @@ func (s *Server) DeletePlanAnnotation(
 
 	err := s.annotationStore.DeletePlanAnnotation(ctx, req.AnnotationId)
 	if err != nil {
-		return &DeleteAnnotationResponse{
-			Error: err.Error(),
-		}, nil
+		return nil, status.Errorf(
+			codes.Internal,
+			"failed to delete plan annotation: %v", err,
+		)
 	}
 
 	return &DeleteAnnotationResponse{}, nil
@@ -261,9 +262,10 @@ func (s *Server) DeleteDiffAnnotation(
 
 	err := s.annotationStore.DeleteDiffAnnotation(ctx, req.AnnotationId)
 	if err != nil {
-		return &DeleteAnnotationResponse{
-			Error: err.Error(),
-		}, nil
+		return nil, status.Errorf(
+			codes.Internal,
+			"failed to delete diff annotation: %v", err,
+		)
 	}
 
 	return &DeleteAnnotationResponse{}, nil

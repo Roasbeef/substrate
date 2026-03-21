@@ -8,6 +8,22 @@ import type {
   DiffAnnotation,
 } from '@/types/annotations.js';
 
+// Maximum length for annotation text fields to prevent abuse.
+const MAX_TEXT_LENGTH = 16384;
+
+// escapeCodeFence escapes content that will be placed inside markdown
+// code fences to prevent fence-breaking injection attacks.
+function escapeCodeFence(text: string): string {
+  // Replace sequences of 3+ backticks with escaped versions.
+  return text.replace(/`{3,}/g, (match) => '`'.repeat(match.length - 1));
+}
+
+// truncateText limits text length to prevent oversized payloads.
+function truncateText(text: string): string {
+  if (text.length <= MAX_TEXT_LENGTH) return text;
+  return text.slice(0, MAX_TEXT_LENGTH) + '\n[...truncated]';
+}
+
 // =============================================================================
 // Plan Annotation Export
 // =============================================================================
@@ -45,29 +61,29 @@ export function exportPlanAnnotations(
     switch (ann.type) {
       case 'DELETION':
         output += `Remove this\n`;
-        output += `\`\`\`\n${ann.originalText}\n\`\`\`\n`;
+        output += `\`\`\`\n${escapeCodeFence(truncateText(ann.originalText))}\n\`\`\`\n`;
         output += `> I don't want this in the plan.\n`;
         break;
 
       case 'INSERTION':
         output += `Add this\n`;
-        output += `\`\`\`\n${ann.text}\n\`\`\`\n`;
+        output += `\`\`\`\n${escapeCodeFence(truncateText(ann.text || ''))}\n\`\`\`\n`;
         break;
 
       case 'REPLACEMENT':
         output += `Change this\n`;
-        output += `**From:**\n\`\`\`\n${ann.originalText}\n\`\`\`\n`;
-        output += `**To:**\n\`\`\`\n${ann.text}\n\`\`\`\n`;
+        output += `**From:**\n\`\`\`\n${escapeCodeFence(truncateText(ann.originalText))}\n\`\`\`\n`;
+        output += `**To:**\n\`\`\`\n${escapeCodeFence(truncateText(ann.text || ''))}\n\`\`\`\n`;
         break;
 
       case 'COMMENT':
-        output += `Feedback on: "${ann.originalText}"\n`;
-        output += `> ${ann.text}\n`;
+        output += `Feedback on: "${truncateText(ann.originalText)}"\n`;
+        output += `> ${truncateText(ann.text || '')}\n`;
         break;
 
       case 'GLOBAL_COMMENT':
         output += `General feedback about the plan\n`;
-        output += `> ${ann.text}\n`;
+        output += `> ${truncateText(ann.text || '')}\n`;
         break;
     }
 

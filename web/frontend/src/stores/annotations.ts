@@ -4,11 +4,7 @@
 import { create } from 'zustand';
 import { devtools } from 'zustand/middleware';
 import type { PlanAnnotation, DiffAnnotation } from '@/types/annotations.js';
-
-// generateId produces a unique annotation ID.
-function generateId(prefix: string): string {
-  return `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
-}
+import * as api from '@/api/annotations.js';
 
 // draftKey returns the localStorage key for draft persistence.
 function draftKey(kind: 'plan' | 'diff', id: string): string {
@@ -84,9 +80,10 @@ export const useAnnotationStore = create<AnnotationState>()(
 
       addPlanAnnotation: (params) => {
         const now = Date.now();
+        const annotationId = crypto.randomUUID();
         const annotation: PlanAnnotation = {
           ...params,
-          id: generateId('plan-ann'),
+          id: annotationId,
           createdAt: now,
           updatedAt: now,
         };
@@ -97,7 +94,22 @@ export const useAnnotationStore = create<AnnotationState>()(
           undefined,
           'addPlanAnnotation',
         );
-        // Auto-save draft.
+        // Sync to server in background.
+        const { planReviewId } = get();
+        if (planReviewId) {
+          api.createPlanAnnotation(planReviewId, {
+            annotationId,
+            blockId: params.blockId,
+            annotationType: params.type,
+            ...(params.text !== undefined ? { text: params.text } : {}),
+            originalText: params.originalText,
+            startOffset: params.startOffset,
+            endOffset: params.endOffset,
+            ...(params.diffContext !== undefined ? { diffContext: params.diffContext } : {}),
+          }).catch(() => {
+            // Server sync failed; localStorage draft is the fallback.
+          });
+        }
         setTimeout(() => get().savePlanDraft(), 0);
         return annotation;
       },
@@ -114,6 +126,17 @@ export const useAnnotationStore = create<AnnotationState>()(
           undefined,
           'updatePlanAnnotation',
         );
+        // Sync to server.
+        const ann = get().planAnnotations.find((a) => a.id === id);
+        if (ann) {
+          api.updatePlanAnnotation(id, {
+            ...(ann.text !== undefined ? { text: ann.text } : {}),
+            originalText: ann.originalText,
+            startOffset: ann.startOffset,
+            endOffset: ann.endOffset,
+            ...(ann.diffContext !== undefined ? { diffContext: ann.diffContext } : {}),
+          }).catch(() => {});
+        }
         setTimeout(() => get().savePlanDraft(), 0);
       },
 
@@ -131,6 +154,8 @@ export const useAnnotationStore = create<AnnotationState>()(
           undefined,
           'deletePlanAnnotation',
         );
+        // Sync to server.
+        api.deletePlanAnnotation(id).catch(() => {});
         setTimeout(() => get().savePlanDraft(), 0);
       },
 
@@ -154,9 +179,10 @@ export const useAnnotationStore = create<AnnotationState>()(
 
       addDiffAnnotation: (params) => {
         const now = Date.now();
+        const annotationId = crypto.randomUUID();
         const annotation: DiffAnnotation = {
           ...params,
-          id: generateId('diff-ann'),
+          id: annotationId,
           createdAt: now,
           updatedAt: now,
         };
@@ -167,6 +193,22 @@ export const useAnnotationStore = create<AnnotationState>()(
           undefined,
           'addDiffAnnotation',
         );
+        // Sync to server.
+        const { diffMessageId } = get();
+        if (diffMessageId) {
+          api.createDiffAnnotation(diffMessageId, {
+            annotationId,
+            annotationType: params.type,
+            scope: params.scope,
+            filePath: params.filePath,
+            lineStart: params.lineStart,
+            lineEnd: params.lineEnd,
+            side: params.side,
+            ...(params.text !== undefined ? { text: params.text } : {}),
+            ...(params.suggestedCode !== undefined ? { suggestedCode: params.suggestedCode } : {}),
+            ...(params.originalCode !== undefined ? { originalCode: params.originalCode } : {}),
+          }).catch(() => {});
+        }
         setTimeout(() => get().saveDiffDraft(), 0);
         return annotation;
       },
@@ -183,6 +225,15 @@ export const useAnnotationStore = create<AnnotationState>()(
           undefined,
           'updateDiffAnnotation',
         );
+        // Sync to server.
+        const ann = get().diffAnnotations.find((a) => a.id === id);
+        if (ann) {
+          api.updateDiffAnnotation(id, {
+            ...(ann.text !== undefined ? { text: ann.text } : {}),
+            ...(ann.suggestedCode !== undefined ? { suggestedCode: ann.suggestedCode } : {}),
+            ...(ann.originalCode !== undefined ? { originalCode: ann.originalCode } : {}),
+          }).catch(() => {});
+        }
         setTimeout(() => get().saveDiffDraft(), 0);
       },
 
@@ -200,6 +251,7 @@ export const useAnnotationStore = create<AnnotationState>()(
           undefined,
           'deleteDiffAnnotation',
         );
+        api.deleteDiffAnnotation(id).catch(() => {});
         setTimeout(() => get().saveDiffDraft(), 0);
       },
 
