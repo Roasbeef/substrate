@@ -151,11 +151,11 @@ export function exportDiffAnnotations(
       output += `### ${lineRange} (${ann.side})\n`;
 
       if (ann.text) {
-        output += `${ann.text}\n`;
+        output += `${truncateText(ann.text)}\n`;
       }
 
       if (ann.suggestedCode) {
-        output += `\n**Suggested code:**\n\`\`\`\n${ann.suggestedCode}\n\`\`\`\n`;
+        output += `\n**Suggested code:**\n\`\`\`\n${escapeCodeFence(truncateText(ann.suggestedCode))}\n\`\`\`\n`;
       }
 
       output += '\n';

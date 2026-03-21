@@ -454,20 +454,37 @@ function InlineContent({ content }: { content: string }) {
       continue;
     }
 
-    // Links: [text](url).
+    // Links: [text](url) — only allow safe protocols.
     match = remaining.match(/^\[([^\]]+)\]\(([^)]+)\)/);
     if (match) {
-      parts.push(
-        <a
-          key={key++}
-          href={match[2]}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="text-blue-600 underline underline-offset-2 hover:text-blue-800"
-        >
-          {match[1]}
-        </a>,
-      );
+      const linkUrl = match[2]!;
+      const isSafe =
+        linkUrl.startsWith('http://') ||
+        linkUrl.startsWith('https://') ||
+        linkUrl.startsWith('mailto:') ||
+        linkUrl.startsWith('/') ||
+        linkUrl.startsWith('#');
+
+      if (isSafe) {
+        parts.push(
+          <a
+            key={key++}
+            href={linkUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-blue-600 underline underline-offset-2 hover:text-blue-800"
+          >
+            {match[1]}
+          </a>,
+        );
+      } else {
+        // Unsafe protocol (e.g., javascript:) — render as plain text.
+        parts.push(
+          <span key={key++} className="text-blue-600">
+            {match[1]}
+          </span>,
+        );
+      }
       remaining = remaining.slice(match[0].length);
       continue;
     }

@@ -18,6 +18,19 @@ const (
 	maxPathLen = 4096
 )
 
+// validPlanAnnotationTypes are the allowed annotation type values for
+// plan annotations.
+var validPlanAnnotationTypes = map[string]bool{
+	"DELETION": true, "INSERTION": true, "REPLACEMENT": true,
+	"COMMENT": true, "GLOBAL_COMMENT": true,
+}
+
+// validDiffAnnotationTypes are the allowed annotation type values for
+// diff annotations.
+var validDiffAnnotationTypes = map[string]bool{
+	"comment": true, "suggestion": true, "concern": true,
+}
+
 // validateTextLen checks that a text field does not exceed the maximum
 // allowed length.
 func validateTextLen(field, value string) error {
@@ -68,6 +81,18 @@ func (s *Server) CreatePlanAnnotation(
 	if req.StartOffset < 0 || req.EndOffset < 0 {
 		return nil, status.Error(
 			codes.InvalidArgument, "offsets must be non-negative",
+		)
+	}
+	if req.EndOffset < req.StartOffset {
+		return nil, status.Error(
+			codes.InvalidArgument,
+			"end_offset must be >= start_offset",
+		)
+	}
+	if !validPlanAnnotationTypes[req.AnnotationType] {
+		return nil, status.Errorf(
+			codes.InvalidArgument,
+			"invalid annotation_type: %q", req.AnnotationType,
 		)
 	}
 	for _, check := range []struct{ field, val string }{
@@ -220,6 +245,18 @@ func (s *Server) CreateDiffAnnotation(
 	if req.LineStart < 0 || req.LineEnd < 0 {
 		return nil, status.Error(
 			codes.InvalidArgument, "line numbers must be non-negative",
+		)
+	}
+	if req.LineEnd < req.LineStart {
+		return nil, status.Error(
+			codes.InvalidArgument,
+			"line_end must be >= line_start",
+		)
+	}
+	if !validDiffAnnotationTypes[req.AnnotationType] {
+		return nil, status.Errorf(
+			codes.InvalidArgument,
+			"invalid annotation_type: %q", req.AnnotationType,
 		)
 	}
 	if err := validatePathLen(req.FilePath); err != nil {
