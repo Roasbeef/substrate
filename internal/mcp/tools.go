@@ -45,34 +45,16 @@ func (s *Server) handleSendMail(ctx context.Context,
 		priority = mail.PriorityNormal
 	}
 
-	mailReq := mail.SendMailRequest{
+	resp, err := s.backend.SendMail(ctx, mail.SendMailRequest{
 		SenderID:       args.AgentID,
 		RecipientNames: args.Recipients,
 		Subject:        args.Subject,
 		Body:           args.Body,
 		Priority:       priority,
 		ThreadID:       args.ThreadID,
-	}
-
-	// Use actor system if available, otherwise fall back to direct service call.
-	var resp mail.SendMailResponse
-	if s.hasMailActor() {
-		var err error
-		resp, err = s.sendMailActor(ctx, mailReq)
-		if err != nil {
-			return nil, SendMailResult{}, err
-		}
-	} else {
-		result := s.mailSvc.Receive(ctx, mailReq)
-		val, err := result.Unpack()
-		if err != nil {
-			return nil, SendMailResult{}, err
-		}
-		resp = val.(mail.SendMailResponse)
-	}
-
-	if resp.Error != nil {
-		return nil, SendMailResult{}, resp.Error
+	})
+	if err != nil {
+		return nil, SendMailResult{}, err
 	}
 
 	return nil, SendMailResult{
@@ -113,31 +95,13 @@ func (s *Server) handleFetchInbox(ctx context.Context,
 		limit = 50
 	}
 
-	mailReq := mail.FetchInboxRequest{
+	resp, err := s.backend.FetchInbox(ctx, mail.FetchInboxRequest{
 		AgentID:    args.AgentID,
 		Limit:      limit,
 		UnreadOnly: args.UnreadOnly,
-	}
-
-	// Use actor system if available, otherwise fall back to direct service call.
-	var resp mail.FetchInboxResponse
-	if s.hasMailActor() {
-		var err error
-		resp, err = s.fetchInboxActor(ctx, mailReq)
-		if err != nil {
-			return nil, FetchInboxResult{}, err
-		}
-	} else {
-		result := s.mailSvc.Receive(ctx, mailReq)
-		val, err := result.Unpack()
-		if err != nil {
-			return nil, FetchInboxResult{}, err
-		}
-		resp = val.(mail.FetchInboxResponse)
-	}
-
-	if resp.Error != nil {
-		return nil, FetchInboxResult{}, resp.Error
+	})
+	if err != nil {
+		return nil, FetchInboxResult{}, err
 	}
 
 	var messages []InboxMessageResult
@@ -177,29 +141,9 @@ type ReadMessageResult struct {
 func (s *Server) handleReadMessage(ctx context.Context,
 	req *mcp.CallToolRequest, args ReadMessageArgs,
 ) (*mcp.CallToolResult, ReadMessageResult, error) {
-	// Use actor system if available, otherwise fall back to direct service call.
-	var resp mail.ReadMessageResponse
-	if s.hasMailActor() {
-		var err error
-		resp, err = s.readMessageActor(ctx, args.AgentID, args.MessageID)
-		if err != nil {
-			return nil, ReadMessageResult{}, err
-		}
-	} else {
-		mailReq := mail.ReadMessageRequest{
-			AgentID:   args.AgentID,
-			MessageID: args.MessageID,
-		}
-		result := s.mailSvc.Receive(ctx, mailReq)
-		val, err := result.Unpack()
-		if err != nil {
-			return nil, ReadMessageResult{}, err
-		}
-		resp = val.(mail.ReadMessageResponse)
-	}
-
-	if resp.Error != nil {
-		return nil, ReadMessageResult{}, resp.Error
+	resp, err := s.backend.ReadMessage(ctx, args.AgentID, args.MessageID)
+	if err != nil {
+		return nil, ReadMessageResult{}, err
 	}
 
 	if resp.Message == nil {
@@ -233,29 +177,9 @@ type AckMessageResult struct {
 func (s *Server) handleAckMessage(ctx context.Context,
 	req *mcp.CallToolRequest, args AckMessageArgs,
 ) (*mcp.CallToolResult, AckMessageResult, error) {
-	// Use actor system if available, otherwise fall back to direct service call.
-	var resp mail.AckMessageResponse
-	if s.hasMailActor() {
-		var err error
-		resp, err = s.ackMessageActor(ctx, args.AgentID, args.MessageID)
-		if err != nil {
-			return nil, AckMessageResult{}, err
-		}
-	} else {
-		mailReq := mail.AckMessageRequest{
-			AgentID:   args.AgentID,
-			MessageID: args.MessageID,
-		}
-		result := s.mailSvc.Receive(ctx, mailReq)
-		val, err := result.Unpack()
-		if err != nil {
-			return nil, AckMessageResult{}, err
-		}
-		resp = val.(mail.AckMessageResponse)
-	}
-
-	if resp.Error != nil {
-		return nil, AckMessageResult{}, resp.Error
+	resp, err := s.backend.AckMessage(ctx, args.AgentID, args.MessageID)
+	if err != nil {
+		return nil, AckMessageResult{}, err
 	}
 
 	return nil, AckMessageResult{Success: resp.Success}, nil
@@ -275,13 +199,29 @@ type StateChangeResult struct {
 func (s *Server) handleMarkRead(ctx context.Context,
 	req *mcp.CallToolRequest, args StateChangeArgs,
 ) (*mcp.CallToolResult, StateChangeResult, error) {
-	return s.updateState(ctx, args.AgentID, args.MessageID, mail.StateReadStr.String(), nil)
+	resp, err := s.backend.UpdateState(
+		ctx, args.AgentID, args.MessageID,
+		mail.StateReadStr.String(), nil,
+	)
+	if err != nil {
+		return nil, StateChangeResult{}, err
+	}
+
+	return nil, StateChangeResult{Success: resp.Success}, nil
 }
 
 func (s *Server) handleStarMessage(ctx context.Context,
 	req *mcp.CallToolRequest, args StateChangeArgs,
 ) (*mcp.CallToolResult, StateChangeResult, error) {
-	return s.updateState(ctx, args.AgentID, args.MessageID, mail.StateStarredStr.String(), nil)
+	resp, err := s.backend.UpdateState(
+		ctx, args.AgentID, args.MessageID,
+		mail.StateStarredStr.String(), nil,
+	)
+	if err != nil {
+		return nil, StateChangeResult{}, err
+	}
+
+	return nil, StateChangeResult{Success: resp.Success}, nil
 }
 
 // SnoozeArgs are the arguments for the snooze_message tool.
@@ -296,52 +236,44 @@ func (s *Server) handleSnoozeMessage(ctx context.Context,
 ) (*mcp.CallToolResult, StateChangeResult, error) {
 	t, err := time.Parse(time.RFC3339, args.SnoozedUntil)
 	if err != nil {
-		return nil, StateChangeResult{}, fmt.Errorf("invalid snoozed_until format: %w", err)
+		return nil, StateChangeResult{},
+			fmt.Errorf("invalid snoozed_until format: %w", err)
 	}
 
-	return s.updateState(ctx, args.AgentID, args.MessageID, mail.StateSnoozedStr.String(), &t)
+	resp, err := s.backend.UpdateState(
+		ctx, args.AgentID, args.MessageID,
+		mail.StateSnoozedStr.String(), &t,
+	)
+	if err != nil {
+		return nil, StateChangeResult{}, err
+	}
+
+	return nil, StateChangeResult{Success: resp.Success}, nil
 }
 
 func (s *Server) handleArchiveMessage(ctx context.Context,
 	req *mcp.CallToolRequest, args StateChangeArgs,
 ) (*mcp.CallToolResult, StateChangeResult, error) {
-	return s.updateState(ctx, args.AgentID, args.MessageID, mail.StateArchivedStr.String(), nil)
+	resp, err := s.backend.UpdateState(
+		ctx, args.AgentID, args.MessageID,
+		mail.StateArchivedStr.String(), nil,
+	)
+	if err != nil {
+		return nil, StateChangeResult{}, err
+	}
+
+	return nil, StateChangeResult{Success: resp.Success}, nil
 }
 
 func (s *Server) handleTrashMessage(ctx context.Context,
 	req *mcp.CallToolRequest, args StateChangeArgs,
 ) (*mcp.CallToolResult, StateChangeResult, error) {
-	return s.updateState(ctx, args.AgentID, args.MessageID, mail.StateTrashStr.String(), nil)
-}
-
-func (s *Server) updateState(ctx context.Context, agentID, messageID int64,
-	newState string, snoozedUntil *time.Time,
-) (*mcp.CallToolResult, StateChangeResult, error) {
-	// Use actor system if available, otherwise fall back to direct service call.
-	var resp mail.UpdateStateResponse
-	if s.hasMailActor() {
-		var err error
-		resp, err = s.updateMessageStateActor(ctx, agentID, messageID, newState, snoozedUntil)
-		if err != nil {
-			return nil, StateChangeResult{}, err
-		}
-	} else {
-		mailReq := mail.UpdateStateRequest{
-			AgentID:      agentID,
-			MessageID:    messageID,
-			NewState:     newState,
-			SnoozedUntil: snoozedUntil,
-		}
-		result := s.mailSvc.Receive(ctx, mailReq)
-		val, err := result.Unpack()
-		if err != nil {
-			return nil, StateChangeResult{}, err
-		}
-		resp = val.(mail.UpdateStateResponse)
-	}
-
-	if resp.Error != nil {
-		return nil, StateChangeResult{}, resp.Error
+	resp, err := s.backend.UpdateState(
+		ctx, args.AgentID, args.MessageID,
+		mail.StateTrashStr.String(), nil,
+	)
+	if err != nil {
+		return nil, StateChangeResult{}, err
 	}
 
 	return nil, StateChangeResult{Success: resp.Success}, nil
@@ -362,16 +294,16 @@ type SubscribeResult struct {
 func (s *Server) handleSubscribe(ctx context.Context,
 	req *mcp.CallToolRequest, args SubscribeArgs,
 ) (*mcp.CallToolResult, SubscribeResult, error) {
-	// Get the topic.
-	topic, err := s.storage.GetTopicByName(ctx, args.TopicName)
+	topic, err := s.backend.GetTopicByName(ctx, args.TopicName)
 	if err != nil {
-		return nil, SubscribeResult{}, fmt.Errorf("topic %q not found: %w", args.TopicName, err)
+		return nil, SubscribeResult{},
+			fmt.Errorf("topic %q not found: %w", args.TopicName, err)
 	}
 
-	// Create subscription.
-	err = s.storage.CreateSubscription(ctx, args.AgentID, topic.ID)
+	err = s.backend.CreateSubscription(ctx, args.AgentID, topic.ID)
 	if err != nil {
-		return nil, SubscribeResult{}, fmt.Errorf("failed to subscribe: %w", err)
+		return nil, SubscribeResult{},
+			fmt.Errorf("failed to subscribe: %w", err)
 	}
 
 	return nil, SubscribeResult{
@@ -389,16 +321,16 @@ type UnsubscribeArgs struct {
 func (s *Server) handleUnsubscribe(ctx context.Context,
 	req *mcp.CallToolRequest, args UnsubscribeArgs,
 ) (*mcp.CallToolResult, SubscribeResult, error) {
-	// Get the topic.
-	topic, err := s.storage.GetTopicByName(ctx, args.TopicName)
+	topic, err := s.backend.GetTopicByName(ctx, args.TopicName)
 	if err != nil {
-		return nil, SubscribeResult{}, fmt.Errorf("topic %q not found: %w", args.TopicName, err)
+		return nil, SubscribeResult{},
+			fmt.Errorf("topic %q not found: %w", args.TopicName, err)
 	}
 
-	// Delete subscription.
-	err = s.storage.DeleteSubscription(ctx, args.AgentID, topic.ID)
+	err = s.backend.DeleteSubscription(ctx, args.AgentID, topic.ID)
 	if err != nil {
-		return nil, SubscribeResult{}, fmt.Errorf("failed to unsubscribe: %w", err)
+		return nil, SubscribeResult{},
+			fmt.Errorf("failed to unsubscribe: %w", err)
 	}
 
 	return nil, SubscribeResult{
@@ -431,9 +363,12 @@ func (s *Server) handleListTopics(ctx context.Context,
 	var topicsResult []TopicInfo
 
 	if args.SubscribedOnly && args.AgentID > 0 {
-		subs, err := s.storage.ListSubscriptionsByAgent(ctx, args.AgentID)
+		subs, err := s.backend.ListSubscriptionsByAgent(
+			ctx, args.AgentID,
+		)
 		if err != nil {
-			return nil, ListTopicsResult{}, fmt.Errorf("failed to list subscriptions: %w", err)
+			return nil, ListTopicsResult{},
+				fmt.Errorf("failed to list subscriptions: %w", err)
 		}
 
 		for _, topic := range subs {
@@ -444,9 +379,10 @@ func (s *Server) handleListTopics(ctx context.Context,
 			})
 		}
 	} else {
-		topics, err := s.storage.ListTopics(ctx)
+		topics, err := s.backend.ListTopics(ctx)
 		if err != nil {
-			return nil, ListTopicsResult{}, fmt.Errorf("failed to list topics: %w", err)
+			return nil, ListTopicsResult{},
+				fmt.Errorf("failed to list topics: %w", err)
 		}
 
 		for _, topic := range topics {
@@ -484,33 +420,15 @@ func (s *Server) handlePublish(ctx context.Context,
 		priority = mail.PriorityNormal
 	}
 
-	pubReq := mail.PublishRequest{
+	resp, err := s.backend.Publish(ctx, mail.PublishRequest{
 		SenderID:  args.AgentID,
 		TopicName: args.TopicName,
 		Subject:   args.Subject,
 		Body:      args.Body,
 		Priority:  priority,
-	}
-
-	// Use actor system if available, otherwise fall back to direct service call.
-	var resp mail.PublishResponse
-	if s.hasMailActor() {
-		var err error
-		resp, err = s.publishMessageActor(ctx, pubReq)
-		if err != nil {
-			return nil, PublishResult{}, err
-		}
-	} else {
-		result := s.mailSvc.Receive(ctx, pubReq)
-		val, err := result.Unpack()
-		if err != nil {
-			return nil, PublishResult{}, err
-		}
-		resp = val.(mail.PublishResponse)
-	}
-
-	if resp.Error != nil {
-		return nil, PublishResult{}, resp.Error
+	})
+	if err != nil {
+		return nil, PublishResult{}, err
 	}
 
 	return nil, PublishResult{
@@ -539,11 +457,12 @@ func (s *Server) handleSearch(ctx context.Context,
 		limit = 20
 	}
 
-	messages, err := s.storage.SearchMessagesForAgent(
+	messages, err := s.backend.SearchMessages(
 		ctx, args.Query, args.AgentID, limit,
 	)
 	if err != nil {
-		return nil, SearchResult{}, fmt.Errorf("search failed: %w", err)
+		return nil, SearchResult{},
+			fmt.Errorf("search failed: %w", err)
 	}
 
 	var results []InboxMessageResult
@@ -554,7 +473,7 @@ func (s *Server) handleSearch(ctx context.Context,
 			SenderID:  m.SenderID,
 			Subject:   m.Subject,
 			Priority:  m.Priority,
-			State:     "", // Search returns store.Message which has no state.
+			State:     "",
 			CreatedAt: m.CreatedAt.Format(time.RFC3339),
 		})
 	}
@@ -578,28 +497,9 @@ type GetStatusResult struct {
 func (s *Server) handleGetStatus(ctx context.Context,
 	req *mcp.CallToolRequest, args GetStatusArgs,
 ) (*mcp.CallToolResult, GetStatusResult, error) {
-	// Use actor system if available, otherwise fall back to direct service call.
-	var resp mail.GetStatusResponse
-	if s.hasMailActor() {
-		var err error
-		resp, err = s.getAgentStatusActor(ctx, args.AgentID)
-		if err != nil {
-			return nil, GetStatusResult{}, err
-		}
-	} else {
-		mailReq := mail.GetStatusRequest{
-			AgentID: args.AgentID,
-		}
-		result := s.mailSvc.Receive(ctx, mailReq)
-		val, err := result.Unpack()
-		if err != nil {
-			return nil, GetStatusResult{}, err
-		}
-		resp = val.(mail.GetStatusResponse)
-	}
-
-	if resp.Error != nil {
-		return nil, GetStatusResult{}, resp.Error
+	resp, err := s.backend.GetStatus(ctx, args.AgentID)
+	if err != nil {
+		return nil, GetStatusResult{}, err
 	}
 
 	return nil, GetStatusResult{
@@ -625,41 +525,22 @@ type PollChangesResult struct {
 func (s *Server) handlePollChanges(ctx context.Context,
 	req *mcp.CallToolRequest, args PollChangesArgs,
 ) (*mcp.CallToolResult, PollChangesResult, error) {
-	// Convert string-keyed map to int64-keyed map for the mail service.
+	// Convert string-keyed map to int64-keyed map.
 	sinceOffsets := make(map[int64]int64)
 	for k, v := range args.SinceOffsets {
 		topicID, err := strconv.ParseInt(k, 10, 64)
 		if err != nil {
-			return nil, PollChangesResult{}, fmt.Errorf(
-				"invalid topic ID %q: %w", k, err,
-			)
+			return nil, PollChangesResult{},
+				fmt.Errorf("invalid topic ID %q: %w", k, err)
 		}
 		sinceOffsets[topicID] = v
 	}
 
-	// Use actor system if available, otherwise fall back to direct service call.
-	var resp mail.PollChangesResponse
-	if s.hasMailActor() {
-		var err error
-		resp, err = s.pollChangesActor(ctx, args.AgentID, sinceOffsets)
-		if err != nil {
-			return nil, PollChangesResult{}, err
-		}
-	} else {
-		mailReq := mail.PollChangesRequest{
-			AgentID:      args.AgentID,
-			SinceOffsets: sinceOffsets,
-		}
-		result := s.mailSvc.Receive(ctx, mailReq)
-		val, err := result.Unpack()
-		if err != nil {
-			return nil, PollChangesResult{}, err
-		}
-		resp = val.(mail.PollChangesResponse)
-	}
-
-	if resp.Error != nil {
-		return nil, PollChangesResult{}, resp.Error
+	resp, err := s.backend.PollChanges(
+		ctx, args.AgentID, sinceOffsets,
+	)
+	if err != nil {
+		return nil, PollChangesResult{}, err
 	}
 
 	var messages []InboxMessageResult
@@ -702,11 +583,12 @@ type RegisterAgentResult struct {
 func (s *Server) handleRegisterAgent(ctx context.Context,
 	req *mcp.CallToolRequest, args RegisterAgentArgs,
 ) (*mcp.CallToolResult, RegisterAgentResult, error) {
-	agent, err := s.registry.RegisterAgent(
+	agent, err := s.backend.RegisterAgent(
 		ctx, args.Name, args.ProjectKey, args.GitBranch,
 	)
 	if err != nil {
-		return nil, RegisterAgentResult{}, fmt.Errorf("failed to register agent: %w", err)
+		return nil, RegisterAgentResult{},
+			fmt.Errorf("failed to register agent: %w", err)
 	}
 
 	return nil, RegisterAgentResult{
@@ -730,9 +612,10 @@ type WhoAmIResult struct {
 func (s *Server) handleWhoAmI(ctx context.Context,
 	req *mcp.CallToolRequest, args WhoAmIArgs,
 ) (*mcp.CallToolResult, WhoAmIResult, error) {
-	agent, err := s.storage.GetAgent(ctx, args.AgentID)
+	agent, err := s.backend.GetAgent(ctx, args.AgentID)
 	if err != nil {
-		return nil, WhoAmIResult{}, fmt.Errorf("agent not found: %w", err)
+		return nil, WhoAmIResult{},
+			fmt.Errorf("agent not found: %w", err)
 	}
 
 	return nil, WhoAmIResult{
