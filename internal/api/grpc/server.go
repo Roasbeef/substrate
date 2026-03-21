@@ -70,6 +70,7 @@ type Server struct {
 	store           *db.Store
 	taskStore       store.TaskStore            // Task CRUD via store interface.
 	planReviewStore store.PlanReviewStore      // Plan review CRUD via store interface.
+	annotationStore store.AnnotationStore      // Annotation CRUD via store interface.
 	mailSvc         *mail.Service              // Direct service for operations not via actor.
 	mailClient      *mailclient.Client         // Shared mail client (required).
 	actClient       *mailclient.ActivityClient // Shared activity client (required).
@@ -106,6 +107,7 @@ type Server struct {
 	UnimplementedReviewServiceServer
 	UnimplementedTaskServiceServer
 	UnimplementedPlanReviewServiceServer
+	UnimplementedAnnotationServiceServer
 }
 
 // NewServer creates a new gRPC server instance.
@@ -127,6 +129,7 @@ func NewServer(
 		store:           dbStore,
 		taskStore:       taskSt,
 		planReviewStore: taskSt,
+		annotationStore: taskSt,
 		mailSvc:         mailSvc,
 		mailClient:      mailclient.NewClient(cfg.MailRef),
 		actClient:       mailclient.NewActivityClient(cfg.ActivityRef),
@@ -182,6 +185,7 @@ func (s *Server) Start() error {
 	RegisterReviewServiceServer(s.grpcServer, s)
 	RegisterTaskServiceServer(s.grpcServer, s)
 	RegisterPlanReviewServiceServer(s.grpcServer, s)
+	RegisterAnnotationServiceServer(s.grpcServer, s)
 
 	// Start serving in a goroutine.
 	s.wg.Add(1)

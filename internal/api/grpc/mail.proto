@@ -1449,3 +1449,153 @@ message DeletePlanReviewRequest {
 message DeletePlanReviewResponse {
     string error = 1;
 }
+
+// =============================================================================
+// AnnotationService
+// =============================================================================
+
+// AnnotationService handles plan and diff annotation CRUD operations.
+service AnnotationService {
+    // CreatePlanAnnotation creates a new plan annotation.
+    rpc CreatePlanAnnotation (CreatePlanAnnotationRequest) returns (PlanAnnotationProto);
+
+    // ListPlanAnnotations lists all annotations for a plan review.
+    rpc ListPlanAnnotations (ListPlanAnnotationsRequest) returns (ListPlanAnnotationsResponse);
+
+    // UpdatePlanAnnotation updates a plan annotation.
+    rpc UpdatePlanAnnotation (UpdatePlanAnnotationRequest) returns (PlanAnnotationProto);
+
+    // DeletePlanAnnotation deletes a plan annotation.
+    rpc DeletePlanAnnotation (DeletePlanAnnotationRequest) returns (DeleteAnnotationResponse);
+
+    // CreateDiffAnnotation creates a new diff annotation.
+    rpc CreateDiffAnnotation (CreateDiffAnnotationRequest) returns (DiffAnnotationProto);
+
+    // ListDiffAnnotations lists all annotations for a diff message.
+    rpc ListDiffAnnotations (ListDiffAnnotationsRequest) returns (ListDiffAnnotationsResponse);
+
+    // UpdateDiffAnnotation updates a diff annotation.
+    rpc UpdateDiffAnnotation (UpdateDiffAnnotationRequest) returns (DiffAnnotationProto);
+
+    // DeleteDiffAnnotation deletes a diff annotation.
+    rpc DeleteDiffAnnotation (DeleteDiffAnnotationRequest) returns (DeleteAnnotationResponse);
+}
+
+// =============================================================================
+// AnnotationService Messages
+// =============================================================================
+
+// PlanAnnotationProto represents a plan annotation record.
+message PlanAnnotationProto {
+    int64 id = 1;
+    string plan_review_id = 2;
+    string annotation_id = 3;
+    string block_id = 4;
+    string annotation_type = 5;
+    string text = 6;
+    string original_text = 7;
+    int32 start_offset = 8;
+    int32 end_offset = 9;
+    string diff_context = 10;
+    int64 created_at = 11;
+    int64 updated_at = 12;
+}
+
+// DiffAnnotationProto represents a diff annotation record.
+message DiffAnnotationProto {
+    int64 id = 1;
+    string annotation_id = 2;
+    int64 message_id = 3;
+    string annotation_type = 4;
+    string scope = 5;
+    string file_path = 6;
+    int32 line_start = 7;
+    int32 line_end = 8;
+    string side = 9;
+    string text = 10;
+    string suggested_code = 11;
+    string original_code = 12;
+    int64 created_at = 13;
+    int64 updated_at = 14;
+}
+
+// CreatePlanAnnotationRequest is the request for CreatePlanAnnotation.
+message CreatePlanAnnotationRequest {
+    string plan_review_id = 1;
+    string annotation_id = 2;
+    string block_id = 3;
+    string annotation_type = 4;
+    string text = 5;
+    string original_text = 6;
+    int32 start_offset = 7;
+    int32 end_offset = 8;
+    string diff_context = 9;
+}
+
+// ListPlanAnnotationsRequest is the request for ListPlanAnnotations.
+message ListPlanAnnotationsRequest {
+    string plan_review_id = 1;
+}
+
+// ListPlanAnnotationsResponse is the response for ListPlanAnnotations.
+message ListPlanAnnotationsResponse {
+    repeated PlanAnnotationProto annotations = 1;
+}
+
+// UpdatePlanAnnotationRequest is the request for UpdatePlanAnnotation.
+message UpdatePlanAnnotationRequest {
+    string annotation_id = 1;
+    string text = 2;
+    string original_text = 3;
+    int32 start_offset = 4;
+    int32 end_offset = 5;
+    string diff_context = 6;
+}
+
+// DeletePlanAnnotationRequest is the request for DeletePlanAnnotation.
+message DeletePlanAnnotationRequest {
+    string annotation_id = 1;
+}
+
+// DeleteAnnotationResponse is the generic response for annotation deletion.
+message DeleteAnnotationResponse {
+    string error = 1;
+}
+
+// CreateDiffAnnotationRequest is the request for CreateDiffAnnotation.
+message CreateDiffAnnotationRequest {
+    string annotation_id = 1;
+    int64 message_id = 2;
+    string annotation_type = 3;
+    string scope = 4;
+    string file_path = 5;
+    int32 line_start = 6;
+    int32 line_end = 7;
+    string side = 8;
+    string text = 9;
+    string suggested_code = 10;
+    string original_code = 11;
+}
+
+// ListDiffAnnotationsRequest is the request for ListDiffAnnotations.
+message ListDiffAnnotationsRequest {
+    int64 message_id = 1;
+}
+
+// ListDiffAnnotationsResponse is the response for ListDiffAnnotations.
+message ListDiffAnnotationsResponse {
+    repeated DiffAnnotationProto annotations = 1;
+}
+
+// UpdateDiffAnnotationRequest is the request for UpdateDiffAnnotation.
+message UpdateDiffAnnotationRequest {
+    string annotation_id = 1;
+    string text = 2;
+    string suggested_code = 3;
+    string original_code = 4;
+}
+
+// DeleteDiffAnnotationRequest is the request for DeleteDiffAnnotation.
+message DeleteDiffAnnotationRequest {
+    string annotation_id = 1;
+}
