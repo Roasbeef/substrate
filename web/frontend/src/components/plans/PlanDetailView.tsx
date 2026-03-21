@@ -1,16 +1,32 @@
-// PlanDetailView component - full plan viewer with markdown rendering and action buttons.
+// PlanDetailView component — full plan viewer with inline annotation support.
+// Uses a 3-column layout: [TOC | BlockViewer | AnnotationSidebar] when in
+// review mode (pending state).
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useCallback, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { clsx } from 'clsx';
 import { twMerge } from 'tailwind-merge';
-import { marked } from 'marked';
-import DOMPurify from 'dompurify';
 import type { PlanReview } from '@/types/api.js';
 import { useUpdatePlanReviewStatus } from '@/hooks/usePlanReviews.js';
 import { useThread } from '@/hooks/useThreads.js';
 import { PlanStateBadge } from './PlanStateBadge.js';
 import { routes } from '@/lib/routes.js';
+
+// Annotation imports.
+import { parseMarkdownToBlocks } from '@/lib/markdown-parser.js';
+import {
+  getAnnotationCountBySection,
+  buildTocHierarchy,
+} from '@/lib/annotation-helpers.js';
+import {
+  exportPlanAnnotations,
+  wrapFeedbackForAgent,
+} from '@/lib/feedback-export.js';
+import { useAnnotationStore } from '@/stores/annotations.js';
+import { BlockViewer } from './BlockViewer.js';
+import { AnnotationSidebar } from './AnnotationSidebar.js';
+import { PlanToc } from './PlanToc.js';
+import { PlanDiffView } from './PlanDiffView.js';
 
 function cn(...inputs: (string | undefined | null | false)[]) {
   return twMerge(clsx(inputs));
@@ -22,21 +38,6 @@ function formatTimestamp(ts: number): string {
   return new Date(ts * 1000).toLocaleString();
 }
 
-// Render markdown safely using marked and DOMPurify.
-function renderMarkdown(text: string): string {
-  const rawHtml = marked.parse(text, {
-    async: false, gfm: true, breaks: true,
-  }) as string;
-  return DOMPurify.sanitize(rawHtml, {
-    ALLOWED_TAGS: [
-      'p', 'br', 'strong', 'em', 'code', 'pre', 'ul', 'ol', 'li',
-      'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'a', 'blockquote', 'hr',
-      'table', 'thead', 'tbody', 'tr', 'th', 'td', 'input', 'span',
-    ],
-    ALLOWED_ATTR: ['href', 'target', 'rel', 'type', 'checked', 'disabled', 'class'],
-  });
-}
-
 export interface PlanDetailViewProps {
   planReview: PlanReview;
 }
@@ -44,7 +45,29 @@ export interface PlanDetailViewProps {
 export function PlanDetailView({ planReview }: PlanDetailViewProps) {
   const navigate = useNavigate();
   const updateStatus = useUpdatePlanReviewStatus();
-  const [comment, setComment] = useState('');
+  const [additionalComment, setAdditionalComment] = useState('');
+  const [showDiff, setShowDiff] = useState(false);
+
+  // Annotation store.
+  const {
+    planAnnotations,
+    setPlanReviewId,
+    loadPlanDraft,
+    reset: resetAnnotations,
+  } = useAnnotationStore();
+
+  // Initialize annotation store with the plan review ID.
+  useEffect(() => {
+    setPlanReviewId(planReview.plan_review_id);
+    loadPlanDraft(planReview.plan_review_id);
+
+    return () => {
+      resetAnnotations();
+    };
+  }, [
+    planReview.plan_review_id, setPlanReviewId, loadPlanDraft,
+    resetAnnotations,
+  ]);
 
   // Fetch the plan thread to get the full plan body from the mail message.
   const { data: threadData, isLoading: threadLoading } = useThread(
@@ -57,39 +80,86 @@ export function PlanDetailView({ planReview }: PlanDetailViewProps) {
     if (!threadData?.messages || threadData.messages.length === 0) {
       return planReview.plan_summary || 'No plan content available.';
     }
-    // The first message contains the full plan content.
     const firstMsg = threadData.messages[0];
-    return firstMsg !== undefined ? firstMsg.body : 'No plan content available.';
+    return firstMsg !== undefined
+      ? firstMsg.body
+      : 'No plan content available.';
   }, [threadData, planReview.plan_summary]);
 
-  // Render plan body as HTML.
-  const renderedPlanBody = useMemo(
-    () => renderMarkdown(planBody),
+  // Extract the previous plan version (for plan diff).
+  const previousPlanBody = useMemo(() => {
+    if (!threadData?.messages || threadData.messages.length < 2) {
+      return null;
+    }
+    // Messages are ordered — second-to-last is the previous version.
+    const prevMsg = threadData.messages[threadData.messages.length - 2];
+    return prevMsg !== undefined ? prevMsg.body : null;
+  }, [threadData]);
+
+  const hasMultipleVersions = previousPlanBody !== null;
+  const versionCount = threadData?.messages?.length ?? 1;
+
+  // Parse plan body into blocks for annotation targeting.
+  const blocks = useMemo(
+    () => parseMarkdownToBlocks(planBody),
     [planBody],
+  );
+
+  // Build table of contents from blocks and annotation counts.
+  const annotationCounts = useMemo(
+    () => getAnnotationCountBySection(blocks, planAnnotations),
+    [blocks, planAnnotations],
+  );
+  const tocItems = useMemo(
+    () => buildTocHierarchy(blocks, annotationCounts),
+    [blocks, annotationCounts],
   );
 
   const isPending = planReview.state === 'pending';
 
-  const handleAction = (action: 'approved' | 'rejected' | 'changes_requested') => {
-    const trimmed = comment.trim();
-    const params: { planReviewId: string; state: typeof action; comment?: string } = {
+  // Scroll to a block by ID.
+  const handleScrollToBlock = useCallback((blockId: string) => {
+    const el = document.querySelector(`[data-block-id="${blockId}"]`);
+    if (el) {
+      el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
+  }, []);
+
+  // Handle review actions.
+  const handleAction = (
+    action: 'approved' | 'rejected' | 'changes_requested',
+  ) => {
+    let comment = additionalComment.trim();
+
+    // For deny actions with annotations, auto-generate structured feedback.
+    if (
+      (action === 'changes_requested' || action === 'rejected') &&
+      planAnnotations.length > 0
+    ) {
+      const annotationFeedback = exportPlanAnnotations(
+        blocks, planAnnotations,
+      );
+      const wrappedFeedback = wrapFeedbackForAgent(annotationFeedback);
+
+      // Append any additional freeform comment.
+      comment = comment
+        ? `${wrappedFeedback}\n\n---\n\nAdditional notes:\n${comment}`
+        : wrappedFeedback;
+    }
+
+    updateStatus.mutate({
       planReviewId: planReview.plan_review_id,
       state: action,
-    };
-    if (trimmed !== '') {
-      params.comment = trimmed;
-    }
-    updateStatus.mutate(
-      params,
-      {
-        onSuccess: () => {
-          setComment('');
-        },
+      ...(comment !== '' ? { comment } : {}),
+    }, {
+      onSuccess: () => {
+        setAdditionalComment('');
       },
-    );
+    });
   };
 
-  const title = planReview.plan_title || planReview.plan_path || 'Untitled Plan';
+  const title =
+    planReview.plan_title || planReview.plan_path || 'Untitled Plan';
 
   return (
     <div className="space-y-6">
@@ -127,7 +197,9 @@ export function PlanDetailView({ planReview }: PlanDetailViewProps) {
             </div>
             {planReview.plan_path ? (
               <p className="mt-1 text-sm text-gray-500">
-                <code className="text-gray-600">{planReview.plan_path}</code>
+                <code className="text-gray-600">
+                  {planReview.plan_path}
+                </code>
               </p>
             ) : null}
           </div>
@@ -136,35 +208,47 @@ export function PlanDetailView({ planReview }: PlanDetailViewProps) {
         {/* Metadata grid. */}
         <div className="mt-4 grid grid-cols-2 gap-4 sm:grid-cols-4">
           <div>
-            <dt className="text-xs font-medium text-gray-500">Reviewer</dt>
+            <dt className="text-xs font-medium text-gray-500">
+              Reviewer
+            </dt>
             <dd className="mt-1 text-sm font-medium text-gray-900">
               {planReview.reviewer_name || '--'}
             </dd>
           </div>
           <div>
-            <dt className="text-xs font-medium text-gray-500">Created</dt>
+            <dt className="text-xs font-medium text-gray-500">
+              Created
+            </dt>
             <dd className="mt-1 text-sm font-medium text-gray-900">
               {formatTimestamp(planReview.created_at)}
             </dd>
           </div>
           <div>
-            <dt className="text-xs font-medium text-gray-500">Updated</dt>
+            <dt className="text-xs font-medium text-gray-500">
+              Updated
+            </dt>
             <dd className="mt-1 text-sm font-medium text-gray-900">
               {formatTimestamp(planReview.updated_at)}
             </dd>
           </div>
           {planReview.reviewed_at > 0 ? (
             <div>
-              <dt className="text-xs font-medium text-gray-500">Reviewed</dt>
+              <dt className="text-xs font-medium text-gray-500">
+                Reviewed
+              </dt>
               <dd className="mt-1 text-sm font-medium text-gray-900">
                 {formatTimestamp(planReview.reviewed_at)}
               </dd>
             </div>
           ) : (
             <div>
-              <dt className="text-xs font-medium text-gray-500">Session</dt>
+              <dt className="text-xs font-medium text-gray-500">
+                Session
+              </dt>
               <dd className="mt-1 text-sm font-medium text-gray-900">
-                {planReview.session_id ? planReview.session_id.slice(0, 12) : '--'}
+                {planReview.session_id
+                  ? planReview.session_id.slice(0, 12)
+                  : '--'}
               </dd>
             </div>
           )}
@@ -184,7 +268,8 @@ export function PlanDetailView({ planReview }: PlanDetailViewProps) {
       </div>
 
       {/* AI Summary section (if available and distinct from body). */}
-      {planReview.plan_summary && planReview.plan_summary !== planBody ? (
+      {planReview.plan_summary &&
+      planReview.plan_summary !== planBody ? (
         <div className="rounded-lg border border-blue-100 bg-blue-50/50 p-4">
           <h3 className="mb-2 text-sm font-semibold text-blue-900">
             AI Summary
@@ -197,45 +282,52 @@ export function PlanDetailView({ planReview }: PlanDetailViewProps) {
 
       {/* Reviewer comment (when resolved). */}
       {planReview.reviewer_comment ? (
-        <div className={cn(
-          'rounded-lg border p-4',
-          planReview.state === 'approved'
-            ? 'border-green-100 bg-green-50/50'
-            : planReview.state === 'rejected'
-              ? 'border-red-100 bg-red-50/50'
-              : 'border-yellow-100 bg-yellow-50/50',
-        )}>
-          <h3 className={cn(
-            'mb-2 text-sm font-semibold',
+        <div
+          className={cn(
+            'rounded-lg border p-4',
             planReview.state === 'approved'
-              ? 'text-green-900'
+              ? 'border-green-100 bg-green-50/50'
               : planReview.state === 'rejected'
-                ? 'text-red-900'
-                : 'text-yellow-900',
-          )}>
+                ? 'border-red-100 bg-red-50/50'
+                : 'border-yellow-100 bg-yellow-50/50',
+          )}
+        >
+          <h3
+            className={cn(
+              'mb-2 text-sm font-semibold',
+              planReview.state === 'approved'
+                ? 'text-green-900'
+                : planReview.state === 'rejected'
+                  ? 'text-red-900'
+                  : 'text-yellow-900',
+            )}
+          >
             Reviewer Comment
           </h3>
-          <p className={cn(
-            'text-sm whitespace-pre-wrap',
-            planReview.state === 'approved'
-              ? 'text-green-800'
-              : planReview.state === 'rejected'
-                ? 'text-red-800'
-                : 'text-yellow-800',
-          )}>
+          <p
+            className={cn(
+              'text-sm whitespace-pre-wrap',
+              planReview.state === 'approved'
+                ? 'text-green-800'
+                : planReview.state === 'rejected'
+                  ? 'text-red-800'
+                  : 'text-yellow-800',
+            )}
+          >
             {planReview.reviewer_comment}
           </p>
         </div>
       ) : null}
 
-      {/* Full plan body rendered as markdown. */}
-      <div className="rounded-lg border border-gray-200 bg-white p-6">
-        <h3 className="mb-4 text-base font-semibold text-gray-900">
-          Plan Content
-        </h3>
-        {threadLoading ? (
+      {/* Plan content — 3-column layout when pending, single column otherwise. */}
+      {threadLoading ? (
+        <div className="rounded-lg border border-gray-200 bg-white p-6">
           <div className="flex items-center gap-2 py-8 text-sm text-gray-500">
-            <svg className="h-4 w-4 animate-spin" viewBox="0 0 24 24" fill="none">
+            <svg
+              className="h-4 w-4 animate-spin"
+              viewBox="0 0 24 24"
+              fill="none"
+            >
               <circle
                 className="opacity-25"
                 cx="12"
@@ -252,13 +344,94 @@ export function PlanDetailView({ planReview }: PlanDetailViewProps) {
             </svg>
             Loading plan content...
           </div>
-        ) : (
-          <div
-            className="prose prose-sm max-w-none text-gray-700"
-            dangerouslySetInnerHTML={{ __html: renderedPlanBody }}
+        </div>
+      ) : isPending ? (
+        // Three-column annotation layout.
+        <div className="flex gap-4">
+          {/* Left: Table of Contents. */}
+          {tocItems.length > 0 && (
+            <div className="hidden w-48 flex-shrink-0 lg:block">
+              <div className="sticky top-4 rounded-lg border border-gray-200 bg-white py-3">
+                <PlanToc
+                  items={tocItems}
+                  onScrollToBlock={handleScrollToBlock}
+                />
+              </div>
+            </div>
+          )}
+
+          {/* Center: Plan content with block-based rendering. */}
+          <div className="min-w-0 flex-1">
+            <div className="rounded-lg border border-gray-200 bg-white p-6">
+              <div className="mb-4 flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <h3 className="text-base font-semibold text-gray-900">
+                    Plan Content
+                  </h3>
+                  {hasMultipleVersions && (
+                    <span className="text-xs text-gray-400">
+                      v{versionCount}
+                    </span>
+                  )}
+                  {hasMultipleVersions && (
+                    <button
+                      type="button"
+                      onClick={() => setShowDiff(!showDiff)}
+                      className={cn(
+                        'rounded-md px-2 py-1 text-xs font-medium transition-colors',
+                        showDiff
+                          ? 'bg-blue-100 text-blue-800'
+                          : 'text-gray-500 hover:bg-gray-100',
+                      )}
+                    >
+                      {showDiff ? 'Hide Diff' : 'Show Changes'}
+                    </button>
+                  )}
+                </div>
+                {planAnnotations.length > 0 && (
+                  <span className="rounded-full bg-yellow-100 px-2.5 py-0.5 text-xs font-medium text-yellow-800">
+                    {planAnnotations.length} annotation
+                    {planAnnotations.length !== 1 ? 's' : ''}
+                  </span>
+                )}
+              </div>
+              {showDiff && previousPlanBody ? (
+                <PlanDiffView
+                  oldText={previousPlanBody}
+                  newText={planBody}
+                />
+              ) : (
+                <BlockViewer
+                  blocks={blocks}
+                  annotations={planAnnotations}
+                />
+              )}
+            </div>
+          </div>
+
+          {/* Right: Annotation Sidebar. */}
+          <div className="hidden w-72 flex-shrink-0 xl:block">
+            <div className="sticky top-4 max-h-[calc(100vh-6rem)] rounded-lg border border-gray-200 bg-white">
+              <AnnotationSidebar
+                annotations={planAnnotations}
+                onScrollToBlock={handleScrollToBlock}
+              />
+            </div>
+          </div>
+        </div>
+      ) : (
+        // Read-only single-column layout.
+        <div className="rounded-lg border border-gray-200 bg-white p-6">
+          <h3 className="mb-4 text-base font-semibold text-gray-900">
+            Plan Content
+          </h3>
+          <BlockViewer
+            blocks={blocks}
+            annotations={planAnnotations}
+            readOnly
           />
-        )}
-      </div>
+        </div>
+      )}
 
       {/* Action buttons (only shown when pending). */}
       {isPending ? (
@@ -267,11 +440,21 @@ export function PlanDetailView({ planReview }: PlanDetailViewProps) {
             Review Actions
           </h3>
 
-          {/* Comment textarea. */}
+          {/* Annotation summary. */}
+          {planAnnotations.length > 0 && (
+            <div className="mb-3 rounded-lg border border-yellow-200 bg-yellow-50 px-3 py-2 text-xs text-yellow-800">
+              {planAnnotations.length} annotation
+              {planAnnotations.length !== 1 ? 's' : ''} will be
+              included as structured feedback when requesting changes
+              or rejecting.
+            </div>
+          )}
+
+          {/* Additional comment textarea. */}
           <textarea
-            value={comment}
-            onChange={(e) => setComment(e.target.value)}
-            placeholder="Add a comment (optional)..."
+            value={additionalComment}
+            onChange={(e) => setAdditionalComment(e.target.value)}
+            placeholder="Add additional notes (optional)..."
             rows={3}
             className={cn(
               'w-full rounded-lg border border-gray-300 px-3 py-2 text-sm',
@@ -308,6 +491,8 @@ export function PlanDetailView({ planReview }: PlanDetailViewProps) {
               )}
             >
               Request Changes
+              {planAnnotations.length > 0 &&
+                ` (${planAnnotations.length})`}
             </button>
 
             <button
