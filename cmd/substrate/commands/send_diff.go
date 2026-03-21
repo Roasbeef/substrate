@@ -138,13 +138,13 @@ func runSendDiff(cmd *cobra.Command, args []string) error {
 
 	// Build message body with diff marker for frontend rendering.
 	var body strings.Builder
-	body.WriteString(fmt.Sprintf(
+	fmt.Fprintf(&body,
 		"**Branch:** `%s` (base: `%s`)\n", branch, base,
-	))
-	body.WriteString(fmt.Sprintf("**Command:** `%s`\n", diffCmd))
-	body.WriteString(fmt.Sprintf(
+	)
+	fmt.Fprintf(&body, "**Command:** `%s`\n", diffCmd)
+	fmt.Fprintf(&body,
 		"**Stats:** %s\n\n", stats.summary(),
-	))
+	)
 
 	// Diff marker — the frontend detects this and renders with DiffViewer.
 	body.WriteString("<!-- substrate:diff -->\n")
