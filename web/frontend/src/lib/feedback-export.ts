@@ -12,10 +12,19 @@ import type {
 const MAX_TEXT_LENGTH = 16384;
 
 // escapeCodeFence escapes content that will be placed inside markdown
-// code fences to prevent fence-breaking injection attacks.
+// code fences to prevent fence-breaking injection attacks. Replaces
+// sequences of 3+ backticks with the Unicode fullwidth grave accent
+// (U+FF40) so they cannot close a code fence.
 function escapeCodeFence(text: string): string {
-  // Replace sequences of 3+ backticks with escaped versions.
-  return text.replace(/`{3,}/g, (match) => '`'.repeat(match.length - 1));
+  return text.replace(/`{3,}/g, (match) =>
+    '\uFF40'.repeat(match.length),
+  );
+}
+
+// sanitizeFilePath strips characters that could inject markdown
+// structure when interpolated into headings.
+function sanitizeFilePath(path: string): string {
+  return path.replace(/[\n\r#]/g, '_');
 }
 
 // truncateText limits text length to prevent oversized payloads.
@@ -117,7 +126,7 @@ export function exportDiffAnnotations(
   let output = '# Code Review Feedback\n\n';
 
   for (const [filePath, fileAnnotations] of grouped) {
-    output += `## ${filePath}\n\n`;
+    output += `## ${sanitizeFilePath(filePath)}\n\n`;
 
     const sorted = [...fileAnnotations].sort((a, b) => {
       const aScope = a.scope ?? 'line';

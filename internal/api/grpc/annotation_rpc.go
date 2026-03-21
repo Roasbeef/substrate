@@ -164,6 +164,25 @@ func (s *Server) UpdatePlanAnnotation(
 			codes.InvalidArgument, "annotation_id is required",
 		)
 	}
+	if req.StartOffset < 0 || req.EndOffset < 0 {
+		return nil, status.Error(
+			codes.InvalidArgument, "offsets must be non-negative",
+		)
+	}
+	if req.EndOffset < req.StartOffset {
+		return nil, status.Error(
+			codes.InvalidArgument,
+			"end_offset must be >= start_offset",
+		)
+	}
+	for _, check := range []struct{ field, val string }{
+		{"text", req.Text},
+		{"original_text", req.OriginalText},
+	} {
+		if err := validateTextLen(check.field, check.val); err != nil {
+			return nil, err
+		}
+	}
 
 	params := store.UpdatePlanAnnotationParams{
 		AnnotationID: req.AnnotationId,
@@ -333,6 +352,15 @@ func (s *Server) UpdateDiffAnnotation(
 		return nil, status.Error(
 			codes.InvalidArgument, "annotation_id is required",
 		)
+	}
+	for _, check := range []struct{ field, val string }{
+		{"text", req.Text},
+		{"suggested_code", req.SuggestedCode},
+		{"original_code", req.OriginalCode},
+	} {
+		if err := validateTextLen(check.field, check.val); err != nil {
+			return nil, err
+		}
 	}
 
 	params := store.UpdateDiffAnnotationParams{
