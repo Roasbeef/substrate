@@ -78,6 +78,26 @@ CREATE TABLE consumer_offsets (
     PRIMARY KEY(agent_id, topic_id)
 );
 
+CREATE TABLE diff_annotations (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    annotation_id TEXT NOT NULL UNIQUE,
+    message_id INTEGER NOT NULL REFERENCES messages(id),
+    annotation_type TEXT NOT NULL
+        CHECK (annotation_type IN ('comment', 'suggestion', 'concern')),
+    scope TEXT NOT NULL DEFAULT 'line'
+        CHECK (scope IN ('line', 'file')),
+    file_path TEXT NOT NULL,
+    line_start INTEGER NOT NULL,
+    line_end INTEGER NOT NULL,
+    side TEXT NOT NULL DEFAULT 'new'
+        CHECK (side IN ('old', 'new')),
+    text TEXT,
+    suggested_code TEXT,
+    original_code TEXT,
+    created_at INTEGER NOT NULL,
+    updated_at INTEGER NOT NULL
+);
+
 CREATE TABLE message_recipients (
     message_id INTEGER NOT NULL REFERENCES messages(id) ON DELETE CASCADE,
     agent_id INTEGER NOT NULL REFERENCES agents(id) ON DELETE CASCADE,
@@ -115,6 +135,28 @@ CREATE TABLE pending_operations (
     attempts INTEGER NOT NULL DEFAULT 0,
     last_error TEXT,
     status TEXT NOT NULL DEFAULT 'pending'
+);
+
+CREATE TABLE plan_annotations (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    plan_review_id TEXT NOT NULL REFERENCES plan_reviews(plan_review_id),
+    annotation_id TEXT NOT NULL UNIQUE,
+    block_id TEXT NOT NULL,
+    annotation_type TEXT NOT NULL
+        CHECK (annotation_type IN (
+            'DELETION', 'INSERTION', 'REPLACEMENT',
+            'COMMENT', 'GLOBAL_COMMENT'
+        )),
+    text TEXT,
+    original_text TEXT NOT NULL,
+    start_offset INTEGER NOT NULL DEFAULT 0,
+    end_offset INTEGER NOT NULL DEFAULT 0,
+    diff_context TEXT
+        CHECK (diff_context IS NULL OR diff_context IN (
+            'added', 'removed', 'modified'
+        )),
+    created_at INTEGER NOT NULL,
+    updated_at INTEGER NOT NULL
 );
 
 CREATE TABLE plan_reviews (
@@ -306,6 +348,12 @@ CREATE INDEX idx_agents_name ON agents(name);
 
 CREATE INDEX idx_agents_project ON agents(project_key);
 
+CREATE INDEX idx_diff_annotations_file
+    ON diff_annotations(message_id, file_path);
+
+CREATE INDEX idx_diff_annotations_message
+    ON diff_annotations(message_id);
+
 CREATE INDEX idx_messages_created ON messages(created_at);
 
 CREATE INDEX idx_messages_deleted ON messages(deleted_by_sender);
@@ -326,6 +374,12 @@ CREATE INDEX idx_pending_expires
 
 CREATE INDEX idx_pending_status
     ON pending_operations(status);
+
+CREATE INDEX idx_plan_annotations_block
+    ON plan_annotations(plan_review_id, block_id);
+
+CREATE INDEX idx_plan_annotations_review
+    ON plan_annotations(plan_review_id);
 
 CREATE INDEX idx_plan_reviews_created ON plan_reviews(created_at DESC);
 
