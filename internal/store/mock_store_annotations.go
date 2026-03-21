@@ -3,45 +3,8 @@ package store
 import (
 	"context"
 	"fmt"
-	"sync"
 	"time"
 )
-
-// Annotation data stores for MockStore.
-// Uses the same package-level map pattern as mock_store_plan_reviews.go.
-
-// mockAnnotationData holds annotation data for a MockStore instance.
-type mockAnnotationData struct {
-	planAnnotations      map[string]PlanAnnotation // Keyed by annotation_id.
-	diffAnnotations      map[string]DiffAnnotation // Keyed by annotation_id.
-	nextPlanAnnotationID int64
-	nextDiffAnnotationID int64
-}
-
-// annotationDataMap stores per-MockStore annotation data.
-var (
-	annotationDataMap  = make(map[*MockStore]*mockAnnotationData)
-	annotationDataMapMu sync.Mutex
-)
-
-// getAnnotationData returns or initializes annotation data for a
-// MockStore. The caller must already hold m.mu.
-func getAnnotationData(m *MockStore) *mockAnnotationData {
-	annotationDataMapMu.Lock()
-	defer annotationDataMapMu.Unlock()
-
-	data, ok := annotationDataMap[m]
-	if !ok {
-		data = &mockAnnotationData{
-			planAnnotations:      make(map[string]PlanAnnotation),
-			diffAnnotations:      make(map[string]DiffAnnotation),
-			nextPlanAnnotationID: 1,
-			nextDiffAnnotationID: 1,
-		}
-		annotationDataMap[m] = data
-	}
-	return data
-}
 
 // =============================================================================
 // Plan annotation mock implementation
@@ -51,14 +14,13 @@ func getAnnotationData(m *MockStore) *mockAnnotationData {
 func (m *MockStore) CreatePlanAnnotation(ctx context.Context,
 	params CreatePlanAnnotationParams,
 ) (PlanAnnotation, error) {
+
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
-	data := getAnnotationData(m)
 	now := time.Now()
-
 	ann := PlanAnnotation{
-		ID:             data.nextPlanAnnotationID,
+		ID:             m.nextPlanAnnotationID,
 		PlanReviewID:   params.PlanReviewID,
 		AnnotationID:   params.AnnotationID,
 		BlockID:        params.BlockID,
@@ -72,8 +34,8 @@ func (m *MockStore) CreatePlanAnnotation(ctx context.Context,
 		UpdatedAt:      now,
 	}
 
-	data.planAnnotations[params.AnnotationID] = ann
-	data.nextPlanAnnotationID++
+	m.planAnnotations[params.AnnotationID] = ann
+	m.nextPlanAnnotationID++
 
 	return ann, nil
 }
@@ -82,11 +44,11 @@ func (m *MockStore) CreatePlanAnnotation(ctx context.Context,
 func (m *MockStore) GetPlanAnnotation(ctx context.Context,
 	annotationID string,
 ) (PlanAnnotation, error) {
+
 	m.mu.RLock()
 	defer m.mu.RUnlock()
 
-	data := getAnnotationData(m)
-	ann, ok := data.planAnnotations[annotationID]
+	ann, ok := m.planAnnotations[annotationID]
 	if !ok {
 		return PlanAnnotation{}, fmt.Errorf(
 			"plan annotation not found: %s", annotationID,
@@ -96,17 +58,17 @@ func (m *MockStore) GetPlanAnnotation(ctx context.Context,
 	return ann, nil
 }
 
-// ListPlanAnnotationsByReview retrieves all annotations for a plan review.
+// ListPlanAnnotationsByReview retrieves all annotations for a plan
+// review.
 func (m *MockStore) ListPlanAnnotationsByReview(ctx context.Context,
 	planReviewID string,
 ) ([]PlanAnnotation, error) {
+
 	m.mu.RLock()
 	defer m.mu.RUnlock()
 
-	data := getAnnotationData(m)
 	var result []PlanAnnotation
-
-	for _, ann := range data.planAnnotations {
+	for _, ann := range m.planAnnotations {
 		if ann.PlanReviewID == planReviewID {
 			result = append(result, ann)
 		}
@@ -119,11 +81,11 @@ func (m *MockStore) ListPlanAnnotationsByReview(ctx context.Context,
 func (m *MockStore) UpdatePlanAnnotation(ctx context.Context,
 	params UpdatePlanAnnotationParams,
 ) error {
+
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
-	data := getAnnotationData(m)
-	ann, ok := data.planAnnotations[params.AnnotationID]
+	ann, ok := m.planAnnotations[params.AnnotationID]
 	if !ok {
 		return fmt.Errorf(
 			"plan annotation not found: %s", params.AnnotationID,
@@ -136,7 +98,7 @@ func (m *MockStore) UpdatePlanAnnotation(ctx context.Context,
 	ann.EndOffset = params.EndOffset
 	ann.DiffContext = params.DiffContext
 	ann.UpdatedAt = time.Now()
-	data.planAnnotations[params.AnnotationID] = ann
+	m.planAnnotations[params.AnnotationID] = ann
 
 	return nil
 }
@@ -145,26 +107,27 @@ func (m *MockStore) UpdatePlanAnnotation(ctx context.Context,
 func (m *MockStore) DeletePlanAnnotation(ctx context.Context,
 	annotationID string,
 ) error {
+
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
-	data := getAnnotationData(m)
-	delete(data.planAnnotations, annotationID)
+	delete(m.planAnnotations, annotationID)
 
 	return nil
 }
 
-// DeletePlanAnnotationsByReview deletes all annotations for a plan review.
+// DeletePlanAnnotationsByReview deletes all annotations for a plan
+// review.
 func (m *MockStore) DeletePlanAnnotationsByReview(ctx context.Context,
 	planReviewID string,
 ) error {
+
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
-	data := getAnnotationData(m)
-	for id, ann := range data.planAnnotations {
+	for id, ann := range m.planAnnotations {
 		if ann.PlanReviewID == planReviewID {
-			delete(data.planAnnotations, id)
+			delete(m.planAnnotations, id)
 		}
 	}
 
@@ -179,14 +142,13 @@ func (m *MockStore) DeletePlanAnnotationsByReview(ctx context.Context,
 func (m *MockStore) CreateDiffAnnotation(ctx context.Context,
 	params CreateDiffAnnotationParams,
 ) (DiffAnnotation, error) {
+
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
-	data := getAnnotationData(m)
 	now := time.Now()
-
 	ann := DiffAnnotation{
-		ID:             data.nextDiffAnnotationID,
+		ID:             m.nextDiffAnnotationID,
 		AnnotationID:   params.AnnotationID,
 		MessageID:      params.MessageID,
 		AnnotationType: params.AnnotationType,
@@ -202,8 +164,8 @@ func (m *MockStore) CreateDiffAnnotation(ctx context.Context,
 		UpdatedAt:      now,
 	}
 
-	data.diffAnnotations[params.AnnotationID] = ann
-	data.nextDiffAnnotationID++
+	m.diffAnnotations[params.AnnotationID] = ann
+	m.nextDiffAnnotationID++
 
 	return ann, nil
 }
@@ -212,11 +174,11 @@ func (m *MockStore) CreateDiffAnnotation(ctx context.Context,
 func (m *MockStore) GetDiffAnnotation(ctx context.Context,
 	annotationID string,
 ) (DiffAnnotation, error) {
+
 	m.mu.RLock()
 	defer m.mu.RUnlock()
 
-	data := getAnnotationData(m)
-	ann, ok := data.diffAnnotations[annotationID]
+	ann, ok := m.diffAnnotations[annotationID]
 	if !ok {
 		return DiffAnnotation{}, fmt.Errorf(
 			"diff annotation not found: %s", annotationID,
@@ -231,13 +193,12 @@ func (m *MockStore) GetDiffAnnotation(ctx context.Context,
 func (m *MockStore) ListDiffAnnotationsByMessage(ctx context.Context,
 	messageID int64,
 ) ([]DiffAnnotation, error) {
+
 	m.mu.RLock()
 	defer m.mu.RUnlock()
 
-	data := getAnnotationData(m)
 	var result []DiffAnnotation
-
-	for _, ann := range data.diffAnnotations {
+	for _, ann := range m.diffAnnotations {
 		if ann.MessageID == messageID {
 			result = append(result, ann)
 		}
@@ -250,11 +211,11 @@ func (m *MockStore) ListDiffAnnotationsByMessage(ctx context.Context,
 func (m *MockStore) UpdateDiffAnnotation(ctx context.Context,
 	params UpdateDiffAnnotationParams,
 ) error {
+
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
-	data := getAnnotationData(m)
-	ann, ok := data.diffAnnotations[params.AnnotationID]
+	ann, ok := m.diffAnnotations[params.AnnotationID]
 	if !ok {
 		return fmt.Errorf(
 			"diff annotation not found: %s", params.AnnotationID,
@@ -265,7 +226,7 @@ func (m *MockStore) UpdateDiffAnnotation(ctx context.Context,
 	ann.SuggestedCode = params.SuggestedCode
 	ann.OriginalCode = params.OriginalCode
 	ann.UpdatedAt = time.Now()
-	data.diffAnnotations[params.AnnotationID] = ann
+	m.diffAnnotations[params.AnnotationID] = ann
 
 	return nil
 }
@@ -274,11 +235,11 @@ func (m *MockStore) UpdateDiffAnnotation(ctx context.Context,
 func (m *MockStore) DeleteDiffAnnotation(ctx context.Context,
 	annotationID string,
 ) error {
+
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
-	data := getAnnotationData(m)
-	delete(data.diffAnnotations, annotationID)
+	delete(m.diffAnnotations, annotationID)
 
 	return nil
 }
@@ -288,13 +249,13 @@ func (m *MockStore) DeleteDiffAnnotation(ctx context.Context,
 func (m *MockStore) DeleteDiffAnnotationsByMessage(ctx context.Context,
 	messageID int64,
 ) error {
+
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
-	data := getAnnotationData(m)
-	for id, ann := range data.diffAnnotations {
+	for id, ann := range m.diffAnnotations {
 		if ann.MessageID == messageID {
-			delete(data.diffAnnotations, id)
+			delete(m.diffAnnotations, id)
 		}
 	}
 

@@ -204,12 +204,15 @@ export function ThreadMessage({
 
     // Post the review feedback as a mail reply in the thread.
     // Uses the substrate send API via fetch to the grpc-gateway.
+    // Post review feedback as a reply in the thread. The sender_id
+    // is intentionally omitted so the server resolves the current
+    // user's agent identity rather than impersonating the original
+    // message sender.
     fetch('/api/v1/messages', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         thread_id: message.thread_id,
-        sender_id: message.sender_id,
         subject: `Re: ${message.subject} [Code Review]`,
         body: feedback,
         priority: 'normal',

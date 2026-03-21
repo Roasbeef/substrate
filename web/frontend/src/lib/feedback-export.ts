@@ -134,7 +134,7 @@ export function exportDiffAnnotations(
       if (scope === 'file') {
         output += `### File Comment\n`;
         if (ann.text) {
-          output += `${ann.text}\n`;
+          output += `${truncateText(ann.text)}\n`;
         }
         if (ann.suggestedCode) {
           output += `\n**Suggested code:**\n\`\`\`\n${ann.suggestedCode}\n\`\`\`\n`;

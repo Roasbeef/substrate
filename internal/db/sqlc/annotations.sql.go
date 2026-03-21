@@ -221,6 +221,7 @@ const ListDiffAnnotationsByMessage = `-- name: ListDiffAnnotationsByMessage :man
 SELECT id, annotation_id, message_id, annotation_type, scope, file_path, line_start, line_end, side, text, suggested_code, original_code, created_by, created_at, updated_at FROM diff_annotations
 WHERE message_id = ?
 ORDER BY file_path ASC, line_start ASC
+LIMIT 500
 `
 
 func (q *Queries) ListDiffAnnotationsByMessage(ctx context.Context, messageID int64) ([]DiffAnnotation, error) {
@@ -266,6 +267,7 @@ const ListPlanAnnotationsByReview = `-- name: ListPlanAnnotationsByReview :many
 SELECT id, plan_review_id, annotation_id, block_id, annotation_type, text, original_text, start_offset, end_offset, diff_context, created_by, created_at, updated_at FROM plan_annotations
 WHERE plan_review_id = ?
 ORDER BY id ASC
+LIMIT 500
 `
 
 func (q *Queries) ListPlanAnnotationsByReview(ctx context.Context, planReviewID string) ([]PlanAnnotation, error) {

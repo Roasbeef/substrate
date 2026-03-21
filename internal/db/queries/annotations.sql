@@ -12,7 +12,8 @@ SELECT * FROM plan_annotations WHERE annotation_id = ?;
 -- name: ListPlanAnnotationsByReview :many
 SELECT * FROM plan_annotations
 WHERE plan_review_id = ?
-ORDER BY id ASC;
+ORDER BY id ASC
+LIMIT 500;
 
 -- name: UpdatePlanAnnotation :exec
 UPDATE plan_annotations
@@ -41,7 +42,8 @@ SELECT * FROM diff_annotations WHERE annotation_id = ?;
 -- name: ListDiffAnnotationsByMessage :many
 SELECT * FROM diff_annotations
 WHERE message_id = ?
-ORDER BY file_path ASC, line_start ASC;
+ORDER BY file_path ASC, line_start ASC
+LIMIT 500;
 
 -- name: UpdateDiffAnnotation :exec
 UPDATE diff_annotations
