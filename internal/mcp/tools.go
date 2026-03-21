@@ -104,7 +104,7 @@ func (s *Server) handleFetchInbox(ctx context.Context,
 		return nil, FetchInboxResult{}, err
 	}
 
-	var messages []InboxMessageResult
+	messages := make([]InboxMessageResult, 0, len(resp.Messages))
 	for _, m := range resp.Messages {
 		messages = append(messages, InboxMessageResult{
 			ID:        m.ID,
@@ -360,7 +360,7 @@ type ListTopicsResult struct {
 func (s *Server) handleListTopics(ctx context.Context,
 	req *mcp.CallToolRequest, args ListTopicsArgs,
 ) (*mcp.CallToolResult, ListTopicsResult, error) {
-	var topicsResult []TopicInfo
+	topicsResult := make([]TopicInfo, 0)
 
 	if args.SubscribedOnly && args.AgentID > 0 {
 		subs, err := s.backend.ListSubscriptionsByAgent(
@@ -465,7 +465,7 @@ func (s *Server) handleSearch(ctx context.Context,
 			fmt.Errorf("search failed: %w", err)
 	}
 
-	var results []InboxMessageResult
+	results := make([]InboxMessageResult, 0, len(messages))
 	for _, m := range messages {
 		results = append(results, InboxMessageResult{
 			ID:        m.ID,
@@ -543,7 +543,7 @@ func (s *Server) handlePollChanges(ctx context.Context,
 		return nil, PollChangesResult{}, err
 	}
 
-	var messages []InboxMessageResult
+	messages := make([]InboxMessageResult, 0, len(resp.NewMessages))
 	for _, m := range resp.NewMessages {
 		messages = append(messages, InboxMessageResult{
 			ID:        m.ID,

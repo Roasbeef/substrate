@@ -9,7 +9,6 @@ import (
 	"google.golang.org/protobuf/types/known/timestamppb"
 
 	subtraterpc "github.com/roasbeef/subtrate/internal/api/grpc"
-	"github.com/roasbeef/subtrate/internal/db/sqlc"
 	"github.com/roasbeef/subtrate/internal/mail"
 	"github.com/roasbeef/subtrate/internal/store"
 )
@@ -350,7 +349,7 @@ func (b *GRPCBackend) SearchMessages(ctx context.Context,
 // RegisterAgent creates a new agent via the gRPC daemon.
 func (b *GRPCBackend) RegisterAgent(ctx context.Context,
 	name, projectKey, gitBranch string,
-) (*sqlc.Agent, error) {
+) (store.Agent, error) {
 	resp, err := b.agentClient.RegisterAgent(
 		ctx, &subtraterpc.RegisterAgentRequest{
 			Name:       name,
@@ -358,10 +357,10 @@ func (b *GRPCBackend) RegisterAgent(ctx context.Context,
 		},
 	)
 	if err != nil {
-		return nil, err
+		return store.Agent{}, err
 	}
 
-	return &sqlc.Agent{
+	return store.Agent{
 		ID:   resp.AgentId,
 		Name: resp.Name,
 	}, nil

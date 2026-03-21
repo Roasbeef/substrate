@@ -64,8 +64,8 @@ func init() {
 		"MCP transport: streamable-http, sse, or stdio",
 	)
 	mcpServeCmd.Flags().StringVar(
-		&mcpAddr, "addr", ":8090",
-		"Listen address for HTTP transports",
+		&mcpAddr, "addr", "127.0.0.1:8090",
+		"Listen address for HTTP transports (default: localhost only)",
 	)
 
 	mcpCmd.AddCommand(mcpServeCmd)
@@ -127,10 +127,14 @@ func runMCPServe(cmd *cobra.Command, args []string) error {
 
 	sigCh := make(chan os.Signal, 1)
 	signal.Notify(sigCh, syscall.SIGINT, syscall.SIGTERM)
+	defer signal.Stop(sigCh)
 
 	go func() {
-		<-sigCh
-		cancel()
+		select {
+		case <-sigCh:
+			cancel()
+		case <-ctx.Done():
+		}
 	}()
 
 	// Start the MCP server on the selected transport.
@@ -163,8 +167,9 @@ func serveStreamableHTTP(
 	)
 
 	httpServer := &http.Server{
-		Addr:    mcpAddr,
-		Handler: handler,
+		Addr:              mcpAddr,
+		Handler:           handler,
+		ReadHeaderTimeout: 5 * time.Second,
 	}
 
 	// Shut down gracefully when context is cancelled.
@@ -203,8 +208,9 @@ func serveSSE(
 	)
 
 	httpServer := &http.Server{
-		Addr:    mcpAddr,
-		Handler: handler,
+		Addr:              mcpAddr,
+		Handler:           handler,
+		ReadHeaderTimeout: 5 * time.Second,
 	}
 
 	// Shut down gracefully when context is cancelled.

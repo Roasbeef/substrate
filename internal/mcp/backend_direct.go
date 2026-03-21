@@ -6,7 +6,6 @@ import (
 
 	"github.com/roasbeef/subtrate/internal/actorutil"
 	"github.com/roasbeef/subtrate/internal/agent"
-	"github.com/roasbeef/subtrate/internal/db/sqlc"
 	"github.com/roasbeef/subtrate/internal/mail"
 	"github.com/roasbeef/subtrate/internal/store"
 )
@@ -322,8 +321,15 @@ func (b *DirectBackend) SearchMessages(ctx context.Context,
 // RegisterAgent creates a new agent with the given name.
 func (b *DirectBackend) RegisterAgent(ctx context.Context,
 	name, projectKey, gitBranch string,
-) (*sqlc.Agent, error) {
-	return b.registry.RegisterAgent(ctx, name, projectKey, gitBranch)
+) (store.Agent, error) {
+	ag, err := b.registry.RegisterAgent(
+		ctx, name, projectKey, gitBranch,
+	)
+	if err != nil {
+		return store.Agent{}, err
+	}
+
+	return store.AgentFromSqlc(*ag), nil
 }
 
 // GetAgent retrieves an agent by ID.

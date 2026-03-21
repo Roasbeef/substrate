@@ -4,7 +4,6 @@ import (
 	"context"
 	"time"
 
-	"github.com/roasbeef/subtrate/internal/db/sqlc"
 	"github.com/roasbeef/subtrate/internal/mail"
 	"github.com/roasbeef/subtrate/internal/store"
 )
@@ -85,7 +84,7 @@ type Backend interface {
 	// RegisterAgent creates a new agent with the given name.
 	RegisterAgent(ctx context.Context,
 		name, projectKey, gitBranch string,
-	) (*sqlc.Agent, error)
+	) (store.Agent, error)
 
 	// GetAgent retrieves an agent by ID.
 	GetAgent(ctx context.Context,
