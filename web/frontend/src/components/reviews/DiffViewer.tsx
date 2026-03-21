@@ -6,14 +6,34 @@ import {
 } from 'react';
 import { FileDiff } from '@pierre/diffs/react';
 import { parsePatchFiles } from '@pierre/diffs';
+import type { DiffAnnotation } from '@/types/annotations.js';
+import { DiffAnnotationLayer } from './DiffAnnotationLayer.js';
 
 export interface DiffViewerProps {
   // The raw unified diff / patch string (git diff output).
   patch: string;
   // Optional CSS class name.
-  className?: string;
+  className?: string | undefined;
   // Initial diff style, defaults to 'unified'.
-  initialStyle?: 'unified' | 'split';
+  initialStyle?: 'unified' | 'split' | undefined;
+  // Annotation support — when provided, enables review mode.
+  reviewMode?: boolean | undefined;
+  annotations?: DiffAnnotation[] | undefined;
+  onAddAnnotation?: ((params: {
+    filePath: string;
+    type: DiffAnnotation['type'];
+    scope: DiffAnnotation['scope'];
+    lineStart: number;
+    lineEnd: number;
+    side: 'old' | 'new';
+    text: string;
+    suggestedCode?: string | undefined;
+  }) => void) | undefined;
+  onUpdateAnnotation?: ((
+    id: string, text: string, suggestedCode?: string | undefined,
+  ) => void) | undefined;
+  onDeleteAnnotation?: ((id: string) => void) | undefined;
+  onSubmitReview?: (() => void) | undefined;
 }
 
 // Extract just the filename from a path (e.g. "b/internal/review/service.go" -> "service.go").
@@ -65,6 +85,12 @@ export function DiffViewer({
   patch,
   className,
   initialStyle = 'unified',
+  reviewMode = false,
+  annotations = [],
+  onAddAnnotation,
+  onUpdateAnnotation,
+  onDeleteAnnotation,
+  onSubmitReview,
 }: DiffViewerProps) {
   const [diffStyle, setDiffStyle] = useState<'unified' | 'split'>(
     initialStyle,
@@ -225,9 +251,23 @@ export function DiffViewer({
         <span className={`text-xs ${fullscreen ? 'text-gray-400' : 'text-gray-500'}`}>
           {fileDiffs.length} file{fileDiffs.length !== 1 ? 's' : ''}
         </span>
+        {reviewMode && annotations.length > 0 && (
+          <span className="rounded-full bg-yellow-100 px-2 py-0.5 text-[10px] font-medium text-yellow-800">
+            {annotations.length} annotation{annotations.length !== 1 ? 's' : ''}
+          </span>
+        )}
       </div>
 
       <div className="flex items-center gap-2">
+        {reviewMode && onSubmitReview && annotations.length > 0 && (
+          <button
+            type="button"
+            onClick={onSubmitReview}
+            className="rounded-md bg-blue-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-blue-700"
+          >
+            Submit Review ({annotations.length})
+          </button>
+        )}
         <button
           type="button"
           onClick={handleCopy}
@@ -301,7 +341,19 @@ export function DiffViewer({
           data-file-idx={idx}
           className="overflow-hidden rounded-lg border border-gray-700"
         >
-          <FileDiff fileDiff={fileDiff} options={options} />
+          {reviewMode && onAddAnnotation && onUpdateAnnotation && onDeleteAnnotation ? (
+            <DiffAnnotationLayer
+              filePath={cleanPath(fileDiff.name ?? fileDiff.prevName ?? `file-${idx}`)}
+              annotations={annotations}
+              onAddAnnotation={onAddAnnotation}
+              onUpdateAnnotation={onUpdateAnnotation}
+              onDeleteAnnotation={onDeleteAnnotation}
+            >
+              <FileDiff fileDiff={fileDiff} options={options} />
+            </DiffAnnotationLayer>
+          ) : (
+            <FileDiff fileDiff={fileDiff} options={options} />
+          )}
         </div>
       ))}
     </div>

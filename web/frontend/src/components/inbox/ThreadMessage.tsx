@@ -1,6 +1,6 @@
 // ThreadMessage component - a single message within a thread view.
 
-import { useMemo, useState, lazy, Suspense } from 'react';
+import { useMemo, useState, useCallback, lazy, Suspense } from 'react';
 import { clsx } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 import { marked } from 'marked';
@@ -9,6 +9,9 @@ import { Avatar } from '@/components/ui/Avatar.js';
 import { PriorityBadge } from '@/components/ui/Badge.js';
 import { Spinner } from '@/components/ui/Spinner.js';
 import type { Message, MessageWithRecipients } from '@/types/api.js';
+import type { DiffAnnotation } from '@/types/annotations.js';
+import { useAnnotationStore } from '@/stores/annotations.js';
+import { exportDiffAnnotations } from '@/lib/feedback-export.js';
 import { formatAgentDisplayName, getAgentContext } from '@/lib/utils.js';
 
 // Lazy-load DiffViewer to avoid bundling Shiki grammars in inbox chunk.
@@ -136,6 +139,53 @@ export function ThreadMessage({
 
   // Track whether the diff section is expanded.
   const [diffExpanded, setDiffExpanded] = useState(false);
+  const [reviewMode, setReviewMode] = useState(false);
+
+  // Diff annotation support.
+  const {
+    diffAnnotations,
+    addDiffAnnotation,
+    updateDiffAnnotation: storeUpdateDiffAnnotation,
+    deleteDiffAnnotation,
+  } = useAnnotationStore();
+
+  const handleAddDiffAnnotation = useCallback(
+    (params: {
+      filePath: string;
+      type: DiffAnnotation['type'];
+      scope: DiffAnnotation['scope'];
+      lineStart: number;
+      lineEnd: number;
+      side: 'old' | 'new';
+      text: string;
+      suggestedCode?: string | undefined;
+    }) => {
+      addDiffAnnotation(params);
+    },
+    [addDiffAnnotation],
+  );
+
+  const handleUpdateDiffAnnotation = useCallback(
+    (id: string, text: string, suggestedCode?: string | undefined) => {
+      storeUpdateDiffAnnotation(id, { text, suggestedCode });
+    },
+    [storeUpdateDiffAnnotation],
+  );
+
+  const handleDeleteDiffAnnotation = useCallback(
+    (id: string) => {
+      deleteDiffAnnotation(id);
+    },
+    [deleteDiffAnnotation],
+  );
+
+  const handleSubmitReview = useCallback(() => {
+    const feedback = exportDiffAnnotations(diffAnnotations);
+    // For now, log the feedback. The full integration will send it
+    // as a mail reply to the agent.
+    console.log('Review feedback:', feedback);
+    // TODO: Send as mail reply via substrate API.
+  }, [diffAnnotations]);
 
   return (
     <div
@@ -220,6 +270,20 @@ export function ThreadMessage({
           >
             {diffExpanded ? 'Hide diff' : 'Show diff'}
           </button>
+          {diffExpanded && (
+            <button
+              type="button"
+              onClick={() => setReviewMode(!reviewMode)}
+              className={cn(
+                'ml-2 rounded-lg border px-3 py-1.5 text-sm font-medium transition-colors',
+                reviewMode
+                  ? 'border-green-200 bg-green-50 text-green-700'
+                  : 'border-gray-200 text-gray-600 hover:bg-gray-50',
+              )}
+            >
+              {reviewMode ? 'Exit Review' : 'Review'}
+            </button>
+          )}
 
           {diffExpanded ? (
             <div className="mt-3">
@@ -234,7 +298,15 @@ export function ThreadMessage({
                   </div>
                 }
               >
-                <DiffViewer patch={patch} />
+                <DiffViewer
+                  patch={patch}
+                  reviewMode={reviewMode}
+                  annotations={diffAnnotations}
+                  onAddAnnotation={handleAddDiffAnnotation}
+                  onUpdateAnnotation={handleUpdateDiffAnnotation}
+                  onDeleteAnnotation={handleDeleteDiffAnnotation}
+                  onSubmitReview={handleSubmitReview}
+                />
               </Suspense>
             </div>
           ) : null}
