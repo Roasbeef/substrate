@@ -80,18 +80,14 @@ func runSend(cmd *cobra.Command, args []string) error {
 		body = strings.TrimSpace(string(data))
 	}
 
-	// Parse priority.
-	var priority mail.Priority
-	switch sendPriority {
-	case "urgent":
-		priority = mail.PriorityUrgent
-	case "normal":
-		priority = mail.PriorityNormal
-	case "low":
-		priority = mail.PriorityLow
-	default:
-		return fmt.Errorf("invalid priority: %s", sendPriority)
+	// Validate and parse priority.
+	if err := validateEnum(
+		sendPriority, "priority",
+		[]string{"urgent", "normal", "low"},
+	); err != nil {
+		return err
 	}
+	priority := mail.Priority(sendPriority)
 
 	// Parse deadline if provided.
 	var deadline *time.Time

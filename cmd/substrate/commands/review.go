@@ -210,6 +210,14 @@ func runReviewRequest(cmd *cobra.Command, args []string) error {
 		)
 	}
 
+	// Validate review type.
+	if err := validateEnum(
+		reviewType, "type",
+		[]string{"full", "security", "performance", "architecture"},
+	); err != nil {
+		return err
+	}
+
 	// Build the request with the appropriate target type.
 	req := &subtraterpc.CreateReviewRequest{
 		RequesterId: agentID,
@@ -480,6 +488,13 @@ func runReviewIssues(cmd *cobra.Command, args []string) error {
 func runReviewDelete(cmd *cobra.Command, args []string) error {
 	ctx := context.Background()
 	reviewID := args[0]
+
+	if !confirmAction(fmt.Sprintf(
+		"Delete review %s and all associated data?", reviewID,
+	)) {
+		fmt.Println("Cancelled.")
+		return nil
+	}
 
 	client, err := getClient()
 	if err != nil {
