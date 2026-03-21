@@ -289,6 +289,46 @@ type QueryStore interface {
 	DeletePlanReview(
 		ctx context.Context, planReviewID string,
 	) error
+
+	// Plan annotation operations.
+	CreatePlanAnnotation(
+		ctx context.Context, arg sqlc.CreatePlanAnnotationParams,
+	) (sqlc.PlanAnnotation, error)
+	GetPlanAnnotation(
+		ctx context.Context, annotationID string,
+	) (sqlc.PlanAnnotation, error)
+	ListPlanAnnotationsByReview(
+		ctx context.Context, planReviewID string,
+	) ([]sqlc.PlanAnnotation, error)
+	UpdatePlanAnnotation(
+		ctx context.Context, arg sqlc.UpdatePlanAnnotationParams,
+	) error
+	DeletePlanAnnotation(
+		ctx context.Context, annotationID string,
+	) error
+	DeletePlanAnnotationsByReview(
+		ctx context.Context, planReviewID string,
+	) error
+
+	// Diff annotation operations.
+	CreateDiffAnnotation(
+		ctx context.Context, arg sqlc.CreateDiffAnnotationParams,
+	) (sqlc.DiffAnnotation, error)
+	GetDiffAnnotation(
+		ctx context.Context, annotationID string,
+	) (sqlc.DiffAnnotation, error)
+	ListDiffAnnotationsByMessage(
+		ctx context.Context, messageID int64,
+	) ([]sqlc.DiffAnnotation, error)
+	UpdateDiffAnnotation(
+		ctx context.Context, arg sqlc.UpdateDiffAnnotationParams,
+	) error
+	DeleteDiffAnnotation(
+		ctx context.Context, annotationID string,
+	) error
+	DeleteDiffAnnotationsByMessage(
+		ctx context.Context, messageID int64,
+	) error
 }
 
 // BatchedQueryStore is a version of QueryStore that's capable of batched
