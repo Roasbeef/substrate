@@ -2,11 +2,50 @@ package subtraterpc
 
 import (
 	"context"
+	"database/sql"
+	"errors"
 
 	"github.com/roasbeef/subtrate/internal/store"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 )
+
+const (
+	// maxTextLen is the maximum length for annotation text fields.
+	maxTextLen = 65536
+
+	// maxPathLen is the maximum length for file path fields.
+	maxPathLen = 4096
+)
+
+// validateTextLen checks that a text field does not exceed the maximum
+// allowed length.
+func validateTextLen(field, value string) error {
+	if len(value) > maxTextLen {
+		return status.Errorf(
+			codes.InvalidArgument,
+			"%s exceeds maximum length of %d", field, maxTextLen,
+		)
+	}
+	return nil
+}
+
+// validatePathLen checks that a file path field does not exceed the
+// maximum allowed length.
+func validatePathLen(value string) error {
+	if len(value) > maxPathLen {
+		return status.Errorf(
+			codes.InvalidArgument,
+			"file_path exceeds maximum length of %d", maxPathLen,
+		)
+	}
+	return nil
+}
+
+// isNotFound returns true if the error indicates a missing row.
+func isNotFound(err error) bool {
+	return errors.Is(err, sql.ErrNoRows)
+}
 
 // =============================================================================
 // Plan Annotation RPCs
@@ -25,6 +64,19 @@ func (s *Server) CreatePlanAnnotation(
 		return nil, status.Error(
 			codes.InvalidArgument, "annotation_id is required",
 		)
+	}
+	if req.StartOffset < 0 || req.EndOffset < 0 {
+		return nil, status.Error(
+			codes.InvalidArgument, "offsets must be non-negative",
+		)
+	}
+	for _, check := range []struct{ field, val string }{
+		{"text", req.Text},
+		{"original_text", req.OriginalText},
+	} {
+		if err := validateTextLen(check.field, check.val); err != nil {
+			return nil, err
+		}
 	}
 
 	params := store.CreatePlanAnnotationParams{
@@ -110,6 +162,13 @@ func (s *Server) UpdatePlanAnnotation(
 		ctx, req.AnnotationId,
 	)
 	if err != nil {
+		if isNotFound(err) {
+			return nil, status.Errorf(
+				codes.NotFound,
+				"plan annotation not found: %s",
+				req.AnnotationId,
+			)
+		}
 		return nil, status.Errorf(
 			codes.Internal,
 			"failed to get updated plan annotation: %v", err,
@@ -157,6 +216,23 @@ func (s *Server) CreateDiffAnnotation(
 		return nil, status.Error(
 			codes.InvalidArgument, "message_id is required",
 		)
+	}
+	if req.LineStart < 0 || req.LineEnd < 0 {
+		return nil, status.Error(
+			codes.InvalidArgument, "line numbers must be non-negative",
+		)
+	}
+	if err := validatePathLen(req.FilePath); err != nil {
+		return nil, err
+	}
+	for _, check := range []struct{ field, val string }{
+		{"text", req.Text},
+		{"suggested_code", req.SuggestedCode},
+		{"original_code", req.OriginalCode},
+	} {
+		if err := validateTextLen(check.field, check.val); err != nil {
+			return nil, err
+		}
 	}
 
 	params := store.CreateDiffAnnotationParams{
@@ -241,6 +317,13 @@ func (s *Server) UpdateDiffAnnotation(
 		ctx, req.AnnotationId,
 	)
 	if err != nil {
+		if isNotFound(err) {
+			return nil, status.Errorf(
+				codes.NotFound,
+				"diff annotation not found: %s",
+				req.AnnotationId,
+			)
+		}
 		return nil, status.Errorf(
 			codes.Internal,
 			"failed to get updated diff annotation: %v", err,

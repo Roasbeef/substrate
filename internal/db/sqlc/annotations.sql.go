@@ -17,7 +17,7 @@ INSERT INTO diff_annotations (
     text, suggested_code, original_code,
     created_at, updated_at
 ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-RETURNING id, annotation_id, message_id, annotation_type, scope, file_path, line_start, line_end, side, text, suggested_code, original_code, created_at, updated_at
+RETURNING id, annotation_id, message_id, annotation_type, scope, file_path, line_start, line_end, side, text, suggested_code, original_code, created_by, created_at, updated_at
 `
 
 type CreateDiffAnnotationParams struct {
@@ -66,6 +66,7 @@ func (q *Queries) CreateDiffAnnotation(ctx context.Context, arg CreateDiffAnnota
 		&i.Text,
 		&i.SuggestedCode,
 		&i.OriginalCode,
+		&i.CreatedBy,
 		&i.CreatedAt,
 		&i.UpdatedAt,
 	)
@@ -78,7 +79,7 @@ INSERT INTO plan_annotations (
     text, original_text, start_offset, end_offset,
     diff_context, created_at, updated_at
 ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-RETURNING id, plan_review_id, annotation_id, block_id, annotation_type, text, original_text, start_offset, end_offset, diff_context, created_at, updated_at
+RETURNING id, plan_review_id, annotation_id, block_id, annotation_type, text, original_text, start_offset, end_offset, diff_context, created_by, created_at, updated_at
 `
 
 type CreatePlanAnnotationParams struct {
@@ -121,6 +122,7 @@ func (q *Queries) CreatePlanAnnotation(ctx context.Context, arg CreatePlanAnnota
 		&i.StartOffset,
 		&i.EndOffset,
 		&i.DiffContext,
+		&i.CreatedBy,
 		&i.CreatedAt,
 		&i.UpdatedAt,
 	)
@@ -164,7 +166,7 @@ func (q *Queries) DeletePlanAnnotationsByReview(ctx context.Context, planReviewI
 }
 
 const GetDiffAnnotation = `-- name: GetDiffAnnotation :one
-SELECT id, annotation_id, message_id, annotation_type, scope, file_path, line_start, line_end, side, text, suggested_code, original_code, created_at, updated_at FROM diff_annotations WHERE annotation_id = ?
+SELECT id, annotation_id, message_id, annotation_type, scope, file_path, line_start, line_end, side, text, suggested_code, original_code, created_by, created_at, updated_at FROM diff_annotations WHERE annotation_id = ?
 `
 
 func (q *Queries) GetDiffAnnotation(ctx context.Context, annotationID string) (DiffAnnotation, error) {
@@ -183,6 +185,7 @@ func (q *Queries) GetDiffAnnotation(ctx context.Context, annotationID string) (D
 		&i.Text,
 		&i.SuggestedCode,
 		&i.OriginalCode,
+		&i.CreatedBy,
 		&i.CreatedAt,
 		&i.UpdatedAt,
 	)
@@ -190,7 +193,7 @@ func (q *Queries) GetDiffAnnotation(ctx context.Context, annotationID string) (D
 }
 
 const GetPlanAnnotation = `-- name: GetPlanAnnotation :one
-SELECT id, plan_review_id, annotation_id, block_id, annotation_type, text, original_text, start_offset, end_offset, diff_context, created_at, updated_at FROM plan_annotations WHERE annotation_id = ?
+SELECT id, plan_review_id, annotation_id, block_id, annotation_type, text, original_text, start_offset, end_offset, diff_context, created_by, created_at, updated_at FROM plan_annotations WHERE annotation_id = ?
 `
 
 func (q *Queries) GetPlanAnnotation(ctx context.Context, annotationID string) (PlanAnnotation, error) {
@@ -207,6 +210,7 @@ func (q *Queries) GetPlanAnnotation(ctx context.Context, annotationID string) (P
 		&i.StartOffset,
 		&i.EndOffset,
 		&i.DiffContext,
+		&i.CreatedBy,
 		&i.CreatedAt,
 		&i.UpdatedAt,
 	)
@@ -214,7 +218,7 @@ func (q *Queries) GetPlanAnnotation(ctx context.Context, annotationID string) (P
 }
 
 const ListDiffAnnotationsByMessage = `-- name: ListDiffAnnotationsByMessage :many
-SELECT id, annotation_id, message_id, annotation_type, scope, file_path, line_start, line_end, side, text, suggested_code, original_code, created_at, updated_at FROM diff_annotations
+SELECT id, annotation_id, message_id, annotation_type, scope, file_path, line_start, line_end, side, text, suggested_code, original_code, created_by, created_at, updated_at FROM diff_annotations
 WHERE message_id = ?
 ORDER BY file_path ASC, line_start ASC
 `
@@ -241,6 +245,7 @@ func (q *Queries) ListDiffAnnotationsByMessage(ctx context.Context, messageID in
 			&i.Text,
 			&i.SuggestedCode,
 			&i.OriginalCode,
+			&i.CreatedBy,
 			&i.CreatedAt,
 			&i.UpdatedAt,
 		); err != nil {
@@ -258,7 +263,7 @@ func (q *Queries) ListDiffAnnotationsByMessage(ctx context.Context, messageID in
 }
 
 const ListPlanAnnotationsByReview = `-- name: ListPlanAnnotationsByReview :many
-SELECT id, plan_review_id, annotation_id, block_id, annotation_type, text, original_text, start_offset, end_offset, diff_context, created_at, updated_at FROM plan_annotations
+SELECT id, plan_review_id, annotation_id, block_id, annotation_type, text, original_text, start_offset, end_offset, diff_context, created_by, created_at, updated_at FROM plan_annotations
 WHERE plan_review_id = ?
 ORDER BY id ASC
 `
@@ -283,6 +288,7 @@ func (q *Queries) ListPlanAnnotationsByReview(ctx context.Context, planReviewID 
 			&i.StartOffset,
 			&i.EndOffset,
 			&i.DiffContext,
+			&i.CreatedBy,
 			&i.CreatedAt,
 			&i.UpdatedAt,
 		); err != nil {

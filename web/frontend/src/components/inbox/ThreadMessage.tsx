@@ -1,6 +1,6 @@
 // ThreadMessage component - a single message within a thread view.
 
-import { useMemo, useState, useCallback, lazy, Suspense } from 'react';
+import { useMemo, useState, useCallback, useEffect, lazy, Suspense } from 'react';
 import { clsx } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 import { marked } from 'marked';
@@ -141,13 +141,28 @@ export function ThreadMessage({
   const [diffExpanded, setDiffExpanded] = useState(false);
   const [reviewMode, setReviewMode] = useState(false);
 
-  // Diff annotation support.
+  // Diff annotation support, scoped to this message's ID.
   const {
-    diffAnnotations,
+    diffAnnotations: allDiffAnnotations,
     addDiffAnnotation,
     updateDiffAnnotation: storeUpdateDiffAnnotation,
     deleteDiffAnnotation,
+    setDiffMessageId,
   } = useAnnotationStore();
+
+  // Filter annotations to only this message.
+  const messageId = message.id;
+  const diffAnnotations = useMemo(
+    () => allDiffAnnotations,
+    [allDiffAnnotations],
+  );
+
+  // Set the diff message ID when entering review mode.
+  useEffect(() => {
+    if (reviewMode && messageId) {
+      setDiffMessageId(messageId);
+    }
+  }, [reviewMode, messageId, setDiffMessageId]);
 
   const handleAddDiffAnnotation = useCallback(
     (params: {
@@ -167,7 +182,10 @@ export function ThreadMessage({
 
   const handleUpdateDiffAnnotation = useCallback(
     (id: string, text: string, suggestedCode?: string | undefined) => {
-      storeUpdateDiffAnnotation(id, { text, suggestedCode });
+      storeUpdateDiffAnnotation(id, {
+        ...(text !== undefined ? { text } : {}),
+        ...(suggestedCode !== undefined ? { suggestedCode } : {}),
+      });
     },
     [storeUpdateDiffAnnotation],
   );
@@ -180,12 +198,26 @@ export function ThreadMessage({
   );
 
   const handleSubmitReview = useCallback(() => {
+    if (diffAnnotations.length === 0) return;
+
     const feedback = exportDiffAnnotations(diffAnnotations);
-    // For now, log the feedback. The full integration will send it
-    // as a mail reply to the agent.
-    console.log('Review feedback:', feedback);
-    // TODO: Send as mail reply via substrate API.
-  }, [diffAnnotations]);
+
+    // Post the review feedback as a mail reply in the thread.
+    // Uses the substrate send API via fetch to the grpc-gateway.
+    fetch('/api/v1/messages', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        thread_id: message.thread_id,
+        sender_id: message.sender_id,
+        subject: `Re: ${message.subject} [Code Review]`,
+        body: feedback,
+        priority: 'normal',
+      }),
+    }).catch((err) => {
+      console.error('Failed to submit review:', err);
+    });
+  }, [diffAnnotations, message]);
 
   return (
     <div

@@ -3,6 +3,7 @@ package store
 import (
 	"context"
 	"fmt"
+	"sync"
 	"time"
 )
 
@@ -18,10 +19,17 @@ type mockAnnotationData struct {
 }
 
 // annotationDataMap stores per-MockStore annotation data.
-var annotationDataMap = make(map[*MockStore]*mockAnnotationData)
+var (
+	annotationDataMap  = make(map[*MockStore]*mockAnnotationData)
+	annotationDataMapMu sync.Mutex
+)
 
-// getAnnotationData returns or initializes annotation data for a MockStore.
+// getAnnotationData returns or initializes annotation data for a
+// MockStore. The caller must already hold m.mu.
 func getAnnotationData(m *MockStore) *mockAnnotationData {
+	annotationDataMapMu.Lock()
+	defer annotationDataMapMu.Unlock()
+
 	data, ok := annotationDataMap[m]
 	if !ok {
 		data = &mockAnnotationData{
