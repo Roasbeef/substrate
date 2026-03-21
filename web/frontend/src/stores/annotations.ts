@@ -1,0 +1,293 @@
+// Annotation store for managing plan and diff annotations using Zustand.
+// Provides CRUD operations with localStorage draft caching and server sync.
+
+import { create } from 'zustand';
+import { devtools } from 'zustand/middleware';
+import type { PlanAnnotation, DiffAnnotation } from '@/types/annotations.js';
+
+// generateId produces a unique annotation ID.
+function generateId(prefix: string): string {
+  return `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
+}
+
+// draftKey returns the localStorage key for draft persistence.
+function draftKey(kind: 'plan' | 'diff', id: string): string {
+  return `annotation-draft-${kind}-${id}`;
+}
+
+interface AnnotationState {
+  // Plan annotations for the currently viewed plan review.
+  planAnnotations: PlanAnnotation[];
+  selectedPlanAnnotationId: string | null;
+  planReviewId: string | null;
+
+  // Diff annotations for the currently viewed diff message.
+  diffAnnotations: DiffAnnotation[];
+  selectedDiffAnnotationId: string | null;
+  diffMessageId: number | null;
+
+  // Plan annotation actions.
+  setPlanReviewId: (id: string) => void;
+  loadPlanAnnotations: (annotations: PlanAnnotation[]) => void;
+  addPlanAnnotation: (
+    params: Omit<PlanAnnotation, 'id' | 'createdAt' | 'updatedAt'>,
+  ) => PlanAnnotation;
+  updatePlanAnnotation: (
+    id: string, updates: Partial<PlanAnnotation>,
+  ) => void;
+  deletePlanAnnotation: (id: string) => void;
+  selectPlanAnnotation: (id: string | null) => void;
+
+  // Diff annotation actions.
+  setDiffMessageId: (id: number) => void;
+  loadDiffAnnotations: (annotations: DiffAnnotation[]) => void;
+  addDiffAnnotation: (
+    params: Omit<DiffAnnotation, 'id' | 'createdAt' | 'updatedAt'>,
+  ) => DiffAnnotation;
+  updateDiffAnnotation: (
+    id: string, updates: Partial<DiffAnnotation>,
+  ) => void;
+  deleteDiffAnnotation: (id: string) => void;
+  selectDiffAnnotation: (id: string | null) => void;
+
+  // Draft persistence.
+  savePlanDraft: () => void;
+  loadPlanDraft: (planReviewId: string) => void;
+  saveDiffDraft: () => void;
+  loadDiffDraft: (messageId: number) => void;
+
+  // Bulk reset.
+  reset: () => void;
+}
+
+export const useAnnotationStore = create<AnnotationState>()(
+  devtools(
+    (set, get) => ({
+      // Initial state.
+      planAnnotations: [],
+      selectedPlanAnnotationId: null,
+      planReviewId: null,
+      diffAnnotations: [],
+      selectedDiffAnnotationId: null,
+      diffMessageId: null,
+
+      // Plan annotation actions.
+      setPlanReviewId: (id) =>
+        set({ planReviewId: id }, undefined, 'setPlanReviewId'),
+
+      loadPlanAnnotations: (annotations) =>
+        set(
+          { planAnnotations: annotations },
+          undefined,
+          'loadPlanAnnotations',
+        ),
+
+      addPlanAnnotation: (params) => {
+        const now = Date.now();
+        const annotation: PlanAnnotation = {
+          ...params,
+          id: generateId('plan-ann'),
+          createdAt: now,
+          updatedAt: now,
+        };
+        set(
+          (state) => ({
+            planAnnotations: [...state.planAnnotations, annotation],
+          }),
+          undefined,
+          'addPlanAnnotation',
+        );
+        // Auto-save draft.
+        setTimeout(() => get().savePlanDraft(), 0);
+        return annotation;
+      },
+
+      updatePlanAnnotation: (id, updates) => {
+        set(
+          (state) => ({
+            planAnnotations: state.planAnnotations.map((a) =>
+              a.id === id
+                ? { ...a, ...updates, updatedAt: Date.now() }
+                : a,
+            ),
+          }),
+          undefined,
+          'updatePlanAnnotation',
+        );
+        setTimeout(() => get().savePlanDraft(), 0);
+      },
+
+      deletePlanAnnotation: (id) => {
+        set(
+          (state) => ({
+            planAnnotations: state.planAnnotations.filter(
+              (a) => a.id !== id,
+            ),
+            selectedPlanAnnotationId:
+              state.selectedPlanAnnotationId === id
+                ? null
+                : state.selectedPlanAnnotationId,
+          }),
+          undefined,
+          'deletePlanAnnotation',
+        );
+        setTimeout(() => get().savePlanDraft(), 0);
+      },
+
+      selectPlanAnnotation: (id) =>
+        set(
+          { selectedPlanAnnotationId: id },
+          undefined,
+          'selectPlanAnnotation',
+        ),
+
+      // Diff annotation actions.
+      setDiffMessageId: (id) =>
+        set({ diffMessageId: id }, undefined, 'setDiffMessageId'),
+
+      loadDiffAnnotations: (annotations) =>
+        set(
+          { diffAnnotations: annotations },
+          undefined,
+          'loadDiffAnnotations',
+        ),
+
+      addDiffAnnotation: (params) => {
+        const now = Date.now();
+        const annotation: DiffAnnotation = {
+          ...params,
+          id: generateId('diff-ann'),
+          createdAt: now,
+          updatedAt: now,
+        };
+        set(
+          (state) => ({
+            diffAnnotations: [...state.diffAnnotations, annotation],
+          }),
+          undefined,
+          'addDiffAnnotation',
+        );
+        setTimeout(() => get().saveDiffDraft(), 0);
+        return annotation;
+      },
+
+      updateDiffAnnotation: (id, updates) => {
+        set(
+          (state) => ({
+            diffAnnotations: state.diffAnnotations.map((a) =>
+              a.id === id
+                ? { ...a, ...updates, updatedAt: Date.now() }
+                : a,
+            ),
+          }),
+          undefined,
+          'updateDiffAnnotation',
+        );
+        setTimeout(() => get().saveDiffDraft(), 0);
+      },
+
+      deleteDiffAnnotation: (id) => {
+        set(
+          (state) => ({
+            diffAnnotations: state.diffAnnotations.filter(
+              (a) => a.id !== id,
+            ),
+            selectedDiffAnnotationId:
+              state.selectedDiffAnnotationId === id
+                ? null
+                : state.selectedDiffAnnotationId,
+          }),
+          undefined,
+          'deleteDiffAnnotation',
+        );
+        setTimeout(() => get().saveDiffDraft(), 0);
+      },
+
+      selectDiffAnnotation: (id) =>
+        set(
+          { selectedDiffAnnotationId: id },
+          undefined,
+          'selectDiffAnnotation',
+        ),
+
+      // Draft persistence — localStorage cache as fallback.
+      savePlanDraft: () => {
+        const { planReviewId, planAnnotations } = get();
+        if (!planReviewId) return;
+        try {
+          localStorage.setItem(
+            draftKey('plan', planReviewId),
+            JSON.stringify(planAnnotations),
+          );
+        } catch {
+          // localStorage may be full or unavailable.
+        }
+      },
+
+      loadPlanDraft: (planReviewId) => {
+        try {
+          const raw = localStorage.getItem(
+            draftKey('plan', planReviewId),
+          );
+          if (raw) {
+            const annotations = JSON.parse(raw) as PlanAnnotation[];
+            set(
+              { planAnnotations: annotations, planReviewId },
+              undefined,
+              'loadPlanDraft',
+            );
+          }
+        } catch {
+          // Corrupt data — ignore.
+        }
+      },
+
+      saveDiffDraft: () => {
+        const { diffMessageId, diffAnnotations } = get();
+        if (!diffMessageId) return;
+        try {
+          localStorage.setItem(
+            draftKey('diff', String(diffMessageId)),
+            JSON.stringify(diffAnnotations),
+          );
+        } catch {
+          // localStorage may be full or unavailable.
+        }
+      },
+
+      loadDiffDraft: (messageId) => {
+        try {
+          const raw = localStorage.getItem(
+            draftKey('diff', String(messageId)),
+          );
+          if (raw) {
+            const annotations = JSON.parse(raw) as DiffAnnotation[];
+            set(
+              { diffAnnotations: annotations, diffMessageId: messageId },
+              undefined,
+              'loadDiffDraft',
+            );
+          }
+        } catch {
+          // Corrupt data — ignore.
+        }
+      },
+
+      // Reset all annotation state.
+      reset: () =>
+        set(
+          {
+            planAnnotations: [],
+            selectedPlanAnnotationId: null,
+            planReviewId: null,
+            diffAnnotations: [],
+            selectedDiffAnnotationId: null,
+            diffMessageId: null,
+          },
+          undefined,
+          'reset',
+        ),
+    }),
+    { name: 'annotation-store' },
+  ),
+);
