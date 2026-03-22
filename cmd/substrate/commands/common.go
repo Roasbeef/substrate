@@ -413,8 +413,7 @@ func outputJSON(v interface{}) error {
 	return nil
 }
 
-// outputCompactJSON outputs JSON in compact form. For slices, it emits
-// one JSON object per line (JSONL format).
+// outputCompactJSON outputs JSON in compact single-line form.
 func outputCompactJSON(v interface{}) error {
 	data, err := json.Marshal(v)
 	if err != nil {

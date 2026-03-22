@@ -57,16 +57,6 @@ var rootCmd = &cobra.Command{
 
 Use this CLI to send and receive messages, subscribe to topics, and manage
 agent identity across Claude Code sessions.`,
-	PersistentPreRun: func(cmd *cobra.Command, args []string) {
-		// Auto-detect non-TTY stdout and default to JSON output.
-		// This makes the CLI agent-friendly when piped or
-		// redirected, without requiring --format json explicitly.
-		if !cmd.Flags().Changed("format") &&
-			!isTerminal(os.Stdout) {
-
-			outputFormat = "json"
-		}
-	},
 }
 
 // Execute runs the CLI.
@@ -75,6 +65,17 @@ func Execute() error {
 }
 
 func init() {
+	// Auto-detect non-TTY stdout and default to JSON output. Using
+	// cobra.OnInitialize ensures this runs for all subcommands without
+	// breaking PersistentPreRun hook chaining.
+	cobra.OnInitialize(func() {
+		if !rootCmd.Flags().Changed("format") &&
+			!isTerminal(os.Stdout) {
+
+			outputFormat = "json"
+		}
+	})
+
 	// Global flags.
 	rootCmd.PersistentFlags().StringVar(
 		&dbPath, "db", "",
