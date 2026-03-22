@@ -984,6 +984,7 @@ const (
 	Agent_Heartbeat_FullMethodName       = "/subtraterpc.Agent/Heartbeat"
 	Agent_EnsureIdentity_FullMethodName  = "/subtraterpc.Agent/EnsureIdentity"
 	Agent_SaveIdentity_FullMethodName    = "/subtraterpc.Agent/SaveIdentity"
+	Agent_DiscoverAgents_FullMethodName  = "/subtraterpc.Agent/DiscoverAgents"
 )
 
 // AgentClient is the client API for Agent service.
@@ -1010,6 +1011,9 @@ type AgentClient interface {
 	EnsureIdentity(ctx context.Context, in *EnsureIdentityRequest, opts ...grpc.CallOption) (*EnsureIdentityResponse, error)
 	// SaveIdentity persists an agent's current state.
 	SaveIdentity(ctx context.Context, in *SaveIdentityRequest, opts ...grpc.CallOption) (*SaveIdentityResponse, error)
+	// DiscoverAgents returns all agents with discovery metadata including
+	// status, working directory, purpose, hostname, and unread counts.
+	DiscoverAgents(ctx context.Context, in *DiscoverAgentsRequest, opts ...grpc.CallOption) (*DiscoverAgentsResponse, error)
 }
 
 type agentClient struct {
@@ -1110,6 +1114,16 @@ func (c *agentClient) SaveIdentity(ctx context.Context, in *SaveIdentityRequest,
 	return out, nil
 }
 
+func (c *agentClient) DiscoverAgents(ctx context.Context, in *DiscoverAgentsRequest, opts ...grpc.CallOption) (*DiscoverAgentsResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(DiscoverAgentsResponse)
+	err := c.cc.Invoke(ctx, Agent_DiscoverAgents_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // AgentServer is the server API for Agent service.
 // All implementations must embed UnimplementedAgentServer
 // for forward compatibility.
@@ -1134,6 +1148,9 @@ type AgentServer interface {
 	EnsureIdentity(context.Context, *EnsureIdentityRequest) (*EnsureIdentityResponse, error)
 	// SaveIdentity persists an agent's current state.
 	SaveIdentity(context.Context, *SaveIdentityRequest) (*SaveIdentityResponse, error)
+	// DiscoverAgents returns all agents with discovery metadata including
+	// status, working directory, purpose, hostname, and unread counts.
+	DiscoverAgents(context.Context, *DiscoverAgentsRequest) (*DiscoverAgentsResponse, error)
 	mustEmbedUnimplementedAgentServer()
 }
 
@@ -1170,6 +1187,9 @@ func (UnimplementedAgentServer) EnsureIdentity(context.Context, *EnsureIdentityR
 }
 func (UnimplementedAgentServer) SaveIdentity(context.Context, *SaveIdentityRequest) (*SaveIdentityResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method SaveIdentity not implemented")
+}
+func (UnimplementedAgentServer) DiscoverAgents(context.Context, *DiscoverAgentsRequest) (*DiscoverAgentsResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method DiscoverAgents not implemented")
 }
 func (UnimplementedAgentServer) mustEmbedUnimplementedAgentServer() {}
 func (UnimplementedAgentServer) testEmbeddedByValue()               {}
@@ -1354,6 +1374,24 @@ func _Agent_SaveIdentity_Handler(srv interface{}, ctx context.Context, dec func(
 	return interceptor(ctx, in, info, handler)
 }
 
+func _Agent_DiscoverAgents_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(DiscoverAgentsRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(AgentServer).DiscoverAgents(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Agent_DiscoverAgents_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(AgentServer).DiscoverAgents(ctx, req.(*DiscoverAgentsRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // Agent_ServiceDesc is the grpc.ServiceDesc for Agent service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -1396,6 +1434,10 @@ var Agent_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "SaveIdentity",
 			Handler:    _Agent_SaveIdentity_Handler,
+		},
+		{
+			MethodName: "DiscoverAgents",
+			Handler:    _Agent_DiscoverAgents_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

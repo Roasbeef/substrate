@@ -460,6 +460,7 @@ message HasUnackedStatusToResponse {
 message RegisterAgentRequest {
     string name = 1;
     string project_key = 2;     // Optional project binding
+    string git_branch = 3;      // Optional git branch name
 }
 
 // RegisterAgentResponse is the response for RegisterAgent.

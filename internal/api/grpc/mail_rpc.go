@@ -1161,8 +1161,9 @@ func (s *Server) RegisterAgent(ctx context.Context, req *RegisterAgentRequest) (
 		return nil, status.Error(codes.InvalidArgument, "name is required")
 	}
 
-	// Note: git_branch is not in the proto, will be set via EnsureIdentity.
-	agent, err := s.agentReg.RegisterAgent(ctx, req.Name, req.ProjectKey, "")
+	agent, err := s.agentReg.RegisterAgent(
+		ctx, req.Name, req.ProjectKey, req.GitBranch,
+	)
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "failed to register agent: %v", err)
 	}

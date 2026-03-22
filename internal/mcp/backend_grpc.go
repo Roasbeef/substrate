@@ -266,45 +266,28 @@ func (b *GRPCBackend) ListSubscriptionsByAgent(ctx context.Context,
 	return topics, nil
 }
 
-// CreateSubscription subscribes an agent to a topic via the gRPC daemon.
+// CreateSubscription subscribes an agent to a topic by name via gRPC.
 func (b *GRPCBackend) CreateSubscription(ctx context.Context,
-	agentID, topicID int64,
+	agentID int64, topicName string,
 ) error {
-	// The gRPC Subscribe RPC takes a topic name, but we have an ID.
-	// Look up the topic name first.
-	resp, err := b.mailClient.GetTopic(
-		ctx, &subtraterpc.GetTopicRequest{TopicId: topicID},
-	)
-	if err != nil {
-		return fmt.Errorf("get topic %d: %w", topicID, err)
-	}
-
-	_, err = b.mailClient.Subscribe(
+	_, err := b.mailClient.Subscribe(
 		ctx, &subtraterpc.SubscribeRequest{
 			AgentId:   agentID,
-			TopicName: resp.Topic.Name,
+			TopicName: topicName,
 		},
 	)
 
 	return err
 }
 
-// DeleteSubscription removes a subscription via the gRPC daemon.
+// DeleteSubscription removes a subscription by topic name via gRPC.
 func (b *GRPCBackend) DeleteSubscription(ctx context.Context,
-	agentID, topicID int64,
+	agentID int64, topicName string,
 ) error {
-	// The gRPC Unsubscribe RPC takes a topic name, but we have an ID.
-	resp, err := b.mailClient.GetTopic(
-		ctx, &subtraterpc.GetTopicRequest{TopicId: topicID},
-	)
-	if err != nil {
-		return fmt.Errorf("get topic %d: %w", topicID, err)
-	}
-
-	_, err = b.mailClient.Unsubscribe(
+	_, err := b.mailClient.Unsubscribe(
 		ctx, &subtraterpc.UnsubscribeRequest{
 			AgentId:   agentID,
-			TopicName: resp.Topic.Name,
+			TopicName: topicName,
 		},
 	)
 
@@ -354,6 +337,7 @@ func (b *GRPCBackend) RegisterAgent(ctx context.Context,
 		ctx, &subtraterpc.RegisterAgentRequest{
 			Name:       name,
 			ProjectKey: projectKey,
+			GitBranch:  gitBranch,
 		},
 	)
 	if err != nil {
