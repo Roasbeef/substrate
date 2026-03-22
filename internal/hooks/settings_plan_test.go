@@ -30,7 +30,7 @@ func TestInstallPlanHooks(t *testing.T) {
 	require.Contains(t, preEntries[0].Hooks[0].Command,
 		"pretooluse_plan.sh",
 	)
-	require.Equal(t, 600, preEntries[0].Hooks[0].Timeout)
+	require.Equal(t, 345600, preEntries[0].Hooks[0].Timeout)
 }
 
 // TestInstallPlanHooksIdempotent verifies double-install is safe.
@@ -196,7 +196,7 @@ func TestPlanHookDefinitions(t *testing.T) {
 	preDef, ok := PlanHookDefinitions["PreToolUse"]
 	require.True(t, ok)
 	require.Equal(t, "ExitPlanMode", preDef.Matcher)
-	require.Equal(t, 600, preDef.Hooks[0].Timeout)
+	require.Equal(t, 345600, preDef.Hooks[0].Timeout)
 }
 
 // TestPlanAndTaskHooksCoexist verifies both hook types can be installed.
