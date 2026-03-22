@@ -1016,7 +1016,7 @@ func TestService_SendMailToReviewer_Success(t *testing.T) {
 
 	// Verify the message was created in the reviewer's inbox.
 	msgs, err := storage.GetUnreadMessages(
-		ctx, reviewerAgent.ID, 10,
+		ctx, reviewerAgent.ID, 10, 0,
 	)
 	require.NoError(t, err)
 	require.Len(t, msgs, 1,

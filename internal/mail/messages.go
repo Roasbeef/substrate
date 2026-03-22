@@ -165,6 +165,9 @@ type FetchInboxRequest struct {
 	// Limit is the maximum number of messages to return.
 	Limit int
 
+	// Offset is the number of messages to skip for pagination.
+	Offset int
+
 	// UnreadOnly filters to only unread messages.
 	UnreadOnly bool
 

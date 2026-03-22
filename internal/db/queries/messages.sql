@@ -87,7 +87,7 @@ LEFT JOIN agents a ON m.sender_id = a.id
 WHERE mr.agent_id = ?
     AND mr.state NOT IN ('archived', 'trash')
 ORDER BY m.created_at DESC
-LIMIT ?;
+LIMIT ? OFFSET ?;
 
 -- name: GetAllInboxMessages :many
 -- Global inbox view: all messages across all agents, not archived or trashed.
@@ -117,7 +117,7 @@ LEFT JOIN agents a ON m.sender_id = a.id
 WHERE mr.agent_id = ?
     AND mr.state = 'unread'
 ORDER BY m.created_at DESC
-LIMIT ?;
+LIMIT ? OFFSET ?;
 
 -- name: GetStarredMessages :many
 SELECT m.*, mr.state, mr.snoozed_until, mr.read_at, mr.acked_at

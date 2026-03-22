@@ -378,7 +378,9 @@ func (s *Service) handleFetchInbox(ctx context.Context,
 	}
 
 	if req.UnreadOnly {
-		msgs, err := s.store.GetUnreadMessages(ctx, req.AgentID, limit)
+		msgs, err := s.store.GetUnreadMessages(
+			ctx, req.AgentID, limit, req.Offset,
+		)
 		if err != nil {
 			response.Error = fmt.Errorf("failed to fetch unread: "+
 				"%w", err)
@@ -399,9 +401,13 @@ func (s *Service) handleFetchInbox(ctx context.Context,
 	var msgs []store.InboxMessage
 	var err error
 	if req.AgentID == 0 {
-		msgs, err = s.store.GetAllInboxMessages(ctx, limit, 0)
+		msgs, err = s.store.GetAllInboxMessages(
+			ctx, limit, req.Offset,
+		)
 	} else {
-		msgs, err = s.store.GetInboxMessages(ctx, req.AgentID, limit)
+		msgs, err = s.store.GetInboxMessages(
+			ctx, req.AgentID, limit, req.Offset,
+		)
 	}
 	if err != nil {
 		response.Error = fmt.Errorf("failed to fetch inbox: %w", err)
@@ -588,7 +594,7 @@ func (s *Service) handlePollChanges(ctx context.Context,
 	seenMsgIDs := make(map[int64]bool)
 
 	// First, check for unread direct messages in the agent's inbox.
-	unreadMsgs, err := s.store.GetUnreadMessages(ctx, req.AgentID, 100)
+	unreadMsgs, err := s.store.GetUnreadMessages(ctx, req.AgentID, 100, 0)
 	if err != nil {
 		response.Error = fmt.Errorf("failed to get unread messages: %w",
 			err)
@@ -1033,7 +1039,7 @@ func (s *Service) SubscribeInbox(ctx context.Context, agentID int64) (<-chan Inb
 				return
 			case <-ticker.C:
 				// Poll for new messages.
-				rows, err := s.store.GetInboxMessages(ctx, agentID, 10)
+				rows, err := s.store.GetInboxMessages(ctx, agentID, 10, 0)
 				if err != nil {
 					continue
 				}

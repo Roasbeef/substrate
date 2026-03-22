@@ -1224,7 +1224,7 @@ func (r *reviewSubActor) hookStop(
 		// immediately approving exit (which could cut a review
 		// short if the database is momentarily busy).
 		msgs, err := r.store.GetUnreadMessages(
-			storeCtx, r.agentID, 10,
+			storeCtx, r.agentID, 10, 0,
 		)
 		if err != nil {
 			log.ErrorS(ctx,

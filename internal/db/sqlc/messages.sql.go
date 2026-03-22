@@ -507,12 +507,13 @@ LEFT JOIN agents a ON m.sender_id = a.id
 WHERE mr.agent_id = ?
     AND mr.state NOT IN ('archived', 'trash')
 ORDER BY m.created_at DESC
-LIMIT ?
+LIMIT ? OFFSET ?
 `
 
 type GetInboxMessagesParams struct {
 	AgentID int64
 	Limit   int64
+	Offset  int64
 }
 
 type GetInboxMessagesRow struct {
@@ -540,7 +541,7 @@ type GetInboxMessagesRow struct {
 }
 
 func (q *Queries) GetInboxMessages(ctx context.Context, arg GetInboxMessagesParams) ([]GetInboxMessagesRow, error) {
-	rows, err := q.db.QueryContext(ctx, GetInboxMessages, arg.AgentID, arg.Limit)
+	rows, err := q.db.QueryContext(ctx, GetInboxMessages, arg.AgentID, arg.Limit, arg.Offset)
 	if err != nil {
 		return nil, err
 	}
@@ -1449,12 +1450,13 @@ LEFT JOIN agents a ON m.sender_id = a.id
 WHERE mr.agent_id = ?
     AND mr.state = 'unread'
 ORDER BY m.created_at DESC
-LIMIT ?
+LIMIT ? OFFSET ?
 `
 
 type GetUnreadMessagesParams struct {
 	AgentID int64
 	Limit   int64
+	Offset  int64
 }
 
 type GetUnreadMessagesRow struct {
@@ -1482,7 +1484,7 @@ type GetUnreadMessagesRow struct {
 }
 
 func (q *Queries) GetUnreadMessages(ctx context.Context, arg GetUnreadMessagesParams) ([]GetUnreadMessagesRow, error) {
-	rows, err := q.db.QueryContext(ctx, GetUnreadMessages, arg.AgentID, arg.Limit)
+	rows, err := q.db.QueryContext(ctx, GetUnreadMessages, arg.AgentID, arg.Limit, arg.Offset)
 	if err != nil {
 		return nil, err
 	}

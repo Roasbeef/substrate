@@ -45,17 +45,6 @@ func runInbox(cmd *cobra.Command, args []string) error {
 	// Send heartbeat to indicate agent activity.
 	_ = client.UpdateHeartbeat(ctx, agentID)
 
-	req := mail.FetchInboxRequest{
-		AgentID:    agentID,
-		Limit:      inboxLimit,
-		UnreadOnly: !inboxAll,
-	}
-
-	messages, err := client.FetchInbox(ctx, req)
-	if err != nil {
-		return err
-	}
-
 	// Parse page token offset for pagination.
 	offset := 0
 	if pageToken != "" {
@@ -67,6 +56,18 @@ func runInbox(cmd *cobra.Command, args []string) error {
 				pageToken, parseErr,
 			)
 		}
+	}
+
+	req := mail.FetchInboxRequest{
+		AgentID:    agentID,
+		Limit:      inboxLimit,
+		Offset:     offset,
+		UnreadOnly: !inboxAll,
+	}
+
+	messages, err := client.FetchInbox(ctx, req)
+	if err != nil {
+		return err
 	}
 
 	switch outputFormat {
