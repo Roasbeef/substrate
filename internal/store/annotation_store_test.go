@@ -126,7 +126,7 @@ func TestUpdatePlanAnnotation(t *testing.T) {
 	require.NoError(t, err)
 
 	// Update the annotation.
-	err = store.UpdatePlanAnnotation(ctx, UpdatePlanAnnotationParams{
+	_, err = store.UpdatePlanAnnotation(ctx, UpdatePlanAnnotationParams{
 		AnnotationID: "ann-upd-001",
 		Text:         "updated comment",
 		OriginalText: "text",

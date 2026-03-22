@@ -307,10 +307,11 @@ func (q *Queries) ListPlanAnnotationsByReview(ctx context.Context, planReviewID 
 	return items, nil
 }
 
-const UpdateDiffAnnotation = `-- name: UpdateDiffAnnotation :exec
+const UpdateDiffAnnotation = `-- name: UpdateDiffAnnotation :one
 UPDATE diff_annotations
 SET text = ?, suggested_code = ?, original_code = ?, updated_at = ?
 WHERE annotation_id = ?
+RETURNING id, annotation_id, message_id, annotation_type, scope, file_path, line_start, line_end, side, text, suggested_code, original_code, created_by, created_at, updated_at
 `
 
 type UpdateDiffAnnotationParams struct {
@@ -321,22 +322,41 @@ type UpdateDiffAnnotationParams struct {
 	AnnotationID  string
 }
 
-func (q *Queries) UpdateDiffAnnotation(ctx context.Context, arg UpdateDiffAnnotationParams) error {
-	_, err := q.db.ExecContext(ctx, UpdateDiffAnnotation,
+func (q *Queries) UpdateDiffAnnotation(ctx context.Context, arg UpdateDiffAnnotationParams) (DiffAnnotation, error) {
+	row := q.db.QueryRowContext(ctx, UpdateDiffAnnotation,
 		arg.Text,
 		arg.SuggestedCode,
 		arg.OriginalCode,
 		arg.UpdatedAt,
 		arg.AnnotationID,
 	)
-	return err
+	var i DiffAnnotation
+	err := row.Scan(
+		&i.ID,
+		&i.AnnotationID,
+		&i.MessageID,
+		&i.AnnotationType,
+		&i.Scope,
+		&i.FilePath,
+		&i.LineStart,
+		&i.LineEnd,
+		&i.Side,
+		&i.Text,
+		&i.SuggestedCode,
+		&i.OriginalCode,
+		&i.CreatedBy,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
 }
 
-const UpdatePlanAnnotation = `-- name: UpdatePlanAnnotation :exec
+const UpdatePlanAnnotation = `-- name: UpdatePlanAnnotation :one
 UPDATE plan_annotations
 SET text = ?, original_text = ?, start_offset = ?,
     end_offset = ?, diff_context = ?, updated_at = ?
 WHERE annotation_id = ?
+RETURNING id, plan_review_id, annotation_id, block_id, annotation_type, text, original_text, start_offset, end_offset, diff_context, created_by, created_at, updated_at
 `
 
 type UpdatePlanAnnotationParams struct {
@@ -349,8 +369,8 @@ type UpdatePlanAnnotationParams struct {
 	AnnotationID string
 }
 
-func (q *Queries) UpdatePlanAnnotation(ctx context.Context, arg UpdatePlanAnnotationParams) error {
-	_, err := q.db.ExecContext(ctx, UpdatePlanAnnotation,
+func (q *Queries) UpdatePlanAnnotation(ctx context.Context, arg UpdatePlanAnnotationParams) (PlanAnnotation, error) {
+	row := q.db.QueryRowContext(ctx, UpdatePlanAnnotation,
 		arg.Text,
 		arg.OriginalText,
 		arg.StartOffset,
@@ -359,5 +379,21 @@ func (q *Queries) UpdatePlanAnnotation(ctx context.Context, arg UpdatePlanAnnota
 		arg.UpdatedAt,
 		arg.AnnotationID,
 	)
-	return err
+	var i PlanAnnotation
+	err := row.Scan(
+		&i.ID,
+		&i.PlanReviewID,
+		&i.AnnotationID,
+		&i.BlockID,
+		&i.AnnotationType,
+		&i.Text,
+		&i.OriginalText,
+		&i.StartOffset,
+		&i.EndOffset,
+		&i.DiffContext,
+		&i.CreatedBy,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
 }

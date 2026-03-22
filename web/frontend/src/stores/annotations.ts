@@ -6,6 +6,11 @@ import { devtools } from 'zustand/middleware';
 import type { PlanAnnotation, DiffAnnotation } from '@/types/annotations.js';
 import * as api from '@/api/annotations.js';
 
+// Debounce timer IDs for draft persistence.
+let planDraftTimer: ReturnType<typeof setTimeout> | null = null;
+let diffDraftTimer: ReturnType<typeof setTimeout> | null = null;
+const DRAFT_DEBOUNCE_MS = 300;
+
 // draftKey returns the localStorage key for draft persistence.
 function draftKey(kind: 'plan' | 'diff', id: string): string {
   return `annotation-draft-${kind}-${id}`;
@@ -110,7 +115,8 @@ export const useAnnotationStore = create<AnnotationState>()(
             // Server sync failed; localStorage draft is the fallback.
           });
         }
-        setTimeout(() => get().savePlanDraft(), 0);
+        if (planDraftTimer) clearTimeout(planDraftTimer);
+        planDraftTimer = setTimeout(() => get().savePlanDraft(), DRAFT_DEBOUNCE_MS);
         return annotation;
       },
 
@@ -137,7 +143,8 @@ export const useAnnotationStore = create<AnnotationState>()(
             ...(ann.diffContext !== undefined ? { diffContext: ann.diffContext } : {}),
           }).catch(() => {});
         }
-        setTimeout(() => get().savePlanDraft(), 0);
+        if (planDraftTimer) clearTimeout(planDraftTimer);
+        planDraftTimer = setTimeout(() => get().savePlanDraft(), DRAFT_DEBOUNCE_MS);
       },
 
       deletePlanAnnotation: (id) => {
@@ -156,7 +163,8 @@ export const useAnnotationStore = create<AnnotationState>()(
         );
         // Sync to server.
         api.deletePlanAnnotation(id).catch(() => {});
-        setTimeout(() => get().savePlanDraft(), 0);
+        if (planDraftTimer) clearTimeout(planDraftTimer);
+        planDraftTimer = setTimeout(() => get().savePlanDraft(), DRAFT_DEBOUNCE_MS);
       },
 
       selectPlanAnnotation: (id) =>
@@ -209,7 +217,8 @@ export const useAnnotationStore = create<AnnotationState>()(
             ...(params.originalCode !== undefined ? { originalCode: params.originalCode } : {}),
           }).catch(() => {});
         }
-        setTimeout(() => get().saveDiffDraft(), 0);
+        if (diffDraftTimer) clearTimeout(diffDraftTimer);
+        diffDraftTimer = setTimeout(() => get().saveDiffDraft(), DRAFT_DEBOUNCE_MS);
         return annotation;
       },
 
@@ -234,7 +243,8 @@ export const useAnnotationStore = create<AnnotationState>()(
             ...(ann.originalCode !== undefined ? { originalCode: ann.originalCode } : {}),
           }).catch(() => {});
         }
-        setTimeout(() => get().saveDiffDraft(), 0);
+        if (diffDraftTimer) clearTimeout(diffDraftTimer);
+        diffDraftTimer = setTimeout(() => get().saveDiffDraft(), DRAFT_DEBOUNCE_MS);
       },
 
       deleteDiffAnnotation: (id) => {
@@ -252,7 +262,8 @@ export const useAnnotationStore = create<AnnotationState>()(
           'deleteDiffAnnotation',
         );
         api.deleteDiffAnnotation(id).catch(() => {});
-        setTimeout(() => get().saveDiffDraft(), 0);
+        if (diffDraftTimer) clearTimeout(diffDraftTimer);
+        diffDraftTimer = setTimeout(() => get().saveDiffDraft(), DRAFT_DEBOUNCE_MS);
       },
 
       selectDiffAnnotation: (id) =>

@@ -157,6 +157,83 @@ describe('exportDiffAnnotations', () => {
   });
 });
 
+describe('security: code fence escaping', () => {
+  it('should escape triple backticks in plan annotations', () => {
+    const blocks = [makeBlock('b1', 1)];
+    const annotations: PlanAnnotation[] = [{
+      id: 'a1',
+      blockId: 'b1',
+      type: PlanAnnotationType.DELETION,
+      originalText: 'line with ``` backticks',
+      startOffset: 0,
+      endOffset: 22,
+      createdAt: Date.now(),
+      updatedAt: Date.now(),
+    }];
+    const result = exportPlanAnnotations(blocks, annotations);
+    // Should not contain raw triple backticks inside code fences.
+    const fenceContent = result.split('```\n')[1]!;
+    expect(fenceContent).not.toContain('```');
+  });
+
+  it('should escape quadruple backticks', () => {
+    const blocks = [makeBlock('b1', 1)];
+    const annotations: PlanAnnotation[] = [{
+      id: 'a1',
+      blockId: 'b1',
+      type: PlanAnnotationType.REPLACEMENT,
+      text: 'new text with ```` four backticks',
+      originalText: 'old text',
+      startOffset: 0,
+      endOffset: 8,
+      createdAt: Date.now(),
+      updatedAt: Date.now(),
+    }];
+    const result = exportPlanAnnotations(blocks, annotations);
+    expect(result).not.toMatch(/````/);
+  });
+
+  it('should sanitize file paths with newlines in diff export', () => {
+    const annotations: DiffAnnotation[] = [{
+      id: 'a1',
+      type: 'comment',
+      scope: 'line',
+      filePath: 'main.go\n## Injected Heading',
+      lineStart: 1,
+      lineEnd: 1,
+      side: 'new',
+      text: 'test',
+      createdAt: Date.now(),
+      updatedAt: Date.now(),
+    }];
+    const result = exportDiffAnnotations(annotations);
+    // Newline in path should be replaced, not create a new heading.
+    // The header "# Code Review Feedback" + one sanitized "## file" = 1 ##.
+    const headings = result.split('\n').filter(l => l.startsWith('## '));
+    expect(headings.length).toBe(1);
+    // The injected heading should not appear.
+    expect(result).not.toContain('## Injected Heading');
+  });
+
+  it('should truncate excessively long annotation text', () => {
+    const blocks = [makeBlock('b1', 1)];
+    const longText = 'x'.repeat(20000);
+    const annotations: PlanAnnotation[] = [{
+      id: 'a1',
+      blockId: 'b1',
+      type: PlanAnnotationType.COMMENT,
+      text: longText,
+      originalText: 'short',
+      startOffset: 0,
+      endOffset: 5,
+      createdAt: Date.now(),
+      updatedAt: Date.now(),
+    }];
+    const result = exportPlanAnnotations(blocks, annotations);
+    expect(result).toContain('[...truncated]');
+  });
+});
+
 describe('wrapFeedbackForAgent', () => {
   it('should include directive preamble', () => {
     const result = wrapFeedbackForAgent('Fix the bugs');

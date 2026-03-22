@@ -15,11 +15,12 @@ WHERE plan_review_id = ?
 ORDER BY id ASC
 LIMIT 500;
 
--- name: UpdatePlanAnnotation :exec
+-- name: UpdatePlanAnnotation :one
 UPDATE plan_annotations
 SET text = ?, original_text = ?, start_offset = ?,
     end_offset = ?, diff_context = ?, updated_at = ?
-WHERE annotation_id = ?;
+WHERE annotation_id = ?
+RETURNING *;
 
 -- name: DeletePlanAnnotation :exec
 DELETE FROM plan_annotations WHERE annotation_id = ?;
@@ -45,10 +46,11 @@ WHERE message_id = ?
 ORDER BY file_path ASC, line_start ASC
 LIMIT 500;
 
--- name: UpdateDiffAnnotation :exec
+-- name: UpdateDiffAnnotation :one
 UPDATE diff_annotations
 SET text = ?, suggested_code = ?, original_code = ?, updated_at = ?
-WHERE annotation_id = ?;
+WHERE annotation_id = ?
+RETURNING *;
 
 -- name: DeleteDiffAnnotation :exec
 DELETE FROM diff_annotations WHERE annotation_id = ?;

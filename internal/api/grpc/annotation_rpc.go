@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"errors"
+	"strings"
 
 	"github.com/roasbeef/subtrate/internal/store"
 	"google.golang.org/grpc/codes"
@@ -31,6 +32,22 @@ var validDiffAnnotationTypes = map[string]bool{
 	"comment": true, "suggestion": true, "concern": true,
 }
 
+// validScopes are the allowed scope values for diff annotations.
+var validScopes = map[string]bool{
+	"line": true, "file": true,
+}
+
+// validSides are the allowed side values for diff annotations.
+var validSides = map[string]bool{
+	"old": true, "new": true,
+}
+
+// validDiffContexts are the allowed diff_context values for plan
+// annotations.
+var validDiffContexts = map[string]bool{
+	"": true, "added": true, "removed": true, "modified": true,
+}
+
 // validateTextLen checks that a text field does not exceed the maximum
 // allowed length.
 func validateTextLen(field, value string) error {
@@ -43,8 +60,8 @@ func validateTextLen(field, value string) error {
 	return nil
 }
 
-// validatePathLen checks that a file path field does not exceed the
-// maximum allowed length.
+// validatePathLen checks that a file path is safe and within length
+// limits. Rejects path traversal, absolute paths, and null bytes.
 func validatePathLen(value string) error {
 	if len(value) > maxPathLen {
 		return status.Errorf(
@@ -52,7 +69,43 @@ func validatePathLen(value string) error {
 			"file_path exceeds maximum length of %d", maxPathLen,
 		)
 	}
+	if strings.Contains(value, "..") {
+		return status.Error(
+			codes.InvalidArgument,
+			"file_path must not contain path traversal",
+		)
+	}
+	if strings.HasPrefix(value, "/") {
+		return status.Error(
+			codes.InvalidArgument,
+			"file_path must be relative",
+		)
+	}
+	if strings.ContainsAny(value, "\x00\n\r") {
+		return status.Error(
+			codes.InvalidArgument,
+			"file_path contains invalid characters",
+		)
+	}
 	return nil
+}
+
+// wrapDBError returns a generic error message for database failures
+// without leaking internal schema details.
+func wrapDBError(operation string, err error) error {
+	if isNotFound(err) {
+		return status.Error(codes.NotFound, "resource not found")
+	}
+
+	// Check for UNIQUE constraint violations (duplicate annotation_id).
+	if strings.Contains(err.Error(), "UNIQUE constraint") {
+		return status.Error(
+			codes.AlreadyExists,
+			"annotation with this ID already exists",
+		)
+	}
+
+	return status.Errorf(codes.Internal, "%s failed", operation)
 }
 
 // isNotFound returns true if the error indicates a missing row.
@@ -95,6 +148,12 @@ func (s *Server) CreatePlanAnnotation(
 			"invalid annotation_type: %q", req.AnnotationType,
 		)
 	}
+	if !validDiffContexts[req.DiffContext] {
+		return nil, status.Errorf(
+			codes.InvalidArgument,
+			"invalid diff_context: %q", req.DiffContext,
+		)
+	}
 	for _, check := range []struct{ field, val string }{
 		{"text", req.Text},
 		{"original_text", req.OriginalText},
@@ -118,10 +177,7 @@ func (s *Server) CreatePlanAnnotation(
 
 	ann, err := s.annotationStore.CreatePlanAnnotation(ctx, params)
 	if err != nil {
-		return nil, status.Errorf(
-			codes.Internal,
-			"failed to create plan annotation: %v", err,
-		)
+		return nil, wrapDBError("create plan annotation", err)
 	}
 
 	return planAnnotationToProto(ann), nil
@@ -141,10 +197,7 @@ func (s *Server) ListPlanAnnotations(
 		ctx, req.PlanReviewId,
 	)
 	if err != nil {
-		return nil, status.Errorf(
-			codes.Internal,
-			"failed to list plan annotations: %v", err,
-		)
+		return nil, wrapDBError("list plan annotations", err)
 	}
 
 	protos := make([]*PlanAnnotationProto, 0, len(annotations))
@@ -193,30 +246,9 @@ func (s *Server) UpdatePlanAnnotation(
 		DiffContext:  req.DiffContext,
 	}
 
-	err := s.annotationStore.UpdatePlanAnnotation(ctx, params)
+	ann, err := s.annotationStore.UpdatePlanAnnotation(ctx, params)
 	if err != nil {
-		return nil, status.Errorf(
-			codes.Internal,
-			"failed to update plan annotation: %v", err,
-		)
-	}
-
-	// Re-fetch to return the updated annotation.
-	ann, err := s.annotationStore.GetPlanAnnotation(
-		ctx, req.AnnotationId,
-	)
-	if err != nil {
-		if isNotFound(err) {
-			return nil, status.Errorf(
-				codes.NotFound,
-				"plan annotation not found: %s",
-				req.AnnotationId,
-			)
-		}
-		return nil, status.Errorf(
-			codes.Internal,
-			"failed to get updated plan annotation: %v", err,
-		)
+		return nil, wrapDBError("update plan annotation", err)
 	}
 
 	return planAnnotationToProto(ann), nil
@@ -234,10 +266,7 @@ func (s *Server) DeletePlanAnnotation(
 
 	err := s.annotationStore.DeletePlanAnnotation(ctx, req.AnnotationId)
 	if err != nil {
-		return nil, status.Errorf(
-			codes.Internal,
-			"failed to delete plan annotation: %v", err,
-		)
+		return nil, wrapDBError("delete plan annotation", err)
 	}
 
 	return &DeleteAnnotationResponse{}, nil
@@ -278,6 +307,19 @@ func (s *Server) CreateDiffAnnotation(
 			"invalid annotation_type: %q", req.AnnotationType,
 		)
 	}
+	if !validScopes[req.Scope] {
+		return nil, status.Errorf(
+			codes.InvalidArgument,
+			"invalid scope: %q (must be 'line' or 'file')",
+			req.Scope,
+		)
+	}
+	if !validSides[req.Side] {
+		return nil, status.Errorf(
+			codes.InvalidArgument,
+			"invalid side: %q (must be 'old' or 'new')", req.Side,
+		)
+	}
 	if err := validatePathLen(req.FilePath); err != nil {
 		return nil, err
 	}
@@ -307,10 +349,7 @@ func (s *Server) CreateDiffAnnotation(
 
 	ann, err := s.annotationStore.CreateDiffAnnotation(ctx, params)
 	if err != nil {
-		return nil, status.Errorf(
-			codes.Internal,
-			"failed to create diff annotation: %v", err,
-		)
+		return nil, wrapDBError("create diff annotation", err)
 	}
 
 	return diffAnnotationToProto(ann), nil
@@ -330,10 +369,7 @@ func (s *Server) ListDiffAnnotations(
 		ctx, req.MessageId,
 	)
 	if err != nil {
-		return nil, status.Errorf(
-			codes.Internal,
-			"failed to list diff annotations: %v", err,
-		)
+		return nil, wrapDBError("list diff annotations", err)
 	}
 
 	protos := make([]*DiffAnnotationProto, 0, len(annotations))
@@ -370,29 +406,9 @@ func (s *Server) UpdateDiffAnnotation(
 		OriginalCode:  req.OriginalCode,
 	}
 
-	err := s.annotationStore.UpdateDiffAnnotation(ctx, params)
+	ann, err := s.annotationStore.UpdateDiffAnnotation(ctx, params)
 	if err != nil {
-		return nil, status.Errorf(
-			codes.Internal,
-			"failed to update diff annotation: %v", err,
-		)
-	}
-
-	ann, err := s.annotationStore.GetDiffAnnotation(
-		ctx, req.AnnotationId,
-	)
-	if err != nil {
-		if isNotFound(err) {
-			return nil, status.Errorf(
-				codes.NotFound,
-				"diff annotation not found: %s",
-				req.AnnotationId,
-			)
-		}
-		return nil, status.Errorf(
-			codes.Internal,
-			"failed to get updated diff annotation: %v", err,
-		)
+		return nil, wrapDBError("update diff annotation", err)
 	}
 
 	return diffAnnotationToProto(ann), nil
@@ -410,10 +426,7 @@ func (s *Server) DeleteDiffAnnotation(
 
 	err := s.annotationStore.DeleteDiffAnnotation(ctx, req.AnnotationId)
 	if err != nil {
-		return nil, status.Errorf(
-			codes.Internal,
-			"failed to delete diff annotation: %v", err,
-		)
+		return nil, wrapDBError("delete diff annotation", err)
 	}
 
 	return &DeleteAnnotationResponse{}, nil

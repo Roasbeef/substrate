@@ -2,7 +2,7 @@ package store
 
 import (
 	"context"
-	"fmt"
+	"database/sql"
 	"time"
 )
 
@@ -50,9 +50,7 @@ func (m *MockStore) GetPlanAnnotation(ctx context.Context,
 
 	ann, ok := m.planAnnotations[annotationID]
 	if !ok {
-		return PlanAnnotation{}, fmt.Errorf(
-			"plan annotation not found: %s", annotationID,
-		)
+		return PlanAnnotation{}, sql.ErrNoRows
 	}
 
 	return ann, nil
@@ -80,16 +78,14 @@ func (m *MockStore) ListPlanAnnotationsByReview(ctx context.Context,
 // UpdatePlanAnnotation updates a plan annotation's content.
 func (m *MockStore) UpdatePlanAnnotation(ctx context.Context,
 	params UpdatePlanAnnotationParams,
-) error {
+) (PlanAnnotation, error) {
 
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
 	ann, ok := m.planAnnotations[params.AnnotationID]
 	if !ok {
-		return fmt.Errorf(
-			"plan annotation not found: %s", params.AnnotationID,
-		)
+		return PlanAnnotation{}, sql.ErrNoRows
 	}
 
 	ann.Text = params.Text
@@ -100,7 +96,7 @@ func (m *MockStore) UpdatePlanAnnotation(ctx context.Context,
 	ann.UpdatedAt = time.Now()
 	m.planAnnotations[params.AnnotationID] = ann
 
-	return nil
+	return ann, nil
 }
 
 // DeletePlanAnnotation deletes a plan annotation by its UUID.
@@ -180,9 +176,7 @@ func (m *MockStore) GetDiffAnnotation(ctx context.Context,
 
 	ann, ok := m.diffAnnotations[annotationID]
 	if !ok {
-		return DiffAnnotation{}, fmt.Errorf(
-			"diff annotation not found: %s", annotationID,
-		)
+		return DiffAnnotation{}, sql.ErrNoRows
 	}
 
 	return ann, nil
@@ -210,16 +204,14 @@ func (m *MockStore) ListDiffAnnotationsByMessage(ctx context.Context,
 // UpdateDiffAnnotation updates a diff annotation's content.
 func (m *MockStore) UpdateDiffAnnotation(ctx context.Context,
 	params UpdateDiffAnnotationParams,
-) error {
+) (DiffAnnotation, error) {
 
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
 	ann, ok := m.diffAnnotations[params.AnnotationID]
 	if !ok {
-		return fmt.Errorf(
-			"diff annotation not found: %s", params.AnnotationID,
-		)
+		return DiffAnnotation{}, sql.ErrNoRows
 	}
 
 	ann.Text = params.Text
@@ -228,7 +220,7 @@ func (m *MockStore) UpdateDiffAnnotation(ctx context.Context,
 	ann.UpdatedAt = time.Now()
 	m.diffAnnotations[params.AnnotationID] = ann
 
-	return nil
+	return ann, nil
 }
 
 // DeleteDiffAnnotation deletes a diff annotation by its UUID.

@@ -302,7 +302,7 @@ type QueryStore interface {
 	) ([]sqlc.PlanAnnotation, error)
 	UpdatePlanAnnotation(
 		ctx context.Context, arg sqlc.UpdatePlanAnnotationParams,
-	) error
+	) (sqlc.PlanAnnotation, error)
 	DeletePlanAnnotation(
 		ctx context.Context, annotationID string,
 	) error
@@ -322,7 +322,7 @@ type QueryStore interface {
 	) ([]sqlc.DiffAnnotation, error)
 	UpdateDiffAnnotation(
 		ctx context.Context, arg sqlc.UpdateDiffAnnotationParams,
-	) error
+	) (sqlc.DiffAnnotation, error)
 	DeleteDiffAnnotation(
 		ctx context.Context, annotationID string,
 	) error

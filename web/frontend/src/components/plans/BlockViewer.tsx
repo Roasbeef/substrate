@@ -2,7 +2,7 @@
 // inline annotation highlighting. Handles text selection for annotation
 // creation via the AnnotationToolbar popover.
 
-import { useRef, useState, useCallback, useEffect, useMemo } from 'react';
+import { useRef, useState, useCallback, useEffect, useMemo, memo } from 'react';
 import type { Block, PlanAnnotation } from '@/types/annotations.js';
 import { PlanAnnotationType } from '@/types/annotations.js';
 import { AnnotationToolbar } from './AnnotationToolbar.js';
@@ -234,7 +234,7 @@ interface BlockRendererProps {
   onSelectAnnotation: (id: string | null) => void;
 }
 
-function BlockRenderer({
+const BlockRenderer = memo(function BlockRenderer({
   block,
   annotations,
   selectedAnnotationId,
@@ -402,7 +402,7 @@ function BlockRenderer({
         </p>
       );
   }
-}
+});
 
 // =============================================================================
 // Inline Content Renderer

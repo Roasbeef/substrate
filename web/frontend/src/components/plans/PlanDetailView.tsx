@@ -63,14 +63,11 @@ export function PlanDetailView({ planReview }: PlanDetailViewProps) {
     const prId = planReview.plan_review_id;
     setPlanReviewId(prId);
 
-    // Try server first, fall back to localStorage draft.
+    // Always prefer server state. Only fall back to localStorage draft
+    // when the server is unreachable.
     fetchPlanAnnotations(prId)
       .then((serverAnnotations) => {
-        if (serverAnnotations.length > 0) {
-          loadPlanAnnotations(serverAnnotations);
-        } else {
-          loadPlanDraft(prId);
-        }
+        loadPlanAnnotations(serverAnnotations);
       })
       .catch(() => {
         loadPlanDraft(prId);

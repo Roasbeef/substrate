@@ -71,10 +71,10 @@ func (s *SqlcStore) ListPlanAnnotationsByReview(ctx context.Context,
 // UpdatePlanAnnotation updates a plan annotation's content.
 func (s *SqlcStore) UpdatePlanAnnotation(ctx context.Context,
 	params UpdatePlanAnnotationParams,
-) error {
+) (PlanAnnotation, error) {
 	now := time.Now().Unix()
 
-	return s.db.UpdatePlanAnnotation(
+	row, err := s.db.UpdatePlanAnnotation(
 		ctx, sqlc.UpdatePlanAnnotationParams{
 			Text:         ToSqlcNullString(params.Text),
 			OriginalText: params.OriginalText,
@@ -85,6 +85,10 @@ func (s *SqlcStore) UpdatePlanAnnotation(ctx context.Context,
 			AnnotationID: params.AnnotationID,
 		},
 	)
+	if err != nil {
+		return PlanAnnotation{}, err
+	}
+	return PlanAnnotationFromSqlc(row), nil
 }
 
 // DeletePlanAnnotation deletes a plan annotation by its UUID.
@@ -164,10 +168,10 @@ func (s *SqlcStore) ListDiffAnnotationsByMessage(ctx context.Context,
 // UpdateDiffAnnotation updates a diff annotation's content.
 func (s *SqlcStore) UpdateDiffAnnotation(ctx context.Context,
 	params UpdateDiffAnnotationParams,
-) error {
+) (DiffAnnotation, error) {
 	now := time.Now().Unix()
 
-	return s.db.UpdateDiffAnnotation(
+	row, err := s.db.UpdateDiffAnnotation(
 		ctx, sqlc.UpdateDiffAnnotationParams{
 			Text:          ToSqlcNullString(params.Text),
 			SuggestedCode: ToSqlcNullString(params.SuggestedCode),
@@ -176,6 +180,10 @@ func (s *SqlcStore) UpdateDiffAnnotation(ctx context.Context,
 			AnnotationID:  params.AnnotationID,
 		},
 	)
+	if err != nil {
+		return DiffAnnotation{}, err
+	}
+	return DiffAnnotationFromSqlc(row), nil
 }
 
 // DeleteDiffAnnotation deletes a diff annotation by its UUID.
@@ -257,10 +265,10 @@ func (s *txSqlcStore) ListPlanAnnotationsByReview(ctx context.Context,
 // UpdatePlanAnnotation updates a plan annotation's content.
 func (s *txSqlcStore) UpdatePlanAnnotation(ctx context.Context,
 	params UpdatePlanAnnotationParams,
-) error {
+) (PlanAnnotation, error) {
 	now := time.Now().Unix()
 
-	return s.queries.UpdatePlanAnnotation(
+	row, err := s.queries.UpdatePlanAnnotation(
 		ctx, sqlc.UpdatePlanAnnotationParams{
 			Text:         ToSqlcNullString(params.Text),
 			OriginalText: params.OriginalText,
@@ -271,6 +279,10 @@ func (s *txSqlcStore) UpdatePlanAnnotation(ctx context.Context,
 			AnnotationID: params.AnnotationID,
 		},
 	)
+	if err != nil {
+		return PlanAnnotation{}, err
+	}
+	return PlanAnnotationFromSqlc(row), nil
 }
 
 // DeletePlanAnnotation deletes a plan annotation by its UUID.
@@ -350,10 +362,10 @@ func (s *txSqlcStore) ListDiffAnnotationsByMessage(ctx context.Context,
 // UpdateDiffAnnotation updates a diff annotation's content.
 func (s *txSqlcStore) UpdateDiffAnnotation(ctx context.Context,
 	params UpdateDiffAnnotationParams,
-) error {
+) (DiffAnnotation, error) {
 	now := time.Now().Unix()
 
-	return s.queries.UpdateDiffAnnotation(
+	row, err := s.queries.UpdateDiffAnnotation(
 		ctx, sqlc.UpdateDiffAnnotationParams{
 			Text:          ToSqlcNullString(params.Text),
 			SuggestedCode: ToSqlcNullString(params.SuggestedCode),
@@ -362,6 +374,10 @@ func (s *txSqlcStore) UpdateDiffAnnotation(ctx context.Context,
 			AnnotationID:  params.AnnotationID,
 		},
 	)
+	if err != nil {
+		return DiffAnnotation{}, err
+	}
+	return DiffAnnotationFromSqlc(row), nil
 }
 
 // DeleteDiffAnnotation deletes a diff annotation by its UUID.

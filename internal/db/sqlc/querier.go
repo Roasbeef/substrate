@@ -200,8 +200,8 @@ type Querier interface {
 	// Update the state of all message recipients in a thread for ALL agents.
 	// Used for global view archive/trash operations.
 	UpdateAllThreadRecipientState(ctx context.Context, arg UpdateAllThreadRecipientStateParams) (int64, error)
-	UpdateDiffAnnotation(ctx context.Context, arg UpdateDiffAnnotationParams) error
-	UpdatePlanAnnotation(ctx context.Context, arg UpdatePlanAnnotationParams) error
+	UpdateDiffAnnotation(ctx context.Context, arg UpdateDiffAnnotationParams) (DiffAnnotation, error)
+	UpdatePlanAnnotation(ctx context.Context, arg UpdatePlanAnnotationParams) (PlanAnnotation, error)
 	UpdatePlanReviewState(ctx context.Context, arg UpdatePlanReviewStateParams) error
 	UpdateRecipientAcked(ctx context.Context, arg UpdateRecipientAckedParams) error
 	UpdateRecipientSnoozed(ctx context.Context, arg UpdateRecipientSnoozedParams) error

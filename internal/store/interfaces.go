@@ -558,10 +558,11 @@ type AnnotationStore interface {
 		ctx context.Context, planReviewID string,
 	) ([]PlanAnnotation, error)
 
-	// UpdatePlanAnnotation updates a plan annotation's content.
+	// UpdatePlanAnnotation updates a plan annotation's content and
+	// returns the updated record.
 	UpdatePlanAnnotation(
 		ctx context.Context, params UpdatePlanAnnotationParams,
-	) error
+	) (PlanAnnotation, error)
 
 	// DeletePlanAnnotation deletes a plan annotation by its UUID.
 	DeletePlanAnnotation(ctx context.Context, annotationID string) error
@@ -588,10 +589,11 @@ type AnnotationStore interface {
 		ctx context.Context, messageID int64,
 	) ([]DiffAnnotation, error)
 
-	// UpdateDiffAnnotation updates a diff annotation's content.
+	// UpdateDiffAnnotation updates a diff annotation's content and
+	// returns the updated record.
 	UpdateDiffAnnotation(
 		ctx context.Context, params UpdateDiffAnnotationParams,
-	) error
+	) (DiffAnnotation, error)
 
 	// DeleteDiffAnnotation deletes a diff annotation by its UUID.
 	DeleteDiffAnnotation(ctx context.Context, annotationID string) error
