@@ -68,7 +68,7 @@ fi
 # The wait command returns hook-format JSON with permissionDecision.
 "$SUBSTRATE" plan wait \
     --plan-review-id "$PLAN_REVIEW_ID" \
-    --timeout 9m \
+    --timeout 96h \
     --format hook 2>/dev/null || {
     # Wait failed — deny to be safe.
     echo '{"hookSpecificOutput":{"permissionDecision":"deny","permissionDecisionReason":"Plan review check failed. Retry ExitPlanMode."}}'

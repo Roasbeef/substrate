@@ -53,7 +53,10 @@ var HookDefinitions = map[string]HookEntry{
 		Hooks: []HookCommand{{
 			Type:    "command",
 			Command: "~/.claude/hooks/substrate/stop.sh",
-			Timeout: 600,
+			// Long timeout (4 days) keeps the agent alive indefinitely,
+			// following plannotator's strategy. The stop hook polls for
+			// new work from other agents. Ctrl+C to force exit.
+			Timeout: 345600,
 		}},
 	},
 	"SubagentStop": {
@@ -96,7 +99,11 @@ var PlanHookDefinitions = map[string]HookEntry{
 		Hooks: []HookCommand{{
 			Type:    "command",
 			Command: "~/.claude/hooks/substrate/pretooluse_plan.sh",
-			Timeout: 600,
+			// Use a very long timeout (4 days) following plannotator's
+			// strategy. The hook blocks until the user acts on the plan
+			// review in the web UI, which may take hours or days for
+			// async review workflows.
+			Timeout: 345600,
 		}},
 	},
 }
