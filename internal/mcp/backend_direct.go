@@ -2,6 +2,7 @@ package mcp
 
 import (
 	"context"
+	"fmt"
 	"time"
 
 	"github.com/roasbeef/subtrate/internal/actorutil"
@@ -297,18 +298,28 @@ func (b *DirectBackend) ListSubscriptionsByAgent(ctx context.Context,
 	return b.storage.ListSubscriptionsByAgent(ctx, agentID)
 }
 
-// CreateSubscription subscribes an agent to a topic.
+// CreateSubscription subscribes an agent to a topic by name.
 func (b *DirectBackend) CreateSubscription(ctx context.Context,
-	agentID, topicID int64,
+	agentID int64, topicName string,
 ) error {
-	return b.storage.CreateSubscription(ctx, agentID, topicID)
+	topic, err := b.storage.GetTopicByName(ctx, topicName)
+	if err != nil {
+		return fmt.Errorf("topic %q not found: %w", topicName, err)
+	}
+
+	return b.storage.CreateSubscription(ctx, agentID, topic.ID)
 }
 
-// DeleteSubscription removes an agent's subscription to a topic.
+// DeleteSubscription removes an agent's subscription by topic name.
 func (b *DirectBackend) DeleteSubscription(ctx context.Context,
-	agentID, topicID int64,
+	agentID int64, topicName string,
 ) error {
-	return b.storage.DeleteSubscription(ctx, agentID, topicID)
+	topic, err := b.storage.GetTopicByName(ctx, topicName)
+	if err != nil {
+		return fmt.Errorf("topic %q not found: %w", topicName, err)
+	}
+
+	return b.storage.DeleteSubscription(ctx, agentID, topic.ID)
 }
 
 // SearchMessages performs full-text search across messages for an agent.

@@ -10,6 +10,19 @@ import (
 	"github.com/roasbeef/subtrate/internal/mail"
 )
 
+// requireAgentID validates that agent_id is non-zero. MCP clients that
+// omit agent_id send 0, which would create messages from a phantom sender
+// or operate on the wrong agent's data.
+func requireAgentID(agentID int64) error {
+	if agentID == 0 {
+		return fmt.Errorf(
+			"agent_id is required and must be non-zero",
+		)
+	}
+
+	return nil
+}
+
 // SendMailArgs are the arguments for the send_mail tool.
 type SendMailArgs struct {
 	// AgentID is the sending agent's ID.
@@ -37,9 +50,14 @@ type SendMailResult struct {
 	ThreadID  string `json:"thread_id"`
 }
 
+// handleSendMail sends a message to one or more agent recipients.
 func (s *Server) handleSendMail(ctx context.Context,
 	req *mcp.CallToolRequest, args SendMailArgs,
 ) (*mcp.CallToolResult, SendMailResult, error) {
+	if err := requireAgentID(args.AgentID); err != nil {
+		return nil, SendMailResult{}, err
+	}
+
 	priority := mail.Priority(args.Priority)
 	if priority == "" {
 		priority = mail.PriorityNormal
@@ -87,9 +105,14 @@ type InboxMessageResult struct {
 	CreatedAt string `json:"created_at"`
 }
 
+// handleFetchInbox retrieves inbox messages for an agent with pagination.
 func (s *Server) handleFetchInbox(ctx context.Context,
 	req *mcp.CallToolRequest, args FetchInboxArgs,
 ) (*mcp.CallToolResult, FetchInboxResult, error) {
+	if err := requireAgentID(args.AgentID); err != nil {
+		return nil, FetchInboxResult{}, err
+	}
+
 	limit := args.Limit
 	if limit <= 0 {
 		limit = 50
@@ -138,9 +161,14 @@ type ReadMessageResult struct {
 	CreatedAt string `json:"created_at"`
 }
 
+// handleReadMessage reads a specific message and marks it as read.
 func (s *Server) handleReadMessage(ctx context.Context,
 	req *mcp.CallToolRequest, args ReadMessageArgs,
 ) (*mcp.CallToolResult, ReadMessageResult, error) {
+	if err := requireAgentID(args.AgentID); err != nil {
+		return nil, ReadMessageResult{}, err
+	}
+
 	resp, err := s.backend.ReadMessage(ctx, args.AgentID, args.MessageID)
 	if err != nil {
 		return nil, ReadMessageResult{}, err
@@ -174,9 +202,14 @@ type AckMessageResult struct {
 	Success bool `json:"success"`
 }
 
+// handleAckMessage acknowledges receipt of a message.
 func (s *Server) handleAckMessage(ctx context.Context,
 	req *mcp.CallToolRequest, args AckMessageArgs,
 ) (*mcp.CallToolResult, AckMessageResult, error) {
+	if err := requireAgentID(args.AgentID); err != nil {
+		return nil, AckMessageResult{}, err
+	}
+
 	resp, err := s.backend.AckMessage(ctx, args.AgentID, args.MessageID)
 	if err != nil {
 		return nil, AckMessageResult{}, err
@@ -196,9 +229,14 @@ type StateChangeResult struct {
 	Success bool `json:"success"`
 }
 
+// handleMarkRead marks a message as read for the agent.
 func (s *Server) handleMarkRead(ctx context.Context,
 	req *mcp.CallToolRequest, args StateChangeArgs,
 ) (*mcp.CallToolResult, StateChangeResult, error) {
+	if err := requireAgentID(args.AgentID); err != nil {
+		return nil, StateChangeResult{}, err
+	}
+
 	resp, err := s.backend.UpdateState(
 		ctx, args.AgentID, args.MessageID,
 		mail.StateReadStr.String(), nil,
@@ -210,9 +248,14 @@ func (s *Server) handleMarkRead(ctx context.Context,
 	return nil, StateChangeResult{Success: resp.Success}, nil
 }
 
+// handleStarMessage stars or unstars a message for later reference.
 func (s *Server) handleStarMessage(ctx context.Context,
 	req *mcp.CallToolRequest, args StateChangeArgs,
 ) (*mcp.CallToolResult, StateChangeResult, error) {
+	if err := requireAgentID(args.AgentID); err != nil {
+		return nil, StateChangeResult{}, err
+	}
+
 	resp, err := s.backend.UpdateState(
 		ctx, args.AgentID, args.MessageID,
 		mail.StateStarredStr.String(), nil,
@@ -231,9 +274,14 @@ type SnoozeArgs struct {
 	SnoozedUntil string `json:"snoozed_until" jsonschema:"RFC3339 timestamp when the message should reappear"`
 }
 
+// handleSnoozeMessage snoozes a message until a specified time.
 func (s *Server) handleSnoozeMessage(ctx context.Context,
 	req *mcp.CallToolRequest, args SnoozeArgs,
 ) (*mcp.CallToolResult, StateChangeResult, error) {
+	if err := requireAgentID(args.AgentID); err != nil {
+		return nil, StateChangeResult{}, err
+	}
+
 	t, err := time.Parse(time.RFC3339, args.SnoozedUntil)
 	if err != nil {
 		return nil, StateChangeResult{},
@@ -251,9 +299,14 @@ func (s *Server) handleSnoozeMessage(ctx context.Context,
 	return nil, StateChangeResult{Success: resp.Success}, nil
 }
 
+// handleArchiveMessage archives a message to remove it from the inbox.
 func (s *Server) handleArchiveMessage(ctx context.Context,
 	req *mcp.CallToolRequest, args StateChangeArgs,
 ) (*mcp.CallToolResult, StateChangeResult, error) {
+	if err := requireAgentID(args.AgentID); err != nil {
+		return nil, StateChangeResult{}, err
+	}
+
 	resp, err := s.backend.UpdateState(
 		ctx, args.AgentID, args.MessageID,
 		mail.StateArchivedStr.String(), nil,
@@ -265,9 +318,14 @@ func (s *Server) handleArchiveMessage(ctx context.Context,
 	return nil, StateChangeResult{Success: resp.Success}, nil
 }
 
+// handleTrashMessage moves a message to the trash.
 func (s *Server) handleTrashMessage(ctx context.Context,
 	req *mcp.CallToolRequest, args StateChangeArgs,
 ) (*mcp.CallToolResult, StateChangeResult, error) {
+	if err := requireAgentID(args.AgentID); err != nil {
+		return nil, StateChangeResult{}, err
+	}
+
 	resp, err := s.backend.UpdateState(
 		ctx, args.AgentID, args.MessageID,
 		mail.StateTrashStr.String(), nil,
@@ -291,16 +349,13 @@ type SubscribeResult struct {
 	TopicName string `json:"topic_name"`
 }
 
+// handleSubscribe subscribes an agent to a topic by name.
 func (s *Server) handleSubscribe(ctx context.Context,
 	req *mcp.CallToolRequest, args SubscribeArgs,
 ) (*mcp.CallToolResult, SubscribeResult, error) {
-	topic, err := s.backend.GetTopicByName(ctx, args.TopicName)
-	if err != nil {
-		return nil, SubscribeResult{},
-			fmt.Errorf("topic %q not found: %w", args.TopicName, err)
-	}
-
-	err = s.backend.CreateSubscription(ctx, args.AgentID, topic.ID)
+	err := s.backend.CreateSubscription(
+		ctx, args.AgentID, args.TopicName,
+	)
 	if err != nil {
 		return nil, SubscribeResult{},
 			fmt.Errorf("failed to subscribe: %w", err)
@@ -318,16 +373,13 @@ type UnsubscribeArgs struct {
 	TopicName string `json:"topic_name" jsonschema:"Name of the topic to unsubscribe from"`
 }
 
+// handleUnsubscribe removes an agent's subscription to a topic.
 func (s *Server) handleUnsubscribe(ctx context.Context,
 	req *mcp.CallToolRequest, args UnsubscribeArgs,
 ) (*mcp.CallToolResult, SubscribeResult, error) {
-	topic, err := s.backend.GetTopicByName(ctx, args.TopicName)
-	if err != nil {
-		return nil, SubscribeResult{},
-			fmt.Errorf("topic %q not found: %w", args.TopicName, err)
-	}
-
-	err = s.backend.DeleteSubscription(ctx, args.AgentID, topic.ID)
+	err := s.backend.DeleteSubscription(
+		ctx, args.AgentID, args.TopicName,
+	)
 	if err != nil {
 		return nil, SubscribeResult{},
 			fmt.Errorf("failed to unsubscribe: %w", err)
@@ -357,6 +409,7 @@ type ListTopicsResult struct {
 	Topics []TopicInfo `json:"topics"`
 }
 
+// handleListTopics lists available topics, optionally filtered by subscription.
 func (s *Server) handleListTopics(ctx context.Context,
 	req *mcp.CallToolRequest, args ListTopicsArgs,
 ) (*mcp.CallToolResult, ListTopicsResult, error) {
@@ -412,9 +465,14 @@ type PublishResult struct {
 	RecipientsCount int   `json:"recipients_count"`
 }
 
+// handlePublish publishes a message to a named topic.
 func (s *Server) handlePublish(ctx context.Context,
 	req *mcp.CallToolRequest, args PublishArgs,
 ) (*mcp.CallToolResult, PublishResult, error) {
+	if err := requireAgentID(args.AgentID); err != nil {
+		return nil, PublishResult{}, err
+	}
+
 	priority := mail.Priority(args.Priority)
 	if priority == "" {
 		priority = mail.PriorityNormal
@@ -449,9 +507,14 @@ type SearchResult struct {
 	Results []InboxMessageResult `json:"results"`
 }
 
+// handleSearch performs full-text search across messages for an agent.
 func (s *Server) handleSearch(ctx context.Context,
 	req *mcp.CallToolRequest, args SearchArgs,
 ) (*mcp.CallToolResult, SearchResult, error) {
+	if err := requireAgentID(args.AgentID); err != nil {
+		return nil, SearchResult{}, err
+	}
+
 	limit := args.Limit
 	if limit <= 0 {
 		limit = 20
@@ -494,9 +557,14 @@ type GetStatusResult struct {
 	UrgentCount int64  `json:"urgent_count"`
 }
 
+// handleGetStatus returns the mail status summary for an agent.
 func (s *Server) handleGetStatus(ctx context.Context,
 	req *mcp.CallToolRequest, args GetStatusArgs,
 ) (*mcp.CallToolResult, GetStatusResult, error) {
+	if err := requireAgentID(args.AgentID); err != nil {
+		return nil, GetStatusResult{}, err
+	}
+
 	resp, err := s.backend.GetStatus(ctx, args.AgentID)
 	if err != nil {
 		return nil, GetStatusResult{}, err
@@ -522,9 +590,14 @@ type PollChangesResult struct {
 	NewOffsets  map[string]int64     `json:"new_offsets"`
 }
 
+// handlePollChanges polls for new messages since the given topic offsets.
 func (s *Server) handlePollChanges(ctx context.Context,
 	req *mcp.CallToolRequest, args PollChangesArgs,
 ) (*mcp.CallToolResult, PollChangesResult, error) {
+	if err := requireAgentID(args.AgentID); err != nil {
+		return nil, PollChangesResult{}, err
+	}
+
 	// Convert string-keyed map to int64-keyed map.
 	sinceOffsets := make(map[int64]int64)
 	for k, v := range args.SinceOffsets {
@@ -580,6 +653,7 @@ type RegisterAgentResult struct {
 	AgentName string `json:"agent_name"`
 }
 
+// handleRegisterAgent creates a new agent with the given name.
 func (s *Server) handleRegisterAgent(ctx context.Context,
 	req *mcp.CallToolRequest, args RegisterAgentArgs,
 ) (*mcp.CallToolResult, RegisterAgentResult, error) {
@@ -609,6 +683,7 @@ type WhoAmIResult struct {
 	ProjectKey string `json:"project_key,omitempty"`
 }
 
+// handleWhoAmI returns the current agent identity by ID.
 func (s *Server) handleWhoAmI(ctx context.Context,
 	req *mcp.CallToolRequest, args WhoAmIArgs,
 ) (*mcp.CallToolResult, WhoAmIResult, error) {

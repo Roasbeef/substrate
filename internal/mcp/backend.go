@@ -66,14 +66,14 @@ type Backend interface {
 		agentID int64,
 	) ([]store.Topic, error)
 
-	// CreateSubscription subscribes an agent to a topic.
+	// CreateSubscription subscribes an agent to a topic by name.
 	CreateSubscription(ctx context.Context,
-		agentID, topicID int64,
+		agentID int64, topicName string,
 	) error
 
-	// DeleteSubscription removes an agent's subscription to a topic.
+	// DeleteSubscription removes an agent's subscription by topic name.
 	DeleteSubscription(ctx context.Context,
-		agentID, topicID int64,
+		agentID int64, topicName string,
 	) error
 
 	// SearchMessages performs full-text search across messages for an agent.
