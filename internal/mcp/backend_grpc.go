@@ -64,6 +64,7 @@ func (b *GRPCBackend) FetchInbox(ctx context.Context,
 			AgentId:    req.AgentID,
 			Limit:      int32(req.Limit),
 			UnreadOnly: req.UnreadOnly,
+			Offset:     int32(req.Offset),
 		},
 	)
 	if err != nil {
@@ -412,11 +413,16 @@ func (b *GRPCBackend) ListAgents(
 
 	agents := make([]store.Agent, len(resp.Agents))
 	for i, a := range resp.Agents {
-		agents[i] = store.Agent{
+		ag := store.Agent{
 			ID:         a.Id,
 			Name:       a.Name,
 			ProjectKey: a.ProjectKey,
+			GitBranch:  a.GitBranch,
 		}
+		if a.LastActiveAt != nil {
+			ag.LastActiveAt = a.LastActiveAt.AsTime()
+		}
+		agents[i] = ag
 	}
 
 	return agents, nil

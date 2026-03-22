@@ -121,6 +121,7 @@ func (s *Server) FetchInbox(ctx context.Context, req *FetchInboxRequest) (*Fetch
 		fetchReq := mail.FetchInboxRequest{
 			AgentID:          0, // Not filtering by recipient.
 			Limit:            limit,
+			Offset:           int(req.Offset),
 			UnreadOnly:       req.UnreadOnly,
 			StateFilter:      stateFilter,
 			SenderNamePrefix: req.SenderNamePrefix,
@@ -150,6 +151,7 @@ func (s *Server) FetchInbox(ctx context.Context, req *FetchInboxRequest) (*Fetch
 	fetchReq := mail.FetchInboxRequest{
 		AgentID:     req.AgentId,
 		Limit:       limit,
+		Offset:      int(req.Offset),
 		UnreadOnly:  req.UnreadOnly,
 		StateFilter: stateFilter,
 		SentOnly:    req.SentOnly,

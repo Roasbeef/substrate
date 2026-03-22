@@ -288,6 +288,7 @@ message FetchInboxRequest {
     // sender_name_prefix filters to messages from agents whose name starts with
     // this prefix (e.g., "reviewer-" for CodeReviewer aggregate).
     string sender_name_prefix = 6;
+    int32 offset = 7;           // Number of messages to skip for pagination
 }
 
 // FetchInboxResponse is the response for FetchInbox.

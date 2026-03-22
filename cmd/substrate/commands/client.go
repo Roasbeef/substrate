@@ -484,6 +484,7 @@ func (c *Client) FetchInbox(ctx context.Context, req mail.FetchInboxRequest) ([]
 			AgentId:    req.AgentID,
 			Limit:      int32(req.Limit),
 			UnreadOnly: req.UnreadOnly,
+			Offset:     int32(req.Offset),
 		}
 
 		resp, err := c.mailClient.FetchInbox(ctx, grpcReq)

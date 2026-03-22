@@ -776,6 +776,7 @@ type FetchInboxRequest struct {
 	// sender_name_prefix filters to messages from agents whose name starts with
 	// this prefix (e.g., "reviewer-" for CodeReviewer aggregate).
 	SenderNamePrefix string `protobuf:"bytes,6,opt,name=sender_name_prefix,json=senderNamePrefix,proto3" json:"sender_name_prefix,omitempty"`
+	Offset           int32  `protobuf:"varint,7,opt,name=offset,proto3" json:"offset,omitempty"` // Number of messages to skip for pagination
 	unknownFields    protoimpl.UnknownFields
 	sizeCache        protoimpl.SizeCache
 }
@@ -850,6 +851,13 @@ func (x *FetchInboxRequest) GetSenderNamePrefix() string {
 		return x.SenderNamePrefix
 	}
 	return ""
+}
+
+func (x *FetchInboxRequest) GetOffset() int32 {
+	if x != nil {
+		return x.Offset
+	}
+	return 0
 }
 
 // FetchInboxResponse is the response for FetchInbox.
@@ -9880,7 +9888,7 @@ const file_mail_proto_rawDesc = "" +
 	"\x10SendMailResponse\x12\x1d\n" +
 	"\n" +
 	"message_id\x18\x01 \x01(\x03R\tmessageId\x12\x1b\n" +
-	"\tthread_id\x18\x02 \x01(\tR\bthreadId\"\xee\x01\n" +
+	"\tthread_id\x18\x02 \x01(\tR\bthreadId\"\x86\x02\n" +
 	"\x11FetchInboxRequest\x12\x19\n" +
 	"\bagent_id\x18\x01 \x01(\x03R\aagentId\x12\x14\n" +
 	"\x05limit\x18\x02 \x01(\x05R\x05limit\x12\x1f\n" +
@@ -9888,7 +9896,8 @@ const file_mail_proto_rawDesc = "" +
 	"unreadOnly\x12<\n" +
 	"\fstate_filter\x18\x04 \x01(\x0e2\x19.subtraterpc.MessageStateR\vstateFilter\x12\x1b\n" +
 	"\tsent_only\x18\x05 \x01(\bR\bsentOnly\x12,\n" +
-	"\x12sender_name_prefix\x18\x06 \x01(\tR\x10senderNamePrefix\"K\n" +
+	"\x12sender_name_prefix\x18\x06 \x01(\tR\x10senderNamePrefix\x12\x16\n" +
+	"\x06offset\x18\a \x01(\x05R\x06offset\"K\n" +
 	"\x12FetchInboxResponse\x125\n" +
 	"\bmessages\x18\x01 \x03(\v2\x19.subtraterpc.InboxMessageR\bmessages\"N\n" +
 	"\x12ReadMessageRequest\x12\x19\n" +
