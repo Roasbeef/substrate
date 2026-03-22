@@ -57,6 +57,7 @@ var rootCmd = &cobra.Command{
 
 Use this CLI to send and receive messages, subscribe to topics, and manage
 agent identity across Claude Code sessions.`,
+	SilenceErrors: true,
 }
 
 // Execute runs the CLI.

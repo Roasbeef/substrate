@@ -33,3 +33,4 @@ node_modules/
 # Review output files
 .reviews/
 review.test
+.claude/.substrate-plan-context

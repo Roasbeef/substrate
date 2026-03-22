@@ -353,6 +353,10 @@ type SubscribeResult struct {
 func (s *Server) handleSubscribe(ctx context.Context,
 	req *mcp.CallToolRequest, args SubscribeArgs,
 ) (*mcp.CallToolResult, SubscribeResult, error) {
+	if err := requireAgentID(args.AgentID); err != nil {
+		return nil, SubscribeResult{}, err
+	}
+
 	err := s.backend.CreateSubscription(
 		ctx, args.AgentID, args.TopicName,
 	)
@@ -377,6 +381,10 @@ type UnsubscribeArgs struct {
 func (s *Server) handleUnsubscribe(ctx context.Context,
 	req *mcp.CallToolRequest, args UnsubscribeArgs,
 ) (*mcp.CallToolResult, SubscribeResult, error) {
+	if err := requireAgentID(args.AgentID); err != nil {
+		return nil, SubscribeResult{}, err
+	}
+
 	err := s.backend.DeleteSubscription(
 		ctx, args.AgentID, args.TopicName,
 	)
