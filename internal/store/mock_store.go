@@ -34,8 +34,8 @@ type MockStore struct {
 	tasksByKey map[string]int64 // "listID:claudeTaskID" -> task ID
 
 	// Annotation data stores.
-	planAnnotations      map[string]PlanAnnotation // Keyed by annotation_id.
-	diffAnnotations      map[string]DiffAnnotation // Keyed by annotation_id.
+	planAnnotations map[string]PlanAnnotation // Keyed by annotation_id.
+	diffAnnotations map[string]DiffAnnotation // Keyed by annotation_id.
 
 	// Counters for auto-incrementing IDs.
 	nextMessageID        int64
@@ -52,20 +52,20 @@ type MockStore struct {
 // NewMockStore creates a new in-memory mock store.
 func NewMockStore() *MockStore {
 	return &MockStore{
-		messages:          make(map[int64]Message),
-		messageRecipients: make(map[int64]map[int64]MessageRecipient),
-		agents:            make(map[int64]Agent),
-		agentsByName:      make(map[string]int64),
-		agentsBySession:   make(map[string]int64),
-		topics:            make(map[int64]Topic),
-		topicsByName:      make(map[string]int64),
-		subscriptions:     make(map[int64]map[int64]bool),
-		activities:        make([]Activity, 0),
-		summaries:         make([]AgentSummary, 0),
-		sessionIdentities: make(map[string]SessionIdentity),
-		taskLists:         make(map[string]TaskList),
-		tasks:             make(map[int64]Task),
-		tasksByKey:        make(map[string]int64),
+		messages:             make(map[int64]Message),
+		messageRecipients:    make(map[int64]map[int64]MessageRecipient),
+		agents:               make(map[int64]Agent),
+		agentsByName:         make(map[string]int64),
+		agentsBySession:      make(map[string]int64),
+		topics:               make(map[int64]Topic),
+		topicsByName:         make(map[string]int64),
+		subscriptions:        make(map[int64]map[int64]bool),
+		activities:           make([]Activity, 0),
+		summaries:            make([]AgentSummary, 0),
+		sessionIdentities:    make(map[string]SessionIdentity),
+		taskLists:            make(map[string]TaskList),
+		tasks:                make(map[int64]Task),
+		tasksByKey:           make(map[string]int64),
 		planAnnotations:      make(map[string]PlanAnnotation),
 		diffAnnotations:      make(map[string]DiffAnnotation),
 		nextMessageID:        1,

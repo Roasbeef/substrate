@@ -14,7 +14,6 @@ import (
 func (m *MockStore) CreatePlanAnnotation(ctx context.Context,
 	params CreatePlanAnnotationParams,
 ) (PlanAnnotation, error) {
-
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
@@ -44,7 +43,6 @@ func (m *MockStore) CreatePlanAnnotation(ctx context.Context,
 func (m *MockStore) GetPlanAnnotation(ctx context.Context,
 	annotationID string,
 ) (PlanAnnotation, error) {
-
 	m.mu.RLock()
 	defer m.mu.RUnlock()
 
@@ -61,7 +59,6 @@ func (m *MockStore) GetPlanAnnotation(ctx context.Context,
 func (m *MockStore) ListPlanAnnotationsByReview(ctx context.Context,
 	planReviewID string,
 ) ([]PlanAnnotation, error) {
-
 	m.mu.RLock()
 	defer m.mu.RUnlock()
 
@@ -79,7 +76,6 @@ func (m *MockStore) ListPlanAnnotationsByReview(ctx context.Context,
 func (m *MockStore) UpdatePlanAnnotation(ctx context.Context,
 	params UpdatePlanAnnotationParams,
 ) (PlanAnnotation, error) {
-
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
@@ -103,7 +99,6 @@ func (m *MockStore) UpdatePlanAnnotation(ctx context.Context,
 func (m *MockStore) DeletePlanAnnotation(ctx context.Context,
 	annotationID string,
 ) error {
-
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
@@ -117,7 +112,6 @@ func (m *MockStore) DeletePlanAnnotation(ctx context.Context,
 func (m *MockStore) DeletePlanAnnotationsByReview(ctx context.Context,
 	planReviewID string,
 ) error {
-
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
@@ -138,7 +132,6 @@ func (m *MockStore) DeletePlanAnnotationsByReview(ctx context.Context,
 func (m *MockStore) CreateDiffAnnotation(ctx context.Context,
 	params CreateDiffAnnotationParams,
 ) (DiffAnnotation, error) {
-
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
@@ -170,7 +163,6 @@ func (m *MockStore) CreateDiffAnnotation(ctx context.Context,
 func (m *MockStore) GetDiffAnnotation(ctx context.Context,
 	annotationID string,
 ) (DiffAnnotation, error) {
-
 	m.mu.RLock()
 	defer m.mu.RUnlock()
 
@@ -187,7 +179,6 @@ func (m *MockStore) GetDiffAnnotation(ctx context.Context,
 func (m *MockStore) ListDiffAnnotationsByMessage(ctx context.Context,
 	messageID int64,
 ) ([]DiffAnnotation, error) {
-
 	m.mu.RLock()
 	defer m.mu.RUnlock()
 
@@ -205,7 +196,6 @@ func (m *MockStore) ListDiffAnnotationsByMessage(ctx context.Context,
 func (m *MockStore) UpdateDiffAnnotation(ctx context.Context,
 	params UpdateDiffAnnotationParams,
 ) (DiffAnnotation, error) {
-
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
@@ -227,7 +217,6 @@ func (m *MockStore) UpdateDiffAnnotation(ctx context.Context,
 func (m *MockStore) DeleteDiffAnnotation(ctx context.Context,
 	annotationID string,
 ) error {
-
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
@@ -241,7 +230,6 @@ func (m *MockStore) DeleteDiffAnnotation(ctx context.Context,
 func (m *MockStore) DeleteDiffAnnotationsByMessage(ctx context.Context,
 	messageID int64,
 ) error {
-
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
