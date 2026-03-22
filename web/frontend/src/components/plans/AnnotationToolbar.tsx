@@ -2,7 +2,7 @@
 // buttons for creating different annotation types (comment, delete, replace,
 // insert). Positioned using the selection bounding rect via createPortal.
 
-import { useEffect, useRef, useCallback, useState } from 'react';
+import { useEffect, useRef, useCallback, useMemo } from 'react';
 import { createPortal } from 'react-dom';
 import { PlanAnnotationType } from '@/types/annotations.js';
 
@@ -20,15 +20,14 @@ export function AnnotationToolbar({
   onClose,
 }: AnnotationToolbarProps) {
   const toolbarRef = useRef<HTMLDivElement>(null);
-  const [position, setPosition] = useState({ top: 0, left: 0 });
 
   // Calculate position above the selection.
-  useEffect(() => {
+  const position = useMemo(() => {
     const toolbarHeight = 40;
     const gap = 8;
     const top = selectionRect.top + window.scrollY - toolbarHeight - gap;
     const left = selectionRect.left + selectionRect.width / 2;
-    setPosition({ top, left });
+    return { top, left };
   }, [selectionRect]);
 
   // Close on escape key.

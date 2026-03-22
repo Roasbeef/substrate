@@ -490,7 +490,7 @@ function InlineContent({ content }: { content: string }) {
     }
 
     // Consume one character or until next special character.
-    const nextSpecial = remaining.slice(1).search(/[\*`\[]/);
+    const nextSpecial = remaining.slice(1).search(/[*`[]/);
     if (nextSpecial === -1) {
       parts.push(remaining);
       break;
@@ -523,7 +523,7 @@ function TableContent({ content }: { content: string }) {
 
   for (let i = 1; i < lines.length; i++) {
     const line = lines[i]!.trim();
-    if (/^[\|\-:\s]+$/.test(line)) continue;
+    if (/^[|\-:\s]+$/.test(line)) continue;
     rows.push(parseRow(line));
   }
 

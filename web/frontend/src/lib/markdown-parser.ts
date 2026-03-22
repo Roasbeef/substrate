@@ -73,7 +73,7 @@ export function parseMarkdownToBlocks(markdown: string): Block[] {
 
   let buffer: string[] = [];
   let currentType: BlockType = 'paragraph';
-  let currentLevel = 0;
+  const currentLevel = 0;
   let bufferStartLine = 1;
 
   // flush pushes the accumulated buffer as a new block.

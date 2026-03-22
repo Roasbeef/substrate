@@ -28,7 +28,6 @@ export function DiffCommentPopover({
   lineStart,
   lineEnd,
   side,
-  originalCode: _originalCode,
   onSubmit,
   onClose,
 }: DiffCommentPopoverProps) {
