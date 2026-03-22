@@ -699,3 +699,128 @@ func (s *Server) handleWhoAmI(ctx context.Context,
 		ProjectKey: agent.ProjectKey,
 	}, nil
 }
+
+// ListAgentsArgs are the arguments for the list_agents tool.
+type ListAgentsArgs struct{}
+
+// AgentInfo is information about a registered agent.
+type AgentInfo struct {
+	ID         int64  `json:"id"`
+	Name       string `json:"name"`
+	ProjectKey string `json:"project_key,omitempty"`
+	GitBranch  string `json:"git_branch,omitempty"`
+}
+
+// ListAgentsResult is the result of the list_agents tool.
+type ListAgentsResult struct {
+	Agents []AgentInfo `json:"agents"`
+}
+
+// handleListAgents returns all registered agents.
+func (s *Server) handleListAgents(ctx context.Context,
+	req *mcp.CallToolRequest, args ListAgentsArgs,
+) (*mcp.CallToolResult, ListAgentsResult, error) {
+	agents, err := s.backend.ListAgents(ctx)
+	if err != nil {
+		return nil, ListAgentsResult{},
+			fmt.Errorf("failed to list agents: %w", err)
+	}
+
+	result := make([]AgentInfo, 0, len(agents))
+	for _, a := range agents {
+		result = append(result, AgentInfo{
+			ID:         a.ID,
+			Name:       a.Name,
+			ProjectKey: a.ProjectKey,
+			GitBranch:  a.GitBranch,
+		})
+	}
+
+	return nil, ListAgentsResult{Agents: result}, nil
+}
+
+// GetAgentByNameArgs are the arguments for the get_agent_by_name tool.
+type GetAgentByNameArgs struct {
+	Name string `json:"name" jsonschema:"Name of the agent to look up"`
+}
+
+// handleGetAgentByName looks up an agent by name instead of ID.
+func (s *Server) handleGetAgentByName(ctx context.Context,
+	req *mcp.CallToolRequest, args GetAgentByNameArgs,
+) (*mcp.CallToolResult, WhoAmIResult, error) {
+	agent, err := s.backend.GetAgentByName(ctx, args.Name)
+	if err != nil {
+		return nil, WhoAmIResult{},
+			fmt.Errorf("agent %q not found: %w", args.Name, err)
+	}
+
+	return nil, WhoAmIResult{
+		AgentID:    agent.ID,
+		AgentName:  agent.Name,
+		ProjectKey: agent.ProjectKey,
+	}, nil
+}
+
+// HeartbeatArgs are the arguments for the heartbeat tool.
+type HeartbeatArgs struct {
+	AgentID int64 `json:"agent_id" jsonschema:"ID of the agent sending the heartbeat"`
+}
+
+// HeartbeatResult is the result of the heartbeat tool.
+type HeartbeatResult struct {
+	Success bool `json:"success"`
+}
+
+// handleHeartbeat records a liveness signal for an agent.
+func (s *Server) handleHeartbeat(ctx context.Context,
+	req *mcp.CallToolRequest, args HeartbeatArgs,
+) (*mcp.CallToolResult, HeartbeatResult, error) {
+	if err := requireAgentID(args.AgentID); err != nil {
+		return nil, HeartbeatResult{}, err
+	}
+
+	err := s.backend.Heartbeat(ctx, args.AgentID)
+	if err != nil {
+		return nil, HeartbeatResult{},
+			fmt.Errorf("heartbeat failed: %w", err)
+	}
+
+	return nil, HeartbeatResult{Success: true}, nil
+}
+
+// ReadThreadArgs are the arguments for the read_thread tool.
+type ReadThreadArgs struct {
+	ThreadID string `json:"thread_id" jsonschema:"Thread ID to read all messages from"`
+}
+
+// ReadThreadResult is the result of the read_thread tool.
+type ReadThreadResult struct {
+	Messages []InboxMessageResult `json:"messages"`
+}
+
+// handleReadThread returns all messages in a conversation thread.
+func (s *Server) handleReadThread(ctx context.Context,
+	req *mcp.CallToolRequest, args ReadThreadArgs,
+) (*mcp.CallToolResult, ReadThreadResult, error) {
+	msgs, err := s.backend.ReadThread(ctx, args.ThreadID)
+	if err != nil {
+		return nil, ReadThreadResult{},
+			fmt.Errorf("failed to read thread: %w", err)
+	}
+
+	result := make([]InboxMessageResult, 0, len(msgs))
+	for _, m := range msgs {
+		result = append(result, InboxMessageResult{
+			ID:        m.ID,
+			ThreadID:  m.ThreadID,
+			SenderID:  m.SenderID,
+			Subject:   m.Subject,
+			Body:      m.Body,
+			Priority:  string(m.Priority),
+			State:     m.State,
+			CreatedAt: m.CreatedAt.Format(time.RFC3339),
+		})
+	}
+
+	return nil, ReadThreadResult{Messages: result}, nil
+}

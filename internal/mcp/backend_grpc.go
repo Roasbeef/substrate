@@ -375,6 +375,82 @@ func (b *GRPCBackend) GetAgent(ctx context.Context,
 	return ag, nil
 }
 
+// GetAgentByName retrieves an agent by name via the gRPC daemon.
+func (b *GRPCBackend) GetAgentByName(ctx context.Context,
+	name string,
+) (store.Agent, error) {
+	resp, err := b.agentClient.GetAgent(
+		ctx, &subtraterpc.GetAgentRequest{Name: name},
+	)
+	if err != nil {
+		return store.Agent{}, err
+	}
+
+	ag := store.Agent{
+		ID:         resp.Id,
+		Name:       resp.Name,
+		ProjectKey: resp.ProjectKey,
+		GitBranch:  resp.GitBranch,
+	}
+	if resp.LastActiveAt != nil {
+		ag.LastActiveAt = resp.LastActiveAt.AsTime()
+	}
+
+	return ag, nil
+}
+
+// ListAgents returns all registered agents via the gRPC daemon.
+func (b *GRPCBackend) ListAgents(
+	ctx context.Context,
+) ([]store.Agent, error) {
+	resp, err := b.agentClient.ListAgents(
+		ctx, &subtraterpc.ListAgentsRequest{},
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	agents := make([]store.Agent, len(resp.Agents))
+	for i, a := range resp.Agents {
+		agents[i] = store.Agent{
+			ID:         a.Id,
+			Name:       a.Name,
+			ProjectKey: a.ProjectKey,
+		}
+	}
+
+	return agents, nil
+}
+
+// Heartbeat updates the agent's last active timestamp via gRPC.
+func (b *GRPCBackend) Heartbeat(ctx context.Context,
+	agentID int64,
+) error {
+	_, err := b.agentClient.Heartbeat(
+		ctx, &subtraterpc.HeartbeatRequest{
+			AgentId: agentID,
+		},
+	)
+
+	return err
+}
+
+// ReadThread returns all messages in a thread via the gRPC daemon.
+func (b *GRPCBackend) ReadThread(ctx context.Context,
+	threadID string,
+) ([]mail.InboxMessage, error) {
+	resp, err := b.mailClient.ReadThread(
+		ctx, &subtraterpc.ReadThreadRequest{
+			ThreadId: threadID,
+		},
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	return protoToInboxMessages(resp.Messages), nil
+}
+
 // protoToStoreTopic converts a proto Topic to a store.Topic.
 func protoToStoreTopic(t *subtraterpc.Topic) store.Topic {
 	topic := store.Topic{

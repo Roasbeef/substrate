@@ -350,5 +350,57 @@ func (b *DirectBackend) GetAgent(ctx context.Context,
 	return b.storage.GetAgent(ctx, agentID)
 }
 
+// GetAgentByName retrieves an agent by name.
+func (b *DirectBackend) GetAgentByName(ctx context.Context,
+	name string,
+) (store.Agent, error) {
+	return b.storage.GetAgentByName(ctx, name)
+}
+
+// ListAgents returns all registered agents.
+func (b *DirectBackend) ListAgents(
+	ctx context.Context,
+) ([]store.Agent, error) {
+	return b.storage.ListAgents(ctx)
+}
+
+// Heartbeat updates the last active timestamp for an agent.
+func (b *DirectBackend) Heartbeat(ctx context.Context,
+	agentID int64,
+) error {
+	return b.storage.UpdateLastActive(
+		ctx, agentID, time.Now(),
+	)
+}
+
+// ReadThread returns all messages in a thread with sender info.
+func (b *DirectBackend) ReadThread(ctx context.Context,
+	threadID string,
+) ([]mail.InboxMessage, error) {
+	msgs, err := b.storage.GetMessagesByThreadWithSender(
+		ctx, threadID,
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	result := make([]mail.InboxMessage, 0, len(msgs))
+	for _, m := range msgs {
+		result = append(result, mail.InboxMessage{
+			ID:         m.ID,
+			ThreadID:   m.ThreadID,
+			TopicID:    m.TopicID,
+			SenderID:   m.SenderID,
+			SenderName: m.SenderName,
+			Subject:    m.Subject,
+			Body:       m.Body,
+			Priority:   mail.Priority(m.Priority),
+			CreatedAt:  m.CreatedAt,
+		})
+	}
+
+	return result, nil
+}
+
 // Compile-time interface check.
 var _ Backend = (*DirectBackend)(nil)

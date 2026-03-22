@@ -90,4 +90,20 @@ type Backend interface {
 	GetAgent(ctx context.Context,
 		agentID int64,
 	) (store.Agent, error)
+
+	// GetAgentByName retrieves an agent by name.
+	GetAgentByName(ctx context.Context,
+		name string,
+	) (store.Agent, error)
+
+	// ListAgents returns all registered agents.
+	ListAgents(ctx context.Context) ([]store.Agent, error)
+
+	// Heartbeat updates the last active timestamp for an agent.
+	Heartbeat(ctx context.Context, agentID int64) error
+
+	// ReadThread returns all messages in a thread ordered by time.
+	ReadThread(ctx context.Context,
+		threadID string,
+	) ([]mail.InboxMessage, error)
 }

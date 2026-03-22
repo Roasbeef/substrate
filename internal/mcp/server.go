@@ -171,4 +171,26 @@ func (s *Server) registerTools() {
 		Name:        "whoami",
 		Description: "Get the current agent identity",
 	}, s.handleWhoAmI)
+
+	// Extended agent tools.
+	mcp.AddTool(s.server, &mcp.Tool{
+		Name:        "list_agents",
+		Description: "List all registered agents with their metadata",
+	}, s.handleListAgents)
+
+	mcp.AddTool(s.server, &mcp.Tool{
+		Name:        "get_agent_by_name",
+		Description: "Look up an agent by name instead of ID",
+	}, s.handleGetAgentByName)
+
+	mcp.AddTool(s.server, &mcp.Tool{
+		Name:        "heartbeat",
+		Description: "Send a liveness heartbeat for an agent",
+	}, s.handleHeartbeat)
+
+	// Thread tools.
+	mcp.AddTool(s.server, &mcp.Tool{
+		Name:        "read_thread",
+		Description: "Read all messages in a conversation thread",
+	}, s.handleReadThread)
 }
