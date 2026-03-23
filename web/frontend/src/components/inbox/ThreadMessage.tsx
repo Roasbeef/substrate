@@ -202,24 +202,35 @@ export function ThreadMessage({
 
     const feedback = exportDiffAnnotations(diffAnnotations);
 
-    // Post the review feedback as a mail reply in the thread.
-    // Uses the substrate send API via fetch to the grpc-gateway.
-    // Post review feedback as a reply in the thread. The sender_id
-    // is intentionally omitted so the server resolves the current
-    // user's agent identity rather than impersonating the original
-    // message sender.
+    // Send review feedback as a mail reply in the thread to the
+    // original sender. Uses the SendMail gRPC endpoint.
+    const senderName = message.sender_name || 'User';
+    console.log(
+      '[Review] Submitting review with',
+      diffAnnotations.length, 'annotations to', senderName,
+    );
     fetch('/api/v1/messages', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
+        recipient_names: [senderName],
         thread_id: message.thread_id,
         subject: `Re: ${message.subject} [Code Review]`,
         body: feedback,
-        priority: 'normal',
+        priority: 'NORMAL',
       }),
-    }).catch((err) => {
-      console.error('Failed to submit review:', err);
-    });
+    })
+      .then((res) => {
+        if (!res.ok) {
+          return res.text().then((t) => {
+            console.error('[Review] Submit failed:', res.status, t);
+          });
+        }
+        console.log('[Review] Review submitted successfully');
+      })
+      .catch((err) => {
+        console.error('[Review] Submit failed:', err);
+      });
   }, [diffAnnotations, message]);
 
   return (

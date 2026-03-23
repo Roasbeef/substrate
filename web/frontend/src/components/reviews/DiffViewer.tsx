@@ -134,16 +134,12 @@ export function DiffViewer({
     [reviewMode, onAddAnnotation],
   );
 
-  const options = useMemo(() => ({
+  const baseOptions = useMemo(() => ({
     diffStyle,
     theme: 'pierre-dark' as const,
     diffIndicators: 'classic' as const,
     disableLineNumbers: false,
-    ...(reviewMode ? {
-      enableLineSelection: true,
-      enableHoverUtility: true,
-    } : {}),
-  }), [diffStyle, reviewMode]);
+  }), [diffStyle]);
 
   // Convert our DiffAnnotation[] to @pierre/diffs lineAnnotations format.
   const getFileLineAnnotations = useCallback(
@@ -416,12 +412,19 @@ export function DiffViewer({
           <FileDiff
             fileDiff={fileDiff}
             options={reviewMode ? {
-              ...options,
-              onLineSelectionEnd: (range: { start: number; end: number; side?: string } | null) => {
+              ...baseOptions,
+              enableGutterUtility: true,
+              enableLineSelection: true,
+              onGutterUtilityClick: (range: { start: number; end: number; side?: string }) => {
                 const fp = cleanPath(fileDiff.name ?? fileDiff.prevName ?? `file-${idx}`);
                 handleLineSelectionEnd(range, fp);
               },
-            } : options}
+              onLineSelectionEnd: (range: { start: number; end: number; side?: string } | null) => {
+                if (!range) return;
+                const fp = cleanPath(fileDiff.name ?? fileDiff.prevName ?? `file-${idx}`);
+                handleLineSelectionEnd(range, fp);
+              },
+            } : baseOptions}
             {...(reviewMode ? {
               lineAnnotations: getFileLineAnnotations(
                 cleanPath(fileDiff.name ?? fileDiff.prevName ?? `file-${idx}`),
@@ -437,30 +440,6 @@ export function DiffViewer({
                 />
               ),
             } : {})}
-            {...(reviewMode ? { renderGutterUtility: (getHoveredLine: () => { lineNumber: number; side: string } | undefined) => {
-              const line = getHoveredLine();
-              if (!line) return null;
-              return (
-                <button
-                  style={{
-                    background: 'none', border: 'none', cursor: 'pointer',
-                    color: '#60a5fa', fontSize: '14px', fontWeight: 'bold',
-                    padding: '0 4px', lineHeight: '1',
-                  }}
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    const fp = cleanPath(fileDiff.name ?? fileDiff.prevName ?? `file-${idx}`);
-                    handleLineSelectionEnd({
-                      start: line.lineNumber,
-                      end: line.lineNumber,
-                      side: line.side,
-                    }, fp);
-                  }}
-                >
-                  +
-                </button>
-              );
-            }} : {})}
           />
         </div>
       ))}
