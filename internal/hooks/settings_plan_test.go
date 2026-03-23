@@ -14,7 +14,7 @@ func TestInstallPlanHooks(t *testing.T) {
 
 	InstallPlanHooks(settings)
 
-	// Should have PostToolUse and PreToolUse entries.
+	// Should have PostToolUse and PermissionRequest entries.
 	postEntries, ok := settings.Hooks["PostToolUse"]
 	require.True(t, ok, "PostToolUse should be present")
 	require.Len(t, postEntries, 1)
@@ -23,8 +23,8 @@ func TestInstallPlanHooks(t *testing.T) {
 		"posttooluse_plan.sh",
 	)
 
-	preEntries, ok := settings.Hooks["PreToolUse"]
-	require.True(t, ok, "PreToolUse should be present")
+	preEntries, ok := settings.Hooks["PermissionRequest"]
+	require.True(t, ok, "PermissionRequest should be present")
 	require.Len(t, preEntries, 1)
 	require.Equal(t, "ExitPlanMode", preEntries[0].Matcher)
 	require.Contains(t, preEntries[0].Hooks[0].Command,
@@ -44,7 +44,7 @@ func TestInstallPlanHooksIdempotent(t *testing.T) {
 
 	// Should still have exactly one entry per event.
 	require.Len(t, settings.Hooks["PostToolUse"], 1)
-	require.Len(t, settings.Hooks["PreToolUse"], 1)
+	require.Len(t, settings.Hooks["PermissionRequest"], 1)
 }
 
 // TestInstallPlanHooksPreservesExisting verifies existing hooks are kept.
@@ -88,9 +88,9 @@ func TestUninstallPlanHooks(t *testing.T) {
 
 	// Events with no remaining hooks should be removed.
 	_, hasPost := settings.Hooks["PostToolUse"]
-	_, hasPre := settings.Hooks["PreToolUse"]
+	_, hasPre := settings.Hooks["PermissionRequest"]
 	require.False(t, hasPost, "PostToolUse should be removed")
-	require.False(t, hasPre, "PreToolUse should be removed")
+	require.False(t, hasPre, "PermissionRequest should be removed")
 }
 
 // TestUninstallPlanHooksPreservesOthers verifies non-plan hooks survive.
@@ -193,7 +193,7 @@ func TestPlanHookDefinitions(t *testing.T) {
 	require.True(t, ok)
 	require.Equal(t, "Write", postDef.Matcher)
 
-	preDef, ok := PlanHookDefinitions["PreToolUse"]
+	preDef, ok := PlanHookDefinitions["PermissionRequest"]
 	require.True(t, ok)
 	require.Equal(t, "ExitPlanMode", preDef.Matcher)
 	require.Equal(t, 345600, preDef.Hooks[0].Timeout)
