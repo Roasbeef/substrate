@@ -217,7 +217,7 @@ export function ThreadMessage({
         thread_id: message.thread_id,
         subject: `Re: ${message.subject} [Code Review]`,
         body: feedback,
-        priority: 'NORMAL',
+        priority: 'PRIORITY_NORMAL',
       }),
     })
       .then((res) => {
