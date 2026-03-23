@@ -430,6 +430,30 @@ export function DiffViewer({
                 cleanPath(fileDiff.name ?? fileDiff.prevName ?? `file-${idx}`),
                 annotations,
               ),
+              renderGutterUtility: (getHoveredLine: () => { lineNumber: number; side: string } | undefined) => {
+                const line = getHoveredLine();
+                if (!line) return null;
+                return (
+                  <button
+                    style={{
+                      background: 'none', border: 'none', cursor: 'pointer',
+                      color: '#60a5fa', fontSize: '16px', fontWeight: 'bold',
+                      padding: '0 4px', lineHeight: '1',
+                    }}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      const fp = cleanPath(fileDiff.name ?? fileDiff.prevName ?? `file-${idx}`);
+                      handleLineSelectionEnd({
+                        start: line.lineNumber,
+                        end: line.lineNumber,
+                        side: line.side,
+                      }, fp);
+                    }}
+                  >
+                    +
+                  </button>
+                );
+              },
             } : {})}
             {...(reviewMode && onUpdateAnnotation && onDeleteAnnotation ? {
               renderAnnotation: (ann: DiffLineAnnotation<DiffAnnotation>) => (
