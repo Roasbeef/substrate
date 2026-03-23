@@ -134,11 +134,16 @@ export function DiffViewer({
     [reviewMode, onAddAnnotation],
   );
 
+  // Always enable gutter utility and line selection so the shadow DOM
+  // elements are created on first render. The renderGutterUtility prop
+  // and callbacks are only wired up when reviewMode is true.
   const baseOptions = useMemo(() => ({
     diffStyle,
     theme: 'pierre-dark' as const,
     diffIndicators: 'classic' as const,
     disableLineNumbers: false,
+    enableGutterUtility: true,
+    enableLineSelection: true,
   }), [diffStyle]);
 
   // Convert our DiffAnnotation[] to @pierre/diffs lineAnnotations format.
@@ -413,8 +418,6 @@ export function DiffViewer({
             fileDiff={fileDiff}
             options={reviewMode ? {
               ...baseOptions,
-              enableGutterUtility: true,
-              enableLineSelection: true,
               onGutterUtilityClick: (range: { start: number; end: number; side?: string }) => {
                 const fp = cleanPath(fileDiff.name ?? fileDiff.prevName ?? `file-${idx}`);
                 handleLineSelectionEnd(range, fp);
