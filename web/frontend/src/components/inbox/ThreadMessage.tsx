@@ -11,6 +11,8 @@ import { Spinner } from '@/components/ui/Spinner.js';
 import type { Message, MessageWithRecipients } from '@/types/api.js';
 import type { DiffAnnotation } from '@/types/annotations.js';
 import { useAnnotationStore } from '@/stores/annotations.js';
+import { useAuthStore } from '@/stores/auth.js';
+import { sendMessage } from '@/api/messages.js';
 import { exportDiffAnnotations } from '@/lib/feedback-export.js';
 import { formatAgentDisplayName, getAgentContext } from '@/lib/utils.js';
 
@@ -201,31 +203,24 @@ export function ThreadMessage({
     if (diffAnnotations.length === 0) return;
 
     const feedback = exportDiffAnnotations(diffAnnotations);
-
-    // Send review feedback as a mail reply in the thread to the
-    // original sender. Uses the SendMail gRPC endpoint.
+    const currentAgent = useAuthStore.getState().currentAgent;
     const senderName = message.sender_name || 'User';
+
     console.log(
       '[Review] Submitting review with',
       diffAnnotations.length, 'annotations to', senderName,
+      'from agent', currentAgent?.name, '(id:', currentAgent?.id, ')',
     );
-    fetch('/api/v1/messages', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        recipient_names: [senderName],
-        thread_id: message.thread_id,
-        subject: `Re: ${message.subject} [Code Review]`,
-        body: feedback,
-        priority: 'PRIORITY_NORMAL',
-      }),
+
+    sendMessage({
+      sender_id: currentAgent?.id ?? 0,
+      recipient_names: [senderName],
+      ...(message.thread_id ? { thread_id: message.thread_id } : {}),
+      subject: `Re: ${message.subject} [Code Review]`,
+      body: feedback,
+      priority: 'PRIORITY_NORMAL',
     })
-      .then((res) => {
-        if (!res.ok) {
-          return res.text().then((t) => {
-            console.error('[Review] Submit failed:', res.status, t);
-          });
-        }
+      .then(() => {
         console.log('[Review] Review submitted successfully');
       })
       .catch((err) => {
