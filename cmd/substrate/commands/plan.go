@@ -432,9 +432,20 @@ func runPlanSubmit(cmd *cobra.Command, args []string) error {
 		summary = extractRegexSummary(content)
 	}
 
-	// Send mail to reviewer.
+	// Generate the plan review ID early so we can include a link in
+	// the mail body. V7 UUID failure is non-fatal since the function
+	// returns a valid V4 fallback.
+	prID, err := newPlanReviewID()
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Warning: %v\n", err)
+	}
+
+	// Send mail to reviewer with a link to the plan review page.
 	subject := cleanSubject(fmt.Sprintf("[PLAN] %s", title))
 	body := formatPlanMessage(content, planPath, summary)
+	body += fmt.Sprintf(
+		"\n\n---\n[Review this plan](/plans/%s)\n", prID,
+	)
 
 	msgID, threadID, err := client.SendMail(ctx, mail.SendMailRequest{
 		SenderID:       agentID,
@@ -445,13 +456,6 @@ func runPlanSubmit(cmd *cobra.Command, args []string) error {
 	})
 	if err != nil {
 		return fmt.Errorf("send plan mail: %w", err)
-	}
-
-	// Create plan review record. V7 UUID failure is non-fatal since
-	// the function returns a valid V4 fallback.
-	prID, err := newPlanReviewID()
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "Warning: %v\n", err)
 	}
 
 	review, err := client.CreatePlanReview(
