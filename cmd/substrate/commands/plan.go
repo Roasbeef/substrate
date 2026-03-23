@@ -743,16 +743,12 @@ func outputPlanDecision(review store.PlanReview) error {
 func outputHookDecision(review store.PlanReview) error {
 	switch review.State {
 	case "approved":
-		comment := "Plan approved."
-		if review.ReviewerComment != "" {
-			comment = fmt.Sprintf(
-				"Plan approved: %s", review.ReviewerComment,
-			)
-		}
 		return outputJSON(map[string]any{
 			"hookSpecificOutput": map[string]any{
-				"permissionDecision": "allow",
-				"additionalContext":  comment,
+				"hookEventName": "PermissionRequest",
+				"decision": map[string]any{
+					"behavior": "allow",
+				},
 			},
 		})
 
@@ -766,8 +762,11 @@ func outputHookDecision(review store.PlanReview) error {
 		}
 		return outputJSON(map[string]any{
 			"hookSpecificOutput": map[string]any{
-				"permissionDecision":       "deny",
-				"permissionDecisionReason": reason,
+				"hookEventName": "PermissionRequest",
+				"decision": map[string]any{
+					"behavior": "deny",
+					"message":  reason,
+				},
 			},
 		})
 
@@ -782,9 +781,12 @@ func outputPlanTimeout(review store.PlanReview) error {
 	case "hook":
 		return outputJSON(map[string]any{
 			"hookSpecificOutput": map[string]any{
-				"permissionDecision": "deny",
-				"permissionDecisionReason": "Plan still pending " +
-					"review. Waiting for approval...",
+				"hookEventName": "PermissionRequest",
+				"decision": map[string]any{
+					"behavior": "deny",
+					"message": "Plan still pending " +
+						"review. Waiting for approval...",
+				},
 			},
 		})
 	case "json":

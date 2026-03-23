@@ -71,6 +71,6 @@ fi
     --timeout 96h \
     --format hook 2>/dev/null || {
     # Wait failed — deny to be safe.
-    echo '{"hookSpecificOutput":{"permissionDecision":"deny","permissionDecisionReason":"Plan review check failed. Retry ExitPlanMode."}}'
+    echo '{"hookSpecificOutput":{"hookEventName":"PermissionRequest","decision":{"behavior":"deny","message":"Plan review check failed. Retry ExitPlanMode."}}}'
     exit 0
 }
