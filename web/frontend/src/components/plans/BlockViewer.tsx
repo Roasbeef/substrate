@@ -52,10 +52,14 @@ export function BlockViewer({
     const selectedText = selection.toString().trim();
     if (!selectedText) return;
 
-    // Find the block element containing the selection.
-    const blockEl = (range.startContainer as HTMLElement).closest?.(
-      '[data-block-id]',
-    ) ?? (range.startContainer.parentElement?.closest?.('[data-block-id]'));
+    // Find the block element containing the selection. The
+    // startContainer is usually a text node, so walk up to the nearest
+    // element before calling closest().
+    const startNode = range.startContainer;
+    const startEl = startNode.nodeType === Node.TEXT_NODE
+      ? startNode.parentElement
+      : startNode as HTMLElement;
+    const blockEl = startEl?.closest?.('[data-block-id]');
     if (!blockEl) return;
 
     const blockId = blockEl.getAttribute('data-block-id');
