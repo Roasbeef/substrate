@@ -43,7 +43,8 @@ var validSides = map[string]bool{
 }
 
 // validDiffContexts are the allowed diff_context values for plan
-// annotations.
+// annotations. The empty string maps to SQL NULL via ToSqlcNullString
+// before insertion, so it satisfies the DB CHECK constraint.
 var validDiffContexts = map[string]bool{
 	"": true, "added": true, "removed": true, "modified": true,
 }
@@ -129,6 +130,11 @@ func (s *Server) CreatePlanAnnotation(
 	if req.AnnotationId == "" {
 		return nil, status.Error(
 			codes.InvalidArgument, "annotation_id is required",
+		)
+	}
+	if req.BlockId == "" {
+		return nil, status.Error(
+			codes.InvalidArgument, "block_id is required",
 		)
 	}
 	if req.StartOffset < 0 || req.EndOffset < 0 {
@@ -226,6 +232,12 @@ func (s *Server) UpdatePlanAnnotation(
 		return nil, status.Error(
 			codes.InvalidArgument,
 			"end_offset must be >= start_offset",
+		)
+	}
+	if !validDiffContexts[req.DiffContext] {
+		return nil, status.Errorf(
+			codes.InvalidArgument,
+			"invalid diff_context: %q", req.DiffContext,
 		)
 	}
 	for _, check := range []struct{ field, val string }{
