@@ -776,6 +776,7 @@ type FetchInboxRequest struct {
 	// sender_name_prefix filters to messages from agents whose name starts with
 	// this prefix (e.g., "reviewer-" for CodeReviewer aggregate).
 	SenderNamePrefix string `protobuf:"bytes,6,opt,name=sender_name_prefix,json=senderNamePrefix,proto3" json:"sender_name_prefix,omitempty"`
+	Offset           int32  `protobuf:"varint,7,opt,name=offset,proto3" json:"offset,omitempty"` // Number of messages to skip for pagination
 	unknownFields    protoimpl.UnknownFields
 	sizeCache        protoimpl.SizeCache
 }
@@ -850,6 +851,13 @@ func (x *FetchInboxRequest) GetSenderNamePrefix() string {
 		return x.SenderNamePrefix
 	}
 	return ""
+}
+
+func (x *FetchInboxRequest) GetOffset() int32 {
+	if x != nil {
+		return x.Offset
+	}
+	return 0
 }
 
 // FetchInboxResponse is the response for FetchInbox.
@@ -2320,6 +2328,7 @@ type RegisterAgentRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Name          string                 `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`
 	ProjectKey    string                 `protobuf:"bytes,2,opt,name=project_key,json=projectKey,proto3" json:"project_key,omitempty"` // Optional project binding
+	GitBranch     string                 `protobuf:"bytes,3,opt,name=git_branch,json=gitBranch,proto3" json:"git_branch,omitempty"`    // Optional git branch name
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -2368,11 +2377,20 @@ func (x *RegisterAgentRequest) GetProjectKey() string {
 	return ""
 }
 
+func (x *RegisterAgentRequest) GetGitBranch() string {
+	if x != nil {
+		return x.GitBranch
+	}
+	return ""
+}
+
 // RegisterAgentResponse is the response for RegisterAgent.
 type RegisterAgentResponse struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	AgentId       int64                  `protobuf:"varint,1,opt,name=agent_id,json=agentId,proto3" json:"agent_id,omitempty"`
 	Name          string                 `protobuf:"bytes,2,opt,name=name,proto3" json:"name,omitempty"`
+	ProjectKey    string                 `protobuf:"bytes,3,opt,name=project_key,json=projectKey,proto3" json:"project_key,omitempty"`
+	GitBranch     string                 `protobuf:"bytes,4,opt,name=git_branch,json=gitBranch,proto3" json:"git_branch,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -2417,6 +2435,20 @@ func (x *RegisterAgentResponse) GetAgentId() int64 {
 func (x *RegisterAgentResponse) GetName() string {
 	if x != nil {
 		return x.Name
+	}
+	return ""
+}
+
+func (x *RegisterAgentResponse) GetProjectKey() string {
+	if x != nil {
+		return x.ProjectKey
+	}
+	return ""
+}
+
+func (x *RegisterAgentResponse) GetGitBranch() string {
+	if x != nil {
+		return x.GitBranch
 	}
 	return ""
 }
@@ -10857,7 +10889,7 @@ const file_mail_proto_rawDesc = "" +
 	"\x10SendMailResponse\x12\x1d\n" +
 	"\n" +
 	"message_id\x18\x01 \x01(\x03R\tmessageId\x12\x1b\n" +
-	"\tthread_id\x18\x02 \x01(\tR\bthreadId\"\xee\x01\n" +
+	"\tthread_id\x18\x02 \x01(\tR\bthreadId\"\x86\x02\n" +
 	"\x11FetchInboxRequest\x12\x19\n" +
 	"\bagent_id\x18\x01 \x01(\x03R\aagentId\x12\x14\n" +
 	"\x05limit\x18\x02 \x01(\x05R\x05limit\x12\x1f\n" +
@@ -10865,7 +10897,8 @@ const file_mail_proto_rawDesc = "" +
 	"unreadOnly\x12<\n" +
 	"\fstate_filter\x18\x04 \x01(\x0e2\x19.subtraterpc.MessageStateR\vstateFilter\x12\x1b\n" +
 	"\tsent_only\x18\x05 \x01(\bR\bsentOnly\x12,\n" +
-	"\x12sender_name_prefix\x18\x06 \x01(\tR\x10senderNamePrefix\"K\n" +
+	"\x12sender_name_prefix\x18\x06 \x01(\tR\x10senderNamePrefix\x12\x16\n" +
+	"\x06offset\x18\a \x01(\x05R\x06offset\"K\n" +
 	"\x12FetchInboxResponse\x125\n" +
 	"\bmessages\x18\x01 \x03(\v2\x19.subtraterpc.InboxMessageR\bmessages\"N\n" +
 	"\x12ReadMessageRequest\x12\x19\n" +
@@ -10968,14 +11001,20 @@ const file_mail_proto_rawDesc = "" +
 	"\frecipient_id\x18\x02 \x01(\x03R\vrecipientId\"=\n" +
 	"\x1aHasUnackedStatusToResponse\x12\x1f\n" +
 	"\vhas_pending\x18\x01 \x01(\bR\n" +
-	"hasPending\"K\n" +
+	"hasPending\"j\n" +
 	"\x14RegisterAgentRequest\x12\x12\n" +
 	"\x04name\x18\x01 \x01(\tR\x04name\x12\x1f\n" +
 	"\vproject_key\x18\x02 \x01(\tR\n" +
-	"projectKey\"F\n" +
+	"projectKey\x12\x1d\n" +
+	"\n" +
+	"git_branch\x18\x03 \x01(\tR\tgitBranch\"\x86\x01\n" +
 	"\x15RegisterAgentResponse\x12\x19\n" +
 	"\bagent_id\x18\x01 \x01(\x03R\aagentId\x12\x12\n" +
-	"\x04name\x18\x02 \x01(\tR\x04name\"@\n" +
+	"\x04name\x18\x02 \x01(\tR\x04name\x12\x1f\n" +
+	"\vproject_key\x18\x03 \x01(\tR\n" +
+	"projectKey\x12\x1d\n" +
+	"\n" +
+	"git_branch\x18\x04 \x01(\tR\tgitBranch\"@\n" +
 	"\x0fGetAgentRequest\x12\x19\n" +
 	"\bagent_id\x18\x01 \x01(\x03R\aagentId\x12\x12\n" +
 	"\x04name\x18\x02 \x01(\tR\x04name\"\x92\x02\n" +
