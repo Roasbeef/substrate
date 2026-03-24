@@ -146,7 +146,7 @@ export function exportDiffAnnotations(
           output += `${truncateText(ann.text)}\n`;
         }
         if (ann.suggestedCode) {
-          output += `\n**Suggested code:**\n\`\`\`\n${ann.suggestedCode}\n\`\`\`\n`;
+          output += `\n**Suggested code:**\n\`\`\`\n${escapeCodeFence(truncateText(ann.suggestedCode))}\n\`\`\`\n`;
         }
         output += '\n';
         continue;
