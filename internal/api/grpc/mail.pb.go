@@ -2389,6 +2389,8 @@ type RegisterAgentResponse struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	AgentId       int64                  `protobuf:"varint,1,opt,name=agent_id,json=agentId,proto3" json:"agent_id,omitempty"`
 	Name          string                 `protobuf:"bytes,2,opt,name=name,proto3" json:"name,omitempty"`
+	ProjectKey    string                 `protobuf:"bytes,3,opt,name=project_key,json=projectKey,proto3" json:"project_key,omitempty"`
+	GitBranch     string                 `protobuf:"bytes,4,opt,name=git_branch,json=gitBranch,proto3" json:"git_branch,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -2433,6 +2435,20 @@ func (x *RegisterAgentResponse) GetAgentId() int64 {
 func (x *RegisterAgentResponse) GetName() string {
 	if x != nil {
 		return x.Name
+	}
+	return ""
+}
+
+func (x *RegisterAgentResponse) GetProjectKey() string {
+	if x != nil {
+		return x.ProjectKey
+	}
+	return ""
+}
+
+func (x *RegisterAgentResponse) GetGitBranch() string {
+	if x != nil {
+		return x.GitBranch
 	}
 	return ""
 }
@@ -10006,10 +10022,14 @@ const file_mail_proto_rawDesc = "" +
 	"\vproject_key\x18\x02 \x01(\tR\n" +
 	"projectKey\x12\x1d\n" +
 	"\n" +
-	"git_branch\x18\x03 \x01(\tR\tgitBranch\"F\n" +
+	"git_branch\x18\x03 \x01(\tR\tgitBranch\"\x86\x01\n" +
 	"\x15RegisterAgentResponse\x12\x19\n" +
 	"\bagent_id\x18\x01 \x01(\x03R\aagentId\x12\x12\n" +
-	"\x04name\x18\x02 \x01(\tR\x04name\"@\n" +
+	"\x04name\x18\x02 \x01(\tR\x04name\x12\x1f\n" +
+	"\vproject_key\x18\x03 \x01(\tR\n" +
+	"projectKey\x12\x1d\n" +
+	"\n" +
+	"git_branch\x18\x04 \x01(\tR\tgitBranch\"@\n" +
 	"\x0fGetAgentRequest\x12\x19\n" +
 	"\bagent_id\x18\x01 \x01(\x03R\aagentId\x12\x12\n" +
 	"\x04name\x18\x02 \x01(\tR\x04name\"\x92\x02\n" +

@@ -5,6 +5,7 @@ import (
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 	"github.com/roasbeef/subtrate/internal/agent"
+	"github.com/roasbeef/subtrate/internal/build"
 	"github.com/roasbeef/subtrate/internal/db"
 	"github.com/roasbeef/subtrate/internal/mail"
 	"github.com/roasbeef/subtrate/internal/store"
@@ -52,7 +53,7 @@ func NewServerWithConfig(cfg Config) *Server {
 func NewServerWithBackend(backend Backend) *Server {
 	mcpServer := mcp.NewServer(&mcp.Implementation{
 		Name:    "subtrate",
-		Version: "0.1.0",
+		Version: build.Version(),
 	}, nil)
 
 	s := &Server{

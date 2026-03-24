@@ -181,7 +181,9 @@ func serveStreamableHTTP(
 		)
 		defer shutdownCancel()
 
-		httpServer.Shutdown(shutdownCtx)
+		if err := httpServer.Shutdown(shutdownCtx); err != nil {
+			log.Printf("HTTP server shutdown error: %v", err)
+		}
 	}()
 
 	fmt.Fprintf(os.Stderr,

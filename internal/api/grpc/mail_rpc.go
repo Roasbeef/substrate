@@ -1171,8 +1171,10 @@ func (s *Server) RegisterAgent(ctx context.Context, req *RegisterAgentRequest) (
 	}
 
 	return &RegisterAgentResponse{
-		AgentId: agent.ID,
-		Name:    agent.Name,
+		AgentId:    agent.ID,
+		Name:       agent.Name,
+		ProjectKey: agent.ProjectKey.String,
+		GitBranch:  agent.GitBranch.String,
 	}, nil
 }
 

@@ -346,8 +346,10 @@ func (b *GRPCBackend) RegisterAgent(ctx context.Context,
 	}
 
 	return store.Agent{
-		ID:   resp.AgentId,
-		Name: resp.Name,
+		ID:         resp.AgentId,
+		Name:       resp.Name,
+		ProjectKey: resp.ProjectKey,
+		GitBranch:  resp.GitBranch,
 	}, nil
 }
 

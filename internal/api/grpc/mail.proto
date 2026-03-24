@@ -468,6 +468,8 @@ message RegisterAgentRequest {
 message RegisterAgentResponse {
     int64 agent_id = 1;
     string name = 2;
+    string project_key = 3;
+    string git_branch = 4;
 }
 
 // GetAgentRequest is the request for GetAgent.

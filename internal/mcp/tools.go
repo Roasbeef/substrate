@@ -95,14 +95,15 @@ type FetchInboxResult struct {
 
 // InboxMessageResult is a message in the inbox.
 type InboxMessageResult struct {
-	ID        int64  `json:"id"`
-	ThreadID  string `json:"thread_id"`
-	SenderID  int64  `json:"sender_id"`
-	Subject   string `json:"subject"`
-	Body      string `json:"body,omitempty"`
-	Priority  string `json:"priority"`
-	State     string `json:"state"`
-	CreatedAt string `json:"created_at"`
+	ID         int64  `json:"id"`
+	ThreadID   string `json:"thread_id"`
+	SenderID   int64  `json:"sender_id"`
+	SenderName string `json:"sender_name,omitempty"`
+	Subject    string `json:"subject"`
+	Body       string `json:"body,omitempty"`
+	Priority   string `json:"priority"`
+	State      string `json:"state"`
+	CreatedAt  string `json:"created_at"`
 }
 
 // handleFetchInbox retrieves inbox messages for an agent with pagination.
@@ -130,13 +131,14 @@ func (s *Server) handleFetchInbox(ctx context.Context,
 	messages := make([]InboxMessageResult, 0, len(resp.Messages))
 	for _, m := range resp.Messages {
 		messages = append(messages, InboxMessageResult{
-			ID:        m.ID,
-			ThreadID:  m.ThreadID,
-			SenderID:  m.SenderID,
-			Subject:   m.Subject,
-			Priority:  string(m.Priority),
-			State:     m.State,
-			CreatedAt: m.CreatedAt.Format(time.RFC3339),
+			ID:         m.ID,
+			ThreadID:   m.ThreadID,
+			SenderID:   m.SenderID,
+			SenderName: m.SenderName,
+			Subject:    m.Subject,
+			Priority:   string(m.Priority),
+			State:      m.State,
+			CreatedAt:  m.CreatedAt.Format(time.RFC3339),
 		})
 	}
 
@@ -627,12 +629,13 @@ func (s *Server) handlePollChanges(ctx context.Context,
 	messages := make([]InboxMessageResult, 0, len(resp.NewMessages))
 	for _, m := range resp.NewMessages {
 		messages = append(messages, InboxMessageResult{
-			ID:        m.ID,
-			ThreadID:  m.ThreadID,
-			SenderID:  m.SenderID,
-			Subject:   m.Subject,
-			Priority:  string(m.Priority),
-			CreatedAt: m.CreatedAt.Format(time.RFC3339),
+			ID:         m.ID,
+			ThreadID:   m.ThreadID,
+			SenderID:   m.SenderID,
+			SenderName: m.SenderName,
+			Subject:    m.Subject,
+			Priority:   string(m.Priority),
+			CreatedAt:  m.CreatedAt.Format(time.RFC3339),
 		})
 	}
 
@@ -819,14 +822,15 @@ func (s *Server) handleReadThread(ctx context.Context,
 	result := make([]InboxMessageResult, 0, len(msgs))
 	for _, m := range msgs {
 		result = append(result, InboxMessageResult{
-			ID:        m.ID,
-			ThreadID:  m.ThreadID,
-			SenderID:  m.SenderID,
-			Subject:   m.Subject,
-			Body:      m.Body,
-			Priority:  string(m.Priority),
-			State:     m.State,
-			CreatedAt: m.CreatedAt.Format(time.RFC3339),
+			ID:         m.ID,
+			ThreadID:   m.ThreadID,
+			SenderID:   m.SenderID,
+			SenderName: m.SenderName,
+			Subject:    m.Subject,
+			Body:       m.Body,
+			Priority:   string(m.Priority),
+			State:      m.State,
+			CreatedAt:  m.CreatedAt.Format(time.RFC3339),
 		})
 	}
 
