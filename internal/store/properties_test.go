@@ -71,7 +71,7 @@ func TestMessageDeliveryInvariant(t *testing.T) {
 
 		// PROPERTY: Message reaches ALL recipients.
 		for _, r := range recipients {
-			inbox, err := store.GetInboxMessages(ctx, r.ID, 100)
+			inbox, err := store.GetInboxMessages(ctx, r.ID, 100, 0)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -271,7 +271,7 @@ func TestUnreadCountInvariant(t *testing.T) {
 
 		// Mark some as read.
 		numToRead := rapid.IntRange(0, numMessages).Draw(t, "numToRead")
-		inbox, _ := store.GetInboxMessages(ctx, recipient.ID, 100)
+		inbox, _ := store.GetInboxMessages(ctx, recipient.ID, 100, 0)
 
 		for i := 0; i < numToRead && i < len(inbox); i++ {
 			_ = store.MarkMessageRead(ctx, inbox[i].ID, recipient.ID)

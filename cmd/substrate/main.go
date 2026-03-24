@@ -1,7 +1,6 @@
 package main
 
 import (
-	"fmt"
 	"os"
 
 	"github.com/roasbeef/subtrate/cmd/substrate/commands"
@@ -9,7 +8,7 @@ import (
 
 func main() {
 	if err := commands.Execute(); err != nil {
-		fmt.Fprintln(os.Stderr, err)
-		os.Exit(1)
+		exitCode := commands.OutputError(err)
+		os.Exit(exitCode)
 	}
 }

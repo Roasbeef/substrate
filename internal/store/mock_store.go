@@ -236,7 +236,7 @@ func (m *MockStore) GetMessagesByThreadWithSender(
 }
 
 func (m *MockStore) GetInboxMessages(
-	ctx context.Context, agentID int64, limit int,
+	ctx context.Context, agentID int64, limit, offset int,
 ) ([]InboxMessage, error) {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
@@ -265,7 +265,7 @@ func (m *MockStore) GetInboxMessages(
 }
 
 func (m *MockStore) GetUnreadMessages(
-	ctx context.Context, agentID int64, limit int,
+	ctx context.Context, agentID int64, limit, offset int,
 ) ([]InboxMessage, error) {
 	m.mu.RLock()
 	defer m.mu.RUnlock()

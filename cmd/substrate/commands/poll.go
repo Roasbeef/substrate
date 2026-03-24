@@ -233,15 +233,15 @@ func formatHookReason(msgs []mail.InboxMessage, urgentCount int) string {
 	var sb strings.Builder
 
 	if urgentCount > 0 {
-		sb.WriteString(fmt.Sprintf(
+		fmt.Fprintf(&sb,
 			"You have %d unread messages (%d URGENT):\n",
 			len(msgs), urgentCount,
-		))
+		)
 	} else {
-		sb.WriteString(fmt.Sprintf(
+		fmt.Fprintf(&sb,
 			"You have %d unread messages:\n",
 			len(msgs),
-		))
+		)
 	}
 
 	// List up to 5 messages.
@@ -257,12 +257,12 @@ func formatHookReason(msgs []mail.InboxMessage, urgentCount int) string {
 		if senderDisplay == "" {
 			senderDisplay = fmt.Sprintf("Agent#%d", msg.SenderID)
 		}
-		sb.WriteString(fmt.Sprintf("From: %s - %q", senderDisplay, msg.Subject))
+		fmt.Fprintf(&sb, "From: %s - %q", senderDisplay, msg.Subject)
 		if msg.Deadline != nil {
 			remaining := time.Until(*msg.Deadline)
 			if remaining > 0 {
-				sb.WriteString(fmt.Sprintf(" (deadline: %s)",
-					formatDuration(remaining)))
+				fmt.Fprintf(&sb, " (deadline: %s)",
+					formatDuration(remaining))
 			} else {
 				sb.WriteString(" (OVERDUE)")
 			}
@@ -271,7 +271,7 @@ func formatHookReason(msgs []mail.InboxMessage, urgentCount int) string {
 	}
 
 	if len(msgs) > 5 {
-		sb.WriteString(fmt.Sprintf("  ... and %d more\n", len(msgs)-5))
+		fmt.Fprintf(&sb, "  ... and %d more\n", len(msgs)-5)
 	}
 
 	sb.WriteString("\nUse `substrate inbox` to see all messages.")

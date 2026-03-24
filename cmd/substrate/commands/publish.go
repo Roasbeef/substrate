@@ -51,18 +51,14 @@ func runPublish(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	// Parse priority.
-	var priority mail.Priority
-	switch publishPriority {
-	case "urgent":
-		priority = mail.PriorityUrgent
-	case "normal":
-		priority = mail.PriorityNormal
-	case "low":
-		priority = mail.PriorityLow
-	default:
-		return fmt.Errorf("invalid priority: %s", publishPriority)
+	// Validate and parse priority.
+	if err := validateEnum(
+		publishPriority, "priority",
+		[]string{"urgent", "normal", "low"},
+	); err != nil {
+		return err
 	}
+	priority := mail.Priority(publishPriority)
 
 	// In queue mode, enqueue the operation for later delivery.
 	if client.Mode() == ModeQueued {

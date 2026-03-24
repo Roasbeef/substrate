@@ -3,6 +3,7 @@ package commands
 import (
 	"context"
 	"fmt"
+	"strconv"
 
 	"github.com/roasbeef/subtrate/internal/mail"
 	"github.com/spf13/cobra"
@@ -44,9 +45,23 @@ func runInbox(cmd *cobra.Command, args []string) error {
 	// Send heartbeat to indicate agent activity.
 	_ = client.UpdateHeartbeat(ctx, agentID)
 
+	// Parse page token offset for pagination.
+	offset := 0
+	if pageToken != "" {
+		var parseErr error
+		offset, parseErr = strconv.Atoi(pageToken)
+		if parseErr != nil {
+			return fmt.Errorf(
+				"invalid page-token %q: %w",
+				pageToken, parseErr,
+			)
+		}
+	}
+
 	req := mail.FetchInboxRequest{
 		AgentID:    agentID,
 		Limit:      inboxLimit,
+		Offset:     offset,
 		UnreadOnly: !inboxAll,
 	}
 
@@ -57,7 +72,9 @@ func runInbox(cmd *cobra.Command, args []string) error {
 
 	switch outputFormat {
 	case "json":
-		return outputJSON(messages)
+		return outputWithPagination(
+			messages, offset, inboxLimit, len(messages),
+		)
 
 	case "context":
 		if len(messages) > 0 {

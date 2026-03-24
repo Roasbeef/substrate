@@ -83,6 +83,13 @@ func runArchive(cmd *cobra.Command, args []string) error {
 }
 
 func runTrash(cmd *cobra.Command, args []string) error {
+	if !confirmAction(fmt.Sprintf(
+		"Move message #%s to trash?", args[0],
+	)) {
+		fmt.Println("Cancelled.")
+		return nil
+	}
+
 	return runMessageAction(args[0], "trash", nil)
 }
 

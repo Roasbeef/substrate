@@ -27,12 +27,12 @@ type MessageStore interface {
 
 	// GetInboxMessages retrieves inbox messages for an agent.
 	GetInboxMessages(
-		ctx context.Context, agentID int64, limit int,
+		ctx context.Context, agentID int64, limit, offset int,
 	) ([]InboxMessage, error)
 
 	// GetUnreadMessages retrieves unread messages for an agent.
 	GetUnreadMessages(
-		ctx context.Context, agentID int64, limit int,
+		ctx context.Context, agentID int64, limit, offset int,
 	) ([]InboxMessage, error)
 
 	// GetArchivedMessages retrieves archived messages for an agent.

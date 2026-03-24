@@ -61,6 +61,24 @@ func getCurrentAgentWithClient(ctx context.Context, client *Client) (int64,
 
 		ag, err := client.GetAgentByName(ctx, agentName)
 		if err != nil {
+			// Try to suggest a close match.
+			if agents, listErr := client.ListAgents(
+				ctx,
+			); listErr == nil {
+				names := make([]string, len(agents))
+				for i, a := range agents {
+					names[i] = a.Name
+				}
+				if suggestion := suggestClosestMatch(
+					agentName, names,
+				); suggestion != "" {
+					return 0, "", fmt.Errorf(
+						"agent %q not found; "+
+							"did you mean %q?",
+						agentName, suggestion,
+					)
+				}
+			}
 			return 0, "", fmt.Errorf("agent %q not found: %w",
 				agentName, err)
 		}
@@ -144,17 +162,17 @@ func formatMessage(msg mail.InboxMessage) string {
 	}
 
 	// Message summary.
-	sb.WriteString(fmt.Sprintf("#%d: %s\n", msg.ID, msg.Subject))
+	fmt.Fprintf(&sb, "#%d: %s\n", msg.ID, msg.Subject)
 	senderDisplay := msg.SenderName
 	if senderDisplay == "" {
 		senderDisplay = fmt.Sprintf("Agent#%d", msg.SenderID)
 	}
-	sb.WriteString(fmt.Sprintf("  From: %s | %s\n",
-		senderDisplay, msg.CreatedAt.Format(time.RFC3339)))
+	fmt.Fprintf(&sb, "  From: %s | %s\n",
+		senderDisplay, msg.CreatedAt.Format(time.RFC3339))
 
 	if msg.Deadline != nil {
-		sb.WriteString(fmt.Sprintf("  Deadline: %s\n",
-			msg.Deadline.Format(time.RFC3339)))
+		fmt.Fprintf(&sb, "  Deadline: %s\n",
+			msg.Deadline.Format(time.RFC3339))
 	}
 
 	return sb.String()
@@ -164,33 +182,33 @@ func formatMessage(msg mail.InboxMessage) string {
 func formatMessageFull(msg *mail.InboxMessage) string {
 	var sb strings.Builder
 
-	sb.WriteString(fmt.Sprintf("Message #%d\n", msg.ID))
+	fmt.Fprintf(&sb, "Message #%d\n", msg.ID)
 	sb.WriteString(strings.Repeat("=", 60) + "\n")
-	sb.WriteString(fmt.Sprintf("Subject: %s\n", msg.Subject))
+	fmt.Fprintf(&sb, "Subject: %s\n", msg.Subject)
 	senderDisplay := msg.SenderName
 	if senderDisplay == "" {
 		senderDisplay = fmt.Sprintf("Agent#%d", msg.SenderID)
 	}
-	sb.WriteString(fmt.Sprintf("From: %s\n", senderDisplay))
-	sb.WriteString(fmt.Sprintf("Thread: %s\n", msg.ThreadID))
-	sb.WriteString(fmt.Sprintf("Priority: %s\n", msg.Priority))
-	sb.WriteString(fmt.Sprintf("State: %s\n", msg.State))
-	sb.WriteString(fmt.Sprintf("Created: %s\n",
-		msg.CreatedAt.Format(time.RFC3339)))
+	fmt.Fprintf(&sb, "From: %s\n", senderDisplay)
+	fmt.Fprintf(&sb, "Thread: %s\n", msg.ThreadID)
+	fmt.Fprintf(&sb, "Priority: %s\n", msg.Priority)
+	fmt.Fprintf(&sb, "State: %s\n", msg.State)
+	fmt.Fprintf(&sb, "Created: %s\n",
+		msg.CreatedAt.Format(time.RFC3339))
 
 	if msg.Deadline != nil {
-		sb.WriteString(fmt.Sprintf("Deadline: %s\n",
-			msg.Deadline.Format(time.RFC3339)))
+		fmt.Fprintf(&sb, "Deadline: %s\n",
+			msg.Deadline.Format(time.RFC3339))
 	}
 
 	if msg.ReadAt != nil {
-		sb.WriteString(fmt.Sprintf("Read: %s\n",
-			msg.ReadAt.Format(time.RFC3339)))
+		fmt.Fprintf(&sb, "Read: %s\n",
+			msg.ReadAt.Format(time.RFC3339))
 	}
 
 	if msg.AckedAt != nil {
-		sb.WriteString(fmt.Sprintf("Acked: %s\n",
-			msg.AckedAt.Format(time.RFC3339)))
+		fmt.Fprintf(&sb, "Acked: %s\n",
+			msg.AckedAt.Format(time.RFC3339))
 	}
 
 	sb.WriteString(strings.Repeat("-", 60) + "\n")
@@ -203,13 +221,13 @@ func formatMessageFull(msg *mail.InboxMessage) string {
 func formatStatus(status mail.AgentStatus) string {
 	var sb strings.Builder
 
-	sb.WriteString(fmt.Sprintf("Agent: %s (ID: %d)\n",
-		status.AgentName, status.AgentID))
+	fmt.Fprintf(&sb, "Agent: %s (ID: %d)\n",
+		status.AgentName, status.AgentID)
 	sb.WriteString(strings.Repeat("-", 40) + "\n")
-	sb.WriteString(fmt.Sprintf("Unread: %d\n", status.UnreadCount))
-	sb.WriteString(fmt.Sprintf("Urgent: %d\n", status.UrgentCount))
-	sb.WriteString(fmt.Sprintf("Starred: %d\n", status.StarredCount))
-	sb.WriteString(fmt.Sprintf("Snoozed: %d\n", status.SnoozedCount))
+	fmt.Fprintf(&sb, "Unread: %d\n", status.UnreadCount)
+	fmt.Fprintf(&sb, "Urgent: %d\n", status.UrgentCount)
+	fmt.Fprintf(&sb, "Starred: %d\n", status.StarredCount)
+	fmt.Fprintf(&sb, "Snoozed: %d\n", status.SnoozedCount)
 
 	return sb.String()
 }
@@ -234,14 +252,14 @@ func formatContext(msgs []mail.InboxMessage) string {
 	}
 
 	if urgentCount > 0 {
-		sb.WriteString(fmt.Sprintf("You have %d URGENT", urgentCount))
+		fmt.Fprintf(&sb, "You have %d URGENT", urgentCount)
 		if normalCount > 0 {
-			sb.WriteString(fmt.Sprintf(" and %d other", normalCount))
+			fmt.Fprintf(&sb, " and %d other", normalCount)
 		}
 		sb.WriteString(" unread messages:\n")
 	} else {
-		sb.WriteString(fmt.Sprintf("You have %d unread messages:\n",
-			len(msgs)))
+		fmt.Fprintf(&sb, "You have %d unread messages:\n",
+			len(msgs))
 	}
 
 	for _, msg := range msgs {
@@ -254,13 +272,13 @@ func formatContext(msgs []mail.InboxMessage) string {
 			senderDisplay = fmt.Sprintf("Agent#%d", msg.SenderID)
 		}
 		// Include message ID and thread ID for replies.
-		sb.WriteString(fmt.Sprintf("#%d From: %s - %q (thread: %s)",
-			msg.ID, senderDisplay, msg.Subject, msg.ThreadID))
+		fmt.Fprintf(&sb, "#%d From: %s - %q (thread: %s)",
+			msg.ID, senderDisplay, msg.Subject, msg.ThreadID)
 		if msg.Deadline != nil {
 			remaining := time.Until(*msg.Deadline)
 			if remaining > 0 {
-				sb.WriteString(fmt.Sprintf(" (deadline: %s)",
-					formatDuration(remaining)))
+				fmt.Fprintf(&sb, " (deadline: %s)",
+					formatDuration(remaining))
 			} else {
 				sb.WriteString(" (OVERDUE)")
 			}
@@ -289,12 +307,184 @@ func formatDuration(d time.Duration) string {
 	return fmt.Sprintf("%dd", int(d.Hours()/24))
 }
 
-// outputJSON outputs data as JSON.
+// Exit codes for semantic error classification.
+const (
+	// ExitSuccess indicates the command completed successfully.
+	ExitSuccess = 0
+
+	// ExitError indicates a general error.
+	ExitError = 1
+
+	// ExitValidation indicates invalid arguments or input.
+	ExitValidation = 2
+
+	// ExitAuth indicates an authentication or authorization failure.
+	ExitAuth = 3
+
+	// ExitNotFound indicates a resource was not found.
+	ExitNotFound = 4
+
+	// ExitConflict indicates a conflict (e.g., already exists).
+	ExitConflict = 5
+)
+
+// CLIError wraps an error with a semantic exit code for structured output.
+type CLIError struct {
+	Code    int    `json:"code"`
+	Message string `json:"message"`
+	Err     error  `json:"-"`
+}
+
+// Error implements the error interface.
+func (e *CLIError) Error() string {
+	return e.Message
+}
+
+// Unwrap returns the underlying error.
+func (e *CLIError) Unwrap() error {
+	return e.Err
+}
+
+// ExitCode returns the semantic exit code for this error.
+func (e *CLIError) ExitCode() int {
+	return e.Code
+}
+
+// NewValidationError creates a CLIError for input validation failures.
+func NewValidationError(msg string, err error) *CLIError {
+	return &CLIError{Code: ExitValidation, Message: msg, Err: err}
+}
+
+// NewNotFoundError creates a CLIError for resource not found failures.
+func NewNotFoundError(msg string, err error) *CLIError {
+	return &CLIError{Code: ExitNotFound, Message: msg, Err: err}
+}
+
+// OutputError writes a structured error to stderr when format is JSON,
+// or a plain text error otherwise.
+func OutputError(err error) int {
+	if outputFormat == "json" {
+		code := ExitError
+		if cliErr, ok := err.(*CLIError); ok {
+			code = cliErr.Code
+		}
+
+		errObj := struct {
+			Error struct {
+				Code    int    `json:"code"`
+				Message string `json:"message"`
+			} `json:"error"`
+		}{}
+		errObj.Error.Code = code
+		errObj.Error.Message = err.Error()
+
+		data, _ := json.Marshal(errObj)
+		fmt.Fprintln(os.Stderr, string(data))
+
+		return code
+	}
+
+	fmt.Fprintln(os.Stderr, err)
+
+	if cliErr, ok := err.(*CLIError); ok {
+		return cliErr.ExitCode()
+	}
+
+	return ExitError
+}
+
+// outputJSON outputs data as JSON, respecting --compact and --fields flags.
 func outputJSON(v interface{}) error {
+	// Apply field filtering if requested.
+	if fieldsFilter != "" {
+		v = filterJSONFields(v, strings.Split(fieldsFilter, ","))
+	}
+
+	if compact {
+		return outputCompactJSON(v)
+	}
+
 	data, err := json.MarshalIndent(v, "", "  ")
 	if err != nil {
 		return err
 	}
 	fmt.Println(string(data))
+
 	return nil
+}
+
+// outputCompactJSON outputs JSON in compact single-line form.
+func outputCompactJSON(v interface{}) error {
+	data, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+	fmt.Println(string(data))
+
+	return nil
+}
+
+// filterJSONFields filters a JSON-serializable value to only include
+// the specified top-level fields. Works on maps and slices of maps.
+func filterJSONFields(v interface{}, fields []string) interface{} {
+	// Marshal to JSON and back to map for generic field filtering.
+	data, err := json.Marshal(v)
+	if err != nil {
+		return v
+	}
+
+	// Try as array of objects.
+	var arr []map[string]interface{}
+	if json.Unmarshal(data, &arr) == nil && len(arr) > 0 {
+		var filtered []map[string]interface{}
+		for _, item := range arr {
+			filtered = append(filtered, pickFields(item, fields))
+		}
+		return filtered
+	}
+
+	// Try as single object.
+	var obj map[string]interface{}
+	if json.Unmarshal(data, &obj) == nil {
+		return pickFields(obj, fields)
+	}
+
+	return v
+}
+
+// pickFields returns a new map containing only the specified fields.
+func pickFields(
+	obj map[string]interface{}, fields []string,
+) map[string]interface{} {
+	result := make(map[string]interface{})
+	for _, f := range fields {
+		f = strings.TrimSpace(f)
+		if val, ok := obj[f]; ok {
+			result[f] = val
+		}
+	}
+
+	return result
+}
+
+// paginationEnvelope wraps list results with pagination metadata.
+type paginationEnvelope struct {
+	Items         interface{} `json:"items"`
+	NextPageToken string      `json:"next_page_token,omitempty"`
+}
+
+// outputWithPagination wraps items in a pagination envelope for JSON output.
+// If there are more results (len(items) == limit), a next_page_token is
+// generated from the current offset + limit.
+func outputWithPagination(
+	items interface{}, offset, limit, count int,
+) error {
+	envelope := paginationEnvelope{Items: items}
+	if count >= limit {
+		nextOffset := offset + limit
+		token := fmt.Sprintf("%d", nextOffset)
+		envelope.NextPageToken = token
+	}
+
+	return outputJSON(envelope)
 }

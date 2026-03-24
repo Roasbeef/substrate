@@ -121,6 +121,7 @@ func (s *Server) FetchInbox(ctx context.Context, req *FetchInboxRequest) (*Fetch
 		fetchReq := mail.FetchInboxRequest{
 			AgentID:          0, // Not filtering by recipient.
 			Limit:            limit,
+			Offset:           int(req.Offset),
 			UnreadOnly:       req.UnreadOnly,
 			StateFilter:      stateFilter,
 			SenderNamePrefix: req.SenderNamePrefix,
@@ -150,6 +151,7 @@ func (s *Server) FetchInbox(ctx context.Context, req *FetchInboxRequest) (*Fetch
 	fetchReq := mail.FetchInboxRequest{
 		AgentID:     req.AgentId,
 		Limit:       limit,
+		Offset:      int(req.Offset),
 		UnreadOnly:  req.UnreadOnly,
 		StateFilter: stateFilter,
 		SentOnly:    req.SentOnly,
@@ -1161,15 +1163,18 @@ func (s *Server) RegisterAgent(ctx context.Context, req *RegisterAgentRequest) (
 		return nil, status.Error(codes.InvalidArgument, "name is required")
 	}
 
-	// Note: git_branch is not in the proto, will be set via EnsureIdentity.
-	agent, err := s.agentReg.RegisterAgent(ctx, req.Name, req.ProjectKey, "")
+	agent, err := s.agentReg.RegisterAgent(
+		ctx, req.Name, req.ProjectKey, req.GitBranch,
+	)
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "failed to register agent: %v", err)
 	}
 
 	return &RegisterAgentResponse{
-		AgentId: agent.ID,
-		Name:    agent.Name,
+		AgentId:    agent.ID,
+		Name:       agent.Name,
+		ProjectKey: agent.ProjectKey.String,
+		GitBranch:  agent.GitBranch.String,
 	}, nil
 }
 

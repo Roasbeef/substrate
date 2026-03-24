@@ -1,6 +1,8 @@
 package commands
 
 import (
+	"os"
+
 	"github.com/roasbeef/subtrate/internal/build"
 	"github.com/spf13/cobra"
 )
@@ -32,6 +34,18 @@ var (
 
 	// queueOnly forces all write operations to go through the local queue.
 	queueOnly bool
+
+	// autoYes skips confirmation prompts for destructive operations.
+	autoYes bool
+
+	// compact enables compact (single-line) JSON output.
+	compact bool
+
+	// fieldsFilter selects specific fields in JSON output.
+	fieldsFilter string
+
+	// pageToken is a pagination token for list commands.
+	pageToken string
 )
 
 // rootCmd is the base command for the CLI.
@@ -43,6 +57,7 @@ var rootCmd = &cobra.Command{
 
 Use this CLI to send and receive messages, subscribe to topics, and manage
 agent identity across Claude Code sessions.`,
+	SilenceErrors: true,
 }
 
 // Execute runs the CLI.
@@ -51,6 +66,17 @@ func Execute() error {
 }
 
 func init() {
+	// Auto-detect non-TTY stdout and default to JSON output. Using
+	// cobra.OnInitialize ensures this runs for all subcommands without
+	// breaking PersistentPreRun hook chaining.
+	cobra.OnInitialize(func() {
+		if !rootCmd.Flags().Changed("format") &&
+			!isTerminal(os.Stdout) {
+
+			outputFormat = "json"
+		}
+	})
+
 	// Global flags.
 	rootCmd.PersistentFlags().StringVar(
 		&dbPath, "db", "",
@@ -88,6 +114,22 @@ func init() {
 		&queueOnly, "queue-only", false,
 		"Force all write operations through the local queue",
 	)
+	rootCmd.PersistentFlags().BoolVarP(
+		&autoYes, "yes", "y", false,
+		"Skip confirmation prompts for destructive operations",
+	)
+	rootCmd.PersistentFlags().BoolVar(
+		&compact, "compact", false,
+		"Compact JSON output (single-line, JSONL for arrays)",
+	)
+	rootCmd.PersistentFlags().StringVar(
+		&fieldsFilter, "fields", "",
+		"Comma-separated list of fields to include in JSON output",
+	)
+	rootCmd.PersistentFlags().StringVar(
+		&pageToken, "page-token", "",
+		"Pagination token for list commands",
+	)
 
 	// Add subcommands.
 	rootCmd.AddCommand(inboxCmd)
@@ -113,4 +155,6 @@ func init() {
 	rootCmd.AddCommand(tasksCmd)
 	rootCmd.AddCommand(planCmd)
 	rootCmd.AddCommand(versionCmd)
+	rootCmd.AddCommand(mcpCmd)
+	rootCmd.AddCommand(schemaCmd)
 }

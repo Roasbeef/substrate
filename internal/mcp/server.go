@@ -5,22 +5,20 @@ import (
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 	"github.com/roasbeef/subtrate/internal/agent"
+	"github.com/roasbeef/subtrate/internal/build"
 	"github.com/roasbeef/subtrate/internal/db"
 	"github.com/roasbeef/subtrate/internal/mail"
 	"github.com/roasbeef/subtrate/internal/store"
 )
 
-// Server wraps the MCP server with mail service dependencies.
+// Server wraps the MCP server with a pluggable backend for mail, agent,
+// and topic operations.
 type Server struct {
-	server   *mcp.Server
-	dbStore  *db.Store
-	storage  store.Storage
-	mailSvc  *mail.Service
-	mailRef  mail.MailActorRef // Optional actor ref for mail operations.
-	registry *agent.Registry
+	server  *mcp.Server
+	backend Backend
 }
 
-// Config holds configuration for the MCP server.
+// Config holds configuration for the MCP server when using direct DB access.
 type Config struct {
 	// Store is the database store.
 	Store *db.Store
@@ -30,31 +28,39 @@ type Config struct {
 	MailActorRef mail.MailActorRef
 }
 
-// NewServer creates a new MCP server with all mail tools registered.
+// NewServer creates a new MCP server with direct database access.
 func NewServer(dbStore *db.Store) *Server {
 	return NewServerWithConfig(Config{Store: dbStore})
 }
 
-// NewServerWithConfig creates a new MCP server with the given configuration.
+// NewServerWithConfig creates a new MCP server backed by a DirectBackend.
 func NewServerWithConfig(cfg Config) *Server {
-	mcpServer := mcp.NewServer(&mcp.Implementation{
-		Name:    "subtrate",
-		Version: "0.1.0",
-	}, nil)
-
-	// Create Storage wrapper from the db.Store.
 	storage := store.FromDB(cfg.Store.DB())
 
+	backend := NewDirectBackend(DirectBackendConfig{
+		Storage:  storage,
+		MailSvc:  mail.NewServiceWithStore(storage),
+		MailRef:  cfg.MailActorRef,
+		Registry: agent.NewRegistry(cfg.Store),
+	})
+
+	return NewServerWithBackend(backend)
+}
+
+// NewServerWithBackend creates a new MCP server with the given backend.
+// This is the primary constructor used by callers that supply their own
+// Backend implementation (e.g., GRPCBackend for the CLI proxy).
+func NewServerWithBackend(backend Backend) *Server {
+	mcpServer := mcp.NewServer(&mcp.Implementation{
+		Name:    "subtrate",
+		Version: build.Version(),
+	}, nil)
+
 	s := &Server{
-		server:   mcpServer,
-		dbStore:  cfg.Store,
-		storage:  storage,
-		mailSvc:  mail.NewServiceWithStore(storage),
-		mailRef:  cfg.MailActorRef,
-		registry: agent.NewRegistry(cfg.Store),
+		server:  mcpServer,
+		backend: backend,
 	}
 
-	// Register all mail tools.
 	s.registerTools()
 
 	return s
@@ -63,6 +69,11 @@ func NewServerWithConfig(cfg Config) *Server {
 // Run starts the MCP server on the given transport.
 func (s *Server) Run(ctx context.Context, transport mcp.Transport) error {
 	return s.server.Run(ctx, transport)
+}
+
+// MCPServer returns the underlying mcp.Server for use with HTTP handlers.
+func (s *Server) MCPServer() *mcp.Server {
+	return s.server
 }
 
 // registerTools registers all mail-related tools.
@@ -161,4 +172,26 @@ func (s *Server) registerTools() {
 		Name:        "whoami",
 		Description: "Get the current agent identity",
 	}, s.handleWhoAmI)
+
+	// Extended agent tools.
+	mcp.AddTool(s.server, &mcp.Tool{
+		Name:        "list_agents",
+		Description: "List all registered agents with their metadata",
+	}, s.handleListAgents)
+
+	mcp.AddTool(s.server, &mcp.Tool{
+		Name:        "get_agent_by_name",
+		Description: "Look up an agent by name instead of ID",
+	}, s.handleGetAgentByName)
+
+	mcp.AddTool(s.server, &mcp.Tool{
+		Name:        "heartbeat",
+		Description: "Send a liveness heartbeat for an agent",
+	}, s.handleHeartbeat)
+
+	// Thread tools.
+	mcp.AddTool(s.server, &mcp.Tool{
+		Name:        "read_thread",
+		Description: "Read all messages in a conversation thread",
+	}, s.handleReadThread)
 }

@@ -512,11 +512,12 @@ func (s *SqlcStore) GetMessagesByThreadWithSender(ctx context.Context,
 
 // GetInboxMessages retrieves inbox messages for an agent.
 func (s *SqlcStore) GetInboxMessages(ctx context.Context, agentID int64,
-	limit int,
+	limit, offset int,
 ) ([]InboxMessage, error) {
 	rows, err := s.db.GetInboxMessages(ctx, sqlc.GetInboxMessagesParams{
 		AgentID: agentID,
 		Limit:   int64(limit),
+		Offset:  int64(offset),
 	})
 	if err != nil {
 		return nil, err
@@ -526,11 +527,12 @@ func (s *SqlcStore) GetInboxMessages(ctx context.Context, agentID int64,
 
 // GetUnreadMessages retrieves unread messages for an agent.
 func (s *SqlcStore) GetUnreadMessages(ctx context.Context, agentID int64,
-	limit int,
+	limit, offset int,
 ) ([]InboxMessage, error) {
 	rows, err := s.db.GetUnreadMessages(ctx, sqlc.GetUnreadMessagesParams{
 		AgentID: agentID,
 		Limit:   int64(limit),
+		Offset:  int64(offset),
 	})
 	if err != nil {
 		return nil, err
@@ -1578,11 +1580,12 @@ func (s *txSqlcStore) GetMessagesByThreadWithSender(ctx context.Context,
 
 // GetInboxMessages retrieves inbox messages for an agent.
 func (s *txSqlcStore) GetInboxMessages(ctx context.Context, agentID int64,
-	limit int,
+	limit, offset int,
 ) ([]InboxMessage, error) {
 	rows, err := s.queries.GetInboxMessages(ctx, sqlc.GetInboxMessagesParams{
 		AgentID: agentID,
 		Limit:   int64(limit),
+		Offset:  int64(offset),
 	})
 	if err != nil {
 		return nil, err
@@ -1592,11 +1595,12 @@ func (s *txSqlcStore) GetInboxMessages(ctx context.Context, agentID int64,
 
 // GetUnreadMessages retrieves unread messages for an agent.
 func (s *txSqlcStore) GetUnreadMessages(ctx context.Context, agentID int64,
-	limit int,
+	limit, offset int,
 ) ([]InboxMessage, error) {
 	rows, err := s.queries.GetUnreadMessages(ctx, sqlc.GetUnreadMessagesParams{
 		AgentID: agentID,
 		Limit:   int64(limit),
+		Offset:  int64(offset),
 	})
 	if err != nil {
 		return nil, err

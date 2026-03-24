@@ -484,6 +484,7 @@ func (c *Client) FetchInbox(ctx context.Context, req mail.FetchInboxRequest) ([]
 			AgentId:    req.AgentID,
 			Limit:      int32(req.Limit),
 			UnreadOnly: req.UnreadOnly,
+			Offset:     int32(req.Offset),
 		}
 
 		resp, err := c.mailClient.FetchInbox(ctx, grpcReq)
@@ -839,11 +840,10 @@ func (c *Client) RegisterAgent(
 	ctx context.Context, name, projectKey, gitBranch string,
 ) (int64, string, error) {
 	if c.mode == ModeGRPC {
-		// Note: gRPC RegisterAgentRequest doesn't include git_branch yet.
-		// The branch will be set on first heartbeat/identity call.
 		resp, err := c.agentClient.RegisterAgent(ctx, &subtraterpc.RegisterAgentRequest{
 			Name:       name,
 			ProjectKey: projectKey,
+			GitBranch:  gitBranch,
 		})
 		if err != nil {
 			return 0, "", err
