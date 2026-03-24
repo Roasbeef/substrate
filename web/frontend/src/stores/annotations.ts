@@ -336,8 +336,17 @@ export const useAnnotationStore = create<AnnotationState>()(
         }
       },
 
-      // Reset all annotation state.
-      reset: () =>
+      // Reset all annotation state and cancel any pending draft timers
+      // to prevent stale writes after navigation.
+      reset: () => {
+        if (planDraftTimer) {
+          clearTimeout(planDraftTimer);
+          planDraftTimer = null;
+        }
+        if (diffDraftTimer) {
+          clearTimeout(diffDraftTimer);
+          diffDraftTimer = null;
+        }
         set(
           {
             planAnnotations: [],
@@ -349,7 +358,8 @@ export const useAnnotationStore = create<AnnotationState>()(
           },
           undefined,
           'reset',
-        ),
+        );
+      },
     }),
     { name: 'annotation-store' },
   ),
