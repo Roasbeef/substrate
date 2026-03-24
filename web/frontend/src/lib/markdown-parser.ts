@@ -200,23 +200,27 @@ export function parseMarkdownToBlocks(markdown: string): Block[] {
       continue;
     }
 
-    // Tables — lines starting with or containing pipes.
-    if (
-      trimmed.startsWith('|') ||
-      (trimmed.includes('|') &&
-        trimmed.match(/^\|?.+\|.+\|?$/))
-    ) {
+    // Tables — require line starts with | and the next line is a
+    // separator row (e.g., |---|---|) to avoid matching prose with pipes.
+    if (trimmed.startsWith('|') && i + 1 < lines.length) {
+      const nextTrimmed = lines[i + 1]!.trim();
+      const isSeparator = /^[|:\-\s]+$/.test(nextTrimmed);
+      if (!isSeparator) {
+        // Not a table — treat as paragraph text.
+        if (buffer.length === 0) {
+          bufferStartLine = currentLineNum;
+        }
+        buffer.push(line);
+        continue;
+      }
+
       flush();
       const tableStartLine = currentLineNum;
       const tableLines: string[] = [line];
 
       while (i + 1 < lines.length) {
         const nextLine = lines[i + 1]!.trim();
-        if (
-          nextLine.startsWith('|') ||
-          (nextLine.includes('|') &&
-            nextLine.match(/^\|?.+\|.+\|?$/))
-        ) {
+        if (nextLine.startsWith('|') || /^[|:\-\s]+$/.test(nextLine)) {
           i++;
           tableLines.push(lines[i]!);
         } else {
