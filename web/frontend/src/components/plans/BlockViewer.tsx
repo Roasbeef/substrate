@@ -69,13 +69,18 @@ export function BlockViewer({
     setToolbarState({ rect, blockId, selectedText });
   }, [readOnly]);
 
-  // Clear toolbar when selection changes.
+  // Clear toolbar when selection changes. Uses a mounted guard so the
+  // delayed setState cannot fire after the component unmounts.
   useEffect(() => {
+    let mounted = true;
+    let timerId: ReturnType<typeof setTimeout> | null = null;
+
     const handleSelectionChange = () => {
       const selection = window.getSelection();
       if (!selection || selection.isCollapsed) {
         // Delay to allow toolbar clicks to register.
-        setTimeout(() => {
+        timerId = setTimeout(() => {
+          if (!mounted) return;
           const sel = window.getSelection();
           if (!sel || sel.isCollapsed) {
             setToolbarState(null);
@@ -84,11 +89,14 @@ export function BlockViewer({
       }
     };
     document.addEventListener('selectionchange', handleSelectionChange);
-    return () =>
+    return () => {
+      mounted = false;
+      if (timerId) clearTimeout(timerId);
       document.removeEventListener(
         'selectionchange',
         handleSelectionChange,
       );
+    };
   }, []);
 
   // Handle annotation creation from toolbar.
