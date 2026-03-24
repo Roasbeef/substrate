@@ -272,3 +272,104 @@ func TestListDiffAnnotationsByMessage(t *testing.T) {
 	require.NoError(t, err)
 	require.Len(t, annotations, 2)
 }
+
+// TestUpdateDiffAnnotation verifies diff annotation text updates.
+func TestUpdateDiffAnnotation(t *testing.T) {
+	store, cleanup := testTaskDB(t)
+	defer cleanup()
+
+	ctx := context.Background()
+	agentID := createTestAgent(t, store, "test-agent")
+
+	topic, err := store.CreateTopic(ctx, CreateTopicParams{
+		Name:      "inbox:test-agent-diff-upd",
+		TopicType: "direct",
+	})
+	require.NoError(t, err)
+
+	msg, err := store.CreateMessage(ctx, CreateMessageParams{
+		ThreadID: "thread-diff-upd",
+		TopicID:  topic.ID,
+		SenderID: agentID,
+		Subject:  "diff message",
+		Body:     "diff content",
+		Priority: "normal",
+	})
+	require.NoError(t, err)
+
+	_, err = store.CreateDiffAnnotation(ctx, CreateDiffAnnotationParams{
+		AnnotationID:   "diff-upd-001",
+		MessageID:      msg.ID,
+		AnnotationType: "comment",
+		Scope:          "line",
+		FilePath:       "main.go",
+		LineStart:      10,
+		LineEnd:        12,
+		Side:           "new",
+		Text:           "original comment",
+	})
+	require.NoError(t, err)
+
+	// Update the annotation.
+	updated, err := store.UpdateDiffAnnotation(
+		ctx, UpdateDiffAnnotationParams{
+			AnnotationID:  "diff-upd-001",
+			Text:          "updated comment",
+			SuggestedCode: "fmt.Println(\"fixed\")",
+		},
+	)
+	require.NoError(t, err)
+	require.Equal(t, "updated comment", updated.Text)
+	require.Equal(t, "fmt.Println(\"fixed\")", updated.SuggestedCode)
+
+	// Verify via get.
+	fetched, err := store.GetDiffAnnotation(ctx, "diff-upd-001")
+	require.NoError(t, err)
+	require.Equal(t, "updated comment", fetched.Text)
+}
+
+// TestDeleteDiffAnnotation verifies diff annotation deletion.
+func TestDeleteDiffAnnotation(t *testing.T) {
+	store, cleanup := testTaskDB(t)
+	defer cleanup()
+
+	ctx := context.Background()
+	agentID := createTestAgent(t, store, "test-agent")
+
+	topic, err := store.CreateTopic(ctx, CreateTopicParams{
+		Name:      "inbox:test-agent-diff-del",
+		TopicType: "direct",
+	})
+	require.NoError(t, err)
+
+	msg, err := store.CreateMessage(ctx, CreateMessageParams{
+		ThreadID: "thread-diff-del",
+		TopicID:  topic.ID,
+		SenderID: agentID,
+		Subject:  "diff message",
+		Body:     "diff content",
+		Priority: "normal",
+	})
+	require.NoError(t, err)
+
+	_, err = store.CreateDiffAnnotation(ctx, CreateDiffAnnotationParams{
+		AnnotationID:   "diff-del-001",
+		MessageID:      msg.ID,
+		AnnotationType: "suggestion",
+		Scope:          "line",
+		FilePath:       "main.go",
+		LineStart:      1,
+		LineEnd:        1,
+		Side:           "new",
+		Text:           "remove this",
+	})
+	require.NoError(t, err)
+
+	// Delete the annotation.
+	err = store.DeleteDiffAnnotation(ctx, "diff-del-001")
+	require.NoError(t, err)
+
+	// Verify it's gone.
+	_, err = store.GetDiffAnnotation(ctx, "diff-del-001")
+	require.Error(t, err)
+}
