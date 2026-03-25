@@ -5,15 +5,37 @@ import {
   useState, useMemo, useCallback, useEffect, useRef,
 } from 'react';
 import { FileDiff } from '@pierre/diffs/react';
+import type { DiffLineAnnotation } from '@pierre/diffs/react';
 import { parsePatchFiles } from '@pierre/diffs';
+import type { DiffAnnotation } from '@/types/annotations.js';
+import { DiffCommentPopover } from './DiffCommentPopover.js';
+import { DiffAnnotationCard } from './DiffAnnotationCard.js';
 
 export interface DiffViewerProps {
   // The raw unified diff / patch string (git diff output).
   patch: string;
   // Optional CSS class name.
-  className?: string;
+  className?: string | undefined;
   // Initial diff style, defaults to 'unified'.
-  initialStyle?: 'unified' | 'split';
+  initialStyle?: 'unified' | 'split' | undefined;
+  // Annotation support — when provided, enables review mode.
+  reviewMode?: boolean | undefined;
+  annotations?: DiffAnnotation[] | undefined;
+  onAddAnnotation?: ((params: {
+    filePath: string;
+    type: DiffAnnotation['type'];
+    scope: DiffAnnotation['scope'];
+    lineStart: number;
+    lineEnd: number;
+    side: 'old' | 'new';
+    text: string;
+    suggestedCode?: string | undefined;
+  }) => void) | undefined;
+  onUpdateAnnotation?: ((
+    id: string, text: string, suggestedCode?: string | undefined,
+  ) => void) | undefined;
+  onDeleteAnnotation?: ((id: string) => void) | undefined;
+  onSubmitReview?: (() => void) | undefined;
 }
 
 // Extract just the filename from a path (e.g. "b/internal/review/service.go" -> "service.go").
@@ -65,6 +87,12 @@ export function DiffViewer({
   patch,
   className,
   initialStyle = 'unified',
+  reviewMode = false,
+  annotations = [],
+  onAddAnnotation,
+  onUpdateAnnotation,
+  onDeleteAnnotation,
+  onSubmitReview,
 }: DiffViewerProps) {
   const [diffStyle, setDiffStyle] = useState<'unified' | 'split'>(
     initialStyle,
@@ -78,12 +106,59 @@ export function DiffViewer({
   const fileRefs = useRef<Map<number, HTMLDivElement>>(new Map());
   const scrollContainerRef = useRef<HTMLDivElement>(null);
 
-  const options = useMemo(() => ({
+  // Review mode state: pending line selection and popover.
+  const [pendingSelection, setPendingSelection] = useState<{
+    start: number;
+    end: number;
+    side: 'deletions' | 'additions';
+    filePath: string;
+    anchorRect: DOMRect;
+  } | null>(null);
+
+  // Handle line selection from @pierre/diffs.
+  const handleLineSelectionEnd = useCallback(
+    (range: { start: number; end: number; side?: string } | null, filePath: string) => {
+      if (!range || !reviewMode || !onAddAnnotation) return;
+      // Get a rough anchor rect from the mouse position.
+      const rect = new DOMRect(
+        window.innerWidth / 2 - 200, 200, 400, 20,
+      );
+      setPendingSelection({
+        start: range.start,
+        end: range.end,
+        side: (range.side as 'deletions' | 'additions') ?? 'additions',
+        filePath,
+        anchorRect: rect,
+      });
+    },
+    [reviewMode, onAddAnnotation],
+  );
+
+  // Always enable gutter utility and line selection so the shadow DOM
+  // elements are created on first render. The renderGutterUtility prop
+  // and callbacks are only wired up when reviewMode is true.
+  const baseOptions = useMemo(() => ({
     diffStyle,
     theme: 'pierre-dark' as const,
     diffIndicators: 'classic' as const,
     disableLineNumbers: false,
+    enableGutterUtility: true,
+    enableLineSelection: true,
   }), [diffStyle]);
+
+  // Convert our DiffAnnotation[] to @pierre/diffs lineAnnotations format.
+  const getFileLineAnnotations = useCallback(
+    (filePath: string, anns: DiffAnnotation[]): DiffLineAnnotation<DiffAnnotation>[] => {
+      return anns
+        .filter((a) => a.filePath === filePath)
+        .map((a) => ({
+          side: (a.side === 'old' ? 'deletions' : 'additions') as 'deletions' | 'additions',
+          lineNumber: a.lineStart,
+          metadata: a,
+        }));
+    },
+    [],
+  );
 
   // Parse the full patch into individual file diffs.
   const fileDiffs = useMemo(() => {
@@ -225,9 +300,23 @@ export function DiffViewer({
         <span className={`text-xs ${fullscreen ? 'text-gray-400' : 'text-gray-500'}`}>
           {fileDiffs.length} file{fileDiffs.length !== 1 ? 's' : ''}
         </span>
+        {reviewMode && annotations.length > 0 && (
+          <span className="rounded-full bg-yellow-100 px-2 py-0.5 text-[10px] font-medium text-yellow-800">
+            {annotations.length} annotation{annotations.length !== 1 ? 's' : ''}
+          </span>
+        )}
       </div>
 
       <div className="flex items-center gap-2">
+        {reviewMode && onSubmitReview && annotations.length > 0 && (
+          <button
+            type="button"
+            onClick={onSubmitReview}
+            className="rounded-md bg-blue-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-blue-700"
+          >
+            Submit Review ({annotations.length})
+          </button>
+        )}
         <button
           type="button"
           onClick={handleCopy}
@@ -285,6 +374,30 @@ export function DiffViewer({
     </div>
   );
 
+  // Handle popover submit.
+  const handlePopoverSubmit = useCallback(
+    (params: {
+      type: DiffAnnotation['type'];
+      scope: DiffAnnotation['scope'];
+      text: string;
+      suggestedCode?: string | undefined;
+    }) => {
+      if (!pendingSelection || !onAddAnnotation) return;
+      onAddAnnotation({
+        filePath: pendingSelection.filePath,
+        type: params.type,
+        scope: params.scope,
+        lineStart: pendingSelection.start,
+        lineEnd: pendingSelection.end,
+        side: pendingSelection.side === 'deletions' ? 'old' : 'new',
+        text: params.text,
+        suggestedCode: params.suggestedCode,
+      });
+      setPendingSelection(null);
+    },
+    [pendingSelection, onAddAnnotation],
+  );
+
   // File diffs list with data attributes for intersection observer.
   const fileDiffList = (
     <div className={`space-y-2 ${fullscreen ? 'p-4' : ''}`}>
@@ -301,7 +414,60 @@ export function DiffViewer({
           data-file-idx={idx}
           className="overflow-hidden rounded-lg border border-gray-700"
         >
-          <FileDiff fileDiff={fileDiff} options={options} />
+          <FileDiff
+            fileDiff={fileDiff}
+            options={reviewMode ? {
+              ...baseOptions,
+              onGutterUtilityClick: (range: { start: number; end: number; side?: string }) => {
+                const fp = cleanPath(fileDiff.name ?? fileDiff.prevName ?? `file-${idx}`);
+                handleLineSelectionEnd(range, fp);
+              },
+              onLineSelectionEnd: (range: { start: number; end: number; side?: string } | null) => {
+                if (!range) return;
+                const fp = cleanPath(fileDiff.name ?? fileDiff.prevName ?? `file-${idx}`);
+                handleLineSelectionEnd(range, fp);
+              },
+            } : baseOptions}
+            {...(reviewMode ? {
+              lineAnnotations: getFileLineAnnotations(
+                cleanPath(fileDiff.name ?? fileDiff.prevName ?? `file-${idx}`),
+                annotations,
+              ),
+              renderGutterUtility: (getHoveredLine: () => { lineNumber: number; side: string } | undefined) => {
+                const line = getHoveredLine();
+                if (!line) return null;
+                return (
+                  <button
+                    style={{
+                      background: 'none', border: 'none', cursor: 'pointer',
+                      color: '#60a5fa', fontSize: '16px', fontWeight: 'bold',
+                      padding: '0 4px', lineHeight: '1',
+                    }}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      const fp = cleanPath(fileDiff.name ?? fileDiff.prevName ?? `file-${idx}`);
+                      handleLineSelectionEnd({
+                        start: line.lineNumber,
+                        end: line.lineNumber,
+                        side: line.side,
+                      }, fp);
+                    }}
+                  >
+                    +
+                  </button>
+                );
+              },
+            } : {})}
+            {...(reviewMode && onUpdateAnnotation && onDeleteAnnotation ? {
+              renderAnnotation: (ann: DiffLineAnnotation<DiffAnnotation>) => (
+                <DiffAnnotationCard
+                  annotation={ann.metadata!}
+                  onUpdate={onUpdateAnnotation}
+                  onDelete={onDeleteAnnotation}
+                />
+              ),
+            } : {})}
+          />
         </div>
       ))}
     </div>
@@ -379,6 +545,17 @@ export function DiffViewer({
             {fileDiffList}
           </div>
         </div>
+        {pendingSelection && (
+          <DiffCommentPopover
+            anchorRect={pendingSelection.anchorRect}
+            filePath={pendingSelection.filePath}
+            lineStart={pendingSelection.start}
+            lineEnd={pendingSelection.end}
+            side={pendingSelection.side === 'deletions' ? 'old' : 'new'}
+            onSubmit={handlePopoverSubmit}
+            onClose={() => setPendingSelection(null)}
+          />
+        )}
       </div>
     );
   }
@@ -388,6 +565,17 @@ export function DiffViewer({
     <div className={className}>
       {toolbar}
       {fileDiffList}
+      {pendingSelection && (
+        <DiffCommentPopover
+          anchorRect={pendingSelection.anchorRect}
+          filePath={pendingSelection.filePath}
+          lineStart={pendingSelection.start}
+          lineEnd={pendingSelection.end}
+          side={pendingSelection.side === 'deletions' ? 'old' : 'new'}
+          onSubmit={handlePopoverSubmit}
+          onClose={() => setPendingSelection(null)}
+        />
+      )}
     </div>
   );
 }

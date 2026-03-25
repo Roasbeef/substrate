@@ -540,6 +540,71 @@ type PlanReviewStore interface {
 	DeletePlanReview(ctx context.Context, planReviewID string) error
 }
 
+// AnnotationStore provides plan and diff annotation CRUD operations.
+type AnnotationStore interface {
+	// CreatePlanAnnotation creates a new plan annotation.
+	CreatePlanAnnotation(
+		ctx context.Context, params CreatePlanAnnotationParams,
+	) (PlanAnnotation, error)
+
+	// GetPlanAnnotation retrieves a plan annotation by its UUID.
+	GetPlanAnnotation(
+		ctx context.Context, annotationID string,
+	) (PlanAnnotation, error)
+
+	// ListPlanAnnotationsByReview retrieves all annotations for a plan
+	// review.
+	ListPlanAnnotationsByReview(
+		ctx context.Context, planReviewID string,
+	) ([]PlanAnnotation, error)
+
+	// UpdatePlanAnnotation updates a plan annotation's content and
+	// returns the updated record.
+	UpdatePlanAnnotation(
+		ctx context.Context, params UpdatePlanAnnotationParams,
+	) (PlanAnnotation, error)
+
+	// DeletePlanAnnotation deletes a plan annotation by its UUID.
+	DeletePlanAnnotation(ctx context.Context, annotationID string) error
+
+	// DeletePlanAnnotationsByReview deletes all annotations for a plan
+	// review.
+	DeletePlanAnnotationsByReview(
+		ctx context.Context, planReviewID string,
+	) error
+
+	// CreateDiffAnnotation creates a new diff annotation.
+	CreateDiffAnnotation(
+		ctx context.Context, params CreateDiffAnnotationParams,
+	) (DiffAnnotation, error)
+
+	// GetDiffAnnotation retrieves a diff annotation by its UUID.
+	GetDiffAnnotation(
+		ctx context.Context, annotationID string,
+	) (DiffAnnotation, error)
+
+	// ListDiffAnnotationsByMessage retrieves all diff annotations for a
+	// message.
+	ListDiffAnnotationsByMessage(
+		ctx context.Context, messageID int64,
+	) ([]DiffAnnotation, error)
+
+	// UpdateDiffAnnotation updates a diff annotation's content and
+	// returns the updated record.
+	UpdateDiffAnnotation(
+		ctx context.Context, params UpdateDiffAnnotationParams,
+	) (DiffAnnotation, error)
+
+	// DeleteDiffAnnotation deletes a diff annotation by its UUID.
+	DeleteDiffAnnotation(ctx context.Context, annotationID string) error
+
+	// DeleteDiffAnnotationsByMessage deletes all diff annotations for a
+	// message.
+	DeleteDiffAnnotationsByMessage(
+		ctx context.Context, messageID int64,
+	) error
+}
+
 // Storage combines all store interfaces for unified access.
 type Storage interface {
 	MessageStore
@@ -551,6 +616,7 @@ type Storage interface {
 	TaskStore
 	ReviewStore
 	PlanReviewStore
+	AnnotationStore
 
 	// WithTx executes a function within a write database transaction.
 	WithTx(ctx context.Context, fn func(ctx context.Context, s Storage) error) error
@@ -1269,4 +1335,130 @@ func ToSqlcNullInt64Val(v int) sql.NullInt64 {
 		return sql.NullInt64{}
 	}
 	return sql.NullInt64{Int64: int64(v), Valid: true}
+}
+
+// =============================================================================
+// Annotation domain types
+// =============================================================================
+
+// PlanAnnotation represents an inline annotation on a plan review block.
+type PlanAnnotation struct {
+	ID             int64
+	PlanReviewID   string
+	AnnotationID   string
+	BlockID        string
+	AnnotationType string
+	Text           string
+	OriginalText   string
+	StartOffset    int
+	EndOffset      int
+	DiffContext    string
+	CreatedAt      time.Time
+	UpdatedAt      time.Time
+}
+
+// CreatePlanAnnotationParams contains parameters for creating a plan
+// annotation.
+type CreatePlanAnnotationParams struct {
+	PlanReviewID   string
+	AnnotationID   string
+	BlockID        string
+	AnnotationType string
+	Text           string
+	OriginalText   string
+	StartOffset    int
+	EndOffset      int
+	DiffContext    string
+}
+
+// UpdatePlanAnnotationParams contains parameters for updating a plan
+// annotation.
+type UpdatePlanAnnotationParams struct {
+	AnnotationID string
+	Text         string
+	OriginalText string
+	StartOffset  int
+	EndOffset    int
+	DiffContext  string
+}
+
+// PlanAnnotationFromSqlc converts a sqlc.PlanAnnotation to a store model.
+func PlanAnnotationFromSqlc(pa sqlc.PlanAnnotation) PlanAnnotation {
+	return PlanAnnotation{
+		ID:             pa.ID,
+		PlanReviewID:   pa.PlanReviewID,
+		AnnotationID:   pa.AnnotationID,
+		BlockID:        pa.BlockID,
+		AnnotationType: pa.AnnotationType,
+		Text:           pa.Text.String,
+		OriginalText:   pa.OriginalText,
+		StartOffset:    int(pa.StartOffset),
+		EndOffset:      int(pa.EndOffset),
+		DiffContext:    pa.DiffContext.String,
+		CreatedAt:      time.Unix(pa.CreatedAt, 0),
+		UpdatedAt:      time.Unix(pa.UpdatedAt, 0),
+	}
+}
+
+// DiffAnnotation represents a line-level annotation on a code diff.
+type DiffAnnotation struct {
+	ID             int64
+	AnnotationID   string
+	MessageID      int64
+	AnnotationType string
+	Scope          string
+	FilePath       string
+	LineStart      int
+	LineEnd        int
+	Side           string
+	Text           string
+	SuggestedCode  string
+	OriginalCode   string
+	CreatedAt      time.Time
+	UpdatedAt      time.Time
+}
+
+// CreateDiffAnnotationParams contains parameters for creating a diff
+// annotation.
+type CreateDiffAnnotationParams struct {
+	AnnotationID   string
+	MessageID      int64
+	AnnotationType string
+	Scope          string
+	FilePath       string
+	LineStart      int
+	LineEnd        int
+	Side           string
+	Text           string
+	SuggestedCode  string
+	OriginalCode   string
+}
+
+// UpdateDiffAnnotationParams contains parameters for updating a diff
+// annotation.
+type UpdateDiffAnnotationParams struct {
+	AnnotationID  string
+	Text          string
+	SuggestedCode string
+	OriginalCode  string
+}
+
+// DiffAnnotationFromSqlc converts a sqlc.DiffAnnotation to a store model.
+func DiffAnnotationFromSqlc(da sqlc.DiffAnnotation) DiffAnnotation {
+	return DiffAnnotation{
+		ID:             da.ID,
+		AnnotationID:   da.AnnotationID,
+		MessageID:      da.MessageID,
+		AnnotationType: da.AnnotationType,
+		Scope:          da.Scope,
+		FilePath:       da.FilePath,
+		LineStart:      int(da.LineStart),
+		LineEnd:        int(da.LineEnd),
+		Side:           da.Side,
+		Text:           da.Text.String,
+		SuggestedCode:  da.SuggestedCode.String,
+		OriginalCode:   da.OriginalCode.String,
+		CreatedAt:      time.Unix(da.CreatedAt, 0),
+		UpdatedAt:      time.Unix(da.UpdatedAt, 0),
+	}
 }

@@ -3331,3 +3331,391 @@ var PlanReviewService_ServiceDesc = grpc.ServiceDesc{
 	Streams:  []grpc.StreamDesc{},
 	Metadata: "mail.proto",
 }
+
+const (
+	AnnotationService_CreatePlanAnnotation_FullMethodName = "/subtraterpc.AnnotationService/CreatePlanAnnotation"
+	AnnotationService_ListPlanAnnotations_FullMethodName  = "/subtraterpc.AnnotationService/ListPlanAnnotations"
+	AnnotationService_UpdatePlanAnnotation_FullMethodName = "/subtraterpc.AnnotationService/UpdatePlanAnnotation"
+	AnnotationService_DeletePlanAnnotation_FullMethodName = "/subtraterpc.AnnotationService/DeletePlanAnnotation"
+	AnnotationService_CreateDiffAnnotation_FullMethodName = "/subtraterpc.AnnotationService/CreateDiffAnnotation"
+	AnnotationService_ListDiffAnnotations_FullMethodName  = "/subtraterpc.AnnotationService/ListDiffAnnotations"
+	AnnotationService_UpdateDiffAnnotation_FullMethodName = "/subtraterpc.AnnotationService/UpdateDiffAnnotation"
+	AnnotationService_DeleteDiffAnnotation_FullMethodName = "/subtraterpc.AnnotationService/DeleteDiffAnnotation"
+)
+
+// AnnotationServiceClient is the client API for AnnotationService service.
+//
+// For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
+//
+// AnnotationService handles plan and diff annotation CRUD operations.
+type AnnotationServiceClient interface {
+	// CreatePlanAnnotation creates a new plan annotation.
+	CreatePlanAnnotation(ctx context.Context, in *CreatePlanAnnotationRequest, opts ...grpc.CallOption) (*PlanAnnotationProto, error)
+	// ListPlanAnnotations lists all annotations for a plan review.
+	ListPlanAnnotations(ctx context.Context, in *ListPlanAnnotationsRequest, opts ...grpc.CallOption) (*ListPlanAnnotationsResponse, error)
+	// UpdatePlanAnnotation updates a plan annotation.
+	UpdatePlanAnnotation(ctx context.Context, in *UpdatePlanAnnotationRequest, opts ...grpc.CallOption) (*PlanAnnotationProto, error)
+	// DeletePlanAnnotation deletes a plan annotation.
+	DeletePlanAnnotation(ctx context.Context, in *DeletePlanAnnotationRequest, opts ...grpc.CallOption) (*DeleteAnnotationResponse, error)
+	// CreateDiffAnnotation creates a new diff annotation.
+	CreateDiffAnnotation(ctx context.Context, in *CreateDiffAnnotationRequest, opts ...grpc.CallOption) (*DiffAnnotationProto, error)
+	// ListDiffAnnotations lists all annotations for a diff message.
+	ListDiffAnnotations(ctx context.Context, in *ListDiffAnnotationsRequest, opts ...grpc.CallOption) (*ListDiffAnnotationsResponse, error)
+	// UpdateDiffAnnotation updates a diff annotation.
+	UpdateDiffAnnotation(ctx context.Context, in *UpdateDiffAnnotationRequest, opts ...grpc.CallOption) (*DiffAnnotationProto, error)
+	// DeleteDiffAnnotation deletes a diff annotation.
+	DeleteDiffAnnotation(ctx context.Context, in *DeleteDiffAnnotationRequest, opts ...grpc.CallOption) (*DeleteAnnotationResponse, error)
+}
+
+type annotationServiceClient struct {
+	cc grpc.ClientConnInterface
+}
+
+func NewAnnotationServiceClient(cc grpc.ClientConnInterface) AnnotationServiceClient {
+	return &annotationServiceClient{cc}
+}
+
+func (c *annotationServiceClient) CreatePlanAnnotation(ctx context.Context, in *CreatePlanAnnotationRequest, opts ...grpc.CallOption) (*PlanAnnotationProto, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(PlanAnnotationProto)
+	err := c.cc.Invoke(ctx, AnnotationService_CreatePlanAnnotation_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *annotationServiceClient) ListPlanAnnotations(ctx context.Context, in *ListPlanAnnotationsRequest, opts ...grpc.CallOption) (*ListPlanAnnotationsResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ListPlanAnnotationsResponse)
+	err := c.cc.Invoke(ctx, AnnotationService_ListPlanAnnotations_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *annotationServiceClient) UpdatePlanAnnotation(ctx context.Context, in *UpdatePlanAnnotationRequest, opts ...grpc.CallOption) (*PlanAnnotationProto, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(PlanAnnotationProto)
+	err := c.cc.Invoke(ctx, AnnotationService_UpdatePlanAnnotation_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *annotationServiceClient) DeletePlanAnnotation(ctx context.Context, in *DeletePlanAnnotationRequest, opts ...grpc.CallOption) (*DeleteAnnotationResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(DeleteAnnotationResponse)
+	err := c.cc.Invoke(ctx, AnnotationService_DeletePlanAnnotation_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *annotationServiceClient) CreateDiffAnnotation(ctx context.Context, in *CreateDiffAnnotationRequest, opts ...grpc.CallOption) (*DiffAnnotationProto, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(DiffAnnotationProto)
+	err := c.cc.Invoke(ctx, AnnotationService_CreateDiffAnnotation_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *annotationServiceClient) ListDiffAnnotations(ctx context.Context, in *ListDiffAnnotationsRequest, opts ...grpc.CallOption) (*ListDiffAnnotationsResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ListDiffAnnotationsResponse)
+	err := c.cc.Invoke(ctx, AnnotationService_ListDiffAnnotations_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *annotationServiceClient) UpdateDiffAnnotation(ctx context.Context, in *UpdateDiffAnnotationRequest, opts ...grpc.CallOption) (*DiffAnnotationProto, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(DiffAnnotationProto)
+	err := c.cc.Invoke(ctx, AnnotationService_UpdateDiffAnnotation_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *annotationServiceClient) DeleteDiffAnnotation(ctx context.Context, in *DeleteDiffAnnotationRequest, opts ...grpc.CallOption) (*DeleteAnnotationResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(DeleteAnnotationResponse)
+	err := c.cc.Invoke(ctx, AnnotationService_DeleteDiffAnnotation_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+// AnnotationServiceServer is the server API for AnnotationService service.
+// All implementations must embed UnimplementedAnnotationServiceServer
+// for forward compatibility.
+//
+// AnnotationService handles plan and diff annotation CRUD operations.
+type AnnotationServiceServer interface {
+	// CreatePlanAnnotation creates a new plan annotation.
+	CreatePlanAnnotation(context.Context, *CreatePlanAnnotationRequest) (*PlanAnnotationProto, error)
+	// ListPlanAnnotations lists all annotations for a plan review.
+	ListPlanAnnotations(context.Context, *ListPlanAnnotationsRequest) (*ListPlanAnnotationsResponse, error)
+	// UpdatePlanAnnotation updates a plan annotation.
+	UpdatePlanAnnotation(context.Context, *UpdatePlanAnnotationRequest) (*PlanAnnotationProto, error)
+	// DeletePlanAnnotation deletes a plan annotation.
+	DeletePlanAnnotation(context.Context, *DeletePlanAnnotationRequest) (*DeleteAnnotationResponse, error)
+	// CreateDiffAnnotation creates a new diff annotation.
+	CreateDiffAnnotation(context.Context, *CreateDiffAnnotationRequest) (*DiffAnnotationProto, error)
+	// ListDiffAnnotations lists all annotations for a diff message.
+	ListDiffAnnotations(context.Context, *ListDiffAnnotationsRequest) (*ListDiffAnnotationsResponse, error)
+	// UpdateDiffAnnotation updates a diff annotation.
+	UpdateDiffAnnotation(context.Context, *UpdateDiffAnnotationRequest) (*DiffAnnotationProto, error)
+	// DeleteDiffAnnotation deletes a diff annotation.
+	DeleteDiffAnnotation(context.Context, *DeleteDiffAnnotationRequest) (*DeleteAnnotationResponse, error)
+	mustEmbedUnimplementedAnnotationServiceServer()
+}
+
+// UnimplementedAnnotationServiceServer must be embedded to have
+// forward compatible implementations.
+//
+// NOTE: this should be embedded by value instead of pointer to avoid a nil
+// pointer dereference when methods are called.
+type UnimplementedAnnotationServiceServer struct{}
+
+func (UnimplementedAnnotationServiceServer) CreatePlanAnnotation(context.Context, *CreatePlanAnnotationRequest) (*PlanAnnotationProto, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method CreatePlanAnnotation not implemented")
+}
+func (UnimplementedAnnotationServiceServer) ListPlanAnnotations(context.Context, *ListPlanAnnotationsRequest) (*ListPlanAnnotationsResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method ListPlanAnnotations not implemented")
+}
+func (UnimplementedAnnotationServiceServer) UpdatePlanAnnotation(context.Context, *UpdatePlanAnnotationRequest) (*PlanAnnotationProto, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method UpdatePlanAnnotation not implemented")
+}
+func (UnimplementedAnnotationServiceServer) DeletePlanAnnotation(context.Context, *DeletePlanAnnotationRequest) (*DeleteAnnotationResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method DeletePlanAnnotation not implemented")
+}
+func (UnimplementedAnnotationServiceServer) CreateDiffAnnotation(context.Context, *CreateDiffAnnotationRequest) (*DiffAnnotationProto, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method CreateDiffAnnotation not implemented")
+}
+func (UnimplementedAnnotationServiceServer) ListDiffAnnotations(context.Context, *ListDiffAnnotationsRequest) (*ListDiffAnnotationsResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method ListDiffAnnotations not implemented")
+}
+func (UnimplementedAnnotationServiceServer) UpdateDiffAnnotation(context.Context, *UpdateDiffAnnotationRequest) (*DiffAnnotationProto, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method UpdateDiffAnnotation not implemented")
+}
+func (UnimplementedAnnotationServiceServer) DeleteDiffAnnotation(context.Context, *DeleteDiffAnnotationRequest) (*DeleteAnnotationResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method DeleteDiffAnnotation not implemented")
+}
+func (UnimplementedAnnotationServiceServer) mustEmbedUnimplementedAnnotationServiceServer() {}
+func (UnimplementedAnnotationServiceServer) testEmbeddedByValue()                           {}
+
+// UnsafeAnnotationServiceServer may be embedded to opt out of forward compatibility for this service.
+// Use of this interface is not recommended, as added methods to AnnotationServiceServer will
+// result in compilation errors.
+type UnsafeAnnotationServiceServer interface {
+	mustEmbedUnimplementedAnnotationServiceServer()
+}
+
+func RegisterAnnotationServiceServer(s grpc.ServiceRegistrar, srv AnnotationServiceServer) {
+	// If the following call pancis, it indicates UnimplementedAnnotationServiceServer was
+	// embedded by pointer and is nil.  This will cause panics if an
+	// unimplemented method is ever invoked, so we test this at initialization
+	// time to prevent it from happening at runtime later due to I/O.
+	if t, ok := srv.(interface{ testEmbeddedByValue() }); ok {
+		t.testEmbeddedByValue()
+	}
+	s.RegisterService(&AnnotationService_ServiceDesc, srv)
+}
+
+func _AnnotationService_CreatePlanAnnotation_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(CreatePlanAnnotationRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(AnnotationServiceServer).CreatePlanAnnotation(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: AnnotationService_CreatePlanAnnotation_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(AnnotationServiceServer).CreatePlanAnnotation(ctx, req.(*CreatePlanAnnotationRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _AnnotationService_ListPlanAnnotations_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ListPlanAnnotationsRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(AnnotationServiceServer).ListPlanAnnotations(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: AnnotationService_ListPlanAnnotations_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(AnnotationServiceServer).ListPlanAnnotations(ctx, req.(*ListPlanAnnotationsRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _AnnotationService_UpdatePlanAnnotation_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(UpdatePlanAnnotationRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(AnnotationServiceServer).UpdatePlanAnnotation(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: AnnotationService_UpdatePlanAnnotation_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(AnnotationServiceServer).UpdatePlanAnnotation(ctx, req.(*UpdatePlanAnnotationRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _AnnotationService_DeletePlanAnnotation_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(DeletePlanAnnotationRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(AnnotationServiceServer).DeletePlanAnnotation(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: AnnotationService_DeletePlanAnnotation_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(AnnotationServiceServer).DeletePlanAnnotation(ctx, req.(*DeletePlanAnnotationRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _AnnotationService_CreateDiffAnnotation_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(CreateDiffAnnotationRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(AnnotationServiceServer).CreateDiffAnnotation(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: AnnotationService_CreateDiffAnnotation_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(AnnotationServiceServer).CreateDiffAnnotation(ctx, req.(*CreateDiffAnnotationRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _AnnotationService_ListDiffAnnotations_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ListDiffAnnotationsRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(AnnotationServiceServer).ListDiffAnnotations(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: AnnotationService_ListDiffAnnotations_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(AnnotationServiceServer).ListDiffAnnotations(ctx, req.(*ListDiffAnnotationsRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _AnnotationService_UpdateDiffAnnotation_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(UpdateDiffAnnotationRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(AnnotationServiceServer).UpdateDiffAnnotation(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: AnnotationService_UpdateDiffAnnotation_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(AnnotationServiceServer).UpdateDiffAnnotation(ctx, req.(*UpdateDiffAnnotationRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _AnnotationService_DeleteDiffAnnotation_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(DeleteDiffAnnotationRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(AnnotationServiceServer).DeleteDiffAnnotation(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: AnnotationService_DeleteDiffAnnotation_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(AnnotationServiceServer).DeleteDiffAnnotation(ctx, req.(*DeleteDiffAnnotationRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+// AnnotationService_ServiceDesc is the grpc.ServiceDesc for AnnotationService service.
+// It's only intended for direct use with grpc.RegisterService,
+// and not to be introspected or modified (even as a copy)
+var AnnotationService_ServiceDesc = grpc.ServiceDesc{
+	ServiceName: "subtraterpc.AnnotationService",
+	HandlerType: (*AnnotationServiceServer)(nil),
+	Methods: []grpc.MethodDesc{
+		{
+			MethodName: "CreatePlanAnnotation",
+			Handler:    _AnnotationService_CreatePlanAnnotation_Handler,
+		},
+		{
+			MethodName: "ListPlanAnnotations",
+			Handler:    _AnnotationService_ListPlanAnnotations_Handler,
+		},
+		{
+			MethodName: "UpdatePlanAnnotation",
+			Handler:    _AnnotationService_UpdatePlanAnnotation_Handler,
+		},
+		{
+			MethodName: "DeletePlanAnnotation",
+			Handler:    _AnnotationService_DeletePlanAnnotation_Handler,
+		},
+		{
+			MethodName: "CreateDiffAnnotation",
+			Handler:    _AnnotationService_CreateDiffAnnotation_Handler,
+		},
+		{
+			MethodName: "ListDiffAnnotations",
+			Handler:    _AnnotationService_ListDiffAnnotations_Handler,
+		},
+		{
+			MethodName: "UpdateDiffAnnotation",
+			Handler:    _AnnotationService_UpdateDiffAnnotation_Handler,
+		},
+		{
+			MethodName: "DeleteDiffAnnotation",
+			Handler:    _AnnotationService_DeleteDiffAnnotation_Handler,
+		},
+	},
+	Streams:  []grpc.StreamDesc{},
+	Metadata: "mail.proto",
+}

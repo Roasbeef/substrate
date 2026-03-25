@@ -1,6 +1,6 @@
 // ThreadMessage component - a single message within a thread view.
 
-import { useMemo, useState, lazy, Suspense } from 'react';
+import { useMemo, useState, useCallback, useEffect, lazy, Suspense } from 'react';
 import { clsx } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 import { marked } from 'marked';
@@ -9,6 +9,11 @@ import { Avatar } from '@/components/ui/Avatar.js';
 import { PriorityBadge } from '@/components/ui/Badge.js';
 import { Spinner } from '@/components/ui/Spinner.js';
 import type { Message, MessageWithRecipients } from '@/types/api.js';
+import type { DiffAnnotation } from '@/types/annotations.js';
+import { useAnnotationStore } from '@/stores/annotations.js';
+import { useAuthStore } from '@/stores/auth.js';
+import { sendMessage } from '@/api/messages.js';
+import { exportDiffAnnotations } from '@/lib/feedback-export.js';
 import { formatAgentDisplayName, getAgentContext } from '@/lib/utils.js';
 
 // Lazy-load DiffViewer to avoid bundling Shiki grammars in inbox chunk.
@@ -136,6 +141,92 @@ export function ThreadMessage({
 
   // Track whether the diff section is expanded.
   const [diffExpanded, setDiffExpanded] = useState(false);
+  const [reviewMode, setReviewMode] = useState(false);
+
+  // Diff annotation support, scoped to this message's ID.
+  const {
+    diffAnnotations: allDiffAnnotations,
+    addDiffAnnotation,
+    updateDiffAnnotation: storeUpdateDiffAnnotation,
+    deleteDiffAnnotation,
+    setDiffMessageId,
+  } = useAnnotationStore();
+
+  // Filter annotations to only this message.
+  const messageId = message.id;
+  const diffAnnotations = useMemo(
+    () => allDiffAnnotations,
+    [allDiffAnnotations],
+  );
+
+  // Set the diff message ID when entering review mode.
+  useEffect(() => {
+    if (reviewMode && messageId) {
+      setDiffMessageId(messageId);
+    }
+  }, [reviewMode, messageId, setDiffMessageId]);
+
+  const handleAddDiffAnnotation = useCallback(
+    (params: {
+      filePath: string;
+      type: DiffAnnotation['type'];
+      scope: DiffAnnotation['scope'];
+      lineStart: number;
+      lineEnd: number;
+      side: 'old' | 'new';
+      text: string;
+      suggestedCode?: string | undefined;
+    }) => {
+      addDiffAnnotation(params);
+    },
+    [addDiffAnnotation],
+  );
+
+  const handleUpdateDiffAnnotation = useCallback(
+    (id: string, text: string, suggestedCode?: string | undefined) => {
+      storeUpdateDiffAnnotation(id, {
+        ...(text !== undefined ? { text } : {}),
+        ...(suggestedCode !== undefined ? { suggestedCode } : {}),
+      });
+    },
+    [storeUpdateDiffAnnotation],
+  );
+
+  const handleDeleteDiffAnnotation = useCallback(
+    (id: string) => {
+      deleteDiffAnnotation(id);
+    },
+    [deleteDiffAnnotation],
+  );
+
+  const handleSubmitReview = useCallback(() => {
+    if (diffAnnotations.length === 0) return;
+
+    const feedback = exportDiffAnnotations(diffAnnotations);
+    const currentAgent = useAuthStore.getState().currentAgent;
+    const senderName = message.sender_name || 'User';
+
+    console.log(
+      '[Review] Submitting review with',
+      diffAnnotations.length, 'annotations to', senderName,
+      'from agent', currentAgent?.name, '(id:', currentAgent?.id, ')',
+    );
+
+    sendMessage({
+      sender_id: currentAgent?.id ?? 0,
+      recipient_names: [senderName],
+      ...(message.thread_id ? { thread_id: message.thread_id } : {}),
+      subject: `Re: ${message.subject} [Code Review]`,
+      body: feedback,
+      priority: 'PRIORITY_NORMAL',
+    })
+      .then(() => {
+        console.log('[Review] Review submitted successfully');
+      })
+      .catch((err) => {
+        console.error('[Review] Submit failed:', err);
+      });
+  }, [diffAnnotations, message]);
 
   return (
     <div
@@ -220,6 +311,20 @@ export function ThreadMessage({
           >
             {diffExpanded ? 'Hide diff' : 'Show diff'}
           </button>
+          {diffExpanded && (
+            <button
+              type="button"
+              onClick={() => setReviewMode(!reviewMode)}
+              className={cn(
+                'ml-2 rounded-lg border px-3 py-1.5 text-sm font-medium transition-colors',
+                reviewMode
+                  ? 'border-green-200 bg-green-50 text-green-700'
+                  : 'border-gray-200 text-gray-600 hover:bg-gray-50',
+              )}
+            >
+              {reviewMode ? 'Exit Review' : 'Review'}
+            </button>
+          )}
 
           {diffExpanded ? (
             <div className="mt-3">
@@ -234,7 +339,15 @@ export function ThreadMessage({
                   </div>
                 }
               >
-                <DiffViewer patch={patch} />
+                <DiffViewer
+                  patch={patch}
+                  reviewMode={reviewMode}
+                  annotations={diffAnnotations}
+                  onAddAnnotation={handleAddDiffAnnotation}
+                  onUpdateAnnotation={handleUpdateDiffAnnotation}
+                  onDeleteAnnotation={handleDeleteDiffAnnotation}
+                  onSubmitReview={handleSubmitReview}
+                />
               </Suspense>
             </div>
           ) : null}

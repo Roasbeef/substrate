@@ -129,9 +129,12 @@ mkdir -p "$(dirname "$debug_log")"
 echo "=== Stop Hook Step 4: $(date) ===" >> "$debug_log"
 echo "session_args: [$session_args]" >> "$debug_log"
 
-# Record start time so we can fill the full 9m30s window on failure.
+# Record start time so we can fill the poll window on failure.
+# With the 4-day hook timeout, we poll for 9m30s per cycle. The hook
+# framework will restart the stop hook repeatedly, keeping the agent
+# alive indefinitely until Ctrl+C.
 start_time=$(date +%s)
-max_duration=570  # 9m30s
+max_duration=570  # 9m30s per poll cycle
 
 poll_output=$(substrate poll $session_args --wait=${max_duration}s --format hook --always-block 2>&1)
 poll_exit=$?

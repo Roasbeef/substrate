@@ -72,8 +72,12 @@ func runInbox(cmd *cobra.Command, args []string) error {
 
 	switch outputFormat {
 	case "json":
+		// Truncate message bodies in inbox listings to keep JSON
+		// output concise for agent context windows. Use `read <id>`
+		// for full content.
+		truncated := truncateInboxBodies(messages)
 		return outputWithPagination(
-			messages, offset, inboxLimit, len(messages),
+			truncated, offset, inboxLimit, len(truncated),
 		)
 
 	case "context":

@@ -33,40 +33,50 @@ type MockStore struct {
 	tasks      map[int64]Task
 	tasksByKey map[string]int64 // "listID:claudeTaskID" -> task ID
 
+	// Annotation data stores.
+	planAnnotations map[string]PlanAnnotation // Keyed by annotation_id.
+	diffAnnotations map[string]DiffAnnotation // Keyed by annotation_id.
+
 	// Counters for auto-incrementing IDs.
-	nextMessageID  int64
-	nextAgentID    int64
-	nextTopicID    int64
-	nextActivityID int64
-	nextTaskListID int64
-	nextTaskID     int64
-	nextSummaryID  int64
+	nextMessageID        int64
+	nextAgentID          int64
+	nextTopicID          int64
+	nextActivityID       int64
+	nextTaskListID       int64
+	nextTaskID           int64
+	nextSummaryID        int64
+	nextPlanAnnotationID int64
+	nextDiffAnnotationID int64
 }
 
 // NewMockStore creates a new in-memory mock store.
 func NewMockStore() *MockStore {
 	return &MockStore{
-		messages:          make(map[int64]Message),
-		messageRecipients: make(map[int64]map[int64]MessageRecipient),
-		agents:            make(map[int64]Agent),
-		agentsByName:      make(map[string]int64),
-		agentsBySession:   make(map[string]int64),
-		topics:            make(map[int64]Topic),
-		topicsByName:      make(map[string]int64),
-		subscriptions:     make(map[int64]map[int64]bool),
-		activities:        make([]Activity, 0),
-		summaries:         make([]AgentSummary, 0),
-		sessionIdentities: make(map[string]SessionIdentity),
-		taskLists:         make(map[string]TaskList),
-		tasks:             make(map[int64]Task),
-		tasksByKey:        make(map[string]int64),
-		nextMessageID:     1,
-		nextAgentID:       1,
-		nextTopicID:       1,
-		nextActivityID:    1,
-		nextTaskListID:    1,
-		nextTaskID:        1,
-		nextSummaryID:     1,
+		messages:             make(map[int64]Message),
+		messageRecipients:    make(map[int64]map[int64]MessageRecipient),
+		agents:               make(map[int64]Agent),
+		agentsByName:         make(map[string]int64),
+		agentsBySession:      make(map[string]int64),
+		topics:               make(map[int64]Topic),
+		topicsByName:         make(map[string]int64),
+		subscriptions:        make(map[int64]map[int64]bool),
+		activities:           make([]Activity, 0),
+		summaries:            make([]AgentSummary, 0),
+		sessionIdentities:    make(map[string]SessionIdentity),
+		taskLists:            make(map[string]TaskList),
+		tasks:                make(map[int64]Task),
+		tasksByKey:           make(map[string]int64),
+		planAnnotations:      make(map[string]PlanAnnotation),
+		diffAnnotations:      make(map[string]DiffAnnotation),
+		nextMessageID:        1,
+		nextAgentID:          1,
+		nextTopicID:          1,
+		nextActivityID:       1,
+		nextTaskListID:       1,
+		nextTaskID:           1,
+		nextSummaryID:        1,
+		nextPlanAnnotationID: 1,
+		nextDiffAnnotationID: 1,
 	}
 }
 

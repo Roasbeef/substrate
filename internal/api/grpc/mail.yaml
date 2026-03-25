@@ -272,3 +272,32 @@ http:
 
     - selector: subtraterpc.PlanReviewService.DeletePlanReview
       delete: "/api/v1/plan-reviews/{plan_review_id}"
+
+    # AnnotationService - Plan and Diff Annotation Operations
+    - selector: subtraterpc.AnnotationService.CreatePlanAnnotation
+      post: "/api/v1/plan-reviews/{plan_review_id}/annotations"
+      body: "*"
+
+    - selector: subtraterpc.AnnotationService.ListPlanAnnotations
+      get: "/api/v1/plan-reviews/{plan_review_id}/annotations"
+
+    - selector: subtraterpc.AnnotationService.UpdatePlanAnnotation
+      patch: "/api/v1/annotations/plan/{annotation_id}"
+      body: "*"
+
+    - selector: subtraterpc.AnnotationService.DeletePlanAnnotation
+      delete: "/api/v1/annotations/plan/{annotation_id}"
+
+    - selector: subtraterpc.AnnotationService.CreateDiffAnnotation
+      post: "/api/v1/messages/{message_id}/diff-annotations"
+      body: "*"
+
+    - selector: subtraterpc.AnnotationService.ListDiffAnnotations
+      get: "/api/v1/messages/{message_id}/diff-annotations"
+
+    - selector: subtraterpc.AnnotationService.UpdateDiffAnnotation
+      patch: "/api/v1/annotations/diff/{annotation_id}"
+      body: "*"
+
+    - selector: subtraterpc.AnnotationService.DeleteDiffAnnotation
+      delete: "/api/v1/annotations/diff/{annotation_id}"

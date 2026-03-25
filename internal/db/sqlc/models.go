@@ -89,6 +89,24 @@ type ConsumerOffset struct {
 	UpdatedAt  int64
 }
 
+type DiffAnnotation struct {
+	ID             int64
+	AnnotationID   string
+	MessageID      int64
+	AnnotationType string
+	Scope          string
+	FilePath       string
+	LineStart      int64
+	LineEnd        int64
+	Side           string
+	Text           sql.NullString
+	SuggestedCode  sql.NullString
+	OriginalCode   sql.NullString
+	CreatedBy      sql.NullInt64
+	CreatedAt      int64
+	UpdatedAt      int64
+}
+
 type Message struct {
 	ID              int64
 	ThreadID        string
@@ -132,6 +150,22 @@ type PendingOperation struct {
 	Attempts       int64
 	LastError      sql.NullString
 	Status         string
+}
+
+type PlanAnnotation struct {
+	ID             int64
+	PlanReviewID   string
+	AnnotationID   string
+	BlockID        string
+	AnnotationType string
+	Text           sql.NullString
+	OriginalText   string
+	StartOffset    int64
+	EndOffset      int64
+	DiffContext    sql.NullString
+	CreatedBy      sql.NullInt64
+	CreatedAt      int64
+	UpdatedAt      int64
 }
 
 type PlanReview struct {

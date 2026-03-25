@@ -53,7 +53,10 @@ var HookDefinitions = map[string]HookEntry{
 		Hooks: []HookCommand{{
 			Type:    "command",
 			Command: "~/.claude/hooks/substrate/stop.sh",
-			Timeout: 600,
+			// Long timeout (4 days) keeps the agent alive indefinitely,
+			// following plannotator's strategy. The stop hook polls for
+			// new work from other agents. Ctrl+C to force exit.
+			Timeout: 345600,
 		}},
 	},
 	"SubagentStop": {
@@ -81,8 +84,11 @@ var HookDefinitions = map[string]HookEntry{
 }
 
 // PlanHookDefinitions defines hooks for plan mode integration.
-// PostToolUse tracks plan file writes; PreToolUse intercepts ExitPlanMode
-// to submit plans for review before proceeding.
+// PostToolUse tracks plan file writes; PermissionRequest intercepts
+// ExitPlanMode to submit plans for review before proceeding. The
+// PermissionRequest hook type (not PreToolUse) is required because it
+// can return permissionDecision allow/deny to control whether the tool
+// call proceeds.
 var PlanHookDefinitions = map[string]HookEntry{
 	"PostToolUse": {
 		Matcher: "Write",
@@ -91,12 +97,16 @@ var PlanHookDefinitions = map[string]HookEntry{
 			Command: "~/.claude/hooks/substrate/posttooluse_plan.sh",
 		}},
 	},
-	"PreToolUse": {
+	"PermissionRequest": {
 		Matcher: "ExitPlanMode",
 		Hooks: []HookCommand{{
 			Type:    "command",
 			Command: "~/.claude/hooks/substrate/pretooluse_plan.sh",
-			Timeout: 600,
+			// Use a very long timeout (4 days) following plannotator's
+			// strategy. The hook blocks until the user acts on the plan
+			// review in the web UI, which may take hours or days for
+			// async review workflows.
+			Timeout: 345600,
 		}},
 	},
 }
@@ -355,8 +365,8 @@ func UninstallPlanHooks(settings *ClaudeSettings) {
 
 // IsPlanHooksInstalled checks if plan mode hooks are installed.
 func IsPlanHooksInstalled(settings *ClaudeSettings) bool {
-	// Check if the PreToolUse ExitPlanMode hook is present.
-	entries, ok := settings.Hooks["PreToolUse"]
+	// Check if the PermissionRequest ExitPlanMode hook is present.
+	entries, ok := settings.Hooks["PermissionRequest"]
 	if !ok {
 		return false
 	}

@@ -488,3 +488,30 @@ func outputWithPagination(
 
 	return outputJSON(envelope)
 }
+
+// maxInboxBodyLen is the maximum body length in inbox JSON output.
+// Messages longer than this are truncated with a hint to use `read`.
+const maxInboxBodyLen = 200
+
+// truncateInboxBodies returns a copy of messages with bodies truncated
+// for JSON output. This prevents large message bodies from flooding
+// agent context windows. Use `substrate read <id>` for full content.
+func truncateInboxBodies(msgs []mail.InboxMessage) []mail.InboxMessage {
+	result := make([]mail.InboxMessage, len(msgs))
+	copy(result, msgs)
+
+	for i := range result {
+		body := result[i].Body
+		if len(body) <= maxInboxBodyLen {
+			continue
+		}
+
+		hint := fmt.Sprintf(
+			"... [truncated, use `substrate read %d` for full message]",
+			result[i].ID,
+		)
+		result[i].Body = body[:maxInboxBodyLen] + hint
+	}
+
+	return result
+}

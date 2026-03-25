@@ -9859,6 +9859,991 @@ func (x *DeletePlanReviewResponse) GetError() string {
 	return ""
 }
 
+// PlanAnnotationProto represents a plan annotation record.
+type PlanAnnotationProto struct {
+	state          protoimpl.MessageState `protogen:"open.v1"`
+	Id             int64                  `protobuf:"varint,1,opt,name=id,proto3" json:"id,omitempty"`
+	PlanReviewId   string                 `protobuf:"bytes,2,opt,name=plan_review_id,json=planReviewId,proto3" json:"plan_review_id,omitempty"`
+	AnnotationId   string                 `protobuf:"bytes,3,opt,name=annotation_id,json=annotationId,proto3" json:"annotation_id,omitempty"`
+	BlockId        string                 `protobuf:"bytes,4,opt,name=block_id,json=blockId,proto3" json:"block_id,omitempty"`
+	AnnotationType string                 `protobuf:"bytes,5,opt,name=annotation_type,json=annotationType,proto3" json:"annotation_type,omitempty"`
+	Text           string                 `protobuf:"bytes,6,opt,name=text,proto3" json:"text,omitempty"`
+	OriginalText   string                 `protobuf:"bytes,7,opt,name=original_text,json=originalText,proto3" json:"original_text,omitempty"`
+	StartOffset    int32                  `protobuf:"varint,8,opt,name=start_offset,json=startOffset,proto3" json:"start_offset,omitempty"`
+	EndOffset      int32                  `protobuf:"varint,9,opt,name=end_offset,json=endOffset,proto3" json:"end_offset,omitempty"`
+	DiffContext    string                 `protobuf:"bytes,10,opt,name=diff_context,json=diffContext,proto3" json:"diff_context,omitempty"`
+	CreatedAt      int64                  `protobuf:"varint,11,opt,name=created_at,json=createdAt,proto3" json:"created_at,omitempty"`
+	UpdatedAt      int64                  `protobuf:"varint,12,opt,name=updated_at,json=updatedAt,proto3" json:"updated_at,omitempty"`
+	unknownFields  protoimpl.UnknownFields
+	sizeCache      protoimpl.SizeCache
+}
+
+func (x *PlanAnnotationProto) Reset() {
+	*x = PlanAnnotationProto{}
+	mi := &file_mail_proto_msgTypes[152]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *PlanAnnotationProto) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*PlanAnnotationProto) ProtoMessage() {}
+
+func (x *PlanAnnotationProto) ProtoReflect() protoreflect.Message {
+	mi := &file_mail_proto_msgTypes[152]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use PlanAnnotationProto.ProtoReflect.Descriptor instead.
+func (*PlanAnnotationProto) Descriptor() ([]byte, []int) {
+	return file_mail_proto_rawDescGZIP(), []int{152}
+}
+
+func (x *PlanAnnotationProto) GetId() int64 {
+	if x != nil {
+		return x.Id
+	}
+	return 0
+}
+
+func (x *PlanAnnotationProto) GetPlanReviewId() string {
+	if x != nil {
+		return x.PlanReviewId
+	}
+	return ""
+}
+
+func (x *PlanAnnotationProto) GetAnnotationId() string {
+	if x != nil {
+		return x.AnnotationId
+	}
+	return ""
+}
+
+func (x *PlanAnnotationProto) GetBlockId() string {
+	if x != nil {
+		return x.BlockId
+	}
+	return ""
+}
+
+func (x *PlanAnnotationProto) GetAnnotationType() string {
+	if x != nil {
+		return x.AnnotationType
+	}
+	return ""
+}
+
+func (x *PlanAnnotationProto) GetText() string {
+	if x != nil {
+		return x.Text
+	}
+	return ""
+}
+
+func (x *PlanAnnotationProto) GetOriginalText() string {
+	if x != nil {
+		return x.OriginalText
+	}
+	return ""
+}
+
+func (x *PlanAnnotationProto) GetStartOffset() int32 {
+	if x != nil {
+		return x.StartOffset
+	}
+	return 0
+}
+
+func (x *PlanAnnotationProto) GetEndOffset() int32 {
+	if x != nil {
+		return x.EndOffset
+	}
+	return 0
+}
+
+func (x *PlanAnnotationProto) GetDiffContext() string {
+	if x != nil {
+		return x.DiffContext
+	}
+	return ""
+}
+
+func (x *PlanAnnotationProto) GetCreatedAt() int64 {
+	if x != nil {
+		return x.CreatedAt
+	}
+	return 0
+}
+
+func (x *PlanAnnotationProto) GetUpdatedAt() int64 {
+	if x != nil {
+		return x.UpdatedAt
+	}
+	return 0
+}
+
+// DiffAnnotationProto represents a diff annotation record.
+type DiffAnnotationProto struct {
+	state          protoimpl.MessageState `protogen:"open.v1"`
+	Id             int64                  `protobuf:"varint,1,opt,name=id,proto3" json:"id,omitempty"`
+	AnnotationId   string                 `protobuf:"bytes,2,opt,name=annotation_id,json=annotationId,proto3" json:"annotation_id,omitempty"`
+	MessageId      int64                  `protobuf:"varint,3,opt,name=message_id,json=messageId,proto3" json:"message_id,omitempty"`
+	AnnotationType string                 `protobuf:"bytes,4,opt,name=annotation_type,json=annotationType,proto3" json:"annotation_type,omitempty"`
+	Scope          string                 `protobuf:"bytes,5,opt,name=scope,proto3" json:"scope,omitempty"`
+	FilePath       string                 `protobuf:"bytes,6,opt,name=file_path,json=filePath,proto3" json:"file_path,omitempty"`
+	LineStart      int32                  `protobuf:"varint,7,opt,name=line_start,json=lineStart,proto3" json:"line_start,omitempty"`
+	LineEnd        int32                  `protobuf:"varint,8,opt,name=line_end,json=lineEnd,proto3" json:"line_end,omitempty"`
+	Side           string                 `protobuf:"bytes,9,opt,name=side,proto3" json:"side,omitempty"`
+	Text           string                 `protobuf:"bytes,10,opt,name=text,proto3" json:"text,omitempty"`
+	SuggestedCode  string                 `protobuf:"bytes,11,opt,name=suggested_code,json=suggestedCode,proto3" json:"suggested_code,omitempty"`
+	OriginalCode   string                 `protobuf:"bytes,12,opt,name=original_code,json=originalCode,proto3" json:"original_code,omitempty"`
+	CreatedAt      int64                  `protobuf:"varint,13,opt,name=created_at,json=createdAt,proto3" json:"created_at,omitempty"`
+	UpdatedAt      int64                  `protobuf:"varint,14,opt,name=updated_at,json=updatedAt,proto3" json:"updated_at,omitempty"`
+	unknownFields  protoimpl.UnknownFields
+	sizeCache      protoimpl.SizeCache
+}
+
+func (x *DiffAnnotationProto) Reset() {
+	*x = DiffAnnotationProto{}
+	mi := &file_mail_proto_msgTypes[153]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *DiffAnnotationProto) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*DiffAnnotationProto) ProtoMessage() {}
+
+func (x *DiffAnnotationProto) ProtoReflect() protoreflect.Message {
+	mi := &file_mail_proto_msgTypes[153]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use DiffAnnotationProto.ProtoReflect.Descriptor instead.
+func (*DiffAnnotationProto) Descriptor() ([]byte, []int) {
+	return file_mail_proto_rawDescGZIP(), []int{153}
+}
+
+func (x *DiffAnnotationProto) GetId() int64 {
+	if x != nil {
+		return x.Id
+	}
+	return 0
+}
+
+func (x *DiffAnnotationProto) GetAnnotationId() string {
+	if x != nil {
+		return x.AnnotationId
+	}
+	return ""
+}
+
+func (x *DiffAnnotationProto) GetMessageId() int64 {
+	if x != nil {
+		return x.MessageId
+	}
+	return 0
+}
+
+func (x *DiffAnnotationProto) GetAnnotationType() string {
+	if x != nil {
+		return x.AnnotationType
+	}
+	return ""
+}
+
+func (x *DiffAnnotationProto) GetScope() string {
+	if x != nil {
+		return x.Scope
+	}
+	return ""
+}
+
+func (x *DiffAnnotationProto) GetFilePath() string {
+	if x != nil {
+		return x.FilePath
+	}
+	return ""
+}
+
+func (x *DiffAnnotationProto) GetLineStart() int32 {
+	if x != nil {
+		return x.LineStart
+	}
+	return 0
+}
+
+func (x *DiffAnnotationProto) GetLineEnd() int32 {
+	if x != nil {
+		return x.LineEnd
+	}
+	return 0
+}
+
+func (x *DiffAnnotationProto) GetSide() string {
+	if x != nil {
+		return x.Side
+	}
+	return ""
+}
+
+func (x *DiffAnnotationProto) GetText() string {
+	if x != nil {
+		return x.Text
+	}
+	return ""
+}
+
+func (x *DiffAnnotationProto) GetSuggestedCode() string {
+	if x != nil {
+		return x.SuggestedCode
+	}
+	return ""
+}
+
+func (x *DiffAnnotationProto) GetOriginalCode() string {
+	if x != nil {
+		return x.OriginalCode
+	}
+	return ""
+}
+
+func (x *DiffAnnotationProto) GetCreatedAt() int64 {
+	if x != nil {
+		return x.CreatedAt
+	}
+	return 0
+}
+
+func (x *DiffAnnotationProto) GetUpdatedAt() int64 {
+	if x != nil {
+		return x.UpdatedAt
+	}
+	return 0
+}
+
+// CreatePlanAnnotationRequest is the request for CreatePlanAnnotation.
+type CreatePlanAnnotationRequest struct {
+	state          protoimpl.MessageState `protogen:"open.v1"`
+	PlanReviewId   string                 `protobuf:"bytes,1,opt,name=plan_review_id,json=planReviewId,proto3" json:"plan_review_id,omitempty"`
+	AnnotationId   string                 `protobuf:"bytes,2,opt,name=annotation_id,json=annotationId,proto3" json:"annotation_id,omitempty"`
+	BlockId        string                 `protobuf:"bytes,3,opt,name=block_id,json=blockId,proto3" json:"block_id,omitempty"`
+	AnnotationType string                 `protobuf:"bytes,4,opt,name=annotation_type,json=annotationType,proto3" json:"annotation_type,omitempty"`
+	Text           string                 `protobuf:"bytes,5,opt,name=text,proto3" json:"text,omitempty"`
+	OriginalText   string                 `protobuf:"bytes,6,opt,name=original_text,json=originalText,proto3" json:"original_text,omitempty"`
+	StartOffset    int32                  `protobuf:"varint,7,opt,name=start_offset,json=startOffset,proto3" json:"start_offset,omitempty"`
+	EndOffset      int32                  `protobuf:"varint,8,opt,name=end_offset,json=endOffset,proto3" json:"end_offset,omitempty"`
+	DiffContext    string                 `protobuf:"bytes,9,opt,name=diff_context,json=diffContext,proto3" json:"diff_context,omitempty"`
+	unknownFields  protoimpl.UnknownFields
+	sizeCache      protoimpl.SizeCache
+}
+
+func (x *CreatePlanAnnotationRequest) Reset() {
+	*x = CreatePlanAnnotationRequest{}
+	mi := &file_mail_proto_msgTypes[154]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *CreatePlanAnnotationRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*CreatePlanAnnotationRequest) ProtoMessage() {}
+
+func (x *CreatePlanAnnotationRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_mail_proto_msgTypes[154]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use CreatePlanAnnotationRequest.ProtoReflect.Descriptor instead.
+func (*CreatePlanAnnotationRequest) Descriptor() ([]byte, []int) {
+	return file_mail_proto_rawDescGZIP(), []int{154}
+}
+
+func (x *CreatePlanAnnotationRequest) GetPlanReviewId() string {
+	if x != nil {
+		return x.PlanReviewId
+	}
+	return ""
+}
+
+func (x *CreatePlanAnnotationRequest) GetAnnotationId() string {
+	if x != nil {
+		return x.AnnotationId
+	}
+	return ""
+}
+
+func (x *CreatePlanAnnotationRequest) GetBlockId() string {
+	if x != nil {
+		return x.BlockId
+	}
+	return ""
+}
+
+func (x *CreatePlanAnnotationRequest) GetAnnotationType() string {
+	if x != nil {
+		return x.AnnotationType
+	}
+	return ""
+}
+
+func (x *CreatePlanAnnotationRequest) GetText() string {
+	if x != nil {
+		return x.Text
+	}
+	return ""
+}
+
+func (x *CreatePlanAnnotationRequest) GetOriginalText() string {
+	if x != nil {
+		return x.OriginalText
+	}
+	return ""
+}
+
+func (x *CreatePlanAnnotationRequest) GetStartOffset() int32 {
+	if x != nil {
+		return x.StartOffset
+	}
+	return 0
+}
+
+func (x *CreatePlanAnnotationRequest) GetEndOffset() int32 {
+	if x != nil {
+		return x.EndOffset
+	}
+	return 0
+}
+
+func (x *CreatePlanAnnotationRequest) GetDiffContext() string {
+	if x != nil {
+		return x.DiffContext
+	}
+	return ""
+}
+
+// ListPlanAnnotationsRequest is the request for ListPlanAnnotations.
+type ListPlanAnnotationsRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	PlanReviewId  string                 `protobuf:"bytes,1,opt,name=plan_review_id,json=planReviewId,proto3" json:"plan_review_id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ListPlanAnnotationsRequest) Reset() {
+	*x = ListPlanAnnotationsRequest{}
+	mi := &file_mail_proto_msgTypes[155]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ListPlanAnnotationsRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ListPlanAnnotationsRequest) ProtoMessage() {}
+
+func (x *ListPlanAnnotationsRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_mail_proto_msgTypes[155]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ListPlanAnnotationsRequest.ProtoReflect.Descriptor instead.
+func (*ListPlanAnnotationsRequest) Descriptor() ([]byte, []int) {
+	return file_mail_proto_rawDescGZIP(), []int{155}
+}
+
+func (x *ListPlanAnnotationsRequest) GetPlanReviewId() string {
+	if x != nil {
+		return x.PlanReviewId
+	}
+	return ""
+}
+
+// ListPlanAnnotationsResponse is the response for ListPlanAnnotations.
+type ListPlanAnnotationsResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Annotations   []*PlanAnnotationProto `protobuf:"bytes,1,rep,name=annotations,proto3" json:"annotations,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ListPlanAnnotationsResponse) Reset() {
+	*x = ListPlanAnnotationsResponse{}
+	mi := &file_mail_proto_msgTypes[156]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ListPlanAnnotationsResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ListPlanAnnotationsResponse) ProtoMessage() {}
+
+func (x *ListPlanAnnotationsResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_mail_proto_msgTypes[156]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ListPlanAnnotationsResponse.ProtoReflect.Descriptor instead.
+func (*ListPlanAnnotationsResponse) Descriptor() ([]byte, []int) {
+	return file_mail_proto_rawDescGZIP(), []int{156}
+}
+
+func (x *ListPlanAnnotationsResponse) GetAnnotations() []*PlanAnnotationProto {
+	if x != nil {
+		return x.Annotations
+	}
+	return nil
+}
+
+// UpdatePlanAnnotationRequest is the request for UpdatePlanAnnotation.
+type UpdatePlanAnnotationRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	AnnotationId  string                 `protobuf:"bytes,1,opt,name=annotation_id,json=annotationId,proto3" json:"annotation_id,omitempty"`
+	Text          string                 `protobuf:"bytes,2,opt,name=text,proto3" json:"text,omitempty"`
+	OriginalText  string                 `protobuf:"bytes,3,opt,name=original_text,json=originalText,proto3" json:"original_text,omitempty"`
+	StartOffset   int32                  `protobuf:"varint,4,opt,name=start_offset,json=startOffset,proto3" json:"start_offset,omitempty"`
+	EndOffset     int32                  `protobuf:"varint,5,opt,name=end_offset,json=endOffset,proto3" json:"end_offset,omitempty"`
+	DiffContext   string                 `protobuf:"bytes,6,opt,name=diff_context,json=diffContext,proto3" json:"diff_context,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *UpdatePlanAnnotationRequest) Reset() {
+	*x = UpdatePlanAnnotationRequest{}
+	mi := &file_mail_proto_msgTypes[157]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *UpdatePlanAnnotationRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*UpdatePlanAnnotationRequest) ProtoMessage() {}
+
+func (x *UpdatePlanAnnotationRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_mail_proto_msgTypes[157]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use UpdatePlanAnnotationRequest.ProtoReflect.Descriptor instead.
+func (*UpdatePlanAnnotationRequest) Descriptor() ([]byte, []int) {
+	return file_mail_proto_rawDescGZIP(), []int{157}
+}
+
+func (x *UpdatePlanAnnotationRequest) GetAnnotationId() string {
+	if x != nil {
+		return x.AnnotationId
+	}
+	return ""
+}
+
+func (x *UpdatePlanAnnotationRequest) GetText() string {
+	if x != nil {
+		return x.Text
+	}
+	return ""
+}
+
+func (x *UpdatePlanAnnotationRequest) GetOriginalText() string {
+	if x != nil {
+		return x.OriginalText
+	}
+	return ""
+}
+
+func (x *UpdatePlanAnnotationRequest) GetStartOffset() int32 {
+	if x != nil {
+		return x.StartOffset
+	}
+	return 0
+}
+
+func (x *UpdatePlanAnnotationRequest) GetEndOffset() int32 {
+	if x != nil {
+		return x.EndOffset
+	}
+	return 0
+}
+
+func (x *UpdatePlanAnnotationRequest) GetDiffContext() string {
+	if x != nil {
+		return x.DiffContext
+	}
+	return ""
+}
+
+// DeletePlanAnnotationRequest is the request for DeletePlanAnnotation.
+type DeletePlanAnnotationRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	AnnotationId  string                 `protobuf:"bytes,1,opt,name=annotation_id,json=annotationId,proto3" json:"annotation_id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *DeletePlanAnnotationRequest) Reset() {
+	*x = DeletePlanAnnotationRequest{}
+	mi := &file_mail_proto_msgTypes[158]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *DeletePlanAnnotationRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*DeletePlanAnnotationRequest) ProtoMessage() {}
+
+func (x *DeletePlanAnnotationRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_mail_proto_msgTypes[158]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use DeletePlanAnnotationRequest.ProtoReflect.Descriptor instead.
+func (*DeletePlanAnnotationRequest) Descriptor() ([]byte, []int) {
+	return file_mail_proto_rawDescGZIP(), []int{158}
+}
+
+func (x *DeletePlanAnnotationRequest) GetAnnotationId() string {
+	if x != nil {
+		return x.AnnotationId
+	}
+	return ""
+}
+
+// DeleteAnnotationResponse is the generic response for annotation deletion.
+type DeleteAnnotationResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Error         string                 `protobuf:"bytes,1,opt,name=error,proto3" json:"error,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *DeleteAnnotationResponse) Reset() {
+	*x = DeleteAnnotationResponse{}
+	mi := &file_mail_proto_msgTypes[159]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *DeleteAnnotationResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*DeleteAnnotationResponse) ProtoMessage() {}
+
+func (x *DeleteAnnotationResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_mail_proto_msgTypes[159]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use DeleteAnnotationResponse.ProtoReflect.Descriptor instead.
+func (*DeleteAnnotationResponse) Descriptor() ([]byte, []int) {
+	return file_mail_proto_rawDescGZIP(), []int{159}
+}
+
+func (x *DeleteAnnotationResponse) GetError() string {
+	if x != nil {
+		return x.Error
+	}
+	return ""
+}
+
+// CreateDiffAnnotationRequest is the request for CreateDiffAnnotation.
+type CreateDiffAnnotationRequest struct {
+	state          protoimpl.MessageState `protogen:"open.v1"`
+	AnnotationId   string                 `protobuf:"bytes,1,opt,name=annotation_id,json=annotationId,proto3" json:"annotation_id,omitempty"`
+	MessageId      int64                  `protobuf:"varint,2,opt,name=message_id,json=messageId,proto3" json:"message_id,omitempty"`
+	AnnotationType string                 `protobuf:"bytes,3,opt,name=annotation_type,json=annotationType,proto3" json:"annotation_type,omitempty"`
+	Scope          string                 `protobuf:"bytes,4,opt,name=scope,proto3" json:"scope,omitempty"`
+	FilePath       string                 `protobuf:"bytes,5,opt,name=file_path,json=filePath,proto3" json:"file_path,omitempty"`
+	LineStart      int32                  `protobuf:"varint,6,opt,name=line_start,json=lineStart,proto3" json:"line_start,omitempty"`
+	LineEnd        int32                  `protobuf:"varint,7,opt,name=line_end,json=lineEnd,proto3" json:"line_end,omitempty"`
+	Side           string                 `protobuf:"bytes,8,opt,name=side,proto3" json:"side,omitempty"`
+	Text           string                 `protobuf:"bytes,9,opt,name=text,proto3" json:"text,omitempty"`
+	SuggestedCode  string                 `protobuf:"bytes,10,opt,name=suggested_code,json=suggestedCode,proto3" json:"suggested_code,omitempty"`
+	OriginalCode   string                 `protobuf:"bytes,11,opt,name=original_code,json=originalCode,proto3" json:"original_code,omitempty"`
+	unknownFields  protoimpl.UnknownFields
+	sizeCache      protoimpl.SizeCache
+}
+
+func (x *CreateDiffAnnotationRequest) Reset() {
+	*x = CreateDiffAnnotationRequest{}
+	mi := &file_mail_proto_msgTypes[160]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *CreateDiffAnnotationRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*CreateDiffAnnotationRequest) ProtoMessage() {}
+
+func (x *CreateDiffAnnotationRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_mail_proto_msgTypes[160]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use CreateDiffAnnotationRequest.ProtoReflect.Descriptor instead.
+func (*CreateDiffAnnotationRequest) Descriptor() ([]byte, []int) {
+	return file_mail_proto_rawDescGZIP(), []int{160}
+}
+
+func (x *CreateDiffAnnotationRequest) GetAnnotationId() string {
+	if x != nil {
+		return x.AnnotationId
+	}
+	return ""
+}
+
+func (x *CreateDiffAnnotationRequest) GetMessageId() int64 {
+	if x != nil {
+		return x.MessageId
+	}
+	return 0
+}
+
+func (x *CreateDiffAnnotationRequest) GetAnnotationType() string {
+	if x != nil {
+		return x.AnnotationType
+	}
+	return ""
+}
+
+func (x *CreateDiffAnnotationRequest) GetScope() string {
+	if x != nil {
+		return x.Scope
+	}
+	return ""
+}
+
+func (x *CreateDiffAnnotationRequest) GetFilePath() string {
+	if x != nil {
+		return x.FilePath
+	}
+	return ""
+}
+
+func (x *CreateDiffAnnotationRequest) GetLineStart() int32 {
+	if x != nil {
+		return x.LineStart
+	}
+	return 0
+}
+
+func (x *CreateDiffAnnotationRequest) GetLineEnd() int32 {
+	if x != nil {
+		return x.LineEnd
+	}
+	return 0
+}
+
+func (x *CreateDiffAnnotationRequest) GetSide() string {
+	if x != nil {
+		return x.Side
+	}
+	return ""
+}
+
+func (x *CreateDiffAnnotationRequest) GetText() string {
+	if x != nil {
+		return x.Text
+	}
+	return ""
+}
+
+func (x *CreateDiffAnnotationRequest) GetSuggestedCode() string {
+	if x != nil {
+		return x.SuggestedCode
+	}
+	return ""
+}
+
+func (x *CreateDiffAnnotationRequest) GetOriginalCode() string {
+	if x != nil {
+		return x.OriginalCode
+	}
+	return ""
+}
+
+// ListDiffAnnotationsRequest is the request for ListDiffAnnotations.
+type ListDiffAnnotationsRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	MessageId     int64                  `protobuf:"varint,1,opt,name=message_id,json=messageId,proto3" json:"message_id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ListDiffAnnotationsRequest) Reset() {
+	*x = ListDiffAnnotationsRequest{}
+	mi := &file_mail_proto_msgTypes[161]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ListDiffAnnotationsRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ListDiffAnnotationsRequest) ProtoMessage() {}
+
+func (x *ListDiffAnnotationsRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_mail_proto_msgTypes[161]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ListDiffAnnotationsRequest.ProtoReflect.Descriptor instead.
+func (*ListDiffAnnotationsRequest) Descriptor() ([]byte, []int) {
+	return file_mail_proto_rawDescGZIP(), []int{161}
+}
+
+func (x *ListDiffAnnotationsRequest) GetMessageId() int64 {
+	if x != nil {
+		return x.MessageId
+	}
+	return 0
+}
+
+// ListDiffAnnotationsResponse is the response for ListDiffAnnotations.
+type ListDiffAnnotationsResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Annotations   []*DiffAnnotationProto `protobuf:"bytes,1,rep,name=annotations,proto3" json:"annotations,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ListDiffAnnotationsResponse) Reset() {
+	*x = ListDiffAnnotationsResponse{}
+	mi := &file_mail_proto_msgTypes[162]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ListDiffAnnotationsResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ListDiffAnnotationsResponse) ProtoMessage() {}
+
+func (x *ListDiffAnnotationsResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_mail_proto_msgTypes[162]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ListDiffAnnotationsResponse.ProtoReflect.Descriptor instead.
+func (*ListDiffAnnotationsResponse) Descriptor() ([]byte, []int) {
+	return file_mail_proto_rawDescGZIP(), []int{162}
+}
+
+func (x *ListDiffAnnotationsResponse) GetAnnotations() []*DiffAnnotationProto {
+	if x != nil {
+		return x.Annotations
+	}
+	return nil
+}
+
+// UpdateDiffAnnotationRequest is the request for UpdateDiffAnnotation.
+type UpdateDiffAnnotationRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	AnnotationId  string                 `protobuf:"bytes,1,opt,name=annotation_id,json=annotationId,proto3" json:"annotation_id,omitempty"`
+	Text          string                 `protobuf:"bytes,2,opt,name=text,proto3" json:"text,omitempty"`
+	SuggestedCode string                 `protobuf:"bytes,3,opt,name=suggested_code,json=suggestedCode,proto3" json:"suggested_code,omitempty"`
+	OriginalCode  string                 `protobuf:"bytes,4,opt,name=original_code,json=originalCode,proto3" json:"original_code,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *UpdateDiffAnnotationRequest) Reset() {
+	*x = UpdateDiffAnnotationRequest{}
+	mi := &file_mail_proto_msgTypes[163]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *UpdateDiffAnnotationRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*UpdateDiffAnnotationRequest) ProtoMessage() {}
+
+func (x *UpdateDiffAnnotationRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_mail_proto_msgTypes[163]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use UpdateDiffAnnotationRequest.ProtoReflect.Descriptor instead.
+func (*UpdateDiffAnnotationRequest) Descriptor() ([]byte, []int) {
+	return file_mail_proto_rawDescGZIP(), []int{163}
+}
+
+func (x *UpdateDiffAnnotationRequest) GetAnnotationId() string {
+	if x != nil {
+		return x.AnnotationId
+	}
+	return ""
+}
+
+func (x *UpdateDiffAnnotationRequest) GetText() string {
+	if x != nil {
+		return x.Text
+	}
+	return ""
+}
+
+func (x *UpdateDiffAnnotationRequest) GetSuggestedCode() string {
+	if x != nil {
+		return x.SuggestedCode
+	}
+	return ""
+}
+
+func (x *UpdateDiffAnnotationRequest) GetOriginalCode() string {
+	if x != nil {
+		return x.OriginalCode
+	}
+	return ""
+}
+
+// DeleteDiffAnnotationRequest is the request for DeleteDiffAnnotation.
+type DeleteDiffAnnotationRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	AnnotationId  string                 `protobuf:"bytes,1,opt,name=annotation_id,json=annotationId,proto3" json:"annotation_id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *DeleteDiffAnnotationRequest) Reset() {
+	*x = DeleteDiffAnnotationRequest{}
+	mi := &file_mail_proto_msgTypes[164]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *DeleteDiffAnnotationRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*DeleteDiffAnnotationRequest) ProtoMessage() {}
+
+func (x *DeleteDiffAnnotationRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_mail_proto_msgTypes[164]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use DeleteDiffAnnotationRequest.ProtoReflect.Descriptor instead.
+func (*DeleteDiffAnnotationRequest) Descriptor() ([]byte, []int) {
+	return file_mail_proto_rawDescGZIP(), []int{164}
+}
+
+func (x *DeleteDiffAnnotationRequest) GetAnnotationId() string {
+	if x != nil {
+		return x.AnnotationId
+	}
+	return ""
+}
+
 var File_mail_proto protoreflect.FileDescriptor
 
 const file_mail_proto_rawDesc = "" +
@@ -10612,7 +11597,98 @@ const file_mail_proto_rawDesc = "" +
 	"\x17DeletePlanReviewRequest\x12$\n" +
 	"\x0eplan_review_id\x18\x01 \x01(\tR\fplanReviewId\"0\n" +
 	"\x18DeletePlanReviewResponse\x12\x14\n" +
-	"\x05error\x18\x01 \x01(\tR\x05error*`\n" +
+	"\x05error\x18\x01 \x01(\tR\x05error\"\x90\x03\n" +
+	"\x13PlanAnnotationProto\x12\x0e\n" +
+	"\x02id\x18\x01 \x01(\x03R\x02id\x12$\n" +
+	"\x0eplan_review_id\x18\x02 \x01(\tR\fplanReviewId\x12#\n" +
+	"\rannotation_id\x18\x03 \x01(\tR\fannotationId\x12\x19\n" +
+	"\bblock_id\x18\x04 \x01(\tR\ablockId\x12'\n" +
+	"\x0fannotation_type\x18\x05 \x01(\tR\x0eannotationType\x12\x12\n" +
+	"\x04text\x18\x06 \x01(\tR\x04text\x12#\n" +
+	"\roriginal_text\x18\a \x01(\tR\foriginalText\x12!\n" +
+	"\fstart_offset\x18\b \x01(\x05R\vstartOffset\x12\x1d\n" +
+	"\n" +
+	"end_offset\x18\t \x01(\x05R\tendOffset\x12!\n" +
+	"\fdiff_context\x18\n" +
+	" \x01(\tR\vdiffContext\x12\x1d\n" +
+	"\n" +
+	"created_at\x18\v \x01(\x03R\tcreatedAt\x12\x1d\n" +
+	"\n" +
+	"updated_at\x18\f \x01(\x03R\tupdatedAt\"\xb1\x03\n" +
+	"\x13DiffAnnotationProto\x12\x0e\n" +
+	"\x02id\x18\x01 \x01(\x03R\x02id\x12#\n" +
+	"\rannotation_id\x18\x02 \x01(\tR\fannotationId\x12\x1d\n" +
+	"\n" +
+	"message_id\x18\x03 \x01(\x03R\tmessageId\x12'\n" +
+	"\x0fannotation_type\x18\x04 \x01(\tR\x0eannotationType\x12\x14\n" +
+	"\x05scope\x18\x05 \x01(\tR\x05scope\x12\x1b\n" +
+	"\tfile_path\x18\x06 \x01(\tR\bfilePath\x12\x1d\n" +
+	"\n" +
+	"line_start\x18\a \x01(\x05R\tlineStart\x12\x19\n" +
+	"\bline_end\x18\b \x01(\x05R\alineEnd\x12\x12\n" +
+	"\x04side\x18\t \x01(\tR\x04side\x12\x12\n" +
+	"\x04text\x18\n" +
+	" \x01(\tR\x04text\x12%\n" +
+	"\x0esuggested_code\x18\v \x01(\tR\rsuggestedCode\x12#\n" +
+	"\roriginal_code\x18\f \x01(\tR\foriginalCode\x12\x1d\n" +
+	"\n" +
+	"created_at\x18\r \x01(\x03R\tcreatedAt\x12\x1d\n" +
+	"\n" +
+	"updated_at\x18\x0e \x01(\x03R\tupdatedAt\"\xca\x02\n" +
+	"\x1bCreatePlanAnnotationRequest\x12$\n" +
+	"\x0eplan_review_id\x18\x01 \x01(\tR\fplanReviewId\x12#\n" +
+	"\rannotation_id\x18\x02 \x01(\tR\fannotationId\x12\x19\n" +
+	"\bblock_id\x18\x03 \x01(\tR\ablockId\x12'\n" +
+	"\x0fannotation_type\x18\x04 \x01(\tR\x0eannotationType\x12\x12\n" +
+	"\x04text\x18\x05 \x01(\tR\x04text\x12#\n" +
+	"\roriginal_text\x18\x06 \x01(\tR\foriginalText\x12!\n" +
+	"\fstart_offset\x18\a \x01(\x05R\vstartOffset\x12\x1d\n" +
+	"\n" +
+	"end_offset\x18\b \x01(\x05R\tendOffset\x12!\n" +
+	"\fdiff_context\x18\t \x01(\tR\vdiffContext\"B\n" +
+	"\x1aListPlanAnnotationsRequest\x12$\n" +
+	"\x0eplan_review_id\x18\x01 \x01(\tR\fplanReviewId\"a\n" +
+	"\x1bListPlanAnnotationsResponse\x12B\n" +
+	"\vannotations\x18\x01 \x03(\v2 .subtraterpc.PlanAnnotationProtoR\vannotations\"\xe0\x01\n" +
+	"\x1bUpdatePlanAnnotationRequest\x12#\n" +
+	"\rannotation_id\x18\x01 \x01(\tR\fannotationId\x12\x12\n" +
+	"\x04text\x18\x02 \x01(\tR\x04text\x12#\n" +
+	"\roriginal_text\x18\x03 \x01(\tR\foriginalText\x12!\n" +
+	"\fstart_offset\x18\x04 \x01(\x05R\vstartOffset\x12\x1d\n" +
+	"\n" +
+	"end_offset\x18\x05 \x01(\x05R\tendOffset\x12!\n" +
+	"\fdiff_context\x18\x06 \x01(\tR\vdiffContext\"B\n" +
+	"\x1bDeletePlanAnnotationRequest\x12#\n" +
+	"\rannotation_id\x18\x01 \x01(\tR\fannotationId\"0\n" +
+	"\x18DeleteAnnotationResponse\x12\x14\n" +
+	"\x05error\x18\x01 \x01(\tR\x05error\"\xeb\x02\n" +
+	"\x1bCreateDiffAnnotationRequest\x12#\n" +
+	"\rannotation_id\x18\x01 \x01(\tR\fannotationId\x12\x1d\n" +
+	"\n" +
+	"message_id\x18\x02 \x01(\x03R\tmessageId\x12'\n" +
+	"\x0fannotation_type\x18\x03 \x01(\tR\x0eannotationType\x12\x14\n" +
+	"\x05scope\x18\x04 \x01(\tR\x05scope\x12\x1b\n" +
+	"\tfile_path\x18\x05 \x01(\tR\bfilePath\x12\x1d\n" +
+	"\n" +
+	"line_start\x18\x06 \x01(\x05R\tlineStart\x12\x19\n" +
+	"\bline_end\x18\a \x01(\x05R\alineEnd\x12\x12\n" +
+	"\x04side\x18\b \x01(\tR\x04side\x12\x12\n" +
+	"\x04text\x18\t \x01(\tR\x04text\x12%\n" +
+	"\x0esuggested_code\x18\n" +
+	" \x01(\tR\rsuggestedCode\x12#\n" +
+	"\roriginal_code\x18\v \x01(\tR\foriginalCode\";\n" +
+	"\x1aListDiffAnnotationsRequest\x12\x1d\n" +
+	"\n" +
+	"message_id\x18\x01 \x01(\x03R\tmessageId\"a\n" +
+	"\x1bListDiffAnnotationsResponse\x12B\n" +
+	"\vannotations\x18\x01 \x03(\v2 .subtraterpc.DiffAnnotationProtoR\vannotations\"\xa2\x01\n" +
+	"\x1bUpdateDiffAnnotationRequest\x12#\n" +
+	"\rannotation_id\x18\x01 \x01(\tR\fannotationId\x12\x12\n" +
+	"\x04text\x18\x02 \x01(\tR\x04text\x12%\n" +
+	"\x0esuggested_code\x18\x03 \x01(\tR\rsuggestedCode\x12#\n" +
+	"\roriginal_code\x18\x04 \x01(\tR\foriginalCode\"B\n" +
+	"\x1bDeleteDiffAnnotationRequest\x12#\n" +
+	"\rannotation_id\x18\x01 \x01(\tR\fannotationId*`\n" +
 	"\bPriority\x12\x18\n" +
 	"\x14PRIORITY_UNSPECIFIED\x10\x00\x12\x10\n" +
 	"\fPRIORITY_LOW\x10\x01\x12\x13\n" +
@@ -10743,7 +11819,16 @@ const file_mail_proto_rawDesc = "" +
 	"\x16GetPlanReviewBySession\x12*.subtraterpc.GetPlanReviewBySessionRequest\x1a\x1c.subtraterpc.PlanReviewProto\x12\\\n" +
 	"\x0fListPlanReviews\x12#.subtraterpc.ListPlanReviewsRequest\x1a$.subtraterpc.ListPlanReviewsResponse\x12b\n" +
 	"\x16UpdatePlanReviewStatus\x12*.subtraterpc.UpdatePlanReviewStatusRequest\x1a\x1c.subtraterpc.PlanReviewProto\x12_\n" +
-	"\x10DeletePlanReview\x12$.subtraterpc.DeletePlanReviewRequest\x1a%.subtraterpc.DeletePlanReviewResponseB<Z:github.com/roasbeef/subtrate/internal/api/grpc/subtraterpcb\x06proto3"
+	"\x10DeletePlanReview\x12$.subtraterpc.DeletePlanReviewRequest\x1a%.subtraterpc.DeletePlanReviewResponse2\xc9\x06\n" +
+	"\x11AnnotationService\x12b\n" +
+	"\x14CreatePlanAnnotation\x12(.subtraterpc.CreatePlanAnnotationRequest\x1a .subtraterpc.PlanAnnotationProto\x12h\n" +
+	"\x13ListPlanAnnotations\x12'.subtraterpc.ListPlanAnnotationsRequest\x1a(.subtraterpc.ListPlanAnnotationsResponse\x12b\n" +
+	"\x14UpdatePlanAnnotation\x12(.subtraterpc.UpdatePlanAnnotationRequest\x1a .subtraterpc.PlanAnnotationProto\x12g\n" +
+	"\x14DeletePlanAnnotation\x12(.subtraterpc.DeletePlanAnnotationRequest\x1a%.subtraterpc.DeleteAnnotationResponse\x12b\n" +
+	"\x14CreateDiffAnnotation\x12(.subtraterpc.CreateDiffAnnotationRequest\x1a .subtraterpc.DiffAnnotationProto\x12h\n" +
+	"\x13ListDiffAnnotations\x12'.subtraterpc.ListDiffAnnotationsRequest\x1a(.subtraterpc.ListDiffAnnotationsResponse\x12b\n" +
+	"\x14UpdateDiffAnnotation\x12(.subtraterpc.UpdateDiffAnnotationRequest\x1a .subtraterpc.DiffAnnotationProto\x12g\n" +
+	"\x14DeleteDiffAnnotation\x12(.subtraterpc.DeleteDiffAnnotationRequest\x1a%.subtraterpc.DeleteAnnotationResponseB<Z:github.com/roasbeef/subtrate/internal/api/grpc/subtraterpcb\x06proto3"
 
 var (
 	file_mail_proto_rawDescOnce sync.Once
@@ -10758,7 +11843,7 @@ func file_mail_proto_rawDescGZIP() []byte {
 }
 
 var file_mail_proto_enumTypes = make([]protoimpl.EnumInfo, 7)
-var file_mail_proto_msgTypes = make([]protoimpl.MessageInfo, 155)
+var file_mail_proto_msgTypes = make([]protoimpl.MessageInfo, 168)
 var file_mail_proto_goTypes = []any{
 	(Priority)(0),                          // 0: subtraterpc.Priority
 	(MessageState)(0),                      // 1: subtraterpc.MessageState
@@ -10919,62 +12004,75 @@ var file_mail_proto_goTypes = []any{
 	(*UpdatePlanReviewStatusRequest)(nil),  // 156: subtraterpc.UpdatePlanReviewStatusRequest
 	(*DeletePlanReviewRequest)(nil),        // 157: subtraterpc.DeletePlanReviewRequest
 	(*DeletePlanReviewResponse)(nil),       // 158: subtraterpc.DeletePlanReviewResponse
-	nil,                                    // 159: subtraterpc.PollChangesRequest.SinceOffsetsEntry
-	nil,                                    // 160: subtraterpc.PollChangesResponse.NewOffsetsEntry
-	nil,                                    // 161: subtraterpc.SaveIdentityRequest.ConsumerOffsetsEntry
-	(*timestamppb.Timestamp)(nil),          // 162: google.protobuf.Timestamp
+	(*PlanAnnotationProto)(nil),            // 159: subtraterpc.PlanAnnotationProto
+	(*DiffAnnotationProto)(nil),            // 160: subtraterpc.DiffAnnotationProto
+	(*CreatePlanAnnotationRequest)(nil),    // 161: subtraterpc.CreatePlanAnnotationRequest
+	(*ListPlanAnnotationsRequest)(nil),     // 162: subtraterpc.ListPlanAnnotationsRequest
+	(*ListPlanAnnotationsResponse)(nil),    // 163: subtraterpc.ListPlanAnnotationsResponse
+	(*UpdatePlanAnnotationRequest)(nil),    // 164: subtraterpc.UpdatePlanAnnotationRequest
+	(*DeletePlanAnnotationRequest)(nil),    // 165: subtraterpc.DeletePlanAnnotationRequest
+	(*DeleteAnnotationResponse)(nil),       // 166: subtraterpc.DeleteAnnotationResponse
+	(*CreateDiffAnnotationRequest)(nil),    // 167: subtraterpc.CreateDiffAnnotationRequest
+	(*ListDiffAnnotationsRequest)(nil),     // 168: subtraterpc.ListDiffAnnotationsRequest
+	(*ListDiffAnnotationsResponse)(nil),    // 169: subtraterpc.ListDiffAnnotationsResponse
+	(*UpdateDiffAnnotationRequest)(nil),    // 170: subtraterpc.UpdateDiffAnnotationRequest
+	(*DeleteDiffAnnotationRequest)(nil),    // 171: subtraterpc.DeleteDiffAnnotationRequest
+	nil,                                    // 172: subtraterpc.PollChangesRequest.SinceOffsetsEntry
+	nil,                                    // 173: subtraterpc.PollChangesResponse.NewOffsetsEntry
+	nil,                                    // 174: subtraterpc.SaveIdentityRequest.ConsumerOffsetsEntry
+	(*timestamppb.Timestamp)(nil),          // 175: google.protobuf.Timestamp
 }
 var file_mail_proto_depIdxs = []int32{
 	0,   // 0: subtraterpc.InboxMessage.priority:type_name -> subtraterpc.Priority
 	1,   // 1: subtraterpc.InboxMessage.state:type_name -> subtraterpc.MessageState
-	162, // 2: subtraterpc.InboxMessage.created_at:type_name -> google.protobuf.Timestamp
-	162, // 3: subtraterpc.InboxMessage.deadline_at:type_name -> google.protobuf.Timestamp
-	162, // 4: subtraterpc.InboxMessage.snoozed_until:type_name -> google.protobuf.Timestamp
-	162, // 5: subtraterpc.InboxMessage.read_at:type_name -> google.protobuf.Timestamp
-	162, // 6: subtraterpc.InboxMessage.acknowledged_at:type_name -> google.protobuf.Timestamp
+	175, // 2: subtraterpc.InboxMessage.created_at:type_name -> google.protobuf.Timestamp
+	175, // 3: subtraterpc.InboxMessage.deadline_at:type_name -> google.protobuf.Timestamp
+	175, // 4: subtraterpc.InboxMessage.snoozed_until:type_name -> google.protobuf.Timestamp
+	175, // 5: subtraterpc.InboxMessage.read_at:type_name -> google.protobuf.Timestamp
+	175, // 6: subtraterpc.InboxMessage.acknowledged_at:type_name -> google.protobuf.Timestamp
 	0,   // 7: subtraterpc.SendMailRequest.priority:type_name -> subtraterpc.Priority
-	162, // 8: subtraterpc.SendMailRequest.deadline_at:type_name -> google.protobuf.Timestamp
+	175, // 8: subtraterpc.SendMailRequest.deadline_at:type_name -> google.protobuf.Timestamp
 	1,   // 9: subtraterpc.FetchInboxRequest.state_filter:type_name -> subtraterpc.MessageState
 	7,   // 10: subtraterpc.FetchInboxResponse.messages:type_name -> subtraterpc.InboxMessage
 	7,   // 11: subtraterpc.ReadMessageResponse.message:type_name -> subtraterpc.InboxMessage
 	7,   // 12: subtraterpc.ReadThreadResponse.messages:type_name -> subtraterpc.InboxMessage
 	1,   // 13: subtraterpc.UpdateStateRequest.new_state:type_name -> subtraterpc.MessageState
-	162, // 14: subtraterpc.UpdateStateRequest.snoozed_until:type_name -> google.protobuf.Timestamp
-	159, // 15: subtraterpc.PollChangesRequest.since_offsets:type_name -> subtraterpc.PollChangesRequest.SinceOffsetsEntry
+	175, // 14: subtraterpc.UpdateStateRequest.snoozed_until:type_name -> google.protobuf.Timestamp
+	172, // 15: subtraterpc.PollChangesRequest.since_offsets:type_name -> subtraterpc.PollChangesRequest.SinceOffsetsEntry
 	7,   // 16: subtraterpc.PollChangesResponse.new_messages:type_name -> subtraterpc.InboxMessage
-	160, // 17: subtraterpc.PollChangesResponse.new_offsets:type_name -> subtraterpc.PollChangesResponse.NewOffsetsEntry
+	173, // 17: subtraterpc.PollChangesResponse.new_offsets:type_name -> subtraterpc.PollChangesResponse.NewOffsetsEntry
 	0,   // 18: subtraterpc.PublishRequest.priority:type_name -> subtraterpc.Priority
-	162, // 19: subtraterpc.Topic.created_at:type_name -> google.protobuf.Timestamp
+	175, // 19: subtraterpc.Topic.created_at:type_name -> google.protobuf.Timestamp
 	31,  // 20: subtraterpc.ListTopicsResponse.topics:type_name -> subtraterpc.Topic
 	7,   // 21: subtraterpc.SearchResponse.results:type_name -> subtraterpc.InboxMessage
-	162, // 22: subtraterpc.GetAgentResponse.created_at:type_name -> google.protobuf.Timestamp
-	162, // 23: subtraterpc.GetAgentResponse.last_active_at:type_name -> google.protobuf.Timestamp
+	175, // 22: subtraterpc.GetAgentResponse.created_at:type_name -> google.protobuf.Timestamp
+	175, // 23: subtraterpc.GetAgentResponse.last_active_at:type_name -> google.protobuf.Timestamp
 	41,  // 24: subtraterpc.ListAgentsResponse.agents:type_name -> subtraterpc.GetAgentResponse
-	161, // 25: subtraterpc.SaveIdentityRequest.consumer_offsets:type_name -> subtraterpc.SaveIdentityRequest.ConsumerOffsetsEntry
+	174, // 25: subtraterpc.SaveIdentityRequest.consumer_offsets:type_name -> subtraterpc.SaveIdentityRequest.ConsumerOffsetsEntry
 	31,  // 26: subtraterpc.GetTopicResponse.topic:type_name -> subtraterpc.Topic
 	61,  // 27: subtraterpc.AutocompleteRecipientsResponse.recipients:type_name -> subtraterpc.AutocompleteRecipient
 	41,  // 28: subtraterpc.UpdateAgentResponse.agent:type_name -> subtraterpc.GetAgentResponse
 	2,   // 29: subtraterpc.AgentWithStatus.status:type_name -> subtraterpc.AgentStatus
-	162, // 30: subtraterpc.AgentWithStatus.last_active_at:type_name -> google.protobuf.Timestamp
+	175, // 30: subtraterpc.AgentWithStatus.last_active_at:type_name -> google.protobuf.Timestamp
 	67,  // 31: subtraterpc.GetAgentsStatusResponse.agents:type_name -> subtraterpc.AgentWithStatus
 	68,  // 32: subtraterpc.GetAgentsStatusResponse.counts:type_name -> subtraterpc.AgentStatusCounts
 	2,   // 33: subtraterpc.DiscoverAgentsRequest.status_filter:type_name -> subtraterpc.AgentStatus
 	2,   // 34: subtraterpc.DiscoveredAgent.status:type_name -> subtraterpc.AgentStatus
-	162, // 35: subtraterpc.DiscoveredAgent.last_active_at:type_name -> google.protobuf.Timestamp
+	175, // 35: subtraterpc.DiscoveredAgent.last_active_at:type_name -> google.protobuf.Timestamp
 	72,  // 36: subtraterpc.DiscoverAgentsResponse.agents:type_name -> subtraterpc.DiscoveredAgent
 	68,  // 37: subtraterpc.DiscoverAgentsResponse.counts:type_name -> subtraterpc.AgentStatusCounts
-	162, // 38: subtraterpc.SessionInfo.started_at:type_name -> google.protobuf.Timestamp
-	162, // 39: subtraterpc.SessionInfo.ended_at:type_name -> google.protobuf.Timestamp
+	175, // 38: subtraterpc.SessionInfo.started_at:type_name -> google.protobuf.Timestamp
+	175, // 39: subtraterpc.SessionInfo.ended_at:type_name -> google.protobuf.Timestamp
 	3,   // 40: subtraterpc.SessionInfo.status:type_name -> subtraterpc.SessionStatus
 	76,  // 41: subtraterpc.ListSessionsResponse.sessions:type_name -> subtraterpc.SessionInfo
 	76,  // 42: subtraterpc.GetSessionResponse.session:type_name -> subtraterpc.SessionInfo
 	76,  // 43: subtraterpc.StartSessionResponse.session:type_name -> subtraterpc.SessionInfo
 	4,   // 44: subtraterpc.ActivityInfo.type:type_name -> subtraterpc.ActivityType
-	162, // 45: subtraterpc.ActivityInfo.created_at:type_name -> google.protobuf.Timestamp
+	175, // 45: subtraterpc.ActivityInfo.created_at:type_name -> google.protobuf.Timestamp
 	4,   // 46: subtraterpc.ListActivitiesRequest.type:type_name -> subtraterpc.ActivityType
 	85,  // 47: subtraterpc.ListActivitiesResponse.activities:type_name -> subtraterpc.ActivityInfo
 	88,  // 48: subtraterpc.GetDashboardStatsResponse.stats:type_name -> subtraterpc.DashboardStats
-	162, // 49: subtraterpc.HealthCheckResponse.time:type_name -> google.protobuf.Timestamp
+	175, // 49: subtraterpc.HealthCheckResponse.time:type_name -> google.protobuf.Timestamp
 	93,  // 50: subtraterpc.CreateReviewRequest.branch_target:type_name -> subtraterpc.BranchTarget
 	94,  // 51: subtraterpc.CreateReviewRequest.commit_target:type_name -> subtraterpc.CommitTarget
 	95,  // 52: subtraterpc.CreateReviewRequest.commit_range_target:type_name -> subtraterpc.CommitRangeTarget
@@ -10982,13 +12080,13 @@ var file_mail_proto_depIdxs = []int32{
 	101, // 54: subtraterpc.ListReviewsProtoResponse.reviews:type_name -> subtraterpc.ReviewSummaryProto
 	104, // 55: subtraterpc.ReviewDetailResponse.iteration_details:type_name -> subtraterpc.ReviewIterationProto
 	112, // 56: subtraterpc.ListReviewIssuesResponse.issues:type_name -> subtraterpc.ReviewIssueProto
-	162, // 57: subtraterpc.TaskListProto.created_at:type_name -> google.protobuf.Timestamp
-	162, // 58: subtraterpc.TaskListProto.last_synced_at:type_name -> google.protobuf.Timestamp
+	175, // 57: subtraterpc.TaskListProto.created_at:type_name -> google.protobuf.Timestamp
+	175, // 58: subtraterpc.TaskListProto.last_synced_at:type_name -> google.protobuf.Timestamp
 	5,   // 59: subtraterpc.TaskProto.status:type_name -> subtraterpc.TaskStatus
-	162, // 60: subtraterpc.TaskProto.created_at:type_name -> google.protobuf.Timestamp
-	162, // 61: subtraterpc.TaskProto.updated_at:type_name -> google.protobuf.Timestamp
-	162, // 62: subtraterpc.TaskProto.started_at:type_name -> google.protobuf.Timestamp
-	162, // 63: subtraterpc.TaskProto.completed_at:type_name -> google.protobuf.Timestamp
+	175, // 60: subtraterpc.TaskProto.created_at:type_name -> google.protobuf.Timestamp
+	175, // 61: subtraterpc.TaskProto.updated_at:type_name -> google.protobuf.Timestamp
+	175, // 62: subtraterpc.TaskProto.started_at:type_name -> google.protobuf.Timestamp
+	175, // 63: subtraterpc.TaskProto.completed_at:type_name -> google.protobuf.Timestamp
 	117, // 64: subtraterpc.RegisterTaskListResponse.task_list:type_name -> subtraterpc.TaskListProto
 	117, // 65: subtraterpc.GetTaskListResponse.task_list:type_name -> subtraterpc.TaskListProto
 	117, // 66: subtraterpc.ListTaskListsResponse.task_lists:type_name -> subtraterpc.TaskListProto
@@ -10998,155 +12096,173 @@ var file_mail_proto_depIdxs = []int32{
 	5,   // 70: subtraterpc.ListTasksRequest.status:type_name -> subtraterpc.TaskStatus
 	118, // 71: subtraterpc.ListTasksResponse.tasks:type_name -> subtraterpc.TaskProto
 	5,   // 72: subtraterpc.UpdateTaskStatusRequest.status:type_name -> subtraterpc.TaskStatus
-	162, // 73: subtraterpc.GetTaskStatsRequest.today_since:type_name -> google.protobuf.Timestamp
+	175, // 73: subtraterpc.GetTaskStatsRequest.today_since:type_name -> google.protobuf.Timestamp
 	119, // 74: subtraterpc.GetTaskStatsResponse.stats:type_name -> subtraterpc.TaskStatsProto
-	162, // 75: subtraterpc.GetAllAgentTaskStatsRequest.today_since:type_name -> google.protobuf.Timestamp
+	175, // 75: subtraterpc.GetAllAgentTaskStatsRequest.today_since:type_name -> google.protobuf.Timestamp
 	120, // 76: subtraterpc.GetAllAgentTaskStatsResponse.stats:type_name -> subtraterpc.AgentTaskStatsProto
-	162, // 77: subtraterpc.PruneOldTasksRequest.older_than:type_name -> google.protobuf.Timestamp
+	175, // 77: subtraterpc.PruneOldTasksRequest.older_than:type_name -> google.protobuf.Timestamp
 	149, // 78: subtraterpc.ListPlanReviewsResponse.plan_reviews:type_name -> subtraterpc.PlanReviewProto
-	8,   // 79: subtraterpc.Mail.SendMail:input_type -> subtraterpc.SendMailRequest
-	10,  // 80: subtraterpc.Mail.FetchInbox:input_type -> subtraterpc.FetchInboxRequest
-	12,  // 81: subtraterpc.Mail.ReadMessage:input_type -> subtraterpc.ReadMessageRequest
-	14,  // 82: subtraterpc.Mail.ReadThread:input_type -> subtraterpc.ReadThreadRequest
-	16,  // 83: subtraterpc.Mail.UpdateState:input_type -> subtraterpc.UpdateStateRequest
-	18,  // 84: subtraterpc.Mail.AckMessage:input_type -> subtraterpc.AckMessageRequest
-	20,  // 85: subtraterpc.Mail.GetStatus:input_type -> subtraterpc.GetStatusRequest
-	22,  // 86: subtraterpc.Mail.PollChanges:input_type -> subtraterpc.PollChangesRequest
-	24,  // 87: subtraterpc.Mail.SubscribeInbox:input_type -> subtraterpc.SubscribeInboxRequest
-	25,  // 88: subtraterpc.Mail.Publish:input_type -> subtraterpc.PublishRequest
-	27,  // 89: subtraterpc.Mail.Subscribe:input_type -> subtraterpc.SubscribeRequest
-	29,  // 90: subtraterpc.Mail.Unsubscribe:input_type -> subtraterpc.UnsubscribeRequest
-	32,  // 91: subtraterpc.Mail.ListTopics:input_type -> subtraterpc.ListTopicsRequest
-	34,  // 92: subtraterpc.Mail.Search:input_type -> subtraterpc.SearchRequest
-	36,  // 93: subtraterpc.Mail.HasUnackedStatusTo:input_type -> subtraterpc.HasUnackedStatusToRequest
-	50,  // 94: subtraterpc.Mail.ReplyToThread:input_type -> subtraterpc.ReplyToThreadRequest
-	52,  // 95: subtraterpc.Mail.ArchiveThread:input_type -> subtraterpc.ArchiveThreadRequest
-	54,  // 96: subtraterpc.Mail.DeleteThread:input_type -> subtraterpc.DeleteThreadRequest
-	56,  // 97: subtraterpc.Mail.MarkThreadUnread:input_type -> subtraterpc.MarkThreadUnreadRequest
-	58,  // 98: subtraterpc.Mail.GetTopic:input_type -> subtraterpc.GetTopicRequest
-	60,  // 99: subtraterpc.Mail.AutocompleteRecipients:input_type -> subtraterpc.AutocompleteRecipientsRequest
-	63,  // 100: subtraterpc.Mail.DeleteMessage:input_type -> subtraterpc.DeleteMessageRequest
-	38,  // 101: subtraterpc.Agent.RegisterAgent:input_type -> subtraterpc.RegisterAgentRequest
-	40,  // 102: subtraterpc.Agent.GetAgent:input_type -> subtraterpc.GetAgentRequest
-	42,  // 103: subtraterpc.Agent.ListAgents:input_type -> subtraterpc.ListAgentsRequest
-	48,  // 104: subtraterpc.Agent.DeleteAgent:input_type -> subtraterpc.DeleteAgentRequest
-	65,  // 105: subtraterpc.Agent.UpdateAgent:input_type -> subtraterpc.UpdateAgentRequest
-	69,  // 106: subtraterpc.Agent.GetAgentsStatus:input_type -> subtraterpc.GetAgentsStatusRequest
-	74,  // 107: subtraterpc.Agent.Heartbeat:input_type -> subtraterpc.HeartbeatRequest
-	44,  // 108: subtraterpc.Agent.EnsureIdentity:input_type -> subtraterpc.EnsureIdentityRequest
-	46,  // 109: subtraterpc.Agent.SaveIdentity:input_type -> subtraterpc.SaveIdentityRequest
-	71,  // 110: subtraterpc.Agent.DiscoverAgents:input_type -> subtraterpc.DiscoverAgentsRequest
-	77,  // 111: subtraterpc.Session.ListSessions:input_type -> subtraterpc.ListSessionsRequest
-	79,  // 112: subtraterpc.Session.GetSession:input_type -> subtraterpc.GetSessionRequest
-	81,  // 113: subtraterpc.Session.StartSession:input_type -> subtraterpc.StartSessionRequest
-	83,  // 114: subtraterpc.Session.CompleteSession:input_type -> subtraterpc.CompleteSessionRequest
-	86,  // 115: subtraterpc.Activity.ListActivities:input_type -> subtraterpc.ListActivitiesRequest
-	89,  // 116: subtraterpc.Stats.GetDashboardStats:input_type -> subtraterpc.GetDashboardStatsRequest
-	91,  // 117: subtraterpc.Stats.HealthCheck:input_type -> subtraterpc.HealthCheckRequest
-	121, // 118: subtraterpc.TaskService.RegisterTaskList:input_type -> subtraterpc.RegisterTaskListRequest
-	123, // 119: subtraterpc.TaskService.GetTaskList:input_type -> subtraterpc.GetTaskListRequest
-	125, // 120: subtraterpc.TaskService.ListTaskLists:input_type -> subtraterpc.ListTaskListsRequest
-	127, // 121: subtraterpc.TaskService.UnregisterTaskList:input_type -> subtraterpc.UnregisterTaskListRequest
-	129, // 122: subtraterpc.TaskService.UpsertTask:input_type -> subtraterpc.UpsertTaskRequest
-	131, // 123: subtraterpc.TaskService.GetTask:input_type -> subtraterpc.GetTaskProtoRequest
-	133, // 124: subtraterpc.TaskService.ListTasks:input_type -> subtraterpc.ListTasksRequest
-	135, // 125: subtraterpc.TaskService.UpdateTaskStatus:input_type -> subtraterpc.UpdateTaskStatusRequest
-	137, // 126: subtraterpc.TaskService.UpdateTaskOwner:input_type -> subtraterpc.UpdateTaskOwnerRequest
-	139, // 127: subtraterpc.TaskService.DeleteTask:input_type -> subtraterpc.DeleteTaskRequest
-	141, // 128: subtraterpc.TaskService.GetTaskStats:input_type -> subtraterpc.GetTaskStatsRequest
-	143, // 129: subtraterpc.TaskService.GetAllAgentTaskStats:input_type -> subtraterpc.GetAllAgentTaskStatsRequest
-	145, // 130: subtraterpc.TaskService.SyncTaskList:input_type -> subtraterpc.SyncTaskListRequest
-	147, // 131: subtraterpc.TaskService.PruneOldTasks:input_type -> subtraterpc.PruneOldTasksRequest
-	97,  // 132: subtraterpc.ReviewService.CreateReview:input_type -> subtraterpc.CreateReviewRequest
-	99,  // 133: subtraterpc.ReviewService.ListReviews:input_type -> subtraterpc.ListReviewsProtoRequest
-	102, // 134: subtraterpc.ReviewService.GetReview:input_type -> subtraterpc.GetReviewProtoRequest
-	105, // 135: subtraterpc.ReviewService.ResubmitReview:input_type -> subtraterpc.ResubmitReviewRequest
-	106, // 136: subtraterpc.ReviewService.CancelReview:input_type -> subtraterpc.CancelReviewProtoRequest
-	108, // 137: subtraterpc.ReviewService.DeleteReview:input_type -> subtraterpc.DeleteReviewProtoRequest
-	110, // 138: subtraterpc.ReviewService.ListReviewIssues:input_type -> subtraterpc.ListReviewIssuesRequest
-	113, // 139: subtraterpc.ReviewService.UpdateIssueStatus:input_type -> subtraterpc.UpdateIssueStatusRequest
-	115, // 140: subtraterpc.ReviewService.GetReviewDiff:input_type -> subtraterpc.GetReviewDiffRequest
-	150, // 141: subtraterpc.PlanReviewService.CreatePlanReview:input_type -> subtraterpc.CreatePlanReviewRequest
-	151, // 142: subtraterpc.PlanReviewService.GetPlanReview:input_type -> subtraterpc.GetPlanReviewRequest
-	152, // 143: subtraterpc.PlanReviewService.GetPlanReviewByThread:input_type -> subtraterpc.GetPlanReviewByThreadRequest
-	153, // 144: subtraterpc.PlanReviewService.GetPlanReviewBySession:input_type -> subtraterpc.GetPlanReviewBySessionRequest
-	154, // 145: subtraterpc.PlanReviewService.ListPlanReviews:input_type -> subtraterpc.ListPlanReviewsRequest
-	156, // 146: subtraterpc.PlanReviewService.UpdatePlanReviewStatus:input_type -> subtraterpc.UpdatePlanReviewStatusRequest
-	157, // 147: subtraterpc.PlanReviewService.DeletePlanReview:input_type -> subtraterpc.DeletePlanReviewRequest
-	9,   // 148: subtraterpc.Mail.SendMail:output_type -> subtraterpc.SendMailResponse
-	11,  // 149: subtraterpc.Mail.FetchInbox:output_type -> subtraterpc.FetchInboxResponse
-	13,  // 150: subtraterpc.Mail.ReadMessage:output_type -> subtraterpc.ReadMessageResponse
-	15,  // 151: subtraterpc.Mail.ReadThread:output_type -> subtraterpc.ReadThreadResponse
-	17,  // 152: subtraterpc.Mail.UpdateState:output_type -> subtraterpc.UpdateStateResponse
-	19,  // 153: subtraterpc.Mail.AckMessage:output_type -> subtraterpc.AckMessageResponse
-	21,  // 154: subtraterpc.Mail.GetStatus:output_type -> subtraterpc.GetStatusResponse
-	23,  // 155: subtraterpc.Mail.PollChanges:output_type -> subtraterpc.PollChangesResponse
-	7,   // 156: subtraterpc.Mail.SubscribeInbox:output_type -> subtraterpc.InboxMessage
-	26,  // 157: subtraterpc.Mail.Publish:output_type -> subtraterpc.PublishResponse
-	28,  // 158: subtraterpc.Mail.Subscribe:output_type -> subtraterpc.SubscribeResponse
-	30,  // 159: subtraterpc.Mail.Unsubscribe:output_type -> subtraterpc.UnsubscribeResponse
-	33,  // 160: subtraterpc.Mail.ListTopics:output_type -> subtraterpc.ListTopicsResponse
-	35,  // 161: subtraterpc.Mail.Search:output_type -> subtraterpc.SearchResponse
-	37,  // 162: subtraterpc.Mail.HasUnackedStatusTo:output_type -> subtraterpc.HasUnackedStatusToResponse
-	51,  // 163: subtraterpc.Mail.ReplyToThread:output_type -> subtraterpc.ReplyToThreadResponse
-	53,  // 164: subtraterpc.Mail.ArchiveThread:output_type -> subtraterpc.ArchiveThreadResponse
-	55,  // 165: subtraterpc.Mail.DeleteThread:output_type -> subtraterpc.DeleteThreadResponse
-	57,  // 166: subtraterpc.Mail.MarkThreadUnread:output_type -> subtraterpc.MarkThreadUnreadResponse
-	59,  // 167: subtraterpc.Mail.GetTopic:output_type -> subtraterpc.GetTopicResponse
-	62,  // 168: subtraterpc.Mail.AutocompleteRecipients:output_type -> subtraterpc.AutocompleteRecipientsResponse
-	64,  // 169: subtraterpc.Mail.DeleteMessage:output_type -> subtraterpc.DeleteMessageResponse
-	39,  // 170: subtraterpc.Agent.RegisterAgent:output_type -> subtraterpc.RegisterAgentResponse
-	41,  // 171: subtraterpc.Agent.GetAgent:output_type -> subtraterpc.GetAgentResponse
-	43,  // 172: subtraterpc.Agent.ListAgents:output_type -> subtraterpc.ListAgentsResponse
-	49,  // 173: subtraterpc.Agent.DeleteAgent:output_type -> subtraterpc.DeleteAgentResponse
-	66,  // 174: subtraterpc.Agent.UpdateAgent:output_type -> subtraterpc.UpdateAgentResponse
-	70,  // 175: subtraterpc.Agent.GetAgentsStatus:output_type -> subtraterpc.GetAgentsStatusResponse
-	75,  // 176: subtraterpc.Agent.Heartbeat:output_type -> subtraterpc.HeartbeatResponse
-	45,  // 177: subtraterpc.Agent.EnsureIdentity:output_type -> subtraterpc.EnsureIdentityResponse
-	47,  // 178: subtraterpc.Agent.SaveIdentity:output_type -> subtraterpc.SaveIdentityResponse
-	73,  // 179: subtraterpc.Agent.DiscoverAgents:output_type -> subtraterpc.DiscoverAgentsResponse
-	78,  // 180: subtraterpc.Session.ListSessions:output_type -> subtraterpc.ListSessionsResponse
-	80,  // 181: subtraterpc.Session.GetSession:output_type -> subtraterpc.GetSessionResponse
-	82,  // 182: subtraterpc.Session.StartSession:output_type -> subtraterpc.StartSessionResponse
-	84,  // 183: subtraterpc.Session.CompleteSession:output_type -> subtraterpc.CompleteSessionResponse
-	87,  // 184: subtraterpc.Activity.ListActivities:output_type -> subtraterpc.ListActivitiesResponse
-	90,  // 185: subtraterpc.Stats.GetDashboardStats:output_type -> subtraterpc.GetDashboardStatsResponse
-	92,  // 186: subtraterpc.Stats.HealthCheck:output_type -> subtraterpc.HealthCheckResponse
-	122, // 187: subtraterpc.TaskService.RegisterTaskList:output_type -> subtraterpc.RegisterTaskListResponse
-	124, // 188: subtraterpc.TaskService.GetTaskList:output_type -> subtraterpc.GetTaskListResponse
-	126, // 189: subtraterpc.TaskService.ListTaskLists:output_type -> subtraterpc.ListTaskListsResponse
-	128, // 190: subtraterpc.TaskService.UnregisterTaskList:output_type -> subtraterpc.UnregisterTaskListResponse
-	130, // 191: subtraterpc.TaskService.UpsertTask:output_type -> subtraterpc.UpsertTaskResponse
-	132, // 192: subtraterpc.TaskService.GetTask:output_type -> subtraterpc.GetTaskResponse
-	134, // 193: subtraterpc.TaskService.ListTasks:output_type -> subtraterpc.ListTasksResponse
-	136, // 194: subtraterpc.TaskService.UpdateTaskStatus:output_type -> subtraterpc.UpdateTaskStatusResponse
-	138, // 195: subtraterpc.TaskService.UpdateTaskOwner:output_type -> subtraterpc.UpdateTaskOwnerResponse
-	140, // 196: subtraterpc.TaskService.DeleteTask:output_type -> subtraterpc.DeleteTaskResponse
-	142, // 197: subtraterpc.TaskService.GetTaskStats:output_type -> subtraterpc.GetTaskStatsResponse
-	144, // 198: subtraterpc.TaskService.GetAllAgentTaskStats:output_type -> subtraterpc.GetAllAgentTaskStatsResponse
-	146, // 199: subtraterpc.TaskService.SyncTaskList:output_type -> subtraterpc.SyncTaskListResponse
-	148, // 200: subtraterpc.TaskService.PruneOldTasks:output_type -> subtraterpc.PruneOldTasksResponse
-	98,  // 201: subtraterpc.ReviewService.CreateReview:output_type -> subtraterpc.CreateReviewResponse
-	100, // 202: subtraterpc.ReviewService.ListReviews:output_type -> subtraterpc.ListReviewsProtoResponse
-	103, // 203: subtraterpc.ReviewService.GetReview:output_type -> subtraterpc.ReviewDetailResponse
-	98,  // 204: subtraterpc.ReviewService.ResubmitReview:output_type -> subtraterpc.CreateReviewResponse
-	107, // 205: subtraterpc.ReviewService.CancelReview:output_type -> subtraterpc.CancelReviewProtoResponse
-	109, // 206: subtraterpc.ReviewService.DeleteReview:output_type -> subtraterpc.DeleteReviewProtoResponse
-	111, // 207: subtraterpc.ReviewService.ListReviewIssues:output_type -> subtraterpc.ListReviewIssuesResponse
-	114, // 208: subtraterpc.ReviewService.UpdateIssueStatus:output_type -> subtraterpc.UpdateIssueStatusResponse
-	116, // 209: subtraterpc.ReviewService.GetReviewDiff:output_type -> subtraterpc.GetReviewDiffResponse
-	149, // 210: subtraterpc.PlanReviewService.CreatePlanReview:output_type -> subtraterpc.PlanReviewProto
-	149, // 211: subtraterpc.PlanReviewService.GetPlanReview:output_type -> subtraterpc.PlanReviewProto
-	149, // 212: subtraterpc.PlanReviewService.GetPlanReviewByThread:output_type -> subtraterpc.PlanReviewProto
-	149, // 213: subtraterpc.PlanReviewService.GetPlanReviewBySession:output_type -> subtraterpc.PlanReviewProto
-	155, // 214: subtraterpc.PlanReviewService.ListPlanReviews:output_type -> subtraterpc.ListPlanReviewsResponse
-	149, // 215: subtraterpc.PlanReviewService.UpdatePlanReviewStatus:output_type -> subtraterpc.PlanReviewProto
-	158, // 216: subtraterpc.PlanReviewService.DeletePlanReview:output_type -> subtraterpc.DeletePlanReviewResponse
-	148, // [148:217] is the sub-list for method output_type
-	79,  // [79:148] is the sub-list for method input_type
-	79,  // [79:79] is the sub-list for extension type_name
-	79,  // [79:79] is the sub-list for extension extendee
-	0,   // [0:79] is the sub-list for field type_name
+	159, // 79: subtraterpc.ListPlanAnnotationsResponse.annotations:type_name -> subtraterpc.PlanAnnotationProto
+	160, // 80: subtraterpc.ListDiffAnnotationsResponse.annotations:type_name -> subtraterpc.DiffAnnotationProto
+	8,   // 81: subtraterpc.Mail.SendMail:input_type -> subtraterpc.SendMailRequest
+	10,  // 82: subtraterpc.Mail.FetchInbox:input_type -> subtraterpc.FetchInboxRequest
+	12,  // 83: subtraterpc.Mail.ReadMessage:input_type -> subtraterpc.ReadMessageRequest
+	14,  // 84: subtraterpc.Mail.ReadThread:input_type -> subtraterpc.ReadThreadRequest
+	16,  // 85: subtraterpc.Mail.UpdateState:input_type -> subtraterpc.UpdateStateRequest
+	18,  // 86: subtraterpc.Mail.AckMessage:input_type -> subtraterpc.AckMessageRequest
+	20,  // 87: subtraterpc.Mail.GetStatus:input_type -> subtraterpc.GetStatusRequest
+	22,  // 88: subtraterpc.Mail.PollChanges:input_type -> subtraterpc.PollChangesRequest
+	24,  // 89: subtraterpc.Mail.SubscribeInbox:input_type -> subtraterpc.SubscribeInboxRequest
+	25,  // 90: subtraterpc.Mail.Publish:input_type -> subtraterpc.PublishRequest
+	27,  // 91: subtraterpc.Mail.Subscribe:input_type -> subtraterpc.SubscribeRequest
+	29,  // 92: subtraterpc.Mail.Unsubscribe:input_type -> subtraterpc.UnsubscribeRequest
+	32,  // 93: subtraterpc.Mail.ListTopics:input_type -> subtraterpc.ListTopicsRequest
+	34,  // 94: subtraterpc.Mail.Search:input_type -> subtraterpc.SearchRequest
+	36,  // 95: subtraterpc.Mail.HasUnackedStatusTo:input_type -> subtraterpc.HasUnackedStatusToRequest
+	50,  // 96: subtraterpc.Mail.ReplyToThread:input_type -> subtraterpc.ReplyToThreadRequest
+	52,  // 97: subtraterpc.Mail.ArchiveThread:input_type -> subtraterpc.ArchiveThreadRequest
+	54,  // 98: subtraterpc.Mail.DeleteThread:input_type -> subtraterpc.DeleteThreadRequest
+	56,  // 99: subtraterpc.Mail.MarkThreadUnread:input_type -> subtraterpc.MarkThreadUnreadRequest
+	58,  // 100: subtraterpc.Mail.GetTopic:input_type -> subtraterpc.GetTopicRequest
+	60,  // 101: subtraterpc.Mail.AutocompleteRecipients:input_type -> subtraterpc.AutocompleteRecipientsRequest
+	63,  // 102: subtraterpc.Mail.DeleteMessage:input_type -> subtraterpc.DeleteMessageRequest
+	38,  // 103: subtraterpc.Agent.RegisterAgent:input_type -> subtraterpc.RegisterAgentRequest
+	40,  // 104: subtraterpc.Agent.GetAgent:input_type -> subtraterpc.GetAgentRequest
+	42,  // 105: subtraterpc.Agent.ListAgents:input_type -> subtraterpc.ListAgentsRequest
+	48,  // 106: subtraterpc.Agent.DeleteAgent:input_type -> subtraterpc.DeleteAgentRequest
+	65,  // 107: subtraterpc.Agent.UpdateAgent:input_type -> subtraterpc.UpdateAgentRequest
+	69,  // 108: subtraterpc.Agent.GetAgentsStatus:input_type -> subtraterpc.GetAgentsStatusRequest
+	74,  // 109: subtraterpc.Agent.Heartbeat:input_type -> subtraterpc.HeartbeatRequest
+	44,  // 110: subtraterpc.Agent.EnsureIdentity:input_type -> subtraterpc.EnsureIdentityRequest
+	46,  // 111: subtraterpc.Agent.SaveIdentity:input_type -> subtraterpc.SaveIdentityRequest
+	71,  // 112: subtraterpc.Agent.DiscoverAgents:input_type -> subtraterpc.DiscoverAgentsRequest
+	77,  // 113: subtraterpc.Session.ListSessions:input_type -> subtraterpc.ListSessionsRequest
+	79,  // 114: subtraterpc.Session.GetSession:input_type -> subtraterpc.GetSessionRequest
+	81,  // 115: subtraterpc.Session.StartSession:input_type -> subtraterpc.StartSessionRequest
+	83,  // 116: subtraterpc.Session.CompleteSession:input_type -> subtraterpc.CompleteSessionRequest
+	86,  // 117: subtraterpc.Activity.ListActivities:input_type -> subtraterpc.ListActivitiesRequest
+	89,  // 118: subtraterpc.Stats.GetDashboardStats:input_type -> subtraterpc.GetDashboardStatsRequest
+	91,  // 119: subtraterpc.Stats.HealthCheck:input_type -> subtraterpc.HealthCheckRequest
+	121, // 120: subtraterpc.TaskService.RegisterTaskList:input_type -> subtraterpc.RegisterTaskListRequest
+	123, // 121: subtraterpc.TaskService.GetTaskList:input_type -> subtraterpc.GetTaskListRequest
+	125, // 122: subtraterpc.TaskService.ListTaskLists:input_type -> subtraterpc.ListTaskListsRequest
+	127, // 123: subtraterpc.TaskService.UnregisterTaskList:input_type -> subtraterpc.UnregisterTaskListRequest
+	129, // 124: subtraterpc.TaskService.UpsertTask:input_type -> subtraterpc.UpsertTaskRequest
+	131, // 125: subtraterpc.TaskService.GetTask:input_type -> subtraterpc.GetTaskProtoRequest
+	133, // 126: subtraterpc.TaskService.ListTasks:input_type -> subtraterpc.ListTasksRequest
+	135, // 127: subtraterpc.TaskService.UpdateTaskStatus:input_type -> subtraterpc.UpdateTaskStatusRequest
+	137, // 128: subtraterpc.TaskService.UpdateTaskOwner:input_type -> subtraterpc.UpdateTaskOwnerRequest
+	139, // 129: subtraterpc.TaskService.DeleteTask:input_type -> subtraterpc.DeleteTaskRequest
+	141, // 130: subtraterpc.TaskService.GetTaskStats:input_type -> subtraterpc.GetTaskStatsRequest
+	143, // 131: subtraterpc.TaskService.GetAllAgentTaskStats:input_type -> subtraterpc.GetAllAgentTaskStatsRequest
+	145, // 132: subtraterpc.TaskService.SyncTaskList:input_type -> subtraterpc.SyncTaskListRequest
+	147, // 133: subtraterpc.TaskService.PruneOldTasks:input_type -> subtraterpc.PruneOldTasksRequest
+	97,  // 134: subtraterpc.ReviewService.CreateReview:input_type -> subtraterpc.CreateReviewRequest
+	99,  // 135: subtraterpc.ReviewService.ListReviews:input_type -> subtraterpc.ListReviewsProtoRequest
+	102, // 136: subtraterpc.ReviewService.GetReview:input_type -> subtraterpc.GetReviewProtoRequest
+	105, // 137: subtraterpc.ReviewService.ResubmitReview:input_type -> subtraterpc.ResubmitReviewRequest
+	106, // 138: subtraterpc.ReviewService.CancelReview:input_type -> subtraterpc.CancelReviewProtoRequest
+	108, // 139: subtraterpc.ReviewService.DeleteReview:input_type -> subtraterpc.DeleteReviewProtoRequest
+	110, // 140: subtraterpc.ReviewService.ListReviewIssues:input_type -> subtraterpc.ListReviewIssuesRequest
+	113, // 141: subtraterpc.ReviewService.UpdateIssueStatus:input_type -> subtraterpc.UpdateIssueStatusRequest
+	115, // 142: subtraterpc.ReviewService.GetReviewDiff:input_type -> subtraterpc.GetReviewDiffRequest
+	150, // 143: subtraterpc.PlanReviewService.CreatePlanReview:input_type -> subtraterpc.CreatePlanReviewRequest
+	151, // 144: subtraterpc.PlanReviewService.GetPlanReview:input_type -> subtraterpc.GetPlanReviewRequest
+	152, // 145: subtraterpc.PlanReviewService.GetPlanReviewByThread:input_type -> subtraterpc.GetPlanReviewByThreadRequest
+	153, // 146: subtraterpc.PlanReviewService.GetPlanReviewBySession:input_type -> subtraterpc.GetPlanReviewBySessionRequest
+	154, // 147: subtraterpc.PlanReviewService.ListPlanReviews:input_type -> subtraterpc.ListPlanReviewsRequest
+	156, // 148: subtraterpc.PlanReviewService.UpdatePlanReviewStatus:input_type -> subtraterpc.UpdatePlanReviewStatusRequest
+	157, // 149: subtraterpc.PlanReviewService.DeletePlanReview:input_type -> subtraterpc.DeletePlanReviewRequest
+	161, // 150: subtraterpc.AnnotationService.CreatePlanAnnotation:input_type -> subtraterpc.CreatePlanAnnotationRequest
+	162, // 151: subtraterpc.AnnotationService.ListPlanAnnotations:input_type -> subtraterpc.ListPlanAnnotationsRequest
+	164, // 152: subtraterpc.AnnotationService.UpdatePlanAnnotation:input_type -> subtraterpc.UpdatePlanAnnotationRequest
+	165, // 153: subtraterpc.AnnotationService.DeletePlanAnnotation:input_type -> subtraterpc.DeletePlanAnnotationRequest
+	167, // 154: subtraterpc.AnnotationService.CreateDiffAnnotation:input_type -> subtraterpc.CreateDiffAnnotationRequest
+	168, // 155: subtraterpc.AnnotationService.ListDiffAnnotations:input_type -> subtraterpc.ListDiffAnnotationsRequest
+	170, // 156: subtraterpc.AnnotationService.UpdateDiffAnnotation:input_type -> subtraterpc.UpdateDiffAnnotationRequest
+	171, // 157: subtraterpc.AnnotationService.DeleteDiffAnnotation:input_type -> subtraterpc.DeleteDiffAnnotationRequest
+	9,   // 158: subtraterpc.Mail.SendMail:output_type -> subtraterpc.SendMailResponse
+	11,  // 159: subtraterpc.Mail.FetchInbox:output_type -> subtraterpc.FetchInboxResponse
+	13,  // 160: subtraterpc.Mail.ReadMessage:output_type -> subtraterpc.ReadMessageResponse
+	15,  // 161: subtraterpc.Mail.ReadThread:output_type -> subtraterpc.ReadThreadResponse
+	17,  // 162: subtraterpc.Mail.UpdateState:output_type -> subtraterpc.UpdateStateResponse
+	19,  // 163: subtraterpc.Mail.AckMessage:output_type -> subtraterpc.AckMessageResponse
+	21,  // 164: subtraterpc.Mail.GetStatus:output_type -> subtraterpc.GetStatusResponse
+	23,  // 165: subtraterpc.Mail.PollChanges:output_type -> subtraterpc.PollChangesResponse
+	7,   // 166: subtraterpc.Mail.SubscribeInbox:output_type -> subtraterpc.InboxMessage
+	26,  // 167: subtraterpc.Mail.Publish:output_type -> subtraterpc.PublishResponse
+	28,  // 168: subtraterpc.Mail.Subscribe:output_type -> subtraterpc.SubscribeResponse
+	30,  // 169: subtraterpc.Mail.Unsubscribe:output_type -> subtraterpc.UnsubscribeResponse
+	33,  // 170: subtraterpc.Mail.ListTopics:output_type -> subtraterpc.ListTopicsResponse
+	35,  // 171: subtraterpc.Mail.Search:output_type -> subtraterpc.SearchResponse
+	37,  // 172: subtraterpc.Mail.HasUnackedStatusTo:output_type -> subtraterpc.HasUnackedStatusToResponse
+	51,  // 173: subtraterpc.Mail.ReplyToThread:output_type -> subtraterpc.ReplyToThreadResponse
+	53,  // 174: subtraterpc.Mail.ArchiveThread:output_type -> subtraterpc.ArchiveThreadResponse
+	55,  // 175: subtraterpc.Mail.DeleteThread:output_type -> subtraterpc.DeleteThreadResponse
+	57,  // 176: subtraterpc.Mail.MarkThreadUnread:output_type -> subtraterpc.MarkThreadUnreadResponse
+	59,  // 177: subtraterpc.Mail.GetTopic:output_type -> subtraterpc.GetTopicResponse
+	62,  // 178: subtraterpc.Mail.AutocompleteRecipients:output_type -> subtraterpc.AutocompleteRecipientsResponse
+	64,  // 179: subtraterpc.Mail.DeleteMessage:output_type -> subtraterpc.DeleteMessageResponse
+	39,  // 180: subtraterpc.Agent.RegisterAgent:output_type -> subtraterpc.RegisterAgentResponse
+	41,  // 181: subtraterpc.Agent.GetAgent:output_type -> subtraterpc.GetAgentResponse
+	43,  // 182: subtraterpc.Agent.ListAgents:output_type -> subtraterpc.ListAgentsResponse
+	49,  // 183: subtraterpc.Agent.DeleteAgent:output_type -> subtraterpc.DeleteAgentResponse
+	66,  // 184: subtraterpc.Agent.UpdateAgent:output_type -> subtraterpc.UpdateAgentResponse
+	70,  // 185: subtraterpc.Agent.GetAgentsStatus:output_type -> subtraterpc.GetAgentsStatusResponse
+	75,  // 186: subtraterpc.Agent.Heartbeat:output_type -> subtraterpc.HeartbeatResponse
+	45,  // 187: subtraterpc.Agent.EnsureIdentity:output_type -> subtraterpc.EnsureIdentityResponse
+	47,  // 188: subtraterpc.Agent.SaveIdentity:output_type -> subtraterpc.SaveIdentityResponse
+	73,  // 189: subtraterpc.Agent.DiscoverAgents:output_type -> subtraterpc.DiscoverAgentsResponse
+	78,  // 190: subtraterpc.Session.ListSessions:output_type -> subtraterpc.ListSessionsResponse
+	80,  // 191: subtraterpc.Session.GetSession:output_type -> subtraterpc.GetSessionResponse
+	82,  // 192: subtraterpc.Session.StartSession:output_type -> subtraterpc.StartSessionResponse
+	84,  // 193: subtraterpc.Session.CompleteSession:output_type -> subtraterpc.CompleteSessionResponse
+	87,  // 194: subtraterpc.Activity.ListActivities:output_type -> subtraterpc.ListActivitiesResponse
+	90,  // 195: subtraterpc.Stats.GetDashboardStats:output_type -> subtraterpc.GetDashboardStatsResponse
+	92,  // 196: subtraterpc.Stats.HealthCheck:output_type -> subtraterpc.HealthCheckResponse
+	122, // 197: subtraterpc.TaskService.RegisterTaskList:output_type -> subtraterpc.RegisterTaskListResponse
+	124, // 198: subtraterpc.TaskService.GetTaskList:output_type -> subtraterpc.GetTaskListResponse
+	126, // 199: subtraterpc.TaskService.ListTaskLists:output_type -> subtraterpc.ListTaskListsResponse
+	128, // 200: subtraterpc.TaskService.UnregisterTaskList:output_type -> subtraterpc.UnregisterTaskListResponse
+	130, // 201: subtraterpc.TaskService.UpsertTask:output_type -> subtraterpc.UpsertTaskResponse
+	132, // 202: subtraterpc.TaskService.GetTask:output_type -> subtraterpc.GetTaskResponse
+	134, // 203: subtraterpc.TaskService.ListTasks:output_type -> subtraterpc.ListTasksResponse
+	136, // 204: subtraterpc.TaskService.UpdateTaskStatus:output_type -> subtraterpc.UpdateTaskStatusResponse
+	138, // 205: subtraterpc.TaskService.UpdateTaskOwner:output_type -> subtraterpc.UpdateTaskOwnerResponse
+	140, // 206: subtraterpc.TaskService.DeleteTask:output_type -> subtraterpc.DeleteTaskResponse
+	142, // 207: subtraterpc.TaskService.GetTaskStats:output_type -> subtraterpc.GetTaskStatsResponse
+	144, // 208: subtraterpc.TaskService.GetAllAgentTaskStats:output_type -> subtraterpc.GetAllAgentTaskStatsResponse
+	146, // 209: subtraterpc.TaskService.SyncTaskList:output_type -> subtraterpc.SyncTaskListResponse
+	148, // 210: subtraterpc.TaskService.PruneOldTasks:output_type -> subtraterpc.PruneOldTasksResponse
+	98,  // 211: subtraterpc.ReviewService.CreateReview:output_type -> subtraterpc.CreateReviewResponse
+	100, // 212: subtraterpc.ReviewService.ListReviews:output_type -> subtraterpc.ListReviewsProtoResponse
+	103, // 213: subtraterpc.ReviewService.GetReview:output_type -> subtraterpc.ReviewDetailResponse
+	98,  // 214: subtraterpc.ReviewService.ResubmitReview:output_type -> subtraterpc.CreateReviewResponse
+	107, // 215: subtraterpc.ReviewService.CancelReview:output_type -> subtraterpc.CancelReviewProtoResponse
+	109, // 216: subtraterpc.ReviewService.DeleteReview:output_type -> subtraterpc.DeleteReviewProtoResponse
+	111, // 217: subtraterpc.ReviewService.ListReviewIssues:output_type -> subtraterpc.ListReviewIssuesResponse
+	114, // 218: subtraterpc.ReviewService.UpdateIssueStatus:output_type -> subtraterpc.UpdateIssueStatusResponse
+	116, // 219: subtraterpc.ReviewService.GetReviewDiff:output_type -> subtraterpc.GetReviewDiffResponse
+	149, // 220: subtraterpc.PlanReviewService.CreatePlanReview:output_type -> subtraterpc.PlanReviewProto
+	149, // 221: subtraterpc.PlanReviewService.GetPlanReview:output_type -> subtraterpc.PlanReviewProto
+	149, // 222: subtraterpc.PlanReviewService.GetPlanReviewByThread:output_type -> subtraterpc.PlanReviewProto
+	149, // 223: subtraterpc.PlanReviewService.GetPlanReviewBySession:output_type -> subtraterpc.PlanReviewProto
+	155, // 224: subtraterpc.PlanReviewService.ListPlanReviews:output_type -> subtraterpc.ListPlanReviewsResponse
+	149, // 225: subtraterpc.PlanReviewService.UpdatePlanReviewStatus:output_type -> subtraterpc.PlanReviewProto
+	158, // 226: subtraterpc.PlanReviewService.DeletePlanReview:output_type -> subtraterpc.DeletePlanReviewResponse
+	159, // 227: subtraterpc.AnnotationService.CreatePlanAnnotation:output_type -> subtraterpc.PlanAnnotationProto
+	163, // 228: subtraterpc.AnnotationService.ListPlanAnnotations:output_type -> subtraterpc.ListPlanAnnotationsResponse
+	159, // 229: subtraterpc.AnnotationService.UpdatePlanAnnotation:output_type -> subtraterpc.PlanAnnotationProto
+	166, // 230: subtraterpc.AnnotationService.DeletePlanAnnotation:output_type -> subtraterpc.DeleteAnnotationResponse
+	160, // 231: subtraterpc.AnnotationService.CreateDiffAnnotation:output_type -> subtraterpc.DiffAnnotationProto
+	169, // 232: subtraterpc.AnnotationService.ListDiffAnnotations:output_type -> subtraterpc.ListDiffAnnotationsResponse
+	160, // 233: subtraterpc.AnnotationService.UpdateDiffAnnotation:output_type -> subtraterpc.DiffAnnotationProto
+	166, // 234: subtraterpc.AnnotationService.DeleteDiffAnnotation:output_type -> subtraterpc.DeleteAnnotationResponse
+	158, // [158:235] is the sub-list for method output_type
+	81,  // [81:158] is the sub-list for method input_type
+	81,  // [81:81] is the sub-list for extension type_name
+	81,  // [81:81] is the sub-list for extension extendee
+	0,   // [0:81] is the sub-list for field type_name
 }
 
 func init() { file_mail_proto_init() }
@@ -11166,9 +12282,9 @@ func file_mail_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_mail_proto_rawDesc), len(file_mail_proto_rawDesc)),
 			NumEnums:      7,
-			NumMessages:   155,
+			NumMessages:   168,
 			NumExtensions: 0,
-			NumServices:   8,
+			NumServices:   9,
 		},
 		GoTypes:           file_mail_proto_goTypes,
 		DependencyIndexes: file_mail_proto_depIdxs,
