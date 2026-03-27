@@ -72,15 +72,17 @@ func (b *HubNotificationBridge) forwardNotification(msg mail.InboxMessage) {
 	wsMsg := &WSMessage{
 		Type: WSMsgTypeNewMessage,
 		Payload: map[string]any{
-			"id":          msg.ID,
-			"sender_id":   msg.SenderID,
-			"sender_name": msg.SenderName,
-			"subject":     msg.Subject,
-			"body":        msg.Body,
-			"priority":    string(msg.Priority),
-			"created_at":  msg.CreatedAt.UTC().Format(time.RFC3339),
-			"thread_id":   msg.ThreadID,
-			"state":       msg.State,
+			"id":                  msg.ID,
+			"sender_id":           msg.SenderID,
+			"sender_name":         msg.SenderName,
+			"sender_project_key":  msg.SenderProjectKey,
+			"sender_git_branch":   msg.SenderGitBranch,
+			"subject":             msg.Subject,
+			"body":                msg.Body,
+			"priority":            string(msg.Priority),
+			"created_at":          msg.CreatedAt.UTC().Format(time.RFC3339),
+			"thread_id":           msg.ThreadID,
+			"state":               msg.State,
 		},
 	}
 

@@ -187,8 +187,20 @@ export function useNewMessageNotifications(
         return;
       }
 
-      // Show the notification with click handler.
-      showNotification(`New message from ${payload.sender_name}`, {
+      // Build notification title with project/branch context first,
+      // then agent name. This helps identify which project the
+      // notification is about at a glance.
+      const projectName = payload.sender_project_key
+        ? payload.sender_project_key.split('/').pop()
+        : undefined;
+      const branch = payload.sender_git_branch;
+      const contextParts = [projectName, branch].filter(Boolean);
+      const context = contextParts.length > 0
+        ? `[${contextParts.join('/')}] `
+        : '';
+      const title = `${context}${payload.sender_name}`;
+
+      showNotification(title, {
         body: payload.subject,
         tag: `message-${payload.id}`,
         onClick: () => {

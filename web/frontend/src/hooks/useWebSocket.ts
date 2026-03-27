@@ -183,6 +183,8 @@ export interface NewMessagePayload {
   thread_id: string;
   sender_id: number;
   sender_name: string;
+  sender_project_key?: string;
+  sender_git_branch?: string;
   subject: string;
   body: string;
   priority: string;

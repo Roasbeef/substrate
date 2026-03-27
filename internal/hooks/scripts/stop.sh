@@ -130,11 +130,10 @@ echo "=== Stop Hook Step 4: $(date) ===" >> "$debug_log"
 echo "session_args: [$session_args]" >> "$debug_log"
 
 # Record start time so we can fill the poll window on failure.
-# With the 4-day hook timeout, we poll for 9m30s per cycle. The hook
-# framework will restart the stop hook repeatedly, keeping the agent
-# alive indefinitely until Ctrl+C.
+# Match the 4-day hook timeout so the poll blocks essentially forever.
+# The server-side long-poll handles wake-on-message internally.
 start_time=$(date +%s)
-max_duration=570  # 9m30s per poll cycle
+max_duration=345000  # ~4 days, just under hook timeout
 
 poll_output=$(substrate poll $session_args --wait=${max_duration}s --format hook --always-block 2>&1)
 poll_exit=$?

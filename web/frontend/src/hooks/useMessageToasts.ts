@@ -115,10 +115,20 @@ export function useMessageToasts(): void {
       // Set duration based on priority (urgent messages stay longer).
       const duration = priority === 'urgent' ? 10000 : 5000;
 
+      // Build title with project/branch context for quick identification.
+      const projectName = payload.sender_project_key
+        ? payload.sender_project_key.split('/').pop()
+        : undefined;
+      const branch = payload.sender_git_branch;
+      const contextParts = [projectName, branch].filter(Boolean);
+      const context = contextParts.length > 0
+        ? `[${contextParts.join('/')}] `
+        : '';
+
       // Show the toast notification.
       addToast({
         variant,
-        title: `New message from ${payload.sender_name}`,
+        title: `${context}${payload.sender_name}`,
         message: subject,
         duration,
         action: {
