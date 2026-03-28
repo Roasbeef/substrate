@@ -24,9 +24,29 @@ const (
 	// defaultGRPCAddr is the default address for the substrated daemon.
 	defaultGRPCAddr = "localhost:10009"
 
+	// substrateGRPCAddrEnv is the environment variable that overrides the
+	// default gRPC address. This allows hook scripts running inside
+	// Kubernetes pods to reach a substrated instance in the same namespace
+	// without passing --grpc-addr on every invocation.
+	substrateGRPCAddrEnv = "SUBSTRATE_GRPC_ADDR"
+
 	// grpcConnectTimeout is the timeout for connecting to the daemon.
 	grpcConnectTimeout = 2 * time.Second
 )
+
+// resolveGRPCAddr returns the gRPC address to use for connecting to the
+// substrated daemon. It checks, in order: the --grpc-addr flag, the
+// SUBSTRATE_GRPC_ADDR environment variable, and the hardcoded default.
+func resolveGRPCAddr() string {
+	if grpcAddr != "" {
+		return grpcAddr
+	}
+	if env := os.Getenv(substrateGRPCAddrEnv); env != "" {
+		return env
+	}
+
+	return defaultGRPCAddr
+}
 
 // Client provides an interface for CLI operations. It can be backed by either
 // a gRPC connection to substrated or direct database access.
@@ -100,10 +120,7 @@ func getClient() (*Client, error) {
 		return getQueuedClient()
 	}
 
-	addr := grpcAddr
-	if addr == "" {
-		addr = defaultGRPCAddr
-	}
+	addr := resolveGRPCAddr()
 
 	// Try gRPC connection first.
 	client, err := tryGRPCConnection(addr)

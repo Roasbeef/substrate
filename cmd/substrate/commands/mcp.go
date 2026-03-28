@@ -84,10 +84,7 @@ func runMCPServe(cmd *cobra.Command, args []string) error {
 	}
 
 	// Determine gRPC address.
-	addr := grpcAddr
-	if addr == "" {
-		addr = defaultGRPCAddr
-	}
+	addr := resolveGRPCAddr()
 
 	// Connect to the daemon via gRPC.
 	conn, err := grpc.NewClient(

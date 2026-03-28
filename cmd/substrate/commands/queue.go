@@ -138,10 +138,7 @@ func runQueueDrain(cmd *cobra.Command, args []string) error {
 	}
 
 	// Get a connected client (not queued).
-	addr := grpcAddr
-	if addr == "" {
-		addr = defaultGRPCAddr
-	}
+	addr := resolveGRPCAddr()
 
 	client, err := tryGRPCConnection(addr)
 	if err != nil {
