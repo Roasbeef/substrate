@@ -53,6 +53,28 @@ function getRouteFilter(pathname: string): RouteFilter {
   return 'inbox';
 }
 
+// Subject prefixes produced by Claude Code hooks. We treat these as
+// auto-generated system mail (permission prompts, idle wake-ups,
+// generic Claude Code alerts, pre-compaction status pings) and hide
+// them from Primary and Agents by default so the inbox isn't drowned
+// in background chatter from long-running agents. The dedicated
+// "Notifications" tab surfaces them on demand.
+const NOTIFICATION_SUBJECT_PREFIXES = [
+  '[Permission]',
+  '[Notification]',
+  '[Idle]',
+  '[Status]',
+];
+
+// isNotificationMessage returns true for hook-generated mail
+// (Permission / Idle / generic Notification / compaction Status).
+// Match is done on the subject prefix because sender_name is the
+// originating agent, not a dedicated notification sender.
+function isNotificationMessage(message: MessageWithRecipients): boolean {
+  const subject = message.subject ?? '';
+  return NOTIFICATION_SUBJECT_PREFIXES.some((p) => subject.startsWith(p));
+}
+
 export default function InboxPage() {
   // Get current location for route-based filtering.
   const location = useLocation();
@@ -164,18 +186,30 @@ export default function InboxPage() {
     return messages;
   }, [messagesResponse?.data, isAggregateFilter, selectedAgentIds]);
 
+  // Partition messages so hook-generated notifications (Permission /
+  // Idle / generic Notification) only appear in the Notifications tab
+  // and don't clutter Primary / Agents.
+  const categoryMessages = useMemo(() => {
+    if (state.category === 'notifications') {
+      return allMessages.filter(isNotificationMessage);
+    }
+    return allMessages.filter((m) => !isNotificationMessage(m));
+  }, [allMessages, state.category]);
+
   // Get unique senders for filter dropdown.
   const uniqueSenders = useMemo(() => {
     const senders = new Set<string>();
-    allMessages.forEach((m) => senders.add(m.sender_name));
+    categoryMessages.forEach((m) => senders.add(m.sender_name));
     return Array.from(senders).sort();
-  }, [allMessages]);
+  }, [categoryMessages]);
 
   // Apply sender filter.
   const messages = useMemo(() => {
-    if (!state.senderFilter) return allMessages;
-    return allMessages.filter((m) => m.sender_name === state.senderFilter);
-  }, [allMessages, state.senderFilter]);
+    if (!state.senderFilter) return categoryMessages;
+    return categoryMessages.filter(
+      (m) => m.sender_name === state.senderFilter,
+    );
+  }, [categoryMessages, state.senderFilter]);
 
   // Group messages by thread for collapsed inbox view.
   const threadGroups = useMemo(
@@ -211,24 +245,28 @@ export default function InboxPage() {
   // Enable real-time updates via WebSocket.
   const { isConnected: wsConnected } = useMessagesRealtime();
 
-  // Compute stats from messages.
+  // Compute stats from messages, excluding hook-generated notifications
+  // so the header counters reflect real inbox activity rather than a
+  // flood of permission prompts.
   const stats = useMemo(() => {
-    const allMessages = messagesResponse?.data;
-    if (!allMessages) {
+    const rawMessages = messagesResponse?.data;
+    if (!rawMessages) {
       return { unread: 0, starred: 0, urgent: 0, acknowledged: 0 };
     }
 
+    const userMessages = rawMessages.filter((m) => !isNotificationMessage(m));
+
     return {
-      unread: allMessages.filter(
+      unread: userMessages.filter(
         (m) => m.recipients[0]?.state === 'unread',
       ).length,
-      starred: allMessages.filter(
+      starred: userMessages.filter(
         (m) => m.recipients[0]?.is_starred,
       ).length,
-      urgent: allMessages.filter(
+      urgent: userMessages.filter(
         (m) => m.priority === 'urgent',
       ).length,
-      acknowledged: allMessages.filter(
+      acknowledged: userMessages.filter(
         (m) => m.recipients[0]?.state === 'acknowledged',
       ).length,
     };
@@ -236,29 +274,33 @@ export default function InboxPage() {
 
   // Compute category counts for tabs.
   const categoryTabs = useMemo((): TabItem[] => {
-    const allMessages = messagesResponse?.data;
-    if (!allMessages) {
+    const rawMessages = messagesResponse?.data;
+    if (!rawMessages) {
       return [
         { id: 'primary', label: 'Primary', count: 0 },
         { id: 'agents', label: 'Agents', count: 0 },
         { id: 'topics', label: 'Topics', count: 0 },
+        { id: 'notifications', label: 'Notifications', count: 0 },
       ];
     }
 
-    // Primary = messages from User (human sender).
-    // Agents = messages from other agents.
-    // Topics = would need topic_id field (not yet in API, count 0 for now).
-    const primaryCount = allMessages.filter(
-      (m) => m.sender_name === 'User',
+    // Primary = messages from User (human sender), excluding hook
+    // notifications. Agents = messages from other agents, excluding
+    // hook notifications. Notifications = hook-generated Permission
+    // / Idle / generic Notification messages.
+    const primaryCount = rawMessages.filter(
+      (m) => m.sender_name === 'User' && !isNotificationMessage(m),
     ).length;
-    const agentsCount = allMessages.filter(
-      (m) => m.sender_name !== 'User',
+    const agentsCount = rawMessages.filter(
+      (m) => m.sender_name !== 'User' && !isNotificationMessage(m),
     ).length;
+    const notificationsCount = rawMessages.filter(isNotificationMessage).length;
 
     return [
       { id: 'primary', label: 'Primary', count: primaryCount },
       { id: 'agents', label: 'Agents', count: agentsCount },
       { id: 'topics', label: 'Topics', count: 0 },
+      { id: 'notifications', label: 'Notifications', count: notificationsCount },
     ];
   }, [messagesResponse]);
 
