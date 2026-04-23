@@ -115,20 +115,23 @@ export function useMessageToasts(): void {
       // Set duration based on priority (urgent messages stay longer).
       const duration = priority === 'urgent' ? 10000 : 5000;
 
-      // Build title with project/branch context for quick identification.
+      // Use project/branch as the toast title so the user can identify
+      // which worktree the message came from. Agent names (e.g.
+      // "SapphireBear") aren't memorable, so we only fall back to
+      // them when no project context is available.
       const projectName = payload.sender_project_key
         ? payload.sender_project_key.split('/').pop()
         : undefined;
       const branch = payload.sender_git_branch;
       const contextParts = [projectName, branch].filter(Boolean);
-      const context = contextParts.length > 0
-        ? `[${contextParts.join('/')}] `
-        : '';
+      const title = contextParts.length > 0
+        ? contextParts.join('/')
+        : payload.sender_name;
 
       // Show the toast notification.
       addToast({
         variant,
-        title: `${context}${payload.sender_name}`,
+        title,
         message: subject,
         duration,
         action: {

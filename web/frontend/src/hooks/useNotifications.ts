@@ -187,18 +187,18 @@ export function useNewMessageNotifications(
         return;
       }
 
-      // Build notification title with project/branch context first,
-      // then agent name. This helps identify which project the
-      // notification is about at a glance.
+      // Show project/branch as the notification title so the user
+      // can identify which worktree the notification came from.
+      // Agent names (e.g. "SapphireBear") aren't memorable, so we
+      // only fall back to them when no project context is available.
       const projectName = payload.sender_project_key
         ? payload.sender_project_key.split('/').pop()
         : undefined;
       const branch = payload.sender_git_branch;
       const contextParts = [projectName, branch].filter(Boolean);
-      const context = contextParts.length > 0
-        ? `[${contextParts.join('/')}] `
-        : '';
-      const title = `${context}${payload.sender_name}`;
+      const title = contextParts.length > 0
+        ? contextParts.join('/')
+        : payload.sender_name;
 
       showNotification(title, {
         body: payload.subject,
