@@ -203,7 +203,9 @@ export function ThreadMessage({
     if (diffAnnotations.length === 0) return;
 
     const feedback = exportDiffAnnotations(diffAnnotations);
-    const currentAgent = useAuthStore.getState().currentAgent;
+    const { currentAgent, availableAgents } = useAuthStore.getState();
+    const userAgent = availableAgents.find((a) => a.name === 'User');
+    const senderId = currentAgent?.id ?? userAgent?.id ?? 0;
     const senderName = message.sender_name || 'User';
 
     console.log(
@@ -213,7 +215,7 @@ export function ThreadMessage({
     );
 
     sendMessage({
-      sender_id: currentAgent?.id ?? 0,
+      sender_id: senderId,
       recipient_names: [senderName],
       ...(message.thread_id ? { thread_id: message.thread_id } : {}),
       subject: `Re: ${message.subject} [Code Review]`,
