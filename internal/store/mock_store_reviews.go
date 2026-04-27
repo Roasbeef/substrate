@@ -71,6 +71,8 @@ func (m *MockStore) CreateReview(ctx context.Context,
 		ReviewType:  params.ReviewType,
 		Priority:    params.Priority,
 		State:       "new",
+		DiffContent: params.DiffContent,
+		DiffCommand: params.DiffCommand,
 		CreatedAt:   now,
 		UpdatedAt:   now,
 	}
@@ -229,6 +231,27 @@ func (m *MockStore) UpdateReviewCompleted(ctx context.Context,
 	review.State = state
 	review.UpdatedAt = now
 	review.CompletedAt = &now
+	data.reviews[reviewID] = review
+
+	return nil
+}
+
+// UpdateReviewDiff replaces the stored diff for a review.
+func (m *MockStore) UpdateReviewDiff(ctx context.Context,
+	reviewID, diffContent, diffCommand string,
+) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	data := getReviewData(m)
+	review, ok := data.reviews[reviewID]
+	if !ok {
+		return fmt.Errorf("review not found: %s", reviewID)
+	}
+
+	review.DiffContent = diffContent
+	review.DiffCommand = diffCommand
+	review.UpdatedAt = time.Now()
 	data.reviews[reviewID] = review
 
 	return nil

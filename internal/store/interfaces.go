@@ -451,6 +451,12 @@ type ReviewStore interface {
 		ctx context.Context, reviewID, state string,
 	) error
 
+	// UpdateReviewDiff replaces the stored diff for a review. Used on
+	// resubmit when the author has pushed new changes.
+	UpdateReviewDiff(
+		ctx context.Context, reviewID, diffContent, diffCommand string,
+	) error
+
 	// CreateReviewIteration records a review iteration result.
 	CreateReviewIteration(
 		ctx context.Context, params CreateReviewIterationParams,
@@ -1018,6 +1024,8 @@ type Review struct {
 	ReviewType  string
 	Priority    string
 	State       string
+	DiffContent string
+	DiffCommand string
 	CreatedAt   time.Time
 	UpdatedAt   time.Time
 	CompletedAt *time.Time
@@ -1076,6 +1084,8 @@ type CreateReviewParams struct {
 	RemoteURL   string
 	ReviewType  string
 	Priority    string
+	DiffContent string
+	DiffCommand string
 }
 
 // CreateReviewIterationParams contains parameters for creating a review
@@ -1161,6 +1171,8 @@ func ReviewFromSqlc(r sqlc.Review) Review {
 		ReviewType:  r.ReviewType,
 		Priority:    r.Priority,
 		State:       r.State,
+		DiffContent: r.DiffContent.String,
+		DiffCommand: r.DiffCommand.String,
 		CreatedAt:   time.Unix(r.CreatedAt, 0),
 		UpdatedAt:   time.Unix(r.UpdatedAt, 0),
 	}

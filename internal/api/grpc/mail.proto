@@ -934,6 +934,15 @@ message CreateReviewRequest {
         PRTarget pr_target = 23;
     }
 
+    // diff_content is the unified diff produced locally by the requesting
+    // agent. substrate stores this in SQLite and feeds it back to the
+    // reviewer agent so the substrate pod does not need filesystem access
+    // to the agent's repo.
+    string diff_content = 24;
+    // diff_command is the git command the agent ran to produce the diff,
+    // recorded for display and audit purposes.
+    string diff_command = 25;
+
     // Deprecated fields kept for backward compatibility.
     // Use target oneof instead.
     string branch = 1 [deprecated = true];
@@ -1012,6 +1021,11 @@ message ReviewIterationProto {
 message ResubmitReviewRequest {
     string review_id = 1;
     string commit_sha = 2;
+    // diff_content is the unified diff for the new commit, computed locally
+    // by the agent. Replaces the diff stored on the review.
+    string diff_content = 3;
+    // diff_command is the git command used to produce diff_content.
+    string diff_command = 4;
 }
 
 // CancelReviewProtoRequest is the request for CancelReview.
