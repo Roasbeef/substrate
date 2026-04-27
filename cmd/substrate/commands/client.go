@@ -1364,8 +1364,11 @@ func (c *Client) ListReviewIssues(
 }
 
 // ResubmitReview re-requests review after the author has pushed changes.
+// The caller computes the diff for the new commit locally and passes it
+// in; substrated stores it and replays it to the reviewer agent.
 func (c *Client) ResubmitReview(
-	ctx context.Context, reviewID, commitSHA string,
+	ctx context.Context, reviewID, commitSHA, diffContent,
+	diffCommand string,
 ) (*subtraterpc.CreateReviewResponse, error) {
 	if err := c.requireGRPC(); err != nil {
 		return nil, err
@@ -1380,8 +1383,10 @@ func (c *Client) ResubmitReview(
 
 	return c.reviewClient.ResubmitReview(
 		ctx, &subtraterpc.ResubmitReviewRequest{
-			ReviewId:  reviewID,
-			CommitSha: commitSHA,
+			ReviewId:    reviewID,
+			CommitSha:   commitSHA,
+			DiffContent: diffContent,
+			DiffCommand: diffCommand,
 		},
 	)
 }

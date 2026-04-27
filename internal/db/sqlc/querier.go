@@ -207,6 +207,7 @@ type Querier interface {
 	UpdateRecipientSnoozed(ctx context.Context, arg UpdateRecipientSnoozedParams) error
 	UpdateRecipientState(ctx context.Context, arg UpdateRecipientStateParams) (int64, error)
 	UpdateReviewCompleted(ctx context.Context, arg UpdateReviewCompletedParams) error
+	UpdateReviewDiff(ctx context.Context, arg UpdateReviewDiffParams) error
 	UpdateReviewIssueStatus(ctx context.Context, arg UpdateReviewIssueStatusParams) error
 	UpdateReviewState(ctx context.Context, arg UpdateReviewStateParams) error
 	UpdateSessionIdentityLastActive(ctx context.Context, arg UpdateSessionIdentityLastActiveParams) error
