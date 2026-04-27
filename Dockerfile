@@ -52,7 +52,7 @@ RUN go build -tags "osusergo,netgo" \
 # ---- Stage 3: Runtime ----
 FROM alpine:3.20
 
-RUN apk add --no-cache ca-certificates sqlite bash
+RUN apk add --no-cache ca-certificates sqlite bash git
 
 COPY --from=builder /out/substrated /usr/local/bin/substrated
 COPY --from=builder /out/substrate /usr/local/bin/substrate
