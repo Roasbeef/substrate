@@ -777,8 +777,13 @@ type FetchInboxRequest struct {
 	// this prefix (e.g., "reviewer-" for CodeReviewer aggregate).
 	SenderNamePrefix string `protobuf:"bytes,6,opt,name=sender_name_prefix,json=senderNamePrefix,proto3" json:"sender_name_prefix,omitempty"`
 	Offset           int32  `protobuf:"varint,7,opt,name=offset,proto3" json:"offset,omitempty"` // Number of messages to skip for pagination
-	unknownFields    protoimpl.UnknownFields
-	sizeCache        protoimpl.SizeCache
+	// category filters by inbox category. Recognized values: "primary"
+	// (everything that isn't hook-generated chatter) and
+	// "notifications" (hook-generated Permission/Idle/Status/
+	// Notification messages). Empty means no category filter.
+	Category      string `protobuf:"bytes,8,opt,name=category,proto3" json:"category,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
 }
 
 func (x *FetchInboxRequest) Reset() {
@@ -860,12 +865,23 @@ func (x *FetchInboxRequest) GetOffset() int32 {
 	return 0
 }
 
+func (x *FetchInboxRequest) GetCategory() string {
+	if x != nil {
+		return x.Category
+	}
+	return ""
+}
+
 // FetchInboxResponse is the response for FetchInbox.
 type FetchInboxResponse struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Messages      []*InboxMessage        `protobuf:"bytes,1,rep,name=messages,proto3" json:"messages,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	state    protoimpl.MessageState `protogen:"open.v1"`
+	Messages []*InboxMessage        `protobuf:"bytes,1,rep,name=messages,proto3" json:"messages,omitempty"`
+	// Aggregate counts for the requesting agent's inbox, ignoring the
+	// page limit and category filter applied to `messages`. Used by the
+	// UI to drive tab labels and stats without a second round trip.
+	CategoryCounts *InboxCategoryCounts `protobuf:"bytes,2,opt,name=category_counts,json=categoryCounts,proto3" json:"category_counts,omitempty"`
+	unknownFields  protoimpl.UnknownFields
+	sizeCache      protoimpl.SizeCache
 }
 
 func (x *FetchInboxResponse) Reset() {
@@ -905,6 +921,86 @@ func (x *FetchInboxResponse) GetMessages() []*InboxMessage {
 	return nil
 }
 
+func (x *FetchInboxResponse) GetCategoryCounts() *InboxCategoryCounts {
+	if x != nil {
+		return x.CategoryCounts
+	}
+	return nil
+}
+
+// InboxCategoryCounts holds total counts per inbox category for an agent,
+// excluding archived and trashed messages.
+type InboxCategoryCounts struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Primary       int64                  `protobuf:"varint,1,opt,name=primary,proto3" json:"primary,omitempty"`
+	Notifications int64                  `protobuf:"varint,3,opt,name=notifications,proto3" json:"notifications,omitempty"`
+	// Unread count across primary (notifications excluded so permission
+	// spam doesn't dominate the unread badge).
+	Unread int64 `protobuf:"varint,4,opt,name=unread,proto3" json:"unread,omitempty"`
+	// Starred count across all categories.
+	Starred       int64 `protobuf:"varint,5,opt,name=starred,proto3" json:"starred,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *InboxCategoryCounts) Reset() {
+	*x = InboxCategoryCounts{}
+	mi := &file_mail_proto_msgTypes[5]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *InboxCategoryCounts) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*InboxCategoryCounts) ProtoMessage() {}
+
+func (x *InboxCategoryCounts) ProtoReflect() protoreflect.Message {
+	mi := &file_mail_proto_msgTypes[5]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use InboxCategoryCounts.ProtoReflect.Descriptor instead.
+func (*InboxCategoryCounts) Descriptor() ([]byte, []int) {
+	return file_mail_proto_rawDescGZIP(), []int{5}
+}
+
+func (x *InboxCategoryCounts) GetPrimary() int64 {
+	if x != nil {
+		return x.Primary
+	}
+	return 0
+}
+
+func (x *InboxCategoryCounts) GetNotifications() int64 {
+	if x != nil {
+		return x.Notifications
+	}
+	return 0
+}
+
+func (x *InboxCategoryCounts) GetUnread() int64 {
+	if x != nil {
+		return x.Unread
+	}
+	return 0
+}
+
+func (x *InboxCategoryCounts) GetStarred() int64 {
+	if x != nil {
+		return x.Starred
+	}
+	return 0
+}
+
 // ReadMessageRequest is the request for ReadMessage.
 type ReadMessageRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
@@ -916,7 +1012,7 @@ type ReadMessageRequest struct {
 
 func (x *ReadMessageRequest) Reset() {
 	*x = ReadMessageRequest{}
-	mi := &file_mail_proto_msgTypes[5]
+	mi := &file_mail_proto_msgTypes[6]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -928,7 +1024,7 @@ func (x *ReadMessageRequest) String() string {
 func (*ReadMessageRequest) ProtoMessage() {}
 
 func (x *ReadMessageRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_mail_proto_msgTypes[5]
+	mi := &file_mail_proto_msgTypes[6]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -941,7 +1037,7 @@ func (x *ReadMessageRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ReadMessageRequest.ProtoReflect.Descriptor instead.
 func (*ReadMessageRequest) Descriptor() ([]byte, []int) {
-	return file_mail_proto_rawDescGZIP(), []int{5}
+	return file_mail_proto_rawDescGZIP(), []int{6}
 }
 
 func (x *ReadMessageRequest) GetAgentId() int64 {
@@ -968,7 +1064,7 @@ type ReadMessageResponse struct {
 
 func (x *ReadMessageResponse) Reset() {
 	*x = ReadMessageResponse{}
-	mi := &file_mail_proto_msgTypes[6]
+	mi := &file_mail_proto_msgTypes[7]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -980,7 +1076,7 @@ func (x *ReadMessageResponse) String() string {
 func (*ReadMessageResponse) ProtoMessage() {}
 
 func (x *ReadMessageResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_mail_proto_msgTypes[6]
+	mi := &file_mail_proto_msgTypes[7]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -993,7 +1089,7 @@ func (x *ReadMessageResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ReadMessageResponse.ProtoReflect.Descriptor instead.
 func (*ReadMessageResponse) Descriptor() ([]byte, []int) {
-	return file_mail_proto_rawDescGZIP(), []int{6}
+	return file_mail_proto_rawDescGZIP(), []int{7}
 }
 
 func (x *ReadMessageResponse) GetMessage() *InboxMessage {
@@ -1014,7 +1110,7 @@ type ReadThreadRequest struct {
 
 func (x *ReadThreadRequest) Reset() {
 	*x = ReadThreadRequest{}
-	mi := &file_mail_proto_msgTypes[7]
+	mi := &file_mail_proto_msgTypes[8]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1026,7 +1122,7 @@ func (x *ReadThreadRequest) String() string {
 func (*ReadThreadRequest) ProtoMessage() {}
 
 func (x *ReadThreadRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_mail_proto_msgTypes[7]
+	mi := &file_mail_proto_msgTypes[8]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1039,7 +1135,7 @@ func (x *ReadThreadRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ReadThreadRequest.ProtoReflect.Descriptor instead.
 func (*ReadThreadRequest) Descriptor() ([]byte, []int) {
-	return file_mail_proto_rawDescGZIP(), []int{7}
+	return file_mail_proto_rawDescGZIP(), []int{8}
 }
 
 func (x *ReadThreadRequest) GetAgentId() int64 {
@@ -1066,7 +1162,7 @@ type ReadThreadResponse struct {
 
 func (x *ReadThreadResponse) Reset() {
 	*x = ReadThreadResponse{}
-	mi := &file_mail_proto_msgTypes[8]
+	mi := &file_mail_proto_msgTypes[9]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1078,7 +1174,7 @@ func (x *ReadThreadResponse) String() string {
 func (*ReadThreadResponse) ProtoMessage() {}
 
 func (x *ReadThreadResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_mail_proto_msgTypes[8]
+	mi := &file_mail_proto_msgTypes[9]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1091,7 +1187,7 @@ func (x *ReadThreadResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ReadThreadResponse.ProtoReflect.Descriptor instead.
 func (*ReadThreadResponse) Descriptor() ([]byte, []int) {
-	return file_mail_proto_rawDescGZIP(), []int{8}
+	return file_mail_proto_rawDescGZIP(), []int{9}
 }
 
 func (x *ReadThreadResponse) GetMessages() []*InboxMessage {
@@ -1114,7 +1210,7 @@ type UpdateStateRequest struct {
 
 func (x *UpdateStateRequest) Reset() {
 	*x = UpdateStateRequest{}
-	mi := &file_mail_proto_msgTypes[9]
+	mi := &file_mail_proto_msgTypes[10]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1126,7 +1222,7 @@ func (x *UpdateStateRequest) String() string {
 func (*UpdateStateRequest) ProtoMessage() {}
 
 func (x *UpdateStateRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_mail_proto_msgTypes[9]
+	mi := &file_mail_proto_msgTypes[10]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1139,7 +1235,7 @@ func (x *UpdateStateRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use UpdateStateRequest.ProtoReflect.Descriptor instead.
 func (*UpdateStateRequest) Descriptor() ([]byte, []int) {
-	return file_mail_proto_rawDescGZIP(), []int{9}
+	return file_mail_proto_rawDescGZIP(), []int{10}
 }
 
 func (x *UpdateStateRequest) GetAgentId() int64 {
@@ -1180,7 +1276,7 @@ type UpdateStateResponse struct {
 
 func (x *UpdateStateResponse) Reset() {
 	*x = UpdateStateResponse{}
-	mi := &file_mail_proto_msgTypes[10]
+	mi := &file_mail_proto_msgTypes[11]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1192,7 +1288,7 @@ func (x *UpdateStateResponse) String() string {
 func (*UpdateStateResponse) ProtoMessage() {}
 
 func (x *UpdateStateResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_mail_proto_msgTypes[10]
+	mi := &file_mail_proto_msgTypes[11]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1205,7 +1301,7 @@ func (x *UpdateStateResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use UpdateStateResponse.ProtoReflect.Descriptor instead.
 func (*UpdateStateResponse) Descriptor() ([]byte, []int) {
-	return file_mail_proto_rawDescGZIP(), []int{10}
+	return file_mail_proto_rawDescGZIP(), []int{11}
 }
 
 func (x *UpdateStateResponse) GetSuccess() bool {
@@ -1226,7 +1322,7 @@ type AckMessageRequest struct {
 
 func (x *AckMessageRequest) Reset() {
 	*x = AckMessageRequest{}
-	mi := &file_mail_proto_msgTypes[11]
+	mi := &file_mail_proto_msgTypes[12]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1238,7 +1334,7 @@ func (x *AckMessageRequest) String() string {
 func (*AckMessageRequest) ProtoMessage() {}
 
 func (x *AckMessageRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_mail_proto_msgTypes[11]
+	mi := &file_mail_proto_msgTypes[12]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1251,7 +1347,7 @@ func (x *AckMessageRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use AckMessageRequest.ProtoReflect.Descriptor instead.
 func (*AckMessageRequest) Descriptor() ([]byte, []int) {
-	return file_mail_proto_rawDescGZIP(), []int{11}
+	return file_mail_proto_rawDescGZIP(), []int{12}
 }
 
 func (x *AckMessageRequest) GetAgentId() int64 {
@@ -1278,7 +1374,7 @@ type AckMessageResponse struct {
 
 func (x *AckMessageResponse) Reset() {
 	*x = AckMessageResponse{}
-	mi := &file_mail_proto_msgTypes[12]
+	mi := &file_mail_proto_msgTypes[13]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1290,7 +1386,7 @@ func (x *AckMessageResponse) String() string {
 func (*AckMessageResponse) ProtoMessage() {}
 
 func (x *AckMessageResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_mail_proto_msgTypes[12]
+	mi := &file_mail_proto_msgTypes[13]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1303,7 +1399,7 @@ func (x *AckMessageResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use AckMessageResponse.ProtoReflect.Descriptor instead.
 func (*AckMessageResponse) Descriptor() ([]byte, []int) {
-	return file_mail_proto_rawDescGZIP(), []int{12}
+	return file_mail_proto_rawDescGZIP(), []int{13}
 }
 
 func (x *AckMessageResponse) GetSuccess() bool {
@@ -1323,7 +1419,7 @@ type GetStatusRequest struct {
 
 func (x *GetStatusRequest) Reset() {
 	*x = GetStatusRequest{}
-	mi := &file_mail_proto_msgTypes[13]
+	mi := &file_mail_proto_msgTypes[14]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1335,7 +1431,7 @@ func (x *GetStatusRequest) String() string {
 func (*GetStatusRequest) ProtoMessage() {}
 
 func (x *GetStatusRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_mail_proto_msgTypes[13]
+	mi := &file_mail_proto_msgTypes[14]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1348,7 +1444,7 @@ func (x *GetStatusRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetStatusRequest.ProtoReflect.Descriptor instead.
 func (*GetStatusRequest) Descriptor() ([]byte, []int) {
-	return file_mail_proto_rawDescGZIP(), []int{13}
+	return file_mail_proto_rawDescGZIP(), []int{14}
 }
 
 func (x *GetStatusRequest) GetAgentId() int64 {
@@ -1373,7 +1469,7 @@ type GetStatusResponse struct {
 
 func (x *GetStatusResponse) Reset() {
 	*x = GetStatusResponse{}
-	mi := &file_mail_proto_msgTypes[14]
+	mi := &file_mail_proto_msgTypes[15]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1385,7 +1481,7 @@ func (x *GetStatusResponse) String() string {
 func (*GetStatusResponse) ProtoMessage() {}
 
 func (x *GetStatusResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_mail_proto_msgTypes[14]
+	mi := &file_mail_proto_msgTypes[15]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1398,7 +1494,7 @@ func (x *GetStatusResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetStatusResponse.ProtoReflect.Descriptor instead.
 func (*GetStatusResponse) Descriptor() ([]byte, []int) {
-	return file_mail_proto_rawDescGZIP(), []int{14}
+	return file_mail_proto_rawDescGZIP(), []int{15}
 }
 
 func (x *GetStatusResponse) GetAgentId() int64 {
@@ -1454,7 +1550,7 @@ type PollChangesRequest struct {
 
 func (x *PollChangesRequest) Reset() {
 	*x = PollChangesRequest{}
-	mi := &file_mail_proto_msgTypes[15]
+	mi := &file_mail_proto_msgTypes[16]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1466,7 +1562,7 @@ func (x *PollChangesRequest) String() string {
 func (*PollChangesRequest) ProtoMessage() {}
 
 func (x *PollChangesRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_mail_proto_msgTypes[15]
+	mi := &file_mail_proto_msgTypes[16]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1479,7 +1575,7 @@ func (x *PollChangesRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use PollChangesRequest.ProtoReflect.Descriptor instead.
 func (*PollChangesRequest) Descriptor() ([]byte, []int) {
-	return file_mail_proto_rawDescGZIP(), []int{15}
+	return file_mail_proto_rawDescGZIP(), []int{16}
 }
 
 func (x *PollChangesRequest) GetAgentId() int64 {
@@ -1507,7 +1603,7 @@ type PollChangesResponse struct {
 
 func (x *PollChangesResponse) Reset() {
 	*x = PollChangesResponse{}
-	mi := &file_mail_proto_msgTypes[16]
+	mi := &file_mail_proto_msgTypes[17]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1519,7 +1615,7 @@ func (x *PollChangesResponse) String() string {
 func (*PollChangesResponse) ProtoMessage() {}
 
 func (x *PollChangesResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_mail_proto_msgTypes[16]
+	mi := &file_mail_proto_msgTypes[17]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1532,7 +1628,7 @@ func (x *PollChangesResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use PollChangesResponse.ProtoReflect.Descriptor instead.
 func (*PollChangesResponse) Descriptor() ([]byte, []int) {
-	return file_mail_proto_rawDescGZIP(), []int{16}
+	return file_mail_proto_rawDescGZIP(), []int{17}
 }
 
 func (x *PollChangesResponse) GetNewMessages() []*InboxMessage {
@@ -1559,7 +1655,7 @@ type SubscribeInboxRequest struct {
 
 func (x *SubscribeInboxRequest) Reset() {
 	*x = SubscribeInboxRequest{}
-	mi := &file_mail_proto_msgTypes[17]
+	mi := &file_mail_proto_msgTypes[18]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1571,7 +1667,7 @@ func (x *SubscribeInboxRequest) String() string {
 func (*SubscribeInboxRequest) ProtoMessage() {}
 
 func (x *SubscribeInboxRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_mail_proto_msgTypes[17]
+	mi := &file_mail_proto_msgTypes[18]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1584,7 +1680,7 @@ func (x *SubscribeInboxRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SubscribeInboxRequest.ProtoReflect.Descriptor instead.
 func (*SubscribeInboxRequest) Descriptor() ([]byte, []int) {
-	return file_mail_proto_rawDescGZIP(), []int{17}
+	return file_mail_proto_rawDescGZIP(), []int{18}
 }
 
 func (x *SubscribeInboxRequest) GetAgentId() int64 {
@@ -1609,7 +1705,7 @@ type PublishRequest struct {
 
 func (x *PublishRequest) Reset() {
 	*x = PublishRequest{}
-	mi := &file_mail_proto_msgTypes[18]
+	mi := &file_mail_proto_msgTypes[19]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1621,7 +1717,7 @@ func (x *PublishRequest) String() string {
 func (*PublishRequest) ProtoMessage() {}
 
 func (x *PublishRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_mail_proto_msgTypes[18]
+	mi := &file_mail_proto_msgTypes[19]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1634,7 +1730,7 @@ func (x *PublishRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use PublishRequest.ProtoReflect.Descriptor instead.
 func (*PublishRequest) Descriptor() ([]byte, []int) {
-	return file_mail_proto_rawDescGZIP(), []int{18}
+	return file_mail_proto_rawDescGZIP(), []int{19}
 }
 
 func (x *PublishRequest) GetSenderId() int64 {
@@ -1690,7 +1786,7 @@ type PublishResponse struct {
 
 func (x *PublishResponse) Reset() {
 	*x = PublishResponse{}
-	mi := &file_mail_proto_msgTypes[19]
+	mi := &file_mail_proto_msgTypes[20]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1702,7 +1798,7 @@ func (x *PublishResponse) String() string {
 func (*PublishResponse) ProtoMessage() {}
 
 func (x *PublishResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_mail_proto_msgTypes[19]
+	mi := &file_mail_proto_msgTypes[20]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1715,7 +1811,7 @@ func (x *PublishResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use PublishResponse.ProtoReflect.Descriptor instead.
 func (*PublishResponse) Descriptor() ([]byte, []int) {
-	return file_mail_proto_rawDescGZIP(), []int{19}
+	return file_mail_proto_rawDescGZIP(), []int{20}
 }
 
 func (x *PublishResponse) GetMessageId() int64 {
@@ -1743,7 +1839,7 @@ type SubscribeRequest struct {
 
 func (x *SubscribeRequest) Reset() {
 	*x = SubscribeRequest{}
-	mi := &file_mail_proto_msgTypes[20]
+	mi := &file_mail_proto_msgTypes[21]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1755,7 +1851,7 @@ func (x *SubscribeRequest) String() string {
 func (*SubscribeRequest) ProtoMessage() {}
 
 func (x *SubscribeRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_mail_proto_msgTypes[20]
+	mi := &file_mail_proto_msgTypes[21]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1768,7 +1864,7 @@ func (x *SubscribeRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SubscribeRequest.ProtoReflect.Descriptor instead.
 func (*SubscribeRequest) Descriptor() ([]byte, []int) {
-	return file_mail_proto_rawDescGZIP(), []int{20}
+	return file_mail_proto_rawDescGZIP(), []int{21}
 }
 
 func (x *SubscribeRequest) GetAgentId() int64 {
@@ -1796,7 +1892,7 @@ type SubscribeResponse struct {
 
 func (x *SubscribeResponse) Reset() {
 	*x = SubscribeResponse{}
-	mi := &file_mail_proto_msgTypes[21]
+	mi := &file_mail_proto_msgTypes[22]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1808,7 +1904,7 @@ func (x *SubscribeResponse) String() string {
 func (*SubscribeResponse) ProtoMessage() {}
 
 func (x *SubscribeResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_mail_proto_msgTypes[21]
+	mi := &file_mail_proto_msgTypes[22]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1821,7 +1917,7 @@ func (x *SubscribeResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SubscribeResponse.ProtoReflect.Descriptor instead.
 func (*SubscribeResponse) Descriptor() ([]byte, []int) {
-	return file_mail_proto_rawDescGZIP(), []int{21}
+	return file_mail_proto_rawDescGZIP(), []int{22}
 }
 
 func (x *SubscribeResponse) GetSuccess() bool {
@@ -1849,7 +1945,7 @@ type UnsubscribeRequest struct {
 
 func (x *UnsubscribeRequest) Reset() {
 	*x = UnsubscribeRequest{}
-	mi := &file_mail_proto_msgTypes[22]
+	mi := &file_mail_proto_msgTypes[23]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1861,7 +1957,7 @@ func (x *UnsubscribeRequest) String() string {
 func (*UnsubscribeRequest) ProtoMessage() {}
 
 func (x *UnsubscribeRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_mail_proto_msgTypes[22]
+	mi := &file_mail_proto_msgTypes[23]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1874,7 +1970,7 @@ func (x *UnsubscribeRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use UnsubscribeRequest.ProtoReflect.Descriptor instead.
 func (*UnsubscribeRequest) Descriptor() ([]byte, []int) {
-	return file_mail_proto_rawDescGZIP(), []int{22}
+	return file_mail_proto_rawDescGZIP(), []int{23}
 }
 
 func (x *UnsubscribeRequest) GetAgentId() int64 {
@@ -1901,7 +1997,7 @@ type UnsubscribeResponse struct {
 
 func (x *UnsubscribeResponse) Reset() {
 	*x = UnsubscribeResponse{}
-	mi := &file_mail_proto_msgTypes[23]
+	mi := &file_mail_proto_msgTypes[24]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1913,7 +2009,7 @@ func (x *UnsubscribeResponse) String() string {
 func (*UnsubscribeResponse) ProtoMessage() {}
 
 func (x *UnsubscribeResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_mail_proto_msgTypes[23]
+	mi := &file_mail_proto_msgTypes[24]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1926,7 +2022,7 @@ func (x *UnsubscribeResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use UnsubscribeResponse.ProtoReflect.Descriptor instead.
 func (*UnsubscribeResponse) Descriptor() ([]byte, []int) {
-	return file_mail_proto_rawDescGZIP(), []int{23}
+	return file_mail_proto_rawDescGZIP(), []int{24}
 }
 
 func (x *UnsubscribeResponse) GetSuccess() bool {
@@ -1950,7 +2046,7 @@ type Topic struct {
 
 func (x *Topic) Reset() {
 	*x = Topic{}
-	mi := &file_mail_proto_msgTypes[24]
+	mi := &file_mail_proto_msgTypes[25]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1962,7 +2058,7 @@ func (x *Topic) String() string {
 func (*Topic) ProtoMessage() {}
 
 func (x *Topic) ProtoReflect() protoreflect.Message {
-	mi := &file_mail_proto_msgTypes[24]
+	mi := &file_mail_proto_msgTypes[25]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1975,7 +2071,7 @@ func (x *Topic) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Topic.ProtoReflect.Descriptor instead.
 func (*Topic) Descriptor() ([]byte, []int) {
-	return file_mail_proto_rawDescGZIP(), []int{24}
+	return file_mail_proto_rawDescGZIP(), []int{25}
 }
 
 func (x *Topic) GetId() int64 {
@@ -2024,7 +2120,7 @@ type ListTopicsRequest struct {
 
 func (x *ListTopicsRequest) Reset() {
 	*x = ListTopicsRequest{}
-	mi := &file_mail_proto_msgTypes[25]
+	mi := &file_mail_proto_msgTypes[26]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2036,7 +2132,7 @@ func (x *ListTopicsRequest) String() string {
 func (*ListTopicsRequest) ProtoMessage() {}
 
 func (x *ListTopicsRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_mail_proto_msgTypes[25]
+	mi := &file_mail_proto_msgTypes[26]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2049,7 +2145,7 @@ func (x *ListTopicsRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListTopicsRequest.ProtoReflect.Descriptor instead.
 func (*ListTopicsRequest) Descriptor() ([]byte, []int) {
-	return file_mail_proto_rawDescGZIP(), []int{25}
+	return file_mail_proto_rawDescGZIP(), []int{26}
 }
 
 func (x *ListTopicsRequest) GetAgentId() int64 {
@@ -2076,7 +2172,7 @@ type ListTopicsResponse struct {
 
 func (x *ListTopicsResponse) Reset() {
 	*x = ListTopicsResponse{}
-	mi := &file_mail_proto_msgTypes[26]
+	mi := &file_mail_proto_msgTypes[27]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2088,7 +2184,7 @@ func (x *ListTopicsResponse) String() string {
 func (*ListTopicsResponse) ProtoMessage() {}
 
 func (x *ListTopicsResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_mail_proto_msgTypes[26]
+	mi := &file_mail_proto_msgTypes[27]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2101,7 +2197,7 @@ func (x *ListTopicsResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListTopicsResponse.ProtoReflect.Descriptor instead.
 func (*ListTopicsResponse) Descriptor() ([]byte, []int) {
-	return file_mail_proto_rawDescGZIP(), []int{26}
+	return file_mail_proto_rawDescGZIP(), []int{27}
 }
 
 func (x *ListTopicsResponse) GetTopics() []*Topic {
@@ -2124,7 +2220,7 @@ type SearchRequest struct {
 
 func (x *SearchRequest) Reset() {
 	*x = SearchRequest{}
-	mi := &file_mail_proto_msgTypes[27]
+	mi := &file_mail_proto_msgTypes[28]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2136,7 +2232,7 @@ func (x *SearchRequest) String() string {
 func (*SearchRequest) ProtoMessage() {}
 
 func (x *SearchRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_mail_proto_msgTypes[27]
+	mi := &file_mail_proto_msgTypes[28]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2149,7 +2245,7 @@ func (x *SearchRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SearchRequest.ProtoReflect.Descriptor instead.
 func (*SearchRequest) Descriptor() ([]byte, []int) {
-	return file_mail_proto_rawDescGZIP(), []int{27}
+	return file_mail_proto_rawDescGZIP(), []int{28}
 }
 
 func (x *SearchRequest) GetAgentId() int64 {
@@ -2190,7 +2286,7 @@ type SearchResponse struct {
 
 func (x *SearchResponse) Reset() {
 	*x = SearchResponse{}
-	mi := &file_mail_proto_msgTypes[28]
+	mi := &file_mail_proto_msgTypes[29]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2202,7 +2298,7 @@ func (x *SearchResponse) String() string {
 func (*SearchResponse) ProtoMessage() {}
 
 func (x *SearchResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_mail_proto_msgTypes[28]
+	mi := &file_mail_proto_msgTypes[29]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2215,7 +2311,7 @@ func (x *SearchResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SearchResponse.ProtoReflect.Descriptor instead.
 func (*SearchResponse) Descriptor() ([]byte, []int) {
-	return file_mail_proto_rawDescGZIP(), []int{28}
+	return file_mail_proto_rawDescGZIP(), []int{29}
 }
 
 func (x *SearchResponse) GetResults() []*InboxMessage {
@@ -2236,7 +2332,7 @@ type HasUnackedStatusToRequest struct {
 
 func (x *HasUnackedStatusToRequest) Reset() {
 	*x = HasUnackedStatusToRequest{}
-	mi := &file_mail_proto_msgTypes[29]
+	mi := &file_mail_proto_msgTypes[30]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2248,7 +2344,7 @@ func (x *HasUnackedStatusToRequest) String() string {
 func (*HasUnackedStatusToRequest) ProtoMessage() {}
 
 func (x *HasUnackedStatusToRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_mail_proto_msgTypes[29]
+	mi := &file_mail_proto_msgTypes[30]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2261,7 +2357,7 @@ func (x *HasUnackedStatusToRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use HasUnackedStatusToRequest.ProtoReflect.Descriptor instead.
 func (*HasUnackedStatusToRequest) Descriptor() ([]byte, []int) {
-	return file_mail_proto_rawDescGZIP(), []int{29}
+	return file_mail_proto_rawDescGZIP(), []int{30}
 }
 
 func (x *HasUnackedStatusToRequest) GetSenderId() int64 {
@@ -2288,7 +2384,7 @@ type HasUnackedStatusToResponse struct {
 
 func (x *HasUnackedStatusToResponse) Reset() {
 	*x = HasUnackedStatusToResponse{}
-	mi := &file_mail_proto_msgTypes[30]
+	mi := &file_mail_proto_msgTypes[31]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2300,7 +2396,7 @@ func (x *HasUnackedStatusToResponse) String() string {
 func (*HasUnackedStatusToResponse) ProtoMessage() {}
 
 func (x *HasUnackedStatusToResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_mail_proto_msgTypes[30]
+	mi := &file_mail_proto_msgTypes[31]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2313,7 +2409,7 @@ func (x *HasUnackedStatusToResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use HasUnackedStatusToResponse.ProtoReflect.Descriptor instead.
 func (*HasUnackedStatusToResponse) Descriptor() ([]byte, []int) {
-	return file_mail_proto_rawDescGZIP(), []int{30}
+	return file_mail_proto_rawDescGZIP(), []int{31}
 }
 
 func (x *HasUnackedStatusToResponse) GetHasPending() bool {
@@ -2335,7 +2431,7 @@ type RegisterAgentRequest struct {
 
 func (x *RegisterAgentRequest) Reset() {
 	*x = RegisterAgentRequest{}
-	mi := &file_mail_proto_msgTypes[31]
+	mi := &file_mail_proto_msgTypes[32]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2347,7 +2443,7 @@ func (x *RegisterAgentRequest) String() string {
 func (*RegisterAgentRequest) ProtoMessage() {}
 
 func (x *RegisterAgentRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_mail_proto_msgTypes[31]
+	mi := &file_mail_proto_msgTypes[32]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2360,7 +2456,7 @@ func (x *RegisterAgentRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RegisterAgentRequest.ProtoReflect.Descriptor instead.
 func (*RegisterAgentRequest) Descriptor() ([]byte, []int) {
-	return file_mail_proto_rawDescGZIP(), []int{31}
+	return file_mail_proto_rawDescGZIP(), []int{32}
 }
 
 func (x *RegisterAgentRequest) GetName() string {
@@ -2397,7 +2493,7 @@ type RegisterAgentResponse struct {
 
 func (x *RegisterAgentResponse) Reset() {
 	*x = RegisterAgentResponse{}
-	mi := &file_mail_proto_msgTypes[32]
+	mi := &file_mail_proto_msgTypes[33]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2409,7 +2505,7 @@ func (x *RegisterAgentResponse) String() string {
 func (*RegisterAgentResponse) ProtoMessage() {}
 
 func (x *RegisterAgentResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_mail_proto_msgTypes[32]
+	mi := &file_mail_proto_msgTypes[33]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2422,7 +2518,7 @@ func (x *RegisterAgentResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RegisterAgentResponse.ProtoReflect.Descriptor instead.
 func (*RegisterAgentResponse) Descriptor() ([]byte, []int) {
-	return file_mail_proto_rawDescGZIP(), []int{32}
+	return file_mail_proto_rawDescGZIP(), []int{33}
 }
 
 func (x *RegisterAgentResponse) GetAgentId() int64 {
@@ -2464,7 +2560,7 @@ type GetAgentRequest struct {
 
 func (x *GetAgentRequest) Reset() {
 	*x = GetAgentRequest{}
-	mi := &file_mail_proto_msgTypes[33]
+	mi := &file_mail_proto_msgTypes[34]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2476,7 +2572,7 @@ func (x *GetAgentRequest) String() string {
 func (*GetAgentRequest) ProtoMessage() {}
 
 func (x *GetAgentRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_mail_proto_msgTypes[33]
+	mi := &file_mail_proto_msgTypes[34]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2489,7 +2585,7 @@ func (x *GetAgentRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetAgentRequest.ProtoReflect.Descriptor instead.
 func (*GetAgentRequest) Descriptor() ([]byte, []int) {
-	return file_mail_proto_rawDescGZIP(), []int{33}
+	return file_mail_proto_rawDescGZIP(), []int{34}
 }
 
 func (x *GetAgentRequest) GetAgentId() int64 {
@@ -2523,7 +2619,7 @@ type GetAgentResponse struct {
 
 func (x *GetAgentResponse) Reset() {
 	*x = GetAgentResponse{}
-	mi := &file_mail_proto_msgTypes[34]
+	mi := &file_mail_proto_msgTypes[35]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2535,7 +2631,7 @@ func (x *GetAgentResponse) String() string {
 func (*GetAgentResponse) ProtoMessage() {}
 
 func (x *GetAgentResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_mail_proto_msgTypes[34]
+	mi := &file_mail_proto_msgTypes[35]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2548,7 +2644,7 @@ func (x *GetAgentResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetAgentResponse.ProtoReflect.Descriptor instead.
 func (*GetAgentResponse) Descriptor() ([]byte, []int) {
-	return file_mail_proto_rawDescGZIP(), []int{34}
+	return file_mail_proto_rawDescGZIP(), []int{35}
 }
 
 func (x *GetAgentResponse) GetId() int64 {
@@ -2610,7 +2706,7 @@ type ListAgentsRequest struct {
 
 func (x *ListAgentsRequest) Reset() {
 	*x = ListAgentsRequest{}
-	mi := &file_mail_proto_msgTypes[35]
+	mi := &file_mail_proto_msgTypes[36]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2622,7 +2718,7 @@ func (x *ListAgentsRequest) String() string {
 func (*ListAgentsRequest) ProtoMessage() {}
 
 func (x *ListAgentsRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_mail_proto_msgTypes[35]
+	mi := &file_mail_proto_msgTypes[36]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2635,7 +2731,7 @@ func (x *ListAgentsRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListAgentsRequest.ProtoReflect.Descriptor instead.
 func (*ListAgentsRequest) Descriptor() ([]byte, []int) {
-	return file_mail_proto_rawDescGZIP(), []int{35}
+	return file_mail_proto_rawDescGZIP(), []int{36}
 }
 
 func (x *ListAgentsRequest) GetLimit() int32 {
@@ -2655,7 +2751,7 @@ type ListAgentsResponse struct {
 
 func (x *ListAgentsResponse) Reset() {
 	*x = ListAgentsResponse{}
-	mi := &file_mail_proto_msgTypes[36]
+	mi := &file_mail_proto_msgTypes[37]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2667,7 +2763,7 @@ func (x *ListAgentsResponse) String() string {
 func (*ListAgentsResponse) ProtoMessage() {}
 
 func (x *ListAgentsResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_mail_proto_msgTypes[36]
+	mi := &file_mail_proto_msgTypes[37]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2680,7 +2776,7 @@ func (x *ListAgentsResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListAgentsResponse.ProtoReflect.Descriptor instead.
 func (*ListAgentsResponse) Descriptor() ([]byte, []int) {
-	return file_mail_proto_rawDescGZIP(), []int{36}
+	return file_mail_proto_rawDescGZIP(), []int{37}
 }
 
 func (x *ListAgentsResponse) GetAgents() []*GetAgentResponse {
@@ -2702,7 +2798,7 @@ type EnsureIdentityRequest struct {
 
 func (x *EnsureIdentityRequest) Reset() {
 	*x = EnsureIdentityRequest{}
-	mi := &file_mail_proto_msgTypes[37]
+	mi := &file_mail_proto_msgTypes[38]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2714,7 +2810,7 @@ func (x *EnsureIdentityRequest) String() string {
 func (*EnsureIdentityRequest) ProtoMessage() {}
 
 func (x *EnsureIdentityRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_mail_proto_msgTypes[37]
+	mi := &file_mail_proto_msgTypes[38]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2727,7 +2823,7 @@ func (x *EnsureIdentityRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use EnsureIdentityRequest.ProtoReflect.Descriptor instead.
 func (*EnsureIdentityRequest) Descriptor() ([]byte, []int) {
-	return file_mail_proto_rawDescGZIP(), []int{37}
+	return file_mail_proto_rawDescGZIP(), []int{38}
 }
 
 func (x *EnsureIdentityRequest) GetSessionId() string {
@@ -2763,7 +2859,7 @@ type EnsureIdentityResponse struct {
 
 func (x *EnsureIdentityResponse) Reset() {
 	*x = EnsureIdentityResponse{}
-	mi := &file_mail_proto_msgTypes[38]
+	mi := &file_mail_proto_msgTypes[39]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2775,7 +2871,7 @@ func (x *EnsureIdentityResponse) String() string {
 func (*EnsureIdentityResponse) ProtoMessage() {}
 
 func (x *EnsureIdentityResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_mail_proto_msgTypes[38]
+	mi := &file_mail_proto_msgTypes[39]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2788,7 +2884,7 @@ func (x *EnsureIdentityResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use EnsureIdentityResponse.ProtoReflect.Descriptor instead.
 func (*EnsureIdentityResponse) Descriptor() ([]byte, []int) {
-	return file_mail_proto_rawDescGZIP(), []int{38}
+	return file_mail_proto_rawDescGZIP(), []int{39}
 }
 
 func (x *EnsureIdentityResponse) GetAgentId() int64 {
@@ -2824,7 +2920,7 @@ type SaveIdentityRequest struct {
 
 func (x *SaveIdentityRequest) Reset() {
 	*x = SaveIdentityRequest{}
-	mi := &file_mail_proto_msgTypes[39]
+	mi := &file_mail_proto_msgTypes[40]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2836,7 +2932,7 @@ func (x *SaveIdentityRequest) String() string {
 func (*SaveIdentityRequest) ProtoMessage() {}
 
 func (x *SaveIdentityRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_mail_proto_msgTypes[39]
+	mi := &file_mail_proto_msgTypes[40]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2849,7 +2945,7 @@ func (x *SaveIdentityRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SaveIdentityRequest.ProtoReflect.Descriptor instead.
 func (*SaveIdentityRequest) Descriptor() ([]byte, []int) {
-	return file_mail_proto_rawDescGZIP(), []int{39}
+	return file_mail_proto_rawDescGZIP(), []int{40}
 }
 
 func (x *SaveIdentityRequest) GetSessionId() string {
@@ -2883,7 +2979,7 @@ type SaveIdentityResponse struct {
 
 func (x *SaveIdentityResponse) Reset() {
 	*x = SaveIdentityResponse{}
-	mi := &file_mail_proto_msgTypes[40]
+	mi := &file_mail_proto_msgTypes[41]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2895,7 +2991,7 @@ func (x *SaveIdentityResponse) String() string {
 func (*SaveIdentityResponse) ProtoMessage() {}
 
 func (x *SaveIdentityResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_mail_proto_msgTypes[40]
+	mi := &file_mail_proto_msgTypes[41]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2908,7 +3004,7 @@ func (x *SaveIdentityResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SaveIdentityResponse.ProtoReflect.Descriptor instead.
 func (*SaveIdentityResponse) Descriptor() ([]byte, []int) {
-	return file_mail_proto_rawDescGZIP(), []int{40}
+	return file_mail_proto_rawDescGZIP(), []int{41}
 }
 
 func (x *SaveIdentityResponse) GetSuccess() bool {
@@ -2928,7 +3024,7 @@ type DeleteAgentRequest struct {
 
 func (x *DeleteAgentRequest) Reset() {
 	*x = DeleteAgentRequest{}
-	mi := &file_mail_proto_msgTypes[41]
+	mi := &file_mail_proto_msgTypes[42]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2940,7 +3036,7 @@ func (x *DeleteAgentRequest) String() string {
 func (*DeleteAgentRequest) ProtoMessage() {}
 
 func (x *DeleteAgentRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_mail_proto_msgTypes[41]
+	mi := &file_mail_proto_msgTypes[42]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2953,7 +3049,7 @@ func (x *DeleteAgentRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DeleteAgentRequest.ProtoReflect.Descriptor instead.
 func (*DeleteAgentRequest) Descriptor() ([]byte, []int) {
-	return file_mail_proto_rawDescGZIP(), []int{41}
+	return file_mail_proto_rawDescGZIP(), []int{42}
 }
 
 func (x *DeleteAgentRequest) GetId() int64 {
@@ -2973,7 +3069,7 @@ type DeleteAgentResponse struct {
 
 func (x *DeleteAgentResponse) Reset() {
 	*x = DeleteAgentResponse{}
-	mi := &file_mail_proto_msgTypes[42]
+	mi := &file_mail_proto_msgTypes[43]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2985,7 +3081,7 @@ func (x *DeleteAgentResponse) String() string {
 func (*DeleteAgentResponse) ProtoMessage() {}
 
 func (x *DeleteAgentResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_mail_proto_msgTypes[42]
+	mi := &file_mail_proto_msgTypes[43]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2998,7 +3094,7 @@ func (x *DeleteAgentResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DeleteAgentResponse.ProtoReflect.Descriptor instead.
 func (*DeleteAgentResponse) Descriptor() ([]byte, []int) {
-	return file_mail_proto_rawDescGZIP(), []int{42}
+	return file_mail_proto_rawDescGZIP(), []int{43}
 }
 
 func (x *DeleteAgentResponse) GetSuccess() bool {
@@ -3020,7 +3116,7 @@ type ReplyToThreadRequest struct {
 
 func (x *ReplyToThreadRequest) Reset() {
 	*x = ReplyToThreadRequest{}
-	mi := &file_mail_proto_msgTypes[43]
+	mi := &file_mail_proto_msgTypes[44]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3032,7 +3128,7 @@ func (x *ReplyToThreadRequest) String() string {
 func (*ReplyToThreadRequest) ProtoMessage() {}
 
 func (x *ReplyToThreadRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_mail_proto_msgTypes[43]
+	mi := &file_mail_proto_msgTypes[44]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3045,7 +3141,7 @@ func (x *ReplyToThreadRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ReplyToThreadRequest.ProtoReflect.Descriptor instead.
 func (*ReplyToThreadRequest) Descriptor() ([]byte, []int) {
-	return file_mail_proto_rawDescGZIP(), []int{43}
+	return file_mail_proto_rawDescGZIP(), []int{44}
 }
 
 func (x *ReplyToThreadRequest) GetSenderId() int64 {
@@ -3079,7 +3175,7 @@ type ReplyToThreadResponse struct {
 
 func (x *ReplyToThreadResponse) Reset() {
 	*x = ReplyToThreadResponse{}
-	mi := &file_mail_proto_msgTypes[44]
+	mi := &file_mail_proto_msgTypes[45]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3091,7 +3187,7 @@ func (x *ReplyToThreadResponse) String() string {
 func (*ReplyToThreadResponse) ProtoMessage() {}
 
 func (x *ReplyToThreadResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_mail_proto_msgTypes[44]
+	mi := &file_mail_proto_msgTypes[45]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3104,7 +3200,7 @@ func (x *ReplyToThreadResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ReplyToThreadResponse.ProtoReflect.Descriptor instead.
 func (*ReplyToThreadResponse) Descriptor() ([]byte, []int) {
-	return file_mail_proto_rawDescGZIP(), []int{44}
+	return file_mail_proto_rawDescGZIP(), []int{45}
 }
 
 func (x *ReplyToThreadResponse) GetMessageId() int64 {
@@ -3125,7 +3221,7 @@ type ArchiveThreadRequest struct {
 
 func (x *ArchiveThreadRequest) Reset() {
 	*x = ArchiveThreadRequest{}
-	mi := &file_mail_proto_msgTypes[45]
+	mi := &file_mail_proto_msgTypes[46]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3137,7 +3233,7 @@ func (x *ArchiveThreadRequest) String() string {
 func (*ArchiveThreadRequest) ProtoMessage() {}
 
 func (x *ArchiveThreadRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_mail_proto_msgTypes[45]
+	mi := &file_mail_proto_msgTypes[46]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3150,7 +3246,7 @@ func (x *ArchiveThreadRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ArchiveThreadRequest.ProtoReflect.Descriptor instead.
 func (*ArchiveThreadRequest) Descriptor() ([]byte, []int) {
-	return file_mail_proto_rawDescGZIP(), []int{45}
+	return file_mail_proto_rawDescGZIP(), []int{46}
 }
 
 func (x *ArchiveThreadRequest) GetAgentId() int64 {
@@ -3178,7 +3274,7 @@ type ArchiveThreadResponse struct {
 
 func (x *ArchiveThreadResponse) Reset() {
 	*x = ArchiveThreadResponse{}
-	mi := &file_mail_proto_msgTypes[46]
+	mi := &file_mail_proto_msgTypes[47]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3190,7 +3286,7 @@ func (x *ArchiveThreadResponse) String() string {
 func (*ArchiveThreadResponse) ProtoMessage() {}
 
 func (x *ArchiveThreadResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_mail_proto_msgTypes[46]
+	mi := &file_mail_proto_msgTypes[47]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3203,7 +3299,7 @@ func (x *ArchiveThreadResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ArchiveThreadResponse.ProtoReflect.Descriptor instead.
 func (*ArchiveThreadResponse) Descriptor() ([]byte, []int) {
-	return file_mail_proto_rawDescGZIP(), []int{46}
+	return file_mail_proto_rawDescGZIP(), []int{47}
 }
 
 func (x *ArchiveThreadResponse) GetSuccess() bool {
@@ -3231,7 +3327,7 @@ type DeleteThreadRequest struct {
 
 func (x *DeleteThreadRequest) Reset() {
 	*x = DeleteThreadRequest{}
-	mi := &file_mail_proto_msgTypes[47]
+	mi := &file_mail_proto_msgTypes[48]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3243,7 +3339,7 @@ func (x *DeleteThreadRequest) String() string {
 func (*DeleteThreadRequest) ProtoMessage() {}
 
 func (x *DeleteThreadRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_mail_proto_msgTypes[47]
+	mi := &file_mail_proto_msgTypes[48]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3256,7 +3352,7 @@ func (x *DeleteThreadRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DeleteThreadRequest.ProtoReflect.Descriptor instead.
 func (*DeleteThreadRequest) Descriptor() ([]byte, []int) {
-	return file_mail_proto_rawDescGZIP(), []int{47}
+	return file_mail_proto_rawDescGZIP(), []int{48}
 }
 
 func (x *DeleteThreadRequest) GetAgentId() int64 {
@@ -3284,7 +3380,7 @@ type DeleteThreadResponse struct {
 
 func (x *DeleteThreadResponse) Reset() {
 	*x = DeleteThreadResponse{}
-	mi := &file_mail_proto_msgTypes[48]
+	mi := &file_mail_proto_msgTypes[49]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3296,7 +3392,7 @@ func (x *DeleteThreadResponse) String() string {
 func (*DeleteThreadResponse) ProtoMessage() {}
 
 func (x *DeleteThreadResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_mail_proto_msgTypes[48]
+	mi := &file_mail_proto_msgTypes[49]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3309,7 +3405,7 @@ func (x *DeleteThreadResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DeleteThreadResponse.ProtoReflect.Descriptor instead.
 func (*DeleteThreadResponse) Descriptor() ([]byte, []int) {
-	return file_mail_proto_rawDescGZIP(), []int{48}
+	return file_mail_proto_rawDescGZIP(), []int{49}
 }
 
 func (x *DeleteThreadResponse) GetSuccess() bool {
@@ -3337,7 +3433,7 @@ type MarkThreadUnreadRequest struct {
 
 func (x *MarkThreadUnreadRequest) Reset() {
 	*x = MarkThreadUnreadRequest{}
-	mi := &file_mail_proto_msgTypes[49]
+	mi := &file_mail_proto_msgTypes[50]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3349,7 +3445,7 @@ func (x *MarkThreadUnreadRequest) String() string {
 func (*MarkThreadUnreadRequest) ProtoMessage() {}
 
 func (x *MarkThreadUnreadRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_mail_proto_msgTypes[49]
+	mi := &file_mail_proto_msgTypes[50]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3362,7 +3458,7 @@ func (x *MarkThreadUnreadRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use MarkThreadUnreadRequest.ProtoReflect.Descriptor instead.
 func (*MarkThreadUnreadRequest) Descriptor() ([]byte, []int) {
-	return file_mail_proto_rawDescGZIP(), []int{49}
+	return file_mail_proto_rawDescGZIP(), []int{50}
 }
 
 func (x *MarkThreadUnreadRequest) GetAgentId() int64 {
@@ -3389,7 +3485,7 @@ type MarkThreadUnreadResponse struct {
 
 func (x *MarkThreadUnreadResponse) Reset() {
 	*x = MarkThreadUnreadResponse{}
-	mi := &file_mail_proto_msgTypes[50]
+	mi := &file_mail_proto_msgTypes[51]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3401,7 +3497,7 @@ func (x *MarkThreadUnreadResponse) String() string {
 func (*MarkThreadUnreadResponse) ProtoMessage() {}
 
 func (x *MarkThreadUnreadResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_mail_proto_msgTypes[50]
+	mi := &file_mail_proto_msgTypes[51]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3414,7 +3510,7 @@ func (x *MarkThreadUnreadResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use MarkThreadUnreadResponse.ProtoReflect.Descriptor instead.
 func (*MarkThreadUnreadResponse) Descriptor() ([]byte, []int) {
-	return file_mail_proto_rawDescGZIP(), []int{50}
+	return file_mail_proto_rawDescGZIP(), []int{51}
 }
 
 func (x *MarkThreadUnreadResponse) GetSuccess() bool {
@@ -3434,7 +3530,7 @@ type GetTopicRequest struct {
 
 func (x *GetTopicRequest) Reset() {
 	*x = GetTopicRequest{}
-	mi := &file_mail_proto_msgTypes[51]
+	mi := &file_mail_proto_msgTypes[52]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3446,7 +3542,7 @@ func (x *GetTopicRequest) String() string {
 func (*GetTopicRequest) ProtoMessage() {}
 
 func (x *GetTopicRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_mail_proto_msgTypes[51]
+	mi := &file_mail_proto_msgTypes[52]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3459,7 +3555,7 @@ func (x *GetTopicRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetTopicRequest.ProtoReflect.Descriptor instead.
 func (*GetTopicRequest) Descriptor() ([]byte, []int) {
-	return file_mail_proto_rawDescGZIP(), []int{51}
+	return file_mail_proto_rawDescGZIP(), []int{52}
 }
 
 func (x *GetTopicRequest) GetTopicId() int64 {
@@ -3479,7 +3575,7 @@ type GetTopicResponse struct {
 
 func (x *GetTopicResponse) Reset() {
 	*x = GetTopicResponse{}
-	mi := &file_mail_proto_msgTypes[52]
+	mi := &file_mail_proto_msgTypes[53]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3491,7 +3587,7 @@ func (x *GetTopicResponse) String() string {
 func (*GetTopicResponse) ProtoMessage() {}
 
 func (x *GetTopicResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_mail_proto_msgTypes[52]
+	mi := &file_mail_proto_msgTypes[53]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3504,7 +3600,7 @@ func (x *GetTopicResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetTopicResponse.ProtoReflect.Descriptor instead.
 func (*GetTopicResponse) Descriptor() ([]byte, []int) {
-	return file_mail_proto_rawDescGZIP(), []int{52}
+	return file_mail_proto_rawDescGZIP(), []int{53}
 }
 
 func (x *GetTopicResponse) GetTopic() *Topic {
@@ -3525,7 +3621,7 @@ type AutocompleteRecipientsRequest struct {
 
 func (x *AutocompleteRecipientsRequest) Reset() {
 	*x = AutocompleteRecipientsRequest{}
-	mi := &file_mail_proto_msgTypes[53]
+	mi := &file_mail_proto_msgTypes[54]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3537,7 +3633,7 @@ func (x *AutocompleteRecipientsRequest) String() string {
 func (*AutocompleteRecipientsRequest) ProtoMessage() {}
 
 func (x *AutocompleteRecipientsRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_mail_proto_msgTypes[53]
+	mi := &file_mail_proto_msgTypes[54]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3550,7 +3646,7 @@ func (x *AutocompleteRecipientsRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use AutocompleteRecipientsRequest.ProtoReflect.Descriptor instead.
 func (*AutocompleteRecipientsRequest) Descriptor() ([]byte, []int) {
-	return file_mail_proto_rawDescGZIP(), []int{53}
+	return file_mail_proto_rawDescGZIP(), []int{54}
 }
 
 func (x *AutocompleteRecipientsRequest) GetQuery() string {
@@ -3581,7 +3677,7 @@ type AutocompleteRecipient struct {
 
 func (x *AutocompleteRecipient) Reset() {
 	*x = AutocompleteRecipient{}
-	mi := &file_mail_proto_msgTypes[54]
+	mi := &file_mail_proto_msgTypes[55]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3593,7 +3689,7 @@ func (x *AutocompleteRecipient) String() string {
 func (*AutocompleteRecipient) ProtoMessage() {}
 
 func (x *AutocompleteRecipient) ProtoReflect() protoreflect.Message {
-	mi := &file_mail_proto_msgTypes[54]
+	mi := &file_mail_proto_msgTypes[55]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3606,7 +3702,7 @@ func (x *AutocompleteRecipient) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use AutocompleteRecipient.ProtoReflect.Descriptor instead.
 func (*AutocompleteRecipient) Descriptor() ([]byte, []int) {
-	return file_mail_proto_rawDescGZIP(), []int{54}
+	return file_mail_proto_rawDescGZIP(), []int{55}
 }
 
 func (x *AutocompleteRecipient) GetId() int64 {
@@ -3654,7 +3750,7 @@ type AutocompleteRecipientsResponse struct {
 
 func (x *AutocompleteRecipientsResponse) Reset() {
 	*x = AutocompleteRecipientsResponse{}
-	mi := &file_mail_proto_msgTypes[55]
+	mi := &file_mail_proto_msgTypes[56]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3666,7 +3762,7 @@ func (x *AutocompleteRecipientsResponse) String() string {
 func (*AutocompleteRecipientsResponse) ProtoMessage() {}
 
 func (x *AutocompleteRecipientsResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_mail_proto_msgTypes[55]
+	mi := &file_mail_proto_msgTypes[56]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3679,7 +3775,7 @@ func (x *AutocompleteRecipientsResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use AutocompleteRecipientsResponse.ProtoReflect.Descriptor instead.
 func (*AutocompleteRecipientsResponse) Descriptor() ([]byte, []int) {
-	return file_mail_proto_rawDescGZIP(), []int{55}
+	return file_mail_proto_rawDescGZIP(), []int{56}
 }
 
 func (x *AutocompleteRecipientsResponse) GetRecipients() []*AutocompleteRecipient {
@@ -3703,7 +3799,7 @@ type DeleteMessageRequest struct {
 
 func (x *DeleteMessageRequest) Reset() {
 	*x = DeleteMessageRequest{}
-	mi := &file_mail_proto_msgTypes[56]
+	mi := &file_mail_proto_msgTypes[57]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3715,7 +3811,7 @@ func (x *DeleteMessageRequest) String() string {
 func (*DeleteMessageRequest) ProtoMessage() {}
 
 func (x *DeleteMessageRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_mail_proto_msgTypes[56]
+	mi := &file_mail_proto_msgTypes[57]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3728,7 +3824,7 @@ func (x *DeleteMessageRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DeleteMessageRequest.ProtoReflect.Descriptor instead.
 func (*DeleteMessageRequest) Descriptor() ([]byte, []int) {
-	return file_mail_proto_rawDescGZIP(), []int{56}
+	return file_mail_proto_rawDescGZIP(), []int{57}
 }
 
 func (x *DeleteMessageRequest) GetAgentId() int64 {
@@ -3762,7 +3858,7 @@ type DeleteMessageResponse struct {
 
 func (x *DeleteMessageResponse) Reset() {
 	*x = DeleteMessageResponse{}
-	mi := &file_mail_proto_msgTypes[57]
+	mi := &file_mail_proto_msgTypes[58]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3774,7 +3870,7 @@ func (x *DeleteMessageResponse) String() string {
 func (*DeleteMessageResponse) ProtoMessage() {}
 
 func (x *DeleteMessageResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_mail_proto_msgTypes[57]
+	mi := &file_mail_proto_msgTypes[58]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3787,7 +3883,7 @@ func (x *DeleteMessageResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DeleteMessageResponse.ProtoReflect.Descriptor instead.
 func (*DeleteMessageResponse) Descriptor() ([]byte, []int) {
-	return file_mail_proto_rawDescGZIP(), []int{57}
+	return file_mail_proto_rawDescGZIP(), []int{58}
 }
 
 func (x *DeleteMessageResponse) GetSuccess() bool {
@@ -3809,7 +3905,7 @@ type UpdateAgentRequest struct {
 
 func (x *UpdateAgentRequest) Reset() {
 	*x = UpdateAgentRequest{}
-	mi := &file_mail_proto_msgTypes[58]
+	mi := &file_mail_proto_msgTypes[59]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3821,7 +3917,7 @@ func (x *UpdateAgentRequest) String() string {
 func (*UpdateAgentRequest) ProtoMessage() {}
 
 func (x *UpdateAgentRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_mail_proto_msgTypes[58]
+	mi := &file_mail_proto_msgTypes[59]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3834,7 +3930,7 @@ func (x *UpdateAgentRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use UpdateAgentRequest.ProtoReflect.Descriptor instead.
 func (*UpdateAgentRequest) Descriptor() ([]byte, []int) {
-	return file_mail_proto_rawDescGZIP(), []int{58}
+	return file_mail_proto_rawDescGZIP(), []int{59}
 }
 
 func (x *UpdateAgentRequest) GetId() int64 {
@@ -3868,7 +3964,7 @@ type UpdateAgentResponse struct {
 
 func (x *UpdateAgentResponse) Reset() {
 	*x = UpdateAgentResponse{}
-	mi := &file_mail_proto_msgTypes[59]
+	mi := &file_mail_proto_msgTypes[60]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3880,7 +3976,7 @@ func (x *UpdateAgentResponse) String() string {
 func (*UpdateAgentResponse) ProtoMessage() {}
 
 func (x *UpdateAgentResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_mail_proto_msgTypes[59]
+	mi := &file_mail_proto_msgTypes[60]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3893,7 +3989,7 @@ func (x *UpdateAgentResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use UpdateAgentResponse.ProtoReflect.Descriptor instead.
 func (*UpdateAgentResponse) Descriptor() ([]byte, []int) {
-	return file_mail_proto_rawDescGZIP(), []int{59}
+	return file_mail_proto_rawDescGZIP(), []int{60}
 }
 
 func (x *UpdateAgentResponse) GetAgent() *GetAgentResponse {
@@ -3920,7 +4016,7 @@ type AgentWithStatus struct {
 
 func (x *AgentWithStatus) Reset() {
 	*x = AgentWithStatus{}
-	mi := &file_mail_proto_msgTypes[60]
+	mi := &file_mail_proto_msgTypes[61]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3932,7 +4028,7 @@ func (x *AgentWithStatus) String() string {
 func (*AgentWithStatus) ProtoMessage() {}
 
 func (x *AgentWithStatus) ProtoReflect() protoreflect.Message {
-	mi := &file_mail_proto_msgTypes[60]
+	mi := &file_mail_proto_msgTypes[61]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3945,7 +4041,7 @@ func (x *AgentWithStatus) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use AgentWithStatus.ProtoReflect.Descriptor instead.
 func (*AgentWithStatus) Descriptor() ([]byte, []int) {
-	return file_mail_proto_rawDescGZIP(), []int{60}
+	return file_mail_proto_rawDescGZIP(), []int{61}
 }
 
 func (x *AgentWithStatus) GetId() int64 {
@@ -4017,7 +4113,7 @@ type AgentStatusCounts struct {
 
 func (x *AgentStatusCounts) Reset() {
 	*x = AgentStatusCounts{}
-	mi := &file_mail_proto_msgTypes[61]
+	mi := &file_mail_proto_msgTypes[62]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -4029,7 +4125,7 @@ func (x *AgentStatusCounts) String() string {
 func (*AgentStatusCounts) ProtoMessage() {}
 
 func (x *AgentStatusCounts) ProtoReflect() protoreflect.Message {
-	mi := &file_mail_proto_msgTypes[61]
+	mi := &file_mail_proto_msgTypes[62]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -4042,7 +4138,7 @@ func (x *AgentStatusCounts) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use AgentStatusCounts.ProtoReflect.Descriptor instead.
 func (*AgentStatusCounts) Descriptor() ([]byte, []int) {
-	return file_mail_proto_rawDescGZIP(), []int{61}
+	return file_mail_proto_rawDescGZIP(), []int{62}
 }
 
 func (x *AgentStatusCounts) GetActive() int32 {
@@ -4082,7 +4178,7 @@ type GetAgentsStatusRequest struct {
 
 func (x *GetAgentsStatusRequest) Reset() {
 	*x = GetAgentsStatusRequest{}
-	mi := &file_mail_proto_msgTypes[62]
+	mi := &file_mail_proto_msgTypes[63]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -4094,7 +4190,7 @@ func (x *GetAgentsStatusRequest) String() string {
 func (*GetAgentsStatusRequest) ProtoMessage() {}
 
 func (x *GetAgentsStatusRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_mail_proto_msgTypes[62]
+	mi := &file_mail_proto_msgTypes[63]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -4107,7 +4203,7 @@ func (x *GetAgentsStatusRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetAgentsStatusRequest.ProtoReflect.Descriptor instead.
 func (*GetAgentsStatusRequest) Descriptor() ([]byte, []int) {
-	return file_mail_proto_rawDescGZIP(), []int{62}
+	return file_mail_proto_rawDescGZIP(), []int{63}
 }
 
 // GetAgentsStatusResponse is the response for GetAgentsStatus.
@@ -4121,7 +4217,7 @@ type GetAgentsStatusResponse struct {
 
 func (x *GetAgentsStatusResponse) Reset() {
 	*x = GetAgentsStatusResponse{}
-	mi := &file_mail_proto_msgTypes[63]
+	mi := &file_mail_proto_msgTypes[64]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -4133,7 +4229,7 @@ func (x *GetAgentsStatusResponse) String() string {
 func (*GetAgentsStatusResponse) ProtoMessage() {}
 
 func (x *GetAgentsStatusResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_mail_proto_msgTypes[63]
+	mi := &file_mail_proto_msgTypes[64]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -4146,7 +4242,7 @@ func (x *GetAgentsStatusResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetAgentsStatusResponse.ProtoReflect.Descriptor instead.
 func (*GetAgentsStatusResponse) Descriptor() ([]byte, []int) {
-	return file_mail_proto_rawDescGZIP(), []int{63}
+	return file_mail_proto_rawDescGZIP(), []int{64}
 }
 
 func (x *GetAgentsStatusResponse) GetAgents() []*AgentWithStatus {
@@ -4178,7 +4274,7 @@ type DiscoverAgentsRequest struct {
 
 func (x *DiscoverAgentsRequest) Reset() {
 	*x = DiscoverAgentsRequest{}
-	mi := &file_mail_proto_msgTypes[64]
+	mi := &file_mail_proto_msgTypes[65]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -4190,7 +4286,7 @@ func (x *DiscoverAgentsRequest) String() string {
 func (*DiscoverAgentsRequest) ProtoMessage() {}
 
 func (x *DiscoverAgentsRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_mail_proto_msgTypes[64]
+	mi := &file_mail_proto_msgTypes[65]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -4203,7 +4299,7 @@ func (x *DiscoverAgentsRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DiscoverAgentsRequest.ProtoReflect.Descriptor instead.
 func (*DiscoverAgentsRequest) Descriptor() ([]byte, []int) {
-	return file_mail_proto_rawDescGZIP(), []int{64}
+	return file_mail_proto_rawDescGZIP(), []int{65}
 }
 
 func (x *DiscoverAgentsRequest) GetStatusFilter() []AgentStatus {
@@ -4248,7 +4344,7 @@ type DiscoveredAgent struct {
 
 func (x *DiscoveredAgent) Reset() {
 	*x = DiscoveredAgent{}
-	mi := &file_mail_proto_msgTypes[65]
+	mi := &file_mail_proto_msgTypes[66]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -4260,7 +4356,7 @@ func (x *DiscoveredAgent) String() string {
 func (*DiscoveredAgent) ProtoMessage() {}
 
 func (x *DiscoveredAgent) ProtoReflect() protoreflect.Message {
-	mi := &file_mail_proto_msgTypes[65]
+	mi := &file_mail_proto_msgTypes[66]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -4273,7 +4369,7 @@ func (x *DiscoveredAgent) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DiscoveredAgent.ProtoReflect.Descriptor instead.
 func (*DiscoveredAgent) Descriptor() ([]byte, []int) {
-	return file_mail_proto_rawDescGZIP(), []int{65}
+	return file_mail_proto_rawDescGZIP(), []int{66}
 }
 
 func (x *DiscoveredAgent) GetId() int64 {
@@ -4371,7 +4467,7 @@ type DiscoverAgentsResponse struct {
 
 func (x *DiscoverAgentsResponse) Reset() {
 	*x = DiscoverAgentsResponse{}
-	mi := &file_mail_proto_msgTypes[66]
+	mi := &file_mail_proto_msgTypes[67]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -4383,7 +4479,7 @@ func (x *DiscoverAgentsResponse) String() string {
 func (*DiscoverAgentsResponse) ProtoMessage() {}
 
 func (x *DiscoverAgentsResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_mail_proto_msgTypes[66]
+	mi := &file_mail_proto_msgTypes[67]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -4396,7 +4492,7 @@ func (x *DiscoverAgentsResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DiscoverAgentsResponse.ProtoReflect.Descriptor instead.
 func (*DiscoverAgentsResponse) Descriptor() ([]byte, []int) {
-	return file_mail_proto_rawDescGZIP(), []int{66}
+	return file_mail_proto_rawDescGZIP(), []int{67}
 }
 
 func (x *DiscoverAgentsResponse) GetAgents() []*DiscoveredAgent {
@@ -4427,7 +4523,7 @@ type HeartbeatRequest struct {
 
 func (x *HeartbeatRequest) Reset() {
 	*x = HeartbeatRequest{}
-	mi := &file_mail_proto_msgTypes[67]
+	mi := &file_mail_proto_msgTypes[68]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -4439,7 +4535,7 @@ func (x *HeartbeatRequest) String() string {
 func (*HeartbeatRequest) ProtoMessage() {}
 
 func (x *HeartbeatRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_mail_proto_msgTypes[67]
+	mi := &file_mail_proto_msgTypes[68]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -4452,7 +4548,7 @@ func (x *HeartbeatRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use HeartbeatRequest.ProtoReflect.Descriptor instead.
 func (*HeartbeatRequest) Descriptor() ([]byte, []int) {
-	return file_mail_proto_rawDescGZIP(), []int{67}
+	return file_mail_proto_rawDescGZIP(), []int{68}
 }
 
 func (x *HeartbeatRequest) GetAgentId() int64 {
@@ -4486,7 +4582,7 @@ type HeartbeatResponse struct {
 
 func (x *HeartbeatResponse) Reset() {
 	*x = HeartbeatResponse{}
-	mi := &file_mail_proto_msgTypes[68]
+	mi := &file_mail_proto_msgTypes[69]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -4498,7 +4594,7 @@ func (x *HeartbeatResponse) String() string {
 func (*HeartbeatResponse) ProtoMessage() {}
 
 func (x *HeartbeatResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_mail_proto_msgTypes[68]
+	mi := &file_mail_proto_msgTypes[69]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -4511,7 +4607,7 @@ func (x *HeartbeatResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use HeartbeatResponse.ProtoReflect.Descriptor instead.
 func (*HeartbeatResponse) Descriptor() ([]byte, []int) {
-	return file_mail_proto_rawDescGZIP(), []int{68}
+	return file_mail_proto_rawDescGZIP(), []int{69}
 }
 
 func (x *HeartbeatResponse) GetSuccess() bool {
@@ -4538,7 +4634,7 @@ type SessionInfo struct {
 
 func (x *SessionInfo) Reset() {
 	*x = SessionInfo{}
-	mi := &file_mail_proto_msgTypes[69]
+	mi := &file_mail_proto_msgTypes[70]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -4550,7 +4646,7 @@ func (x *SessionInfo) String() string {
 func (*SessionInfo) ProtoMessage() {}
 
 func (x *SessionInfo) ProtoReflect() protoreflect.Message {
-	mi := &file_mail_proto_msgTypes[69]
+	mi := &file_mail_proto_msgTypes[70]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -4563,7 +4659,7 @@ func (x *SessionInfo) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SessionInfo.ProtoReflect.Descriptor instead.
 func (*SessionInfo) Descriptor() ([]byte, []int) {
-	return file_mail_proto_rawDescGZIP(), []int{69}
+	return file_mail_proto_rawDescGZIP(), []int{70}
 }
 
 func (x *SessionInfo) GetId() int64 {
@@ -4633,7 +4729,7 @@ type ListSessionsRequest struct {
 
 func (x *ListSessionsRequest) Reset() {
 	*x = ListSessionsRequest{}
-	mi := &file_mail_proto_msgTypes[70]
+	mi := &file_mail_proto_msgTypes[71]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -4645,7 +4741,7 @@ func (x *ListSessionsRequest) String() string {
 func (*ListSessionsRequest) ProtoMessage() {}
 
 func (x *ListSessionsRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_mail_proto_msgTypes[70]
+	mi := &file_mail_proto_msgTypes[71]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -4658,7 +4754,7 @@ func (x *ListSessionsRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListSessionsRequest.ProtoReflect.Descriptor instead.
 func (*ListSessionsRequest) Descriptor() ([]byte, []int) {
-	return file_mail_proto_rawDescGZIP(), []int{70}
+	return file_mail_proto_rawDescGZIP(), []int{71}
 }
 
 func (x *ListSessionsRequest) GetActiveOnly() bool {
@@ -4685,7 +4781,7 @@ type ListSessionsResponse struct {
 
 func (x *ListSessionsResponse) Reset() {
 	*x = ListSessionsResponse{}
-	mi := &file_mail_proto_msgTypes[71]
+	mi := &file_mail_proto_msgTypes[72]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -4697,7 +4793,7 @@ func (x *ListSessionsResponse) String() string {
 func (*ListSessionsResponse) ProtoMessage() {}
 
 func (x *ListSessionsResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_mail_proto_msgTypes[71]
+	mi := &file_mail_proto_msgTypes[72]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -4710,7 +4806,7 @@ func (x *ListSessionsResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListSessionsResponse.ProtoReflect.Descriptor instead.
 func (*ListSessionsResponse) Descriptor() ([]byte, []int) {
-	return file_mail_proto_rawDescGZIP(), []int{71}
+	return file_mail_proto_rawDescGZIP(), []int{72}
 }
 
 func (x *ListSessionsResponse) GetSessions() []*SessionInfo {
@@ -4730,7 +4826,7 @@ type GetSessionRequest struct {
 
 func (x *GetSessionRequest) Reset() {
 	*x = GetSessionRequest{}
-	mi := &file_mail_proto_msgTypes[72]
+	mi := &file_mail_proto_msgTypes[73]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -4742,7 +4838,7 @@ func (x *GetSessionRequest) String() string {
 func (*GetSessionRequest) ProtoMessage() {}
 
 func (x *GetSessionRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_mail_proto_msgTypes[72]
+	mi := &file_mail_proto_msgTypes[73]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -4755,7 +4851,7 @@ func (x *GetSessionRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetSessionRequest.ProtoReflect.Descriptor instead.
 func (*GetSessionRequest) Descriptor() ([]byte, []int) {
-	return file_mail_proto_rawDescGZIP(), []int{72}
+	return file_mail_proto_rawDescGZIP(), []int{73}
 }
 
 func (x *GetSessionRequest) GetSessionId() int64 {
@@ -4775,7 +4871,7 @@ type GetSessionResponse struct {
 
 func (x *GetSessionResponse) Reset() {
 	*x = GetSessionResponse{}
-	mi := &file_mail_proto_msgTypes[73]
+	mi := &file_mail_proto_msgTypes[74]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -4787,7 +4883,7 @@ func (x *GetSessionResponse) String() string {
 func (*GetSessionResponse) ProtoMessage() {}
 
 func (x *GetSessionResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_mail_proto_msgTypes[73]
+	mi := &file_mail_proto_msgTypes[74]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -4800,7 +4896,7 @@ func (x *GetSessionResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetSessionResponse.ProtoReflect.Descriptor instead.
 func (*GetSessionResponse) Descriptor() ([]byte, []int) {
-	return file_mail_proto_rawDescGZIP(), []int{73}
+	return file_mail_proto_rawDescGZIP(), []int{74}
 }
 
 func (x *GetSessionResponse) GetSession() *SessionInfo {
@@ -4822,7 +4918,7 @@ type StartSessionRequest struct {
 
 func (x *StartSessionRequest) Reset() {
 	*x = StartSessionRequest{}
-	mi := &file_mail_proto_msgTypes[74]
+	mi := &file_mail_proto_msgTypes[75]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -4834,7 +4930,7 @@ func (x *StartSessionRequest) String() string {
 func (*StartSessionRequest) ProtoMessage() {}
 
 func (x *StartSessionRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_mail_proto_msgTypes[74]
+	mi := &file_mail_proto_msgTypes[75]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -4847,7 +4943,7 @@ func (x *StartSessionRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use StartSessionRequest.ProtoReflect.Descriptor instead.
 func (*StartSessionRequest) Descriptor() ([]byte, []int) {
-	return file_mail_proto_rawDescGZIP(), []int{74}
+	return file_mail_proto_rawDescGZIP(), []int{75}
 }
 
 func (x *StartSessionRequest) GetAgentId() int64 {
@@ -4881,7 +4977,7 @@ type StartSessionResponse struct {
 
 func (x *StartSessionResponse) Reset() {
 	*x = StartSessionResponse{}
-	mi := &file_mail_proto_msgTypes[75]
+	mi := &file_mail_proto_msgTypes[76]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -4893,7 +4989,7 @@ func (x *StartSessionResponse) String() string {
 func (*StartSessionResponse) ProtoMessage() {}
 
 func (x *StartSessionResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_mail_proto_msgTypes[75]
+	mi := &file_mail_proto_msgTypes[76]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -4906,7 +5002,7 @@ func (x *StartSessionResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use StartSessionResponse.ProtoReflect.Descriptor instead.
 func (*StartSessionResponse) Descriptor() ([]byte, []int) {
-	return file_mail_proto_rawDescGZIP(), []int{75}
+	return file_mail_proto_rawDescGZIP(), []int{76}
 }
 
 func (x *StartSessionResponse) GetSession() *SessionInfo {
@@ -4926,7 +5022,7 @@ type CompleteSessionRequest struct {
 
 func (x *CompleteSessionRequest) Reset() {
 	*x = CompleteSessionRequest{}
-	mi := &file_mail_proto_msgTypes[76]
+	mi := &file_mail_proto_msgTypes[77]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -4938,7 +5034,7 @@ func (x *CompleteSessionRequest) String() string {
 func (*CompleteSessionRequest) ProtoMessage() {}
 
 func (x *CompleteSessionRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_mail_proto_msgTypes[76]
+	mi := &file_mail_proto_msgTypes[77]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -4951,7 +5047,7 @@ func (x *CompleteSessionRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CompleteSessionRequest.ProtoReflect.Descriptor instead.
 func (*CompleteSessionRequest) Descriptor() ([]byte, []int) {
-	return file_mail_proto_rawDescGZIP(), []int{76}
+	return file_mail_proto_rawDescGZIP(), []int{77}
 }
 
 func (x *CompleteSessionRequest) GetSessionId() int64 {
@@ -4971,7 +5067,7 @@ type CompleteSessionResponse struct {
 
 func (x *CompleteSessionResponse) Reset() {
 	*x = CompleteSessionResponse{}
-	mi := &file_mail_proto_msgTypes[77]
+	mi := &file_mail_proto_msgTypes[78]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -4983,7 +5079,7 @@ func (x *CompleteSessionResponse) String() string {
 func (*CompleteSessionResponse) ProtoMessage() {}
 
 func (x *CompleteSessionResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_mail_proto_msgTypes[77]
+	mi := &file_mail_proto_msgTypes[78]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -4996,7 +5092,7 @@ func (x *CompleteSessionResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CompleteSessionResponse.ProtoReflect.Descriptor instead.
 func (*CompleteSessionResponse) Descriptor() ([]byte, []int) {
-	return file_mail_proto_rawDescGZIP(), []int{77}
+	return file_mail_proto_rawDescGZIP(), []int{78}
 }
 
 func (x *CompleteSessionResponse) GetSuccess() bool {
@@ -5022,7 +5118,7 @@ type ActivityInfo struct {
 
 func (x *ActivityInfo) Reset() {
 	*x = ActivityInfo{}
-	mi := &file_mail_proto_msgTypes[78]
+	mi := &file_mail_proto_msgTypes[79]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -5034,7 +5130,7 @@ func (x *ActivityInfo) String() string {
 func (*ActivityInfo) ProtoMessage() {}
 
 func (x *ActivityInfo) ProtoReflect() protoreflect.Message {
-	mi := &file_mail_proto_msgTypes[78]
+	mi := &file_mail_proto_msgTypes[79]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -5047,7 +5143,7 @@ func (x *ActivityInfo) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ActivityInfo.ProtoReflect.Descriptor instead.
 func (*ActivityInfo) Descriptor() ([]byte, []int) {
-	return file_mail_proto_rawDescGZIP(), []int{78}
+	return file_mail_proto_rawDescGZIP(), []int{79}
 }
 
 func (x *ActivityInfo) GetId() int64 {
@@ -5112,7 +5208,7 @@ type ListActivitiesRequest struct {
 
 func (x *ListActivitiesRequest) Reset() {
 	*x = ListActivitiesRequest{}
-	mi := &file_mail_proto_msgTypes[79]
+	mi := &file_mail_proto_msgTypes[80]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -5124,7 +5220,7 @@ func (x *ListActivitiesRequest) String() string {
 func (*ListActivitiesRequest) ProtoMessage() {}
 
 func (x *ListActivitiesRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_mail_proto_msgTypes[79]
+	mi := &file_mail_proto_msgTypes[80]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -5137,7 +5233,7 @@ func (x *ListActivitiesRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListActivitiesRequest.ProtoReflect.Descriptor instead.
 func (*ListActivitiesRequest) Descriptor() ([]byte, []int) {
-	return file_mail_proto_rawDescGZIP(), []int{79}
+	return file_mail_proto_rawDescGZIP(), []int{80}
 }
 
 func (x *ListActivitiesRequest) GetAgentId() int64 {
@@ -5181,7 +5277,7 @@ type ListActivitiesResponse struct {
 
 func (x *ListActivitiesResponse) Reset() {
 	*x = ListActivitiesResponse{}
-	mi := &file_mail_proto_msgTypes[80]
+	mi := &file_mail_proto_msgTypes[81]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -5193,7 +5289,7 @@ func (x *ListActivitiesResponse) String() string {
 func (*ListActivitiesResponse) ProtoMessage() {}
 
 func (x *ListActivitiesResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_mail_proto_msgTypes[80]
+	mi := &file_mail_proto_msgTypes[81]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -5206,7 +5302,7 @@ func (x *ListActivitiesResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListActivitiesResponse.ProtoReflect.Descriptor instead.
 func (*ListActivitiesResponse) Descriptor() ([]byte, []int) {
-	return file_mail_proto_rawDescGZIP(), []int{80}
+	return file_mail_proto_rawDescGZIP(), []int{81}
 }
 
 func (x *ListActivitiesResponse) GetActivities() []*ActivityInfo {
@@ -5250,7 +5346,7 @@ type DashboardStats struct {
 
 func (x *DashboardStats) Reset() {
 	*x = DashboardStats{}
-	mi := &file_mail_proto_msgTypes[81]
+	mi := &file_mail_proto_msgTypes[82]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -5262,7 +5358,7 @@ func (x *DashboardStats) String() string {
 func (*DashboardStats) ProtoMessage() {}
 
 func (x *DashboardStats) ProtoReflect() protoreflect.Message {
-	mi := &file_mail_proto_msgTypes[81]
+	mi := &file_mail_proto_msgTypes[82]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -5275,7 +5371,7 @@ func (x *DashboardStats) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DashboardStats.ProtoReflect.Descriptor instead.
 func (*DashboardStats) Descriptor() ([]byte, []int) {
-	return file_mail_proto_rawDescGZIP(), []int{81}
+	return file_mail_proto_rawDescGZIP(), []int{82}
 }
 
 func (x *DashboardStats) GetActiveAgents() int32 {
@@ -5315,7 +5411,7 @@ type GetDashboardStatsRequest struct {
 
 func (x *GetDashboardStatsRequest) Reset() {
 	*x = GetDashboardStatsRequest{}
-	mi := &file_mail_proto_msgTypes[82]
+	mi := &file_mail_proto_msgTypes[83]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -5327,7 +5423,7 @@ func (x *GetDashboardStatsRequest) String() string {
 func (*GetDashboardStatsRequest) ProtoMessage() {}
 
 func (x *GetDashboardStatsRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_mail_proto_msgTypes[82]
+	mi := &file_mail_proto_msgTypes[83]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -5340,7 +5436,7 @@ func (x *GetDashboardStatsRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetDashboardStatsRequest.ProtoReflect.Descriptor instead.
 func (*GetDashboardStatsRequest) Descriptor() ([]byte, []int) {
-	return file_mail_proto_rawDescGZIP(), []int{82}
+	return file_mail_proto_rawDescGZIP(), []int{83}
 }
 
 // GetDashboardStatsResponse is the response for GetDashboardStats.
@@ -5353,7 +5449,7 @@ type GetDashboardStatsResponse struct {
 
 func (x *GetDashboardStatsResponse) Reset() {
 	*x = GetDashboardStatsResponse{}
-	mi := &file_mail_proto_msgTypes[83]
+	mi := &file_mail_proto_msgTypes[84]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -5365,7 +5461,7 @@ func (x *GetDashboardStatsResponse) String() string {
 func (*GetDashboardStatsResponse) ProtoMessage() {}
 
 func (x *GetDashboardStatsResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_mail_proto_msgTypes[83]
+	mi := &file_mail_proto_msgTypes[84]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -5378,7 +5474,7 @@ func (x *GetDashboardStatsResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetDashboardStatsResponse.ProtoReflect.Descriptor instead.
 func (*GetDashboardStatsResponse) Descriptor() ([]byte, []int) {
-	return file_mail_proto_rawDescGZIP(), []int{83}
+	return file_mail_proto_rawDescGZIP(), []int{84}
 }
 
 func (x *GetDashboardStatsResponse) GetStats() *DashboardStats {
@@ -5397,7 +5493,7 @@ type HealthCheckRequest struct {
 
 func (x *HealthCheckRequest) Reset() {
 	*x = HealthCheckRequest{}
-	mi := &file_mail_proto_msgTypes[84]
+	mi := &file_mail_proto_msgTypes[85]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -5409,7 +5505,7 @@ func (x *HealthCheckRequest) String() string {
 func (*HealthCheckRequest) ProtoMessage() {}
 
 func (x *HealthCheckRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_mail_proto_msgTypes[84]
+	mi := &file_mail_proto_msgTypes[85]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -5422,7 +5518,7 @@ func (x *HealthCheckRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use HealthCheckRequest.ProtoReflect.Descriptor instead.
 func (*HealthCheckRequest) Descriptor() ([]byte, []int) {
-	return file_mail_proto_rawDescGZIP(), []int{84}
+	return file_mail_proto_rawDescGZIP(), []int{85}
 }
 
 // HealthCheckResponse is the response for HealthCheck.
@@ -5436,7 +5532,7 @@ type HealthCheckResponse struct {
 
 func (x *HealthCheckResponse) Reset() {
 	*x = HealthCheckResponse{}
-	mi := &file_mail_proto_msgTypes[85]
+	mi := &file_mail_proto_msgTypes[86]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -5448,7 +5544,7 @@ func (x *HealthCheckResponse) String() string {
 func (*HealthCheckResponse) ProtoMessage() {}
 
 func (x *HealthCheckResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_mail_proto_msgTypes[85]
+	mi := &file_mail_proto_msgTypes[86]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -5461,7 +5557,7 @@ func (x *HealthCheckResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use HealthCheckResponse.ProtoReflect.Descriptor instead.
 func (*HealthCheckResponse) Descriptor() ([]byte, []int) {
-	return file_mail_proto_rawDescGZIP(), []int{85}
+	return file_mail_proto_rawDescGZIP(), []int{86}
 }
 
 func (x *HealthCheckResponse) GetStatus() string {
@@ -5491,7 +5587,7 @@ type BranchTarget struct {
 
 func (x *BranchTarget) Reset() {
 	*x = BranchTarget{}
-	mi := &file_mail_proto_msgTypes[86]
+	mi := &file_mail_proto_msgTypes[87]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -5503,7 +5599,7 @@ func (x *BranchTarget) String() string {
 func (*BranchTarget) ProtoMessage() {}
 
 func (x *BranchTarget) ProtoReflect() protoreflect.Message {
-	mi := &file_mail_proto_msgTypes[86]
+	mi := &file_mail_proto_msgTypes[87]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -5516,7 +5612,7 @@ func (x *BranchTarget) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use BranchTarget.ProtoReflect.Descriptor instead.
 func (*BranchTarget) Descriptor() ([]byte, []int) {
-	return file_mail_proto_rawDescGZIP(), []int{86}
+	return file_mail_proto_rawDescGZIP(), []int{87}
 }
 
 func (x *BranchTarget) GetBranch() string {
@@ -5546,7 +5642,7 @@ type CommitTarget struct {
 
 func (x *CommitTarget) Reset() {
 	*x = CommitTarget{}
-	mi := &file_mail_proto_msgTypes[87]
+	mi := &file_mail_proto_msgTypes[88]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -5558,7 +5654,7 @@ func (x *CommitTarget) String() string {
 func (*CommitTarget) ProtoMessage() {}
 
 func (x *CommitTarget) ProtoReflect() protoreflect.Message {
-	mi := &file_mail_proto_msgTypes[87]
+	mi := &file_mail_proto_msgTypes[88]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -5571,7 +5667,7 @@ func (x *CommitTarget) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CommitTarget.ProtoReflect.Descriptor instead.
 func (*CommitTarget) Descriptor() ([]byte, []int) {
-	return file_mail_proto_rawDescGZIP(), []int{87}
+	return file_mail_proto_rawDescGZIP(), []int{88}
 }
 
 func (x *CommitTarget) GetSha() string {
@@ -5603,7 +5699,7 @@ type CommitRangeTarget struct {
 
 func (x *CommitRangeTarget) Reset() {
 	*x = CommitRangeTarget{}
-	mi := &file_mail_proto_msgTypes[88]
+	mi := &file_mail_proto_msgTypes[89]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -5615,7 +5711,7 @@ func (x *CommitRangeTarget) String() string {
 func (*CommitRangeTarget) ProtoMessage() {}
 
 func (x *CommitRangeTarget) ProtoReflect() protoreflect.Message {
-	mi := &file_mail_proto_msgTypes[88]
+	mi := &file_mail_proto_msgTypes[89]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -5628,7 +5724,7 @@ func (x *CommitRangeTarget) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CommitRangeTarget.ProtoReflect.Descriptor instead.
 func (*CommitRangeTarget) Descriptor() ([]byte, []int) {
-	return file_mail_proto_rawDescGZIP(), []int{88}
+	return file_mail_proto_rawDescGZIP(), []int{89}
 }
 
 func (x *CommitRangeTarget) GetStartSha() string {
@@ -5667,7 +5763,7 @@ type PRTarget struct {
 
 func (x *PRTarget) Reset() {
 	*x = PRTarget{}
-	mi := &file_mail_proto_msgTypes[89]
+	mi := &file_mail_proto_msgTypes[90]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -5679,7 +5775,7 @@ func (x *PRTarget) String() string {
 func (*PRTarget) ProtoMessage() {}
 
 func (x *PRTarget) ProtoReflect() protoreflect.Message {
-	mi := &file_mail_proto_msgTypes[89]
+	mi := &file_mail_proto_msgTypes[90]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -5692,7 +5788,7 @@ func (x *PRTarget) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use PRTarget.ProtoReflect.Descriptor instead.
 func (*PRTarget) Descriptor() ([]byte, []int) {
-	return file_mail_proto_rawDescGZIP(), []int{89}
+	return file_mail_proto_rawDescGZIP(), []int{90}
 }
 
 func (x *PRTarget) GetNumber() int32 {
@@ -5759,7 +5855,7 @@ type CreateReviewRequest struct {
 
 func (x *CreateReviewRequest) Reset() {
 	*x = CreateReviewRequest{}
-	mi := &file_mail_proto_msgTypes[90]
+	mi := &file_mail_proto_msgTypes[91]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -5771,7 +5867,7 @@ func (x *CreateReviewRequest) String() string {
 func (*CreateReviewRequest) ProtoMessage() {}
 
 func (x *CreateReviewRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_mail_proto_msgTypes[90]
+	mi := &file_mail_proto_msgTypes[91]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -5784,7 +5880,7 @@ func (x *CreateReviewRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CreateReviewRequest.ProtoReflect.Descriptor instead.
 func (*CreateReviewRequest) Descriptor() ([]byte, []int) {
-	return file_mail_proto_rawDescGZIP(), []int{90}
+	return file_mail_proto_rawDescGZIP(), []int{91}
 }
 
 func (x *CreateReviewRequest) GetRepoPath() string {
@@ -5956,7 +6052,7 @@ type CreateReviewResponse struct {
 
 func (x *CreateReviewResponse) Reset() {
 	*x = CreateReviewResponse{}
-	mi := &file_mail_proto_msgTypes[91]
+	mi := &file_mail_proto_msgTypes[92]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -5968,7 +6064,7 @@ func (x *CreateReviewResponse) String() string {
 func (*CreateReviewResponse) ProtoMessage() {}
 
 func (x *CreateReviewResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_mail_proto_msgTypes[91]
+	mi := &file_mail_proto_msgTypes[92]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -5981,7 +6077,7 @@ func (x *CreateReviewResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CreateReviewResponse.ProtoReflect.Descriptor instead.
 func (*CreateReviewResponse) Descriptor() ([]byte, []int) {
-	return file_mail_proto_rawDescGZIP(), []int{91}
+	return file_mail_proto_rawDescGZIP(), []int{92}
 }
 
 func (x *CreateReviewResponse) GetReviewId() string {
@@ -6025,7 +6121,7 @@ type ListReviewsProtoRequest struct {
 
 func (x *ListReviewsProtoRequest) Reset() {
 	*x = ListReviewsProtoRequest{}
-	mi := &file_mail_proto_msgTypes[92]
+	mi := &file_mail_proto_msgTypes[93]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -6037,7 +6133,7 @@ func (x *ListReviewsProtoRequest) String() string {
 func (*ListReviewsProtoRequest) ProtoMessage() {}
 
 func (x *ListReviewsProtoRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_mail_proto_msgTypes[92]
+	mi := &file_mail_proto_msgTypes[93]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -6050,7 +6146,7 @@ func (x *ListReviewsProtoRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListReviewsProtoRequest.ProtoReflect.Descriptor instead.
 func (*ListReviewsProtoRequest) Descriptor() ([]byte, []int) {
-	return file_mail_proto_rawDescGZIP(), []int{92}
+	return file_mail_proto_rawDescGZIP(), []int{93}
 }
 
 func (x *ListReviewsProtoRequest) GetState() string {
@@ -6091,7 +6187,7 @@ type ListReviewsProtoResponse struct {
 
 func (x *ListReviewsProtoResponse) Reset() {
 	*x = ListReviewsProtoResponse{}
-	mi := &file_mail_proto_msgTypes[93]
+	mi := &file_mail_proto_msgTypes[94]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -6103,7 +6199,7 @@ func (x *ListReviewsProtoResponse) String() string {
 func (*ListReviewsProtoResponse) ProtoMessage() {}
 
 func (x *ListReviewsProtoResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_mail_proto_msgTypes[93]
+	mi := &file_mail_proto_msgTypes[94]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -6116,7 +6212,7 @@ func (x *ListReviewsProtoResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListReviewsProtoResponse.ProtoReflect.Descriptor instead.
 func (*ListReviewsProtoResponse) Descriptor() ([]byte, []int) {
-	return file_mail_proto_rawDescGZIP(), []int{93}
+	return file_mail_proto_rawDescGZIP(), []int{94}
 }
 
 func (x *ListReviewsProtoResponse) GetReviews() []*ReviewSummaryProto {
@@ -6142,7 +6238,7 @@ type ReviewSummaryProto struct {
 
 func (x *ReviewSummaryProto) Reset() {
 	*x = ReviewSummaryProto{}
-	mi := &file_mail_proto_msgTypes[94]
+	mi := &file_mail_proto_msgTypes[95]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -6154,7 +6250,7 @@ func (x *ReviewSummaryProto) String() string {
 func (*ReviewSummaryProto) ProtoMessage() {}
 
 func (x *ReviewSummaryProto) ProtoReflect() protoreflect.Message {
-	mi := &file_mail_proto_msgTypes[94]
+	mi := &file_mail_proto_msgTypes[95]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -6167,7 +6263,7 @@ func (x *ReviewSummaryProto) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ReviewSummaryProto.ProtoReflect.Descriptor instead.
 func (*ReviewSummaryProto) Descriptor() ([]byte, []int) {
-	return file_mail_proto_rawDescGZIP(), []int{94}
+	return file_mail_proto_rawDescGZIP(), []int{95}
 }
 
 func (x *ReviewSummaryProto) GetReviewId() string {
@@ -6229,7 +6325,7 @@ type GetReviewProtoRequest struct {
 
 func (x *GetReviewProtoRequest) Reset() {
 	*x = GetReviewProtoRequest{}
-	mi := &file_mail_proto_msgTypes[95]
+	mi := &file_mail_proto_msgTypes[96]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -6241,7 +6337,7 @@ func (x *GetReviewProtoRequest) String() string {
 func (*GetReviewProtoRequest) ProtoMessage() {}
 
 func (x *GetReviewProtoRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_mail_proto_msgTypes[95]
+	mi := &file_mail_proto_msgTypes[96]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -6254,7 +6350,7 @@ func (x *GetReviewProtoRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetReviewProtoRequest.ProtoReflect.Descriptor instead.
 func (*GetReviewProtoRequest) Descriptor() ([]byte, []int) {
-	return file_mail_proto_rawDescGZIP(), []int{95}
+	return file_mail_proto_rawDescGZIP(), []int{96}
 }
 
 func (x *GetReviewProtoRequest) GetReviewId() string {
@@ -6284,7 +6380,7 @@ type ReviewDetailResponse struct {
 
 func (x *ReviewDetailResponse) Reset() {
 	*x = ReviewDetailResponse{}
-	mi := &file_mail_proto_msgTypes[96]
+	mi := &file_mail_proto_msgTypes[97]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -6296,7 +6392,7 @@ func (x *ReviewDetailResponse) String() string {
 func (*ReviewDetailResponse) ProtoMessage() {}
 
 func (x *ReviewDetailResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_mail_proto_msgTypes[96]
+	mi := &file_mail_proto_msgTypes[97]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -6309,7 +6405,7 @@ func (x *ReviewDetailResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ReviewDetailResponse.ProtoReflect.Descriptor instead.
 func (*ReviewDetailResponse) Descriptor() ([]byte, []int) {
-	return file_mail_proto_rawDescGZIP(), []int{96}
+	return file_mail_proto_rawDescGZIP(), []int{97}
 }
 
 func (x *ReviewDetailResponse) GetReviewId() string {
@@ -6401,7 +6497,7 @@ type ReviewIterationProto struct {
 
 func (x *ReviewIterationProto) Reset() {
 	*x = ReviewIterationProto{}
-	mi := &file_mail_proto_msgTypes[97]
+	mi := &file_mail_proto_msgTypes[98]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -6413,7 +6509,7 @@ func (x *ReviewIterationProto) String() string {
 func (*ReviewIterationProto) ProtoMessage() {}
 
 func (x *ReviewIterationProto) ProtoReflect() protoreflect.Message {
-	mi := &file_mail_proto_msgTypes[97]
+	mi := &file_mail_proto_msgTypes[98]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -6426,7 +6522,7 @@ func (x *ReviewIterationProto) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ReviewIterationProto.ProtoReflect.Descriptor instead.
 func (*ReviewIterationProto) Descriptor() ([]byte, []int) {
-	return file_mail_proto_rawDescGZIP(), []int{97}
+	return file_mail_proto_rawDescGZIP(), []int{98}
 }
 
 func (x *ReviewIterationProto) GetIterationNum() int32 {
@@ -6510,7 +6606,7 @@ type ResubmitReviewRequest struct {
 
 func (x *ResubmitReviewRequest) Reset() {
 	*x = ResubmitReviewRequest{}
-	mi := &file_mail_proto_msgTypes[98]
+	mi := &file_mail_proto_msgTypes[99]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -6522,7 +6618,7 @@ func (x *ResubmitReviewRequest) String() string {
 func (*ResubmitReviewRequest) ProtoMessage() {}
 
 func (x *ResubmitReviewRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_mail_proto_msgTypes[98]
+	mi := &file_mail_proto_msgTypes[99]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -6535,7 +6631,7 @@ func (x *ResubmitReviewRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ResubmitReviewRequest.ProtoReflect.Descriptor instead.
 func (*ResubmitReviewRequest) Descriptor() ([]byte, []int) {
-	return file_mail_proto_rawDescGZIP(), []int{98}
+	return file_mail_proto_rawDescGZIP(), []int{99}
 }
 
 func (x *ResubmitReviewRequest) GetReviewId() string {
@@ -6563,7 +6659,7 @@ type CancelReviewProtoRequest struct {
 
 func (x *CancelReviewProtoRequest) Reset() {
 	*x = CancelReviewProtoRequest{}
-	mi := &file_mail_proto_msgTypes[99]
+	mi := &file_mail_proto_msgTypes[100]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -6575,7 +6671,7 @@ func (x *CancelReviewProtoRequest) String() string {
 func (*CancelReviewProtoRequest) ProtoMessage() {}
 
 func (x *CancelReviewProtoRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_mail_proto_msgTypes[99]
+	mi := &file_mail_proto_msgTypes[100]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -6588,7 +6684,7 @@ func (x *CancelReviewProtoRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CancelReviewProtoRequest.ProtoReflect.Descriptor instead.
 func (*CancelReviewProtoRequest) Descriptor() ([]byte, []int) {
-	return file_mail_proto_rawDescGZIP(), []int{99}
+	return file_mail_proto_rawDescGZIP(), []int{100}
 }
 
 func (x *CancelReviewProtoRequest) GetReviewId() string {
@@ -6615,7 +6711,7 @@ type CancelReviewProtoResponse struct {
 
 func (x *CancelReviewProtoResponse) Reset() {
 	*x = CancelReviewProtoResponse{}
-	mi := &file_mail_proto_msgTypes[100]
+	mi := &file_mail_proto_msgTypes[101]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -6627,7 +6723,7 @@ func (x *CancelReviewProtoResponse) String() string {
 func (*CancelReviewProtoResponse) ProtoMessage() {}
 
 func (x *CancelReviewProtoResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_mail_proto_msgTypes[100]
+	mi := &file_mail_proto_msgTypes[101]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -6640,7 +6736,7 @@ func (x *CancelReviewProtoResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CancelReviewProtoResponse.ProtoReflect.Descriptor instead.
 func (*CancelReviewProtoResponse) Descriptor() ([]byte, []int) {
-	return file_mail_proto_rawDescGZIP(), []int{100}
+	return file_mail_proto_rawDescGZIP(), []int{101}
 }
 
 func (x *CancelReviewProtoResponse) GetError() string {
@@ -6660,7 +6756,7 @@ type DeleteReviewProtoRequest struct {
 
 func (x *DeleteReviewProtoRequest) Reset() {
 	*x = DeleteReviewProtoRequest{}
-	mi := &file_mail_proto_msgTypes[101]
+	mi := &file_mail_proto_msgTypes[102]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -6672,7 +6768,7 @@ func (x *DeleteReviewProtoRequest) String() string {
 func (*DeleteReviewProtoRequest) ProtoMessage() {}
 
 func (x *DeleteReviewProtoRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_mail_proto_msgTypes[101]
+	mi := &file_mail_proto_msgTypes[102]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -6685,7 +6781,7 @@ func (x *DeleteReviewProtoRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DeleteReviewProtoRequest.ProtoReflect.Descriptor instead.
 func (*DeleteReviewProtoRequest) Descriptor() ([]byte, []int) {
-	return file_mail_proto_rawDescGZIP(), []int{101}
+	return file_mail_proto_rawDescGZIP(), []int{102}
 }
 
 func (x *DeleteReviewProtoRequest) GetReviewId() string {
@@ -6705,7 +6801,7 @@ type DeleteReviewProtoResponse struct {
 
 func (x *DeleteReviewProtoResponse) Reset() {
 	*x = DeleteReviewProtoResponse{}
-	mi := &file_mail_proto_msgTypes[102]
+	mi := &file_mail_proto_msgTypes[103]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -6717,7 +6813,7 @@ func (x *DeleteReviewProtoResponse) String() string {
 func (*DeleteReviewProtoResponse) ProtoMessage() {}
 
 func (x *DeleteReviewProtoResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_mail_proto_msgTypes[102]
+	mi := &file_mail_proto_msgTypes[103]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -6730,7 +6826,7 @@ func (x *DeleteReviewProtoResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DeleteReviewProtoResponse.ProtoReflect.Descriptor instead.
 func (*DeleteReviewProtoResponse) Descriptor() ([]byte, []int) {
-	return file_mail_proto_rawDescGZIP(), []int{102}
+	return file_mail_proto_rawDescGZIP(), []int{103}
 }
 
 func (x *DeleteReviewProtoResponse) GetError() string {
@@ -6750,7 +6846,7 @@ type ListReviewIssuesRequest struct {
 
 func (x *ListReviewIssuesRequest) Reset() {
 	*x = ListReviewIssuesRequest{}
-	mi := &file_mail_proto_msgTypes[103]
+	mi := &file_mail_proto_msgTypes[104]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -6762,7 +6858,7 @@ func (x *ListReviewIssuesRequest) String() string {
 func (*ListReviewIssuesRequest) ProtoMessage() {}
 
 func (x *ListReviewIssuesRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_mail_proto_msgTypes[103]
+	mi := &file_mail_proto_msgTypes[104]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -6775,7 +6871,7 @@ func (x *ListReviewIssuesRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListReviewIssuesRequest.ProtoReflect.Descriptor instead.
 func (*ListReviewIssuesRequest) Descriptor() ([]byte, []int) {
-	return file_mail_proto_rawDescGZIP(), []int{103}
+	return file_mail_proto_rawDescGZIP(), []int{104}
 }
 
 func (x *ListReviewIssuesRequest) GetReviewId() string {
@@ -6795,7 +6891,7 @@ type ListReviewIssuesResponse struct {
 
 func (x *ListReviewIssuesResponse) Reset() {
 	*x = ListReviewIssuesResponse{}
-	mi := &file_mail_proto_msgTypes[104]
+	mi := &file_mail_proto_msgTypes[105]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -6807,7 +6903,7 @@ func (x *ListReviewIssuesResponse) String() string {
 func (*ListReviewIssuesResponse) ProtoMessage() {}
 
 func (x *ListReviewIssuesResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_mail_proto_msgTypes[104]
+	mi := &file_mail_proto_msgTypes[105]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -6820,7 +6916,7 @@ func (x *ListReviewIssuesResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListReviewIssuesResponse.ProtoReflect.Descriptor instead.
 func (*ListReviewIssuesResponse) Descriptor() ([]byte, []int) {
-	return file_mail_proto_rawDescGZIP(), []int{104}
+	return file_mail_proto_rawDescGZIP(), []int{105}
 }
 
 func (x *ListReviewIssuesResponse) GetIssues() []*ReviewIssueProto {
@@ -6853,7 +6949,7 @@ type ReviewIssueProto struct {
 
 func (x *ReviewIssueProto) Reset() {
 	*x = ReviewIssueProto{}
-	mi := &file_mail_proto_msgTypes[105]
+	mi := &file_mail_proto_msgTypes[106]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -6865,7 +6961,7 @@ func (x *ReviewIssueProto) String() string {
 func (*ReviewIssueProto) ProtoMessage() {}
 
 func (x *ReviewIssueProto) ProtoReflect() protoreflect.Message {
-	mi := &file_mail_proto_msgTypes[105]
+	mi := &file_mail_proto_msgTypes[106]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -6878,7 +6974,7 @@ func (x *ReviewIssueProto) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ReviewIssueProto.ProtoReflect.Descriptor instead.
 func (*ReviewIssueProto) Descriptor() ([]byte, []int) {
-	return file_mail_proto_rawDescGZIP(), []int{105}
+	return file_mail_proto_rawDescGZIP(), []int{106}
 }
 
 func (x *ReviewIssueProto) GetId() int64 {
@@ -6991,7 +7087,7 @@ type UpdateIssueStatusRequest struct {
 
 func (x *UpdateIssueStatusRequest) Reset() {
 	*x = UpdateIssueStatusRequest{}
-	mi := &file_mail_proto_msgTypes[106]
+	mi := &file_mail_proto_msgTypes[107]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -7003,7 +7099,7 @@ func (x *UpdateIssueStatusRequest) String() string {
 func (*UpdateIssueStatusRequest) ProtoMessage() {}
 
 func (x *UpdateIssueStatusRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_mail_proto_msgTypes[106]
+	mi := &file_mail_proto_msgTypes[107]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -7016,7 +7112,7 @@ func (x *UpdateIssueStatusRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use UpdateIssueStatusRequest.ProtoReflect.Descriptor instead.
 func (*UpdateIssueStatusRequest) Descriptor() ([]byte, []int) {
-	return file_mail_proto_rawDescGZIP(), []int{106}
+	return file_mail_proto_rawDescGZIP(), []int{107}
 }
 
 func (x *UpdateIssueStatusRequest) GetReviewId() string {
@@ -7050,7 +7146,7 @@ type UpdateIssueStatusResponse struct {
 
 func (x *UpdateIssueStatusResponse) Reset() {
 	*x = UpdateIssueStatusResponse{}
-	mi := &file_mail_proto_msgTypes[107]
+	mi := &file_mail_proto_msgTypes[108]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -7062,7 +7158,7 @@ func (x *UpdateIssueStatusResponse) String() string {
 func (*UpdateIssueStatusResponse) ProtoMessage() {}
 
 func (x *UpdateIssueStatusResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_mail_proto_msgTypes[107]
+	mi := &file_mail_proto_msgTypes[108]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -7075,7 +7171,7 @@ func (x *UpdateIssueStatusResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use UpdateIssueStatusResponse.ProtoReflect.Descriptor instead.
 func (*UpdateIssueStatusResponse) Descriptor() ([]byte, []int) {
-	return file_mail_proto_rawDescGZIP(), []int{107}
+	return file_mail_proto_rawDescGZIP(), []int{108}
 }
 
 func (x *UpdateIssueStatusResponse) GetError() string {
@@ -7095,7 +7191,7 @@ type GetReviewDiffRequest struct {
 
 func (x *GetReviewDiffRequest) Reset() {
 	*x = GetReviewDiffRequest{}
-	mi := &file_mail_proto_msgTypes[108]
+	mi := &file_mail_proto_msgTypes[109]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -7107,7 +7203,7 @@ func (x *GetReviewDiffRequest) String() string {
 func (*GetReviewDiffRequest) ProtoMessage() {}
 
 func (x *GetReviewDiffRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_mail_proto_msgTypes[108]
+	mi := &file_mail_proto_msgTypes[109]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -7120,7 +7216,7 @@ func (x *GetReviewDiffRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetReviewDiffRequest.ProtoReflect.Descriptor instead.
 func (*GetReviewDiffRequest) Descriptor() ([]byte, []int) {
-	return file_mail_proto_rawDescGZIP(), []int{108}
+	return file_mail_proto_rawDescGZIP(), []int{109}
 }
 
 func (x *GetReviewDiffRequest) GetReviewId() string {
@@ -7144,7 +7240,7 @@ type GetReviewDiffResponse struct {
 
 func (x *GetReviewDiffResponse) Reset() {
 	*x = GetReviewDiffResponse{}
-	mi := &file_mail_proto_msgTypes[109]
+	mi := &file_mail_proto_msgTypes[110]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -7156,7 +7252,7 @@ func (x *GetReviewDiffResponse) String() string {
 func (*GetReviewDiffResponse) ProtoMessage() {}
 
 func (x *GetReviewDiffResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_mail_proto_msgTypes[109]
+	mi := &file_mail_proto_msgTypes[110]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -7169,7 +7265,7 @@ func (x *GetReviewDiffResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetReviewDiffResponse.ProtoReflect.Descriptor instead.
 func (*GetReviewDiffResponse) Descriptor() ([]byte, []int) {
-	return file_mail_proto_rawDescGZIP(), []int{109}
+	return file_mail_proto_rawDescGZIP(), []int{110}
 }
 
 func (x *GetReviewDiffResponse) GetPatch() string {
@@ -7208,7 +7304,7 @@ type TaskListProto struct {
 
 func (x *TaskListProto) Reset() {
 	*x = TaskListProto{}
-	mi := &file_mail_proto_msgTypes[110]
+	mi := &file_mail_proto_msgTypes[111]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -7220,7 +7316,7 @@ func (x *TaskListProto) String() string {
 func (*TaskListProto) ProtoMessage() {}
 
 func (x *TaskListProto) ProtoReflect() protoreflect.Message {
-	mi := &file_mail_proto_msgTypes[110]
+	mi := &file_mail_proto_msgTypes[111]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -7233,7 +7329,7 @@ func (x *TaskListProto) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use TaskListProto.ProtoReflect.Descriptor instead.
 func (*TaskListProto) Descriptor() ([]byte, []int) {
-	return file_mail_proto_rawDescGZIP(), []int{110}
+	return file_mail_proto_rawDescGZIP(), []int{111}
 }
 
 func (x *TaskListProto) GetId() int64 {
@@ -7303,7 +7399,7 @@ type TaskProto struct {
 
 func (x *TaskProto) Reset() {
 	*x = TaskProto{}
-	mi := &file_mail_proto_msgTypes[111]
+	mi := &file_mail_proto_msgTypes[112]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -7315,7 +7411,7 @@ func (x *TaskProto) String() string {
 func (*TaskProto) ProtoMessage() {}
 
 func (x *TaskProto) ProtoReflect() protoreflect.Message {
-	mi := &file_mail_proto_msgTypes[111]
+	mi := &file_mail_proto_msgTypes[112]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -7328,7 +7424,7 @@ func (x *TaskProto) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use TaskProto.ProtoReflect.Descriptor instead.
 func (*TaskProto) Descriptor() ([]byte, []int) {
-	return file_mail_proto_rawDescGZIP(), []int{111}
+	return file_mail_proto_rawDescGZIP(), []int{112}
 }
 
 func (x *TaskProto) GetId() int64 {
@@ -7458,7 +7554,7 @@ type TaskStatsProto struct {
 
 func (x *TaskStatsProto) Reset() {
 	*x = TaskStatsProto{}
-	mi := &file_mail_proto_msgTypes[112]
+	mi := &file_mail_proto_msgTypes[113]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -7470,7 +7566,7 @@ func (x *TaskStatsProto) String() string {
 func (*TaskStatsProto) ProtoMessage() {}
 
 func (x *TaskStatsProto) ProtoReflect() protoreflect.Message {
-	mi := &file_mail_proto_msgTypes[112]
+	mi := &file_mail_proto_msgTypes[113]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -7483,7 +7579,7 @@ func (x *TaskStatsProto) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use TaskStatsProto.ProtoReflect.Descriptor instead.
 func (*TaskStatsProto) Descriptor() ([]byte, []int) {
-	return file_mail_proto_rawDescGZIP(), []int{112}
+	return file_mail_proto_rawDescGZIP(), []int{113}
 }
 
 func (x *TaskStatsProto) GetPendingCount() int64 {
@@ -7543,7 +7639,7 @@ type AgentTaskStatsProto struct {
 
 func (x *AgentTaskStatsProto) Reset() {
 	*x = AgentTaskStatsProto{}
-	mi := &file_mail_proto_msgTypes[113]
+	mi := &file_mail_proto_msgTypes[114]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -7555,7 +7651,7 @@ func (x *AgentTaskStatsProto) String() string {
 func (*AgentTaskStatsProto) ProtoMessage() {}
 
 func (x *AgentTaskStatsProto) ProtoReflect() protoreflect.Message {
-	mi := &file_mail_proto_msgTypes[113]
+	mi := &file_mail_proto_msgTypes[114]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -7568,7 +7664,7 @@ func (x *AgentTaskStatsProto) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use AgentTaskStatsProto.ProtoReflect.Descriptor instead.
 func (*AgentTaskStatsProto) Descriptor() ([]byte, []int) {
-	return file_mail_proto_rawDescGZIP(), []int{113}
+	return file_mail_proto_rawDescGZIP(), []int{114}
 }
 
 func (x *AgentTaskStatsProto) GetAgentId() int64 {
@@ -7625,7 +7721,7 @@ type RegisterTaskListRequest struct {
 
 func (x *RegisterTaskListRequest) Reset() {
 	*x = RegisterTaskListRequest{}
-	mi := &file_mail_proto_msgTypes[114]
+	mi := &file_mail_proto_msgTypes[115]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -7637,7 +7733,7 @@ func (x *RegisterTaskListRequest) String() string {
 func (*RegisterTaskListRequest) ProtoMessage() {}
 
 func (x *RegisterTaskListRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_mail_proto_msgTypes[114]
+	mi := &file_mail_proto_msgTypes[115]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -7650,7 +7746,7 @@ func (x *RegisterTaskListRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RegisterTaskListRequest.ProtoReflect.Descriptor instead.
 func (*RegisterTaskListRequest) Descriptor() ([]byte, []int) {
-	return file_mail_proto_rawDescGZIP(), []int{114}
+	return file_mail_proto_rawDescGZIP(), []int{115}
 }
 
 func (x *RegisterTaskListRequest) GetListId() string {
@@ -7685,7 +7781,7 @@ type RegisterTaskListResponse struct {
 
 func (x *RegisterTaskListResponse) Reset() {
 	*x = RegisterTaskListResponse{}
-	mi := &file_mail_proto_msgTypes[115]
+	mi := &file_mail_proto_msgTypes[116]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -7697,7 +7793,7 @@ func (x *RegisterTaskListResponse) String() string {
 func (*RegisterTaskListResponse) ProtoMessage() {}
 
 func (x *RegisterTaskListResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_mail_proto_msgTypes[115]
+	mi := &file_mail_proto_msgTypes[116]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -7710,7 +7806,7 @@ func (x *RegisterTaskListResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RegisterTaskListResponse.ProtoReflect.Descriptor instead.
 func (*RegisterTaskListResponse) Descriptor() ([]byte, []int) {
-	return file_mail_proto_rawDescGZIP(), []int{115}
+	return file_mail_proto_rawDescGZIP(), []int{116}
 }
 
 func (x *RegisterTaskListResponse) GetTaskList() *TaskListProto {
@@ -7737,7 +7833,7 @@ type GetTaskListRequest struct {
 
 func (x *GetTaskListRequest) Reset() {
 	*x = GetTaskListRequest{}
-	mi := &file_mail_proto_msgTypes[116]
+	mi := &file_mail_proto_msgTypes[117]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -7749,7 +7845,7 @@ func (x *GetTaskListRequest) String() string {
 func (*GetTaskListRequest) ProtoMessage() {}
 
 func (x *GetTaskListRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_mail_proto_msgTypes[116]
+	mi := &file_mail_proto_msgTypes[117]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -7762,7 +7858,7 @@ func (x *GetTaskListRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetTaskListRequest.ProtoReflect.Descriptor instead.
 func (*GetTaskListRequest) Descriptor() ([]byte, []int) {
-	return file_mail_proto_rawDescGZIP(), []int{116}
+	return file_mail_proto_rawDescGZIP(), []int{117}
 }
 
 func (x *GetTaskListRequest) GetListId() string {
@@ -7783,7 +7879,7 @@ type GetTaskListResponse struct {
 
 func (x *GetTaskListResponse) Reset() {
 	*x = GetTaskListResponse{}
-	mi := &file_mail_proto_msgTypes[117]
+	mi := &file_mail_proto_msgTypes[118]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -7795,7 +7891,7 @@ func (x *GetTaskListResponse) String() string {
 func (*GetTaskListResponse) ProtoMessage() {}
 
 func (x *GetTaskListResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_mail_proto_msgTypes[117]
+	mi := &file_mail_proto_msgTypes[118]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -7808,7 +7904,7 @@ func (x *GetTaskListResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetTaskListResponse.ProtoReflect.Descriptor instead.
 func (*GetTaskListResponse) Descriptor() ([]byte, []int) {
-	return file_mail_proto_rawDescGZIP(), []int{117}
+	return file_mail_proto_rawDescGZIP(), []int{118}
 }
 
 func (x *GetTaskListResponse) GetTaskList() *TaskListProto {
@@ -7835,7 +7931,7 @@ type ListTaskListsRequest struct {
 
 func (x *ListTaskListsRequest) Reset() {
 	*x = ListTaskListsRequest{}
-	mi := &file_mail_proto_msgTypes[118]
+	mi := &file_mail_proto_msgTypes[119]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -7847,7 +7943,7 @@ func (x *ListTaskListsRequest) String() string {
 func (*ListTaskListsRequest) ProtoMessage() {}
 
 func (x *ListTaskListsRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_mail_proto_msgTypes[118]
+	mi := &file_mail_proto_msgTypes[119]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -7860,7 +7956,7 @@ func (x *ListTaskListsRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListTaskListsRequest.ProtoReflect.Descriptor instead.
 func (*ListTaskListsRequest) Descriptor() ([]byte, []int) {
-	return file_mail_proto_rawDescGZIP(), []int{118}
+	return file_mail_proto_rawDescGZIP(), []int{119}
 }
 
 func (x *ListTaskListsRequest) GetAgentId() int64 {
@@ -7881,7 +7977,7 @@ type ListTaskListsResponse struct {
 
 func (x *ListTaskListsResponse) Reset() {
 	*x = ListTaskListsResponse{}
-	mi := &file_mail_proto_msgTypes[119]
+	mi := &file_mail_proto_msgTypes[120]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -7893,7 +7989,7 @@ func (x *ListTaskListsResponse) String() string {
 func (*ListTaskListsResponse) ProtoMessage() {}
 
 func (x *ListTaskListsResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_mail_proto_msgTypes[119]
+	mi := &file_mail_proto_msgTypes[120]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -7906,7 +8002,7 @@ func (x *ListTaskListsResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListTaskListsResponse.ProtoReflect.Descriptor instead.
 func (*ListTaskListsResponse) Descriptor() ([]byte, []int) {
-	return file_mail_proto_rawDescGZIP(), []int{119}
+	return file_mail_proto_rawDescGZIP(), []int{120}
 }
 
 func (x *ListTaskListsResponse) GetTaskLists() []*TaskListProto {
@@ -7933,7 +8029,7 @@ type UnregisterTaskListRequest struct {
 
 func (x *UnregisterTaskListRequest) Reset() {
 	*x = UnregisterTaskListRequest{}
-	mi := &file_mail_proto_msgTypes[120]
+	mi := &file_mail_proto_msgTypes[121]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -7945,7 +8041,7 @@ func (x *UnregisterTaskListRequest) String() string {
 func (*UnregisterTaskListRequest) ProtoMessage() {}
 
 func (x *UnregisterTaskListRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_mail_proto_msgTypes[120]
+	mi := &file_mail_proto_msgTypes[121]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -7958,7 +8054,7 @@ func (x *UnregisterTaskListRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use UnregisterTaskListRequest.ProtoReflect.Descriptor instead.
 func (*UnregisterTaskListRequest) Descriptor() ([]byte, []int) {
-	return file_mail_proto_rawDescGZIP(), []int{120}
+	return file_mail_proto_rawDescGZIP(), []int{121}
 }
 
 func (x *UnregisterTaskListRequest) GetListId() string {
@@ -7978,7 +8074,7 @@ type UnregisterTaskListResponse struct {
 
 func (x *UnregisterTaskListResponse) Reset() {
 	*x = UnregisterTaskListResponse{}
-	mi := &file_mail_proto_msgTypes[121]
+	mi := &file_mail_proto_msgTypes[122]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -7990,7 +8086,7 @@ func (x *UnregisterTaskListResponse) String() string {
 func (*UnregisterTaskListResponse) ProtoMessage() {}
 
 func (x *UnregisterTaskListResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_mail_proto_msgTypes[121]
+	mi := &file_mail_proto_msgTypes[122]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -8003,7 +8099,7 @@ func (x *UnregisterTaskListResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use UnregisterTaskListResponse.ProtoReflect.Descriptor instead.
 func (*UnregisterTaskListResponse) Descriptor() ([]byte, []int) {
-	return file_mail_proto_rawDescGZIP(), []int{121}
+	return file_mail_proto_rawDescGZIP(), []int{122}
 }
 
 func (x *UnregisterTaskListResponse) GetError() string {
@@ -8035,7 +8131,7 @@ type UpsertTaskRequest struct {
 
 func (x *UpsertTaskRequest) Reset() {
 	*x = UpsertTaskRequest{}
-	mi := &file_mail_proto_msgTypes[122]
+	mi := &file_mail_proto_msgTypes[123]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -8047,7 +8143,7 @@ func (x *UpsertTaskRequest) String() string {
 func (*UpsertTaskRequest) ProtoMessage() {}
 
 func (x *UpsertTaskRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_mail_proto_msgTypes[122]
+	mi := &file_mail_proto_msgTypes[123]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -8060,7 +8156,7 @@ func (x *UpsertTaskRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use UpsertTaskRequest.ProtoReflect.Descriptor instead.
 func (*UpsertTaskRequest) Descriptor() ([]byte, []int) {
-	return file_mail_proto_rawDescGZIP(), []int{122}
+	return file_mail_proto_rawDescGZIP(), []int{123}
 }
 
 func (x *UpsertTaskRequest) GetAgentId() int64 {
@@ -8165,7 +8261,7 @@ type UpsertTaskResponse struct {
 
 func (x *UpsertTaskResponse) Reset() {
 	*x = UpsertTaskResponse{}
-	mi := &file_mail_proto_msgTypes[123]
+	mi := &file_mail_proto_msgTypes[124]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -8177,7 +8273,7 @@ func (x *UpsertTaskResponse) String() string {
 func (*UpsertTaskResponse) ProtoMessage() {}
 
 func (x *UpsertTaskResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_mail_proto_msgTypes[123]
+	mi := &file_mail_proto_msgTypes[124]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -8190,7 +8286,7 @@ func (x *UpsertTaskResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use UpsertTaskResponse.ProtoReflect.Descriptor instead.
 func (*UpsertTaskResponse) Descriptor() ([]byte, []int) {
-	return file_mail_proto_rawDescGZIP(), []int{123}
+	return file_mail_proto_rawDescGZIP(), []int{124}
 }
 
 func (x *UpsertTaskResponse) GetTask() *TaskProto {
@@ -8218,7 +8314,7 @@ type GetTaskProtoRequest struct {
 
 func (x *GetTaskProtoRequest) Reset() {
 	*x = GetTaskProtoRequest{}
-	mi := &file_mail_proto_msgTypes[124]
+	mi := &file_mail_proto_msgTypes[125]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -8230,7 +8326,7 @@ func (x *GetTaskProtoRequest) String() string {
 func (*GetTaskProtoRequest) ProtoMessage() {}
 
 func (x *GetTaskProtoRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_mail_proto_msgTypes[124]
+	mi := &file_mail_proto_msgTypes[125]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -8243,7 +8339,7 @@ func (x *GetTaskProtoRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetTaskProtoRequest.ProtoReflect.Descriptor instead.
 func (*GetTaskProtoRequest) Descriptor() ([]byte, []int) {
-	return file_mail_proto_rawDescGZIP(), []int{124}
+	return file_mail_proto_rawDescGZIP(), []int{125}
 }
 
 func (x *GetTaskProtoRequest) GetListId() string {
@@ -8271,7 +8367,7 @@ type GetTaskResponse struct {
 
 func (x *GetTaskResponse) Reset() {
 	*x = GetTaskResponse{}
-	mi := &file_mail_proto_msgTypes[125]
+	mi := &file_mail_proto_msgTypes[126]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -8283,7 +8379,7 @@ func (x *GetTaskResponse) String() string {
 func (*GetTaskResponse) ProtoMessage() {}
 
 func (x *GetTaskResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_mail_proto_msgTypes[125]
+	mi := &file_mail_proto_msgTypes[126]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -8296,7 +8392,7 @@ func (x *GetTaskResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetTaskResponse.ProtoReflect.Descriptor instead.
 func (*GetTaskResponse) Descriptor() ([]byte, []int) {
-	return file_mail_proto_rawDescGZIP(), []int{125}
+	return file_mail_proto_rawDescGZIP(), []int{126}
 }
 
 func (x *GetTaskResponse) GetTask() *TaskProto {
@@ -8329,7 +8425,7 @@ type ListTasksRequest struct {
 
 func (x *ListTasksRequest) Reset() {
 	*x = ListTasksRequest{}
-	mi := &file_mail_proto_msgTypes[126]
+	mi := &file_mail_proto_msgTypes[127]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -8341,7 +8437,7 @@ func (x *ListTasksRequest) String() string {
 func (*ListTasksRequest) ProtoMessage() {}
 
 func (x *ListTasksRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_mail_proto_msgTypes[126]
+	mi := &file_mail_proto_msgTypes[127]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -8354,7 +8450,7 @@ func (x *ListTasksRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListTasksRequest.ProtoReflect.Descriptor instead.
 func (*ListTasksRequest) Descriptor() ([]byte, []int) {
-	return file_mail_proto_rawDescGZIP(), []int{126}
+	return file_mail_proto_rawDescGZIP(), []int{127}
 }
 
 func (x *ListTasksRequest) GetAgentId() int64 {
@@ -8417,7 +8513,7 @@ type ListTasksResponse struct {
 
 func (x *ListTasksResponse) Reset() {
 	*x = ListTasksResponse{}
-	mi := &file_mail_proto_msgTypes[127]
+	mi := &file_mail_proto_msgTypes[128]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -8429,7 +8525,7 @@ func (x *ListTasksResponse) String() string {
 func (*ListTasksResponse) ProtoMessage() {}
 
 func (x *ListTasksResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_mail_proto_msgTypes[127]
+	mi := &file_mail_proto_msgTypes[128]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -8442,7 +8538,7 @@ func (x *ListTasksResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListTasksResponse.ProtoReflect.Descriptor instead.
 func (*ListTasksResponse) Descriptor() ([]byte, []int) {
-	return file_mail_proto_rawDescGZIP(), []int{127}
+	return file_mail_proto_rawDescGZIP(), []int{128}
 }
 
 func (x *ListTasksResponse) GetTasks() []*TaskProto {
@@ -8471,7 +8567,7 @@ type UpdateTaskStatusRequest struct {
 
 func (x *UpdateTaskStatusRequest) Reset() {
 	*x = UpdateTaskStatusRequest{}
-	mi := &file_mail_proto_msgTypes[128]
+	mi := &file_mail_proto_msgTypes[129]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -8483,7 +8579,7 @@ func (x *UpdateTaskStatusRequest) String() string {
 func (*UpdateTaskStatusRequest) ProtoMessage() {}
 
 func (x *UpdateTaskStatusRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_mail_proto_msgTypes[128]
+	mi := &file_mail_proto_msgTypes[129]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -8496,7 +8592,7 @@ func (x *UpdateTaskStatusRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use UpdateTaskStatusRequest.ProtoReflect.Descriptor instead.
 func (*UpdateTaskStatusRequest) Descriptor() ([]byte, []int) {
-	return file_mail_proto_rawDescGZIP(), []int{128}
+	return file_mail_proto_rawDescGZIP(), []int{129}
 }
 
 func (x *UpdateTaskStatusRequest) GetListId() string {
@@ -8530,7 +8626,7 @@ type UpdateTaskStatusResponse struct {
 
 func (x *UpdateTaskStatusResponse) Reset() {
 	*x = UpdateTaskStatusResponse{}
-	mi := &file_mail_proto_msgTypes[129]
+	mi := &file_mail_proto_msgTypes[130]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -8542,7 +8638,7 @@ func (x *UpdateTaskStatusResponse) String() string {
 func (*UpdateTaskStatusResponse) ProtoMessage() {}
 
 func (x *UpdateTaskStatusResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_mail_proto_msgTypes[129]
+	mi := &file_mail_proto_msgTypes[130]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -8555,7 +8651,7 @@ func (x *UpdateTaskStatusResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use UpdateTaskStatusResponse.ProtoReflect.Descriptor instead.
 func (*UpdateTaskStatusResponse) Descriptor() ([]byte, []int) {
-	return file_mail_proto_rawDescGZIP(), []int{129}
+	return file_mail_proto_rawDescGZIP(), []int{130}
 }
 
 func (x *UpdateTaskStatusResponse) GetError() string {
@@ -8577,7 +8673,7 @@ type UpdateTaskOwnerRequest struct {
 
 func (x *UpdateTaskOwnerRequest) Reset() {
 	*x = UpdateTaskOwnerRequest{}
-	mi := &file_mail_proto_msgTypes[130]
+	mi := &file_mail_proto_msgTypes[131]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -8589,7 +8685,7 @@ func (x *UpdateTaskOwnerRequest) String() string {
 func (*UpdateTaskOwnerRequest) ProtoMessage() {}
 
 func (x *UpdateTaskOwnerRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_mail_proto_msgTypes[130]
+	mi := &file_mail_proto_msgTypes[131]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -8602,7 +8698,7 @@ func (x *UpdateTaskOwnerRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use UpdateTaskOwnerRequest.ProtoReflect.Descriptor instead.
 func (*UpdateTaskOwnerRequest) Descriptor() ([]byte, []int) {
-	return file_mail_proto_rawDescGZIP(), []int{130}
+	return file_mail_proto_rawDescGZIP(), []int{131}
 }
 
 func (x *UpdateTaskOwnerRequest) GetListId() string {
@@ -8636,7 +8732,7 @@ type UpdateTaskOwnerResponse struct {
 
 func (x *UpdateTaskOwnerResponse) Reset() {
 	*x = UpdateTaskOwnerResponse{}
-	mi := &file_mail_proto_msgTypes[131]
+	mi := &file_mail_proto_msgTypes[132]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -8648,7 +8744,7 @@ func (x *UpdateTaskOwnerResponse) String() string {
 func (*UpdateTaskOwnerResponse) ProtoMessage() {}
 
 func (x *UpdateTaskOwnerResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_mail_proto_msgTypes[131]
+	mi := &file_mail_proto_msgTypes[132]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -8661,7 +8757,7 @@ func (x *UpdateTaskOwnerResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use UpdateTaskOwnerResponse.ProtoReflect.Descriptor instead.
 func (*UpdateTaskOwnerResponse) Descriptor() ([]byte, []int) {
-	return file_mail_proto_rawDescGZIP(), []int{131}
+	return file_mail_proto_rawDescGZIP(), []int{132}
 }
 
 func (x *UpdateTaskOwnerResponse) GetError() string {
@@ -8681,7 +8777,7 @@ type DeleteTaskRequest struct {
 
 func (x *DeleteTaskRequest) Reset() {
 	*x = DeleteTaskRequest{}
-	mi := &file_mail_proto_msgTypes[132]
+	mi := &file_mail_proto_msgTypes[133]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -8693,7 +8789,7 @@ func (x *DeleteTaskRequest) String() string {
 func (*DeleteTaskRequest) ProtoMessage() {}
 
 func (x *DeleteTaskRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_mail_proto_msgTypes[132]
+	mi := &file_mail_proto_msgTypes[133]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -8706,7 +8802,7 @@ func (x *DeleteTaskRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DeleteTaskRequest.ProtoReflect.Descriptor instead.
 func (*DeleteTaskRequest) Descriptor() ([]byte, []int) {
-	return file_mail_proto_rawDescGZIP(), []int{132}
+	return file_mail_proto_rawDescGZIP(), []int{133}
 }
 
 func (x *DeleteTaskRequest) GetId() int64 {
@@ -8726,7 +8822,7 @@ type DeleteTaskResponse struct {
 
 func (x *DeleteTaskResponse) Reset() {
 	*x = DeleteTaskResponse{}
-	mi := &file_mail_proto_msgTypes[133]
+	mi := &file_mail_proto_msgTypes[134]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -8738,7 +8834,7 @@ func (x *DeleteTaskResponse) String() string {
 func (*DeleteTaskResponse) ProtoMessage() {}
 
 func (x *DeleteTaskResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_mail_proto_msgTypes[133]
+	mi := &file_mail_proto_msgTypes[134]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -8751,7 +8847,7 @@ func (x *DeleteTaskResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DeleteTaskResponse.ProtoReflect.Descriptor instead.
 func (*DeleteTaskResponse) Descriptor() ([]byte, []int) {
-	return file_mail_proto_rawDescGZIP(), []int{133}
+	return file_mail_proto_rawDescGZIP(), []int{134}
 }
 
 func (x *DeleteTaskResponse) GetError() string {
@@ -8773,7 +8869,7 @@ type GetTaskStatsRequest struct {
 
 func (x *GetTaskStatsRequest) Reset() {
 	*x = GetTaskStatsRequest{}
-	mi := &file_mail_proto_msgTypes[134]
+	mi := &file_mail_proto_msgTypes[135]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -8785,7 +8881,7 @@ func (x *GetTaskStatsRequest) String() string {
 func (*GetTaskStatsRequest) ProtoMessage() {}
 
 func (x *GetTaskStatsRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_mail_proto_msgTypes[134]
+	mi := &file_mail_proto_msgTypes[135]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -8798,7 +8894,7 @@ func (x *GetTaskStatsRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetTaskStatsRequest.ProtoReflect.Descriptor instead.
 func (*GetTaskStatsRequest) Descriptor() ([]byte, []int) {
-	return file_mail_proto_rawDescGZIP(), []int{134}
+	return file_mail_proto_rawDescGZIP(), []int{135}
 }
 
 func (x *GetTaskStatsRequest) GetAgentId() int64 {
@@ -8833,7 +8929,7 @@ type GetTaskStatsResponse struct {
 
 func (x *GetTaskStatsResponse) Reset() {
 	*x = GetTaskStatsResponse{}
-	mi := &file_mail_proto_msgTypes[135]
+	mi := &file_mail_proto_msgTypes[136]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -8845,7 +8941,7 @@ func (x *GetTaskStatsResponse) String() string {
 func (*GetTaskStatsResponse) ProtoMessage() {}
 
 func (x *GetTaskStatsResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_mail_proto_msgTypes[135]
+	mi := &file_mail_proto_msgTypes[136]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -8858,7 +8954,7 @@ func (x *GetTaskStatsResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetTaskStatsResponse.ProtoReflect.Descriptor instead.
 func (*GetTaskStatsResponse) Descriptor() ([]byte, []int) {
-	return file_mail_proto_rawDescGZIP(), []int{135}
+	return file_mail_proto_rawDescGZIP(), []int{136}
 }
 
 func (x *GetTaskStatsResponse) GetStats() *TaskStatsProto {
@@ -8885,7 +8981,7 @@ type GetAllAgentTaskStatsRequest struct {
 
 func (x *GetAllAgentTaskStatsRequest) Reset() {
 	*x = GetAllAgentTaskStatsRequest{}
-	mi := &file_mail_proto_msgTypes[136]
+	mi := &file_mail_proto_msgTypes[137]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -8897,7 +8993,7 @@ func (x *GetAllAgentTaskStatsRequest) String() string {
 func (*GetAllAgentTaskStatsRequest) ProtoMessage() {}
 
 func (x *GetAllAgentTaskStatsRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_mail_proto_msgTypes[136]
+	mi := &file_mail_proto_msgTypes[137]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -8910,7 +9006,7 @@ func (x *GetAllAgentTaskStatsRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetAllAgentTaskStatsRequest.ProtoReflect.Descriptor instead.
 func (*GetAllAgentTaskStatsRequest) Descriptor() ([]byte, []int) {
-	return file_mail_proto_rawDescGZIP(), []int{136}
+	return file_mail_proto_rawDescGZIP(), []int{137}
 }
 
 func (x *GetAllAgentTaskStatsRequest) GetTodaySince() *timestamppb.Timestamp {
@@ -8931,7 +9027,7 @@ type GetAllAgentTaskStatsResponse struct {
 
 func (x *GetAllAgentTaskStatsResponse) Reset() {
 	*x = GetAllAgentTaskStatsResponse{}
-	mi := &file_mail_proto_msgTypes[137]
+	mi := &file_mail_proto_msgTypes[138]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -8943,7 +9039,7 @@ func (x *GetAllAgentTaskStatsResponse) String() string {
 func (*GetAllAgentTaskStatsResponse) ProtoMessage() {}
 
 func (x *GetAllAgentTaskStatsResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_mail_proto_msgTypes[137]
+	mi := &file_mail_proto_msgTypes[138]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -8956,7 +9052,7 @@ func (x *GetAllAgentTaskStatsResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetAllAgentTaskStatsResponse.ProtoReflect.Descriptor instead.
 func (*GetAllAgentTaskStatsResponse) Descriptor() ([]byte, []int) {
-	return file_mail_proto_rawDescGZIP(), []int{137}
+	return file_mail_proto_rawDescGZIP(), []int{138}
 }
 
 func (x *GetAllAgentTaskStatsResponse) GetStats() []*AgentTaskStatsProto {
@@ -8983,7 +9079,7 @@ type SyncTaskListRequest struct {
 
 func (x *SyncTaskListRequest) Reset() {
 	*x = SyncTaskListRequest{}
-	mi := &file_mail_proto_msgTypes[138]
+	mi := &file_mail_proto_msgTypes[139]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -8995,7 +9091,7 @@ func (x *SyncTaskListRequest) String() string {
 func (*SyncTaskListRequest) ProtoMessage() {}
 
 func (x *SyncTaskListRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_mail_proto_msgTypes[138]
+	mi := &file_mail_proto_msgTypes[139]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -9008,7 +9104,7 @@ func (x *SyncTaskListRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SyncTaskListRequest.ProtoReflect.Descriptor instead.
 func (*SyncTaskListRequest) Descriptor() ([]byte, []int) {
-	return file_mail_proto_rawDescGZIP(), []int{138}
+	return file_mail_proto_rawDescGZIP(), []int{139}
 }
 
 func (x *SyncTaskListRequest) GetListId() string {
@@ -9030,7 +9126,7 @@ type SyncTaskListResponse struct {
 
 func (x *SyncTaskListResponse) Reset() {
 	*x = SyncTaskListResponse{}
-	mi := &file_mail_proto_msgTypes[139]
+	mi := &file_mail_proto_msgTypes[140]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -9042,7 +9138,7 @@ func (x *SyncTaskListResponse) String() string {
 func (*SyncTaskListResponse) ProtoMessage() {}
 
 func (x *SyncTaskListResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_mail_proto_msgTypes[139]
+	mi := &file_mail_proto_msgTypes[140]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -9055,7 +9151,7 @@ func (x *SyncTaskListResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SyncTaskListResponse.ProtoReflect.Descriptor instead.
 func (*SyncTaskListResponse) Descriptor() ([]byte, []int) {
-	return file_mail_proto_rawDescGZIP(), []int{139}
+	return file_mail_proto_rawDescGZIP(), []int{140}
 }
 
 func (x *SyncTaskListResponse) GetTasksUpdated() int32 {
@@ -9089,7 +9185,7 @@ type PruneOldTasksRequest struct {
 
 func (x *PruneOldTasksRequest) Reset() {
 	*x = PruneOldTasksRequest{}
-	mi := &file_mail_proto_msgTypes[140]
+	mi := &file_mail_proto_msgTypes[141]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -9101,7 +9197,7 @@ func (x *PruneOldTasksRequest) String() string {
 func (*PruneOldTasksRequest) ProtoMessage() {}
 
 func (x *PruneOldTasksRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_mail_proto_msgTypes[140]
+	mi := &file_mail_proto_msgTypes[141]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -9114,7 +9210,7 @@ func (x *PruneOldTasksRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use PruneOldTasksRequest.ProtoReflect.Descriptor instead.
 func (*PruneOldTasksRequest) Descriptor() ([]byte, []int) {
-	return file_mail_proto_rawDescGZIP(), []int{140}
+	return file_mail_proto_rawDescGZIP(), []int{141}
 }
 
 func (x *PruneOldTasksRequest) GetOlderThan() *timestamppb.Timestamp {
@@ -9134,7 +9230,7 @@ type PruneOldTasksResponse struct {
 
 func (x *PruneOldTasksResponse) Reset() {
 	*x = PruneOldTasksResponse{}
-	mi := &file_mail_proto_msgTypes[141]
+	mi := &file_mail_proto_msgTypes[142]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -9146,7 +9242,7 @@ func (x *PruneOldTasksResponse) String() string {
 func (*PruneOldTasksResponse) ProtoMessage() {}
 
 func (x *PruneOldTasksResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_mail_proto_msgTypes[141]
+	mi := &file_mail_proto_msgTypes[142]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -9159,7 +9255,7 @@ func (x *PruneOldTasksResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use PruneOldTasksResponse.ProtoReflect.Descriptor instead.
 func (*PruneOldTasksResponse) Descriptor() ([]byte, []int) {
-	return file_mail_proto_rawDescGZIP(), []int{141}
+	return file_mail_proto_rawDescGZIP(), []int{142}
 }
 
 func (x *PruneOldTasksResponse) GetError() string {
@@ -9195,7 +9291,7 @@ type PlanReviewProto struct {
 
 func (x *PlanReviewProto) Reset() {
 	*x = PlanReviewProto{}
-	mi := &file_mail_proto_msgTypes[142]
+	mi := &file_mail_proto_msgTypes[143]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -9207,7 +9303,7 @@ func (x *PlanReviewProto) String() string {
 func (*PlanReviewProto) ProtoMessage() {}
 
 func (x *PlanReviewProto) ProtoReflect() protoreflect.Message {
-	mi := &file_mail_proto_msgTypes[142]
+	mi := &file_mail_proto_msgTypes[143]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -9220,7 +9316,7 @@ func (x *PlanReviewProto) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use PlanReviewProto.ProtoReflect.Descriptor instead.
 func (*PlanReviewProto) Descriptor() ([]byte, []int) {
-	return file_mail_proto_rawDescGZIP(), []int{142}
+	return file_mail_proto_rawDescGZIP(), []int{143}
 }
 
 func (x *PlanReviewProto) GetId() int64 {
@@ -9360,7 +9456,7 @@ type CreatePlanReviewRequest struct {
 
 func (x *CreatePlanReviewRequest) Reset() {
 	*x = CreatePlanReviewRequest{}
-	mi := &file_mail_proto_msgTypes[143]
+	mi := &file_mail_proto_msgTypes[144]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -9372,7 +9468,7 @@ func (x *CreatePlanReviewRequest) String() string {
 func (*CreatePlanReviewRequest) ProtoMessage() {}
 
 func (x *CreatePlanReviewRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_mail_proto_msgTypes[143]
+	mi := &file_mail_proto_msgTypes[144]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -9385,7 +9481,7 @@ func (x *CreatePlanReviewRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CreatePlanReviewRequest.ProtoReflect.Descriptor instead.
 func (*CreatePlanReviewRequest) Descriptor() ([]byte, []int) {
-	return file_mail_proto_rawDescGZIP(), []int{143}
+	return file_mail_proto_rawDescGZIP(), []int{144}
 }
 
 func (x *CreatePlanReviewRequest) GetPlanReviewId() string {
@@ -9461,7 +9557,7 @@ type GetPlanReviewRequest struct {
 
 func (x *GetPlanReviewRequest) Reset() {
 	*x = GetPlanReviewRequest{}
-	mi := &file_mail_proto_msgTypes[144]
+	mi := &file_mail_proto_msgTypes[145]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -9473,7 +9569,7 @@ func (x *GetPlanReviewRequest) String() string {
 func (*GetPlanReviewRequest) ProtoMessage() {}
 
 func (x *GetPlanReviewRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_mail_proto_msgTypes[144]
+	mi := &file_mail_proto_msgTypes[145]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -9486,7 +9582,7 @@ func (x *GetPlanReviewRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetPlanReviewRequest.ProtoReflect.Descriptor instead.
 func (*GetPlanReviewRequest) Descriptor() ([]byte, []int) {
-	return file_mail_proto_rawDescGZIP(), []int{144}
+	return file_mail_proto_rawDescGZIP(), []int{145}
 }
 
 func (x *GetPlanReviewRequest) GetPlanReviewId() string {
@@ -9506,7 +9602,7 @@ type GetPlanReviewByThreadRequest struct {
 
 func (x *GetPlanReviewByThreadRequest) Reset() {
 	*x = GetPlanReviewByThreadRequest{}
-	mi := &file_mail_proto_msgTypes[145]
+	mi := &file_mail_proto_msgTypes[146]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -9518,7 +9614,7 @@ func (x *GetPlanReviewByThreadRequest) String() string {
 func (*GetPlanReviewByThreadRequest) ProtoMessage() {}
 
 func (x *GetPlanReviewByThreadRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_mail_proto_msgTypes[145]
+	mi := &file_mail_proto_msgTypes[146]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -9531,7 +9627,7 @@ func (x *GetPlanReviewByThreadRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetPlanReviewByThreadRequest.ProtoReflect.Descriptor instead.
 func (*GetPlanReviewByThreadRequest) Descriptor() ([]byte, []int) {
-	return file_mail_proto_rawDescGZIP(), []int{145}
+	return file_mail_proto_rawDescGZIP(), []int{146}
 }
 
 func (x *GetPlanReviewByThreadRequest) GetThreadId() string {
@@ -9551,7 +9647,7 @@ type GetPlanReviewBySessionRequest struct {
 
 func (x *GetPlanReviewBySessionRequest) Reset() {
 	*x = GetPlanReviewBySessionRequest{}
-	mi := &file_mail_proto_msgTypes[146]
+	mi := &file_mail_proto_msgTypes[147]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -9563,7 +9659,7 @@ func (x *GetPlanReviewBySessionRequest) String() string {
 func (*GetPlanReviewBySessionRequest) ProtoMessage() {}
 
 func (x *GetPlanReviewBySessionRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_mail_proto_msgTypes[146]
+	mi := &file_mail_proto_msgTypes[147]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -9576,7 +9672,7 @@ func (x *GetPlanReviewBySessionRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetPlanReviewBySessionRequest.ProtoReflect.Descriptor instead.
 func (*GetPlanReviewBySessionRequest) Descriptor() ([]byte, []int) {
-	return file_mail_proto_rawDescGZIP(), []int{146}
+	return file_mail_proto_rawDescGZIP(), []int{147}
 }
 
 func (x *GetPlanReviewBySessionRequest) GetSessionId() string {
@@ -9599,7 +9695,7 @@ type ListPlanReviewsRequest struct {
 
 func (x *ListPlanReviewsRequest) Reset() {
 	*x = ListPlanReviewsRequest{}
-	mi := &file_mail_proto_msgTypes[147]
+	mi := &file_mail_proto_msgTypes[148]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -9611,7 +9707,7 @@ func (x *ListPlanReviewsRequest) String() string {
 func (*ListPlanReviewsRequest) ProtoMessage() {}
 
 func (x *ListPlanReviewsRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_mail_proto_msgTypes[147]
+	mi := &file_mail_proto_msgTypes[148]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -9624,7 +9720,7 @@ func (x *ListPlanReviewsRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListPlanReviewsRequest.ProtoReflect.Descriptor instead.
 func (*ListPlanReviewsRequest) Descriptor() ([]byte, []int) {
-	return file_mail_proto_rawDescGZIP(), []int{147}
+	return file_mail_proto_rawDescGZIP(), []int{148}
 }
 
 func (x *ListPlanReviewsRequest) GetState() string {
@@ -9665,7 +9761,7 @@ type ListPlanReviewsResponse struct {
 
 func (x *ListPlanReviewsResponse) Reset() {
 	*x = ListPlanReviewsResponse{}
-	mi := &file_mail_proto_msgTypes[148]
+	mi := &file_mail_proto_msgTypes[149]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -9677,7 +9773,7 @@ func (x *ListPlanReviewsResponse) String() string {
 func (*ListPlanReviewsResponse) ProtoMessage() {}
 
 func (x *ListPlanReviewsResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_mail_proto_msgTypes[148]
+	mi := &file_mail_proto_msgTypes[149]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -9690,7 +9786,7 @@ func (x *ListPlanReviewsResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListPlanReviewsResponse.ProtoReflect.Descriptor instead.
 func (*ListPlanReviewsResponse) Descriptor() ([]byte, []int) {
-	return file_mail_proto_rawDescGZIP(), []int{148}
+	return file_mail_proto_rawDescGZIP(), []int{149}
 }
 
 func (x *ListPlanReviewsResponse) GetPlanReviews() []*PlanReviewProto {
@@ -9713,7 +9809,7 @@ type UpdatePlanReviewStatusRequest struct {
 
 func (x *UpdatePlanReviewStatusRequest) Reset() {
 	*x = UpdatePlanReviewStatusRequest{}
-	mi := &file_mail_proto_msgTypes[149]
+	mi := &file_mail_proto_msgTypes[150]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -9725,7 +9821,7 @@ func (x *UpdatePlanReviewStatusRequest) String() string {
 func (*UpdatePlanReviewStatusRequest) ProtoMessage() {}
 
 func (x *UpdatePlanReviewStatusRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_mail_proto_msgTypes[149]
+	mi := &file_mail_proto_msgTypes[150]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -9738,7 +9834,7 @@ func (x *UpdatePlanReviewStatusRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use UpdatePlanReviewStatusRequest.ProtoReflect.Descriptor instead.
 func (*UpdatePlanReviewStatusRequest) Descriptor() ([]byte, []int) {
-	return file_mail_proto_rawDescGZIP(), []int{149}
+	return file_mail_proto_rawDescGZIP(), []int{150}
 }
 
 func (x *UpdatePlanReviewStatusRequest) GetPlanReviewId() string {
@@ -9779,7 +9875,7 @@ type DeletePlanReviewRequest struct {
 
 func (x *DeletePlanReviewRequest) Reset() {
 	*x = DeletePlanReviewRequest{}
-	mi := &file_mail_proto_msgTypes[150]
+	mi := &file_mail_proto_msgTypes[151]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -9791,7 +9887,7 @@ func (x *DeletePlanReviewRequest) String() string {
 func (*DeletePlanReviewRequest) ProtoMessage() {}
 
 func (x *DeletePlanReviewRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_mail_proto_msgTypes[150]
+	mi := &file_mail_proto_msgTypes[151]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -9804,7 +9900,7 @@ func (x *DeletePlanReviewRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DeletePlanReviewRequest.ProtoReflect.Descriptor instead.
 func (*DeletePlanReviewRequest) Descriptor() ([]byte, []int) {
-	return file_mail_proto_rawDescGZIP(), []int{150}
+	return file_mail_proto_rawDescGZIP(), []int{151}
 }
 
 func (x *DeletePlanReviewRequest) GetPlanReviewId() string {
@@ -9824,7 +9920,7 @@ type DeletePlanReviewResponse struct {
 
 func (x *DeletePlanReviewResponse) Reset() {
 	*x = DeletePlanReviewResponse{}
-	mi := &file_mail_proto_msgTypes[151]
+	mi := &file_mail_proto_msgTypes[152]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -9836,7 +9932,7 @@ func (x *DeletePlanReviewResponse) String() string {
 func (*DeletePlanReviewResponse) ProtoMessage() {}
 
 func (x *DeletePlanReviewResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_mail_proto_msgTypes[151]
+	mi := &file_mail_proto_msgTypes[152]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -9849,7 +9945,7 @@ func (x *DeletePlanReviewResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DeletePlanReviewResponse.ProtoReflect.Descriptor instead.
 func (*DeletePlanReviewResponse) Descriptor() ([]byte, []int) {
-	return file_mail_proto_rawDescGZIP(), []int{151}
+	return file_mail_proto_rawDescGZIP(), []int{152}
 }
 
 func (x *DeletePlanReviewResponse) GetError() string {
@@ -9880,7 +9976,7 @@ type PlanAnnotationProto struct {
 
 func (x *PlanAnnotationProto) Reset() {
 	*x = PlanAnnotationProto{}
-	mi := &file_mail_proto_msgTypes[152]
+	mi := &file_mail_proto_msgTypes[153]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -9892,7 +9988,7 @@ func (x *PlanAnnotationProto) String() string {
 func (*PlanAnnotationProto) ProtoMessage() {}
 
 func (x *PlanAnnotationProto) ProtoReflect() protoreflect.Message {
-	mi := &file_mail_proto_msgTypes[152]
+	mi := &file_mail_proto_msgTypes[153]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -9905,7 +10001,7 @@ func (x *PlanAnnotationProto) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use PlanAnnotationProto.ProtoReflect.Descriptor instead.
 func (*PlanAnnotationProto) Descriptor() ([]byte, []int) {
-	return file_mail_proto_rawDescGZIP(), []int{152}
+	return file_mail_proto_rawDescGZIP(), []int{153}
 }
 
 func (x *PlanAnnotationProto) GetId() int64 {
@@ -10015,7 +10111,7 @@ type DiffAnnotationProto struct {
 
 func (x *DiffAnnotationProto) Reset() {
 	*x = DiffAnnotationProto{}
-	mi := &file_mail_proto_msgTypes[153]
+	mi := &file_mail_proto_msgTypes[154]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -10027,7 +10123,7 @@ func (x *DiffAnnotationProto) String() string {
 func (*DiffAnnotationProto) ProtoMessage() {}
 
 func (x *DiffAnnotationProto) ProtoReflect() protoreflect.Message {
-	mi := &file_mail_proto_msgTypes[153]
+	mi := &file_mail_proto_msgTypes[154]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -10040,7 +10136,7 @@ func (x *DiffAnnotationProto) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DiffAnnotationProto.ProtoReflect.Descriptor instead.
 func (*DiffAnnotationProto) Descriptor() ([]byte, []int) {
-	return file_mail_proto_rawDescGZIP(), []int{153}
+	return file_mail_proto_rawDescGZIP(), []int{154}
 }
 
 func (x *DiffAnnotationProto) GetId() int64 {
@@ -10159,7 +10255,7 @@ type CreatePlanAnnotationRequest struct {
 
 func (x *CreatePlanAnnotationRequest) Reset() {
 	*x = CreatePlanAnnotationRequest{}
-	mi := &file_mail_proto_msgTypes[154]
+	mi := &file_mail_proto_msgTypes[155]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -10171,7 +10267,7 @@ func (x *CreatePlanAnnotationRequest) String() string {
 func (*CreatePlanAnnotationRequest) ProtoMessage() {}
 
 func (x *CreatePlanAnnotationRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_mail_proto_msgTypes[154]
+	mi := &file_mail_proto_msgTypes[155]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -10184,7 +10280,7 @@ func (x *CreatePlanAnnotationRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CreatePlanAnnotationRequest.ProtoReflect.Descriptor instead.
 func (*CreatePlanAnnotationRequest) Descriptor() ([]byte, []int) {
-	return file_mail_proto_rawDescGZIP(), []int{154}
+	return file_mail_proto_rawDescGZIP(), []int{155}
 }
 
 func (x *CreatePlanAnnotationRequest) GetPlanReviewId() string {
@@ -10260,7 +10356,7 @@ type ListPlanAnnotationsRequest struct {
 
 func (x *ListPlanAnnotationsRequest) Reset() {
 	*x = ListPlanAnnotationsRequest{}
-	mi := &file_mail_proto_msgTypes[155]
+	mi := &file_mail_proto_msgTypes[156]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -10272,7 +10368,7 @@ func (x *ListPlanAnnotationsRequest) String() string {
 func (*ListPlanAnnotationsRequest) ProtoMessage() {}
 
 func (x *ListPlanAnnotationsRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_mail_proto_msgTypes[155]
+	mi := &file_mail_proto_msgTypes[156]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -10285,7 +10381,7 @@ func (x *ListPlanAnnotationsRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListPlanAnnotationsRequest.ProtoReflect.Descriptor instead.
 func (*ListPlanAnnotationsRequest) Descriptor() ([]byte, []int) {
-	return file_mail_proto_rawDescGZIP(), []int{155}
+	return file_mail_proto_rawDescGZIP(), []int{156}
 }
 
 func (x *ListPlanAnnotationsRequest) GetPlanReviewId() string {
@@ -10305,7 +10401,7 @@ type ListPlanAnnotationsResponse struct {
 
 func (x *ListPlanAnnotationsResponse) Reset() {
 	*x = ListPlanAnnotationsResponse{}
-	mi := &file_mail_proto_msgTypes[156]
+	mi := &file_mail_proto_msgTypes[157]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -10317,7 +10413,7 @@ func (x *ListPlanAnnotationsResponse) String() string {
 func (*ListPlanAnnotationsResponse) ProtoMessage() {}
 
 func (x *ListPlanAnnotationsResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_mail_proto_msgTypes[156]
+	mi := &file_mail_proto_msgTypes[157]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -10330,7 +10426,7 @@ func (x *ListPlanAnnotationsResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListPlanAnnotationsResponse.ProtoReflect.Descriptor instead.
 func (*ListPlanAnnotationsResponse) Descriptor() ([]byte, []int) {
-	return file_mail_proto_rawDescGZIP(), []int{156}
+	return file_mail_proto_rawDescGZIP(), []int{157}
 }
 
 func (x *ListPlanAnnotationsResponse) GetAnnotations() []*PlanAnnotationProto {
@@ -10355,7 +10451,7 @@ type UpdatePlanAnnotationRequest struct {
 
 func (x *UpdatePlanAnnotationRequest) Reset() {
 	*x = UpdatePlanAnnotationRequest{}
-	mi := &file_mail_proto_msgTypes[157]
+	mi := &file_mail_proto_msgTypes[158]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -10367,7 +10463,7 @@ func (x *UpdatePlanAnnotationRequest) String() string {
 func (*UpdatePlanAnnotationRequest) ProtoMessage() {}
 
 func (x *UpdatePlanAnnotationRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_mail_proto_msgTypes[157]
+	mi := &file_mail_proto_msgTypes[158]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -10380,7 +10476,7 @@ func (x *UpdatePlanAnnotationRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use UpdatePlanAnnotationRequest.ProtoReflect.Descriptor instead.
 func (*UpdatePlanAnnotationRequest) Descriptor() ([]byte, []int) {
-	return file_mail_proto_rawDescGZIP(), []int{157}
+	return file_mail_proto_rawDescGZIP(), []int{158}
 }
 
 func (x *UpdatePlanAnnotationRequest) GetAnnotationId() string {
@@ -10435,7 +10531,7 @@ type DeletePlanAnnotationRequest struct {
 
 func (x *DeletePlanAnnotationRequest) Reset() {
 	*x = DeletePlanAnnotationRequest{}
-	mi := &file_mail_proto_msgTypes[158]
+	mi := &file_mail_proto_msgTypes[159]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -10447,7 +10543,7 @@ func (x *DeletePlanAnnotationRequest) String() string {
 func (*DeletePlanAnnotationRequest) ProtoMessage() {}
 
 func (x *DeletePlanAnnotationRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_mail_proto_msgTypes[158]
+	mi := &file_mail_proto_msgTypes[159]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -10460,7 +10556,7 @@ func (x *DeletePlanAnnotationRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DeletePlanAnnotationRequest.ProtoReflect.Descriptor instead.
 func (*DeletePlanAnnotationRequest) Descriptor() ([]byte, []int) {
-	return file_mail_proto_rawDescGZIP(), []int{158}
+	return file_mail_proto_rawDescGZIP(), []int{159}
 }
 
 func (x *DeletePlanAnnotationRequest) GetAnnotationId() string {
@@ -10480,7 +10576,7 @@ type DeleteAnnotationResponse struct {
 
 func (x *DeleteAnnotationResponse) Reset() {
 	*x = DeleteAnnotationResponse{}
-	mi := &file_mail_proto_msgTypes[159]
+	mi := &file_mail_proto_msgTypes[160]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -10492,7 +10588,7 @@ func (x *DeleteAnnotationResponse) String() string {
 func (*DeleteAnnotationResponse) ProtoMessage() {}
 
 func (x *DeleteAnnotationResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_mail_proto_msgTypes[159]
+	mi := &file_mail_proto_msgTypes[160]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -10505,7 +10601,7 @@ func (x *DeleteAnnotationResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DeleteAnnotationResponse.ProtoReflect.Descriptor instead.
 func (*DeleteAnnotationResponse) Descriptor() ([]byte, []int) {
-	return file_mail_proto_rawDescGZIP(), []int{159}
+	return file_mail_proto_rawDescGZIP(), []int{160}
 }
 
 func (x *DeleteAnnotationResponse) GetError() string {
@@ -10535,7 +10631,7 @@ type CreateDiffAnnotationRequest struct {
 
 func (x *CreateDiffAnnotationRequest) Reset() {
 	*x = CreateDiffAnnotationRequest{}
-	mi := &file_mail_proto_msgTypes[160]
+	mi := &file_mail_proto_msgTypes[161]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -10547,7 +10643,7 @@ func (x *CreateDiffAnnotationRequest) String() string {
 func (*CreateDiffAnnotationRequest) ProtoMessage() {}
 
 func (x *CreateDiffAnnotationRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_mail_proto_msgTypes[160]
+	mi := &file_mail_proto_msgTypes[161]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -10560,7 +10656,7 @@ func (x *CreateDiffAnnotationRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CreateDiffAnnotationRequest.ProtoReflect.Descriptor instead.
 func (*CreateDiffAnnotationRequest) Descriptor() ([]byte, []int) {
-	return file_mail_proto_rawDescGZIP(), []int{160}
+	return file_mail_proto_rawDescGZIP(), []int{161}
 }
 
 func (x *CreateDiffAnnotationRequest) GetAnnotationId() string {
@@ -10650,7 +10746,7 @@ type ListDiffAnnotationsRequest struct {
 
 func (x *ListDiffAnnotationsRequest) Reset() {
 	*x = ListDiffAnnotationsRequest{}
-	mi := &file_mail_proto_msgTypes[161]
+	mi := &file_mail_proto_msgTypes[162]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -10662,7 +10758,7 @@ func (x *ListDiffAnnotationsRequest) String() string {
 func (*ListDiffAnnotationsRequest) ProtoMessage() {}
 
 func (x *ListDiffAnnotationsRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_mail_proto_msgTypes[161]
+	mi := &file_mail_proto_msgTypes[162]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -10675,7 +10771,7 @@ func (x *ListDiffAnnotationsRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListDiffAnnotationsRequest.ProtoReflect.Descriptor instead.
 func (*ListDiffAnnotationsRequest) Descriptor() ([]byte, []int) {
-	return file_mail_proto_rawDescGZIP(), []int{161}
+	return file_mail_proto_rawDescGZIP(), []int{162}
 }
 
 func (x *ListDiffAnnotationsRequest) GetMessageId() int64 {
@@ -10695,7 +10791,7 @@ type ListDiffAnnotationsResponse struct {
 
 func (x *ListDiffAnnotationsResponse) Reset() {
 	*x = ListDiffAnnotationsResponse{}
-	mi := &file_mail_proto_msgTypes[162]
+	mi := &file_mail_proto_msgTypes[163]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -10707,7 +10803,7 @@ func (x *ListDiffAnnotationsResponse) String() string {
 func (*ListDiffAnnotationsResponse) ProtoMessage() {}
 
 func (x *ListDiffAnnotationsResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_mail_proto_msgTypes[162]
+	mi := &file_mail_proto_msgTypes[163]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -10720,7 +10816,7 @@ func (x *ListDiffAnnotationsResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListDiffAnnotationsResponse.ProtoReflect.Descriptor instead.
 func (*ListDiffAnnotationsResponse) Descriptor() ([]byte, []int) {
-	return file_mail_proto_rawDescGZIP(), []int{162}
+	return file_mail_proto_rawDescGZIP(), []int{163}
 }
 
 func (x *ListDiffAnnotationsResponse) GetAnnotations() []*DiffAnnotationProto {
@@ -10743,7 +10839,7 @@ type UpdateDiffAnnotationRequest struct {
 
 func (x *UpdateDiffAnnotationRequest) Reset() {
 	*x = UpdateDiffAnnotationRequest{}
-	mi := &file_mail_proto_msgTypes[163]
+	mi := &file_mail_proto_msgTypes[164]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -10755,7 +10851,7 @@ func (x *UpdateDiffAnnotationRequest) String() string {
 func (*UpdateDiffAnnotationRequest) ProtoMessage() {}
 
 func (x *UpdateDiffAnnotationRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_mail_proto_msgTypes[163]
+	mi := &file_mail_proto_msgTypes[164]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -10768,7 +10864,7 @@ func (x *UpdateDiffAnnotationRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use UpdateDiffAnnotationRequest.ProtoReflect.Descriptor instead.
 func (*UpdateDiffAnnotationRequest) Descriptor() ([]byte, []int) {
-	return file_mail_proto_rawDescGZIP(), []int{163}
+	return file_mail_proto_rawDescGZIP(), []int{164}
 }
 
 func (x *UpdateDiffAnnotationRequest) GetAnnotationId() string {
@@ -10809,7 +10905,7 @@ type DeleteDiffAnnotationRequest struct {
 
 func (x *DeleteDiffAnnotationRequest) Reset() {
 	*x = DeleteDiffAnnotationRequest{}
-	mi := &file_mail_proto_msgTypes[164]
+	mi := &file_mail_proto_msgTypes[165]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -10821,7 +10917,7 @@ func (x *DeleteDiffAnnotationRequest) String() string {
 func (*DeleteDiffAnnotationRequest) ProtoMessage() {}
 
 func (x *DeleteDiffAnnotationRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_mail_proto_msgTypes[164]
+	mi := &file_mail_proto_msgTypes[165]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -10834,7 +10930,7 @@ func (x *DeleteDiffAnnotationRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DeleteDiffAnnotationRequest.ProtoReflect.Descriptor instead.
 func (*DeleteDiffAnnotationRequest) Descriptor() ([]byte, []int) {
-	return file_mail_proto_rawDescGZIP(), []int{164}
+	return file_mail_proto_rawDescGZIP(), []int{165}
 }
 
 func (x *DeleteDiffAnnotationRequest) GetAnnotationId() string {
@@ -10889,7 +10985,7 @@ const file_mail_proto_rawDesc = "" +
 	"\x10SendMailResponse\x12\x1d\n" +
 	"\n" +
 	"message_id\x18\x01 \x01(\x03R\tmessageId\x12\x1b\n" +
-	"\tthread_id\x18\x02 \x01(\tR\bthreadId\"\x86\x02\n" +
+	"\tthread_id\x18\x02 \x01(\tR\bthreadId\"\xa2\x02\n" +
 	"\x11FetchInboxRequest\x12\x19\n" +
 	"\bagent_id\x18\x01 \x01(\x03R\aagentId\x12\x14\n" +
 	"\x05limit\x18\x02 \x01(\x05R\x05limit\x12\x1f\n" +
@@ -10898,9 +10994,16 @@ const file_mail_proto_rawDesc = "" +
 	"\fstate_filter\x18\x04 \x01(\x0e2\x19.subtraterpc.MessageStateR\vstateFilter\x12\x1b\n" +
 	"\tsent_only\x18\x05 \x01(\bR\bsentOnly\x12,\n" +
 	"\x12sender_name_prefix\x18\x06 \x01(\tR\x10senderNamePrefix\x12\x16\n" +
-	"\x06offset\x18\a \x01(\x05R\x06offset\"K\n" +
+	"\x06offset\x18\a \x01(\x05R\x06offset\x12\x1a\n" +
+	"\bcategory\x18\b \x01(\tR\bcategory\"\x96\x01\n" +
 	"\x12FetchInboxResponse\x125\n" +
-	"\bmessages\x18\x01 \x03(\v2\x19.subtraterpc.InboxMessageR\bmessages\"N\n" +
+	"\bmessages\x18\x01 \x03(\v2\x19.subtraterpc.InboxMessageR\bmessages\x12I\n" +
+	"\x0fcategory_counts\x18\x02 \x01(\v2 .subtraterpc.InboxCategoryCountsR\x0ecategoryCounts\"\x87\x01\n" +
+	"\x13InboxCategoryCounts\x12\x18\n" +
+	"\aprimary\x18\x01 \x01(\x03R\aprimary\x12$\n" +
+	"\rnotifications\x18\x03 \x01(\x03R\rnotifications\x12\x16\n" +
+	"\x06unread\x18\x04 \x01(\x03R\x06unread\x12\x18\n" +
+	"\astarred\x18\x05 \x01(\x03R\astarred\"N\n" +
 	"\x12ReadMessageRequest\x12\x19\n" +
 	"\bagent_id\x18\x01 \x01(\x03R\aagentId\x12\x1d\n" +
 	"\n" +
@@ -11843,7 +11946,7 @@ func file_mail_proto_rawDescGZIP() []byte {
 }
 
 var file_mail_proto_enumTypes = make([]protoimpl.EnumInfo, 7)
-var file_mail_proto_msgTypes = make([]protoimpl.MessageInfo, 168)
+var file_mail_proto_msgTypes = make([]protoimpl.MessageInfo, 169)
 var file_mail_proto_goTypes = []any{
 	(Priority)(0),                          // 0: subtraterpc.Priority
 	(MessageState)(0),                      // 1: subtraterpc.MessageState
@@ -11857,412 +11960,414 @@ var file_mail_proto_goTypes = []any{
 	(*SendMailResponse)(nil),               // 9: subtraterpc.SendMailResponse
 	(*FetchInboxRequest)(nil),              // 10: subtraterpc.FetchInboxRequest
 	(*FetchInboxResponse)(nil),             // 11: subtraterpc.FetchInboxResponse
-	(*ReadMessageRequest)(nil),             // 12: subtraterpc.ReadMessageRequest
-	(*ReadMessageResponse)(nil),            // 13: subtraterpc.ReadMessageResponse
-	(*ReadThreadRequest)(nil),              // 14: subtraterpc.ReadThreadRequest
-	(*ReadThreadResponse)(nil),             // 15: subtraterpc.ReadThreadResponse
-	(*UpdateStateRequest)(nil),             // 16: subtraterpc.UpdateStateRequest
-	(*UpdateStateResponse)(nil),            // 17: subtraterpc.UpdateStateResponse
-	(*AckMessageRequest)(nil),              // 18: subtraterpc.AckMessageRequest
-	(*AckMessageResponse)(nil),             // 19: subtraterpc.AckMessageResponse
-	(*GetStatusRequest)(nil),               // 20: subtraterpc.GetStatusRequest
-	(*GetStatusResponse)(nil),              // 21: subtraterpc.GetStatusResponse
-	(*PollChangesRequest)(nil),             // 22: subtraterpc.PollChangesRequest
-	(*PollChangesResponse)(nil),            // 23: subtraterpc.PollChangesResponse
-	(*SubscribeInboxRequest)(nil),          // 24: subtraterpc.SubscribeInboxRequest
-	(*PublishRequest)(nil),                 // 25: subtraterpc.PublishRequest
-	(*PublishResponse)(nil),                // 26: subtraterpc.PublishResponse
-	(*SubscribeRequest)(nil),               // 27: subtraterpc.SubscribeRequest
-	(*SubscribeResponse)(nil),              // 28: subtraterpc.SubscribeResponse
-	(*UnsubscribeRequest)(nil),             // 29: subtraterpc.UnsubscribeRequest
-	(*UnsubscribeResponse)(nil),            // 30: subtraterpc.UnsubscribeResponse
-	(*Topic)(nil),                          // 31: subtraterpc.Topic
-	(*ListTopicsRequest)(nil),              // 32: subtraterpc.ListTopicsRequest
-	(*ListTopicsResponse)(nil),             // 33: subtraterpc.ListTopicsResponse
-	(*SearchRequest)(nil),                  // 34: subtraterpc.SearchRequest
-	(*SearchResponse)(nil),                 // 35: subtraterpc.SearchResponse
-	(*HasUnackedStatusToRequest)(nil),      // 36: subtraterpc.HasUnackedStatusToRequest
-	(*HasUnackedStatusToResponse)(nil),     // 37: subtraterpc.HasUnackedStatusToResponse
-	(*RegisterAgentRequest)(nil),           // 38: subtraterpc.RegisterAgentRequest
-	(*RegisterAgentResponse)(nil),          // 39: subtraterpc.RegisterAgentResponse
-	(*GetAgentRequest)(nil),                // 40: subtraterpc.GetAgentRequest
-	(*GetAgentResponse)(nil),               // 41: subtraterpc.GetAgentResponse
-	(*ListAgentsRequest)(nil),              // 42: subtraterpc.ListAgentsRequest
-	(*ListAgentsResponse)(nil),             // 43: subtraterpc.ListAgentsResponse
-	(*EnsureIdentityRequest)(nil),          // 44: subtraterpc.EnsureIdentityRequest
-	(*EnsureIdentityResponse)(nil),         // 45: subtraterpc.EnsureIdentityResponse
-	(*SaveIdentityRequest)(nil),            // 46: subtraterpc.SaveIdentityRequest
-	(*SaveIdentityResponse)(nil),           // 47: subtraterpc.SaveIdentityResponse
-	(*DeleteAgentRequest)(nil),             // 48: subtraterpc.DeleteAgentRequest
-	(*DeleteAgentResponse)(nil),            // 49: subtraterpc.DeleteAgentResponse
-	(*ReplyToThreadRequest)(nil),           // 50: subtraterpc.ReplyToThreadRequest
-	(*ReplyToThreadResponse)(nil),          // 51: subtraterpc.ReplyToThreadResponse
-	(*ArchiveThreadRequest)(nil),           // 52: subtraterpc.ArchiveThreadRequest
-	(*ArchiveThreadResponse)(nil),          // 53: subtraterpc.ArchiveThreadResponse
-	(*DeleteThreadRequest)(nil),            // 54: subtraterpc.DeleteThreadRequest
-	(*DeleteThreadResponse)(nil),           // 55: subtraterpc.DeleteThreadResponse
-	(*MarkThreadUnreadRequest)(nil),        // 56: subtraterpc.MarkThreadUnreadRequest
-	(*MarkThreadUnreadResponse)(nil),       // 57: subtraterpc.MarkThreadUnreadResponse
-	(*GetTopicRequest)(nil),                // 58: subtraterpc.GetTopicRequest
-	(*GetTopicResponse)(nil),               // 59: subtraterpc.GetTopicResponse
-	(*AutocompleteRecipientsRequest)(nil),  // 60: subtraterpc.AutocompleteRecipientsRequest
-	(*AutocompleteRecipient)(nil),          // 61: subtraterpc.AutocompleteRecipient
-	(*AutocompleteRecipientsResponse)(nil), // 62: subtraterpc.AutocompleteRecipientsResponse
-	(*DeleteMessageRequest)(nil),           // 63: subtraterpc.DeleteMessageRequest
-	(*DeleteMessageResponse)(nil),          // 64: subtraterpc.DeleteMessageResponse
-	(*UpdateAgentRequest)(nil),             // 65: subtraterpc.UpdateAgentRequest
-	(*UpdateAgentResponse)(nil),            // 66: subtraterpc.UpdateAgentResponse
-	(*AgentWithStatus)(nil),                // 67: subtraterpc.AgentWithStatus
-	(*AgentStatusCounts)(nil),              // 68: subtraterpc.AgentStatusCounts
-	(*GetAgentsStatusRequest)(nil),         // 69: subtraterpc.GetAgentsStatusRequest
-	(*GetAgentsStatusResponse)(nil),        // 70: subtraterpc.GetAgentsStatusResponse
-	(*DiscoverAgentsRequest)(nil),          // 71: subtraterpc.DiscoverAgentsRequest
-	(*DiscoveredAgent)(nil),                // 72: subtraterpc.DiscoveredAgent
-	(*DiscoverAgentsResponse)(nil),         // 73: subtraterpc.DiscoverAgentsResponse
-	(*HeartbeatRequest)(nil),               // 74: subtraterpc.HeartbeatRequest
-	(*HeartbeatResponse)(nil),              // 75: subtraterpc.HeartbeatResponse
-	(*SessionInfo)(nil),                    // 76: subtraterpc.SessionInfo
-	(*ListSessionsRequest)(nil),            // 77: subtraterpc.ListSessionsRequest
-	(*ListSessionsResponse)(nil),           // 78: subtraterpc.ListSessionsResponse
-	(*GetSessionRequest)(nil),              // 79: subtraterpc.GetSessionRequest
-	(*GetSessionResponse)(nil),             // 80: subtraterpc.GetSessionResponse
-	(*StartSessionRequest)(nil),            // 81: subtraterpc.StartSessionRequest
-	(*StartSessionResponse)(nil),           // 82: subtraterpc.StartSessionResponse
-	(*CompleteSessionRequest)(nil),         // 83: subtraterpc.CompleteSessionRequest
-	(*CompleteSessionResponse)(nil),        // 84: subtraterpc.CompleteSessionResponse
-	(*ActivityInfo)(nil),                   // 85: subtraterpc.ActivityInfo
-	(*ListActivitiesRequest)(nil),          // 86: subtraterpc.ListActivitiesRequest
-	(*ListActivitiesResponse)(nil),         // 87: subtraterpc.ListActivitiesResponse
-	(*DashboardStats)(nil),                 // 88: subtraterpc.DashboardStats
-	(*GetDashboardStatsRequest)(nil),       // 89: subtraterpc.GetDashboardStatsRequest
-	(*GetDashboardStatsResponse)(nil),      // 90: subtraterpc.GetDashboardStatsResponse
-	(*HealthCheckRequest)(nil),             // 91: subtraterpc.HealthCheckRequest
-	(*HealthCheckResponse)(nil),            // 92: subtraterpc.HealthCheckResponse
-	(*BranchTarget)(nil),                   // 93: subtraterpc.BranchTarget
-	(*CommitTarget)(nil),                   // 94: subtraterpc.CommitTarget
-	(*CommitRangeTarget)(nil),              // 95: subtraterpc.CommitRangeTarget
-	(*PRTarget)(nil),                       // 96: subtraterpc.PRTarget
-	(*CreateReviewRequest)(nil),            // 97: subtraterpc.CreateReviewRequest
-	(*CreateReviewResponse)(nil),           // 98: subtraterpc.CreateReviewResponse
-	(*ListReviewsProtoRequest)(nil),        // 99: subtraterpc.ListReviewsProtoRequest
-	(*ListReviewsProtoResponse)(nil),       // 100: subtraterpc.ListReviewsProtoResponse
-	(*ReviewSummaryProto)(nil),             // 101: subtraterpc.ReviewSummaryProto
-	(*GetReviewProtoRequest)(nil),          // 102: subtraterpc.GetReviewProtoRequest
-	(*ReviewDetailResponse)(nil),           // 103: subtraterpc.ReviewDetailResponse
-	(*ReviewIterationProto)(nil),           // 104: subtraterpc.ReviewIterationProto
-	(*ResubmitReviewRequest)(nil),          // 105: subtraterpc.ResubmitReviewRequest
-	(*CancelReviewProtoRequest)(nil),       // 106: subtraterpc.CancelReviewProtoRequest
-	(*CancelReviewProtoResponse)(nil),      // 107: subtraterpc.CancelReviewProtoResponse
-	(*DeleteReviewProtoRequest)(nil),       // 108: subtraterpc.DeleteReviewProtoRequest
-	(*DeleteReviewProtoResponse)(nil),      // 109: subtraterpc.DeleteReviewProtoResponse
-	(*ListReviewIssuesRequest)(nil),        // 110: subtraterpc.ListReviewIssuesRequest
-	(*ListReviewIssuesResponse)(nil),       // 111: subtraterpc.ListReviewIssuesResponse
-	(*ReviewIssueProto)(nil),               // 112: subtraterpc.ReviewIssueProto
-	(*UpdateIssueStatusRequest)(nil),       // 113: subtraterpc.UpdateIssueStatusRequest
-	(*UpdateIssueStatusResponse)(nil),      // 114: subtraterpc.UpdateIssueStatusResponse
-	(*GetReviewDiffRequest)(nil),           // 115: subtraterpc.GetReviewDiffRequest
-	(*GetReviewDiffResponse)(nil),          // 116: subtraterpc.GetReviewDiffResponse
-	(*TaskListProto)(nil),                  // 117: subtraterpc.TaskListProto
-	(*TaskProto)(nil),                      // 118: subtraterpc.TaskProto
-	(*TaskStatsProto)(nil),                 // 119: subtraterpc.TaskStatsProto
-	(*AgentTaskStatsProto)(nil),            // 120: subtraterpc.AgentTaskStatsProto
-	(*RegisterTaskListRequest)(nil),        // 121: subtraterpc.RegisterTaskListRequest
-	(*RegisterTaskListResponse)(nil),       // 122: subtraterpc.RegisterTaskListResponse
-	(*GetTaskListRequest)(nil),             // 123: subtraterpc.GetTaskListRequest
-	(*GetTaskListResponse)(nil),            // 124: subtraterpc.GetTaskListResponse
-	(*ListTaskListsRequest)(nil),           // 125: subtraterpc.ListTaskListsRequest
-	(*ListTaskListsResponse)(nil),          // 126: subtraterpc.ListTaskListsResponse
-	(*UnregisterTaskListRequest)(nil),      // 127: subtraterpc.UnregisterTaskListRequest
-	(*UnregisterTaskListResponse)(nil),     // 128: subtraterpc.UnregisterTaskListResponse
-	(*UpsertTaskRequest)(nil),              // 129: subtraterpc.UpsertTaskRequest
-	(*UpsertTaskResponse)(nil),             // 130: subtraterpc.UpsertTaskResponse
-	(*GetTaskProtoRequest)(nil),            // 131: subtraterpc.GetTaskProtoRequest
-	(*GetTaskResponse)(nil),                // 132: subtraterpc.GetTaskResponse
-	(*ListTasksRequest)(nil),               // 133: subtraterpc.ListTasksRequest
-	(*ListTasksResponse)(nil),              // 134: subtraterpc.ListTasksResponse
-	(*UpdateTaskStatusRequest)(nil),        // 135: subtraterpc.UpdateTaskStatusRequest
-	(*UpdateTaskStatusResponse)(nil),       // 136: subtraterpc.UpdateTaskStatusResponse
-	(*UpdateTaskOwnerRequest)(nil),         // 137: subtraterpc.UpdateTaskOwnerRequest
-	(*UpdateTaskOwnerResponse)(nil),        // 138: subtraterpc.UpdateTaskOwnerResponse
-	(*DeleteTaskRequest)(nil),              // 139: subtraterpc.DeleteTaskRequest
-	(*DeleteTaskResponse)(nil),             // 140: subtraterpc.DeleteTaskResponse
-	(*GetTaskStatsRequest)(nil),            // 141: subtraterpc.GetTaskStatsRequest
-	(*GetTaskStatsResponse)(nil),           // 142: subtraterpc.GetTaskStatsResponse
-	(*GetAllAgentTaskStatsRequest)(nil),    // 143: subtraterpc.GetAllAgentTaskStatsRequest
-	(*GetAllAgentTaskStatsResponse)(nil),   // 144: subtraterpc.GetAllAgentTaskStatsResponse
-	(*SyncTaskListRequest)(nil),            // 145: subtraterpc.SyncTaskListRequest
-	(*SyncTaskListResponse)(nil),           // 146: subtraterpc.SyncTaskListResponse
-	(*PruneOldTasksRequest)(nil),           // 147: subtraterpc.PruneOldTasksRequest
-	(*PruneOldTasksResponse)(nil),          // 148: subtraterpc.PruneOldTasksResponse
-	(*PlanReviewProto)(nil),                // 149: subtraterpc.PlanReviewProto
-	(*CreatePlanReviewRequest)(nil),        // 150: subtraterpc.CreatePlanReviewRequest
-	(*GetPlanReviewRequest)(nil),           // 151: subtraterpc.GetPlanReviewRequest
-	(*GetPlanReviewByThreadRequest)(nil),   // 152: subtraterpc.GetPlanReviewByThreadRequest
-	(*GetPlanReviewBySessionRequest)(nil),  // 153: subtraterpc.GetPlanReviewBySessionRequest
-	(*ListPlanReviewsRequest)(nil),         // 154: subtraterpc.ListPlanReviewsRequest
-	(*ListPlanReviewsResponse)(nil),        // 155: subtraterpc.ListPlanReviewsResponse
-	(*UpdatePlanReviewStatusRequest)(nil),  // 156: subtraterpc.UpdatePlanReviewStatusRequest
-	(*DeletePlanReviewRequest)(nil),        // 157: subtraterpc.DeletePlanReviewRequest
-	(*DeletePlanReviewResponse)(nil),       // 158: subtraterpc.DeletePlanReviewResponse
-	(*PlanAnnotationProto)(nil),            // 159: subtraterpc.PlanAnnotationProto
-	(*DiffAnnotationProto)(nil),            // 160: subtraterpc.DiffAnnotationProto
-	(*CreatePlanAnnotationRequest)(nil),    // 161: subtraterpc.CreatePlanAnnotationRequest
-	(*ListPlanAnnotationsRequest)(nil),     // 162: subtraterpc.ListPlanAnnotationsRequest
-	(*ListPlanAnnotationsResponse)(nil),    // 163: subtraterpc.ListPlanAnnotationsResponse
-	(*UpdatePlanAnnotationRequest)(nil),    // 164: subtraterpc.UpdatePlanAnnotationRequest
-	(*DeletePlanAnnotationRequest)(nil),    // 165: subtraterpc.DeletePlanAnnotationRequest
-	(*DeleteAnnotationResponse)(nil),       // 166: subtraterpc.DeleteAnnotationResponse
-	(*CreateDiffAnnotationRequest)(nil),    // 167: subtraterpc.CreateDiffAnnotationRequest
-	(*ListDiffAnnotationsRequest)(nil),     // 168: subtraterpc.ListDiffAnnotationsRequest
-	(*ListDiffAnnotationsResponse)(nil),    // 169: subtraterpc.ListDiffAnnotationsResponse
-	(*UpdateDiffAnnotationRequest)(nil),    // 170: subtraterpc.UpdateDiffAnnotationRequest
-	(*DeleteDiffAnnotationRequest)(nil),    // 171: subtraterpc.DeleteDiffAnnotationRequest
-	nil,                                    // 172: subtraterpc.PollChangesRequest.SinceOffsetsEntry
-	nil,                                    // 173: subtraterpc.PollChangesResponse.NewOffsetsEntry
-	nil,                                    // 174: subtraterpc.SaveIdentityRequest.ConsumerOffsetsEntry
-	(*timestamppb.Timestamp)(nil),          // 175: google.protobuf.Timestamp
+	(*InboxCategoryCounts)(nil),            // 12: subtraterpc.InboxCategoryCounts
+	(*ReadMessageRequest)(nil),             // 13: subtraterpc.ReadMessageRequest
+	(*ReadMessageResponse)(nil),            // 14: subtraterpc.ReadMessageResponse
+	(*ReadThreadRequest)(nil),              // 15: subtraterpc.ReadThreadRequest
+	(*ReadThreadResponse)(nil),             // 16: subtraterpc.ReadThreadResponse
+	(*UpdateStateRequest)(nil),             // 17: subtraterpc.UpdateStateRequest
+	(*UpdateStateResponse)(nil),            // 18: subtraterpc.UpdateStateResponse
+	(*AckMessageRequest)(nil),              // 19: subtraterpc.AckMessageRequest
+	(*AckMessageResponse)(nil),             // 20: subtraterpc.AckMessageResponse
+	(*GetStatusRequest)(nil),               // 21: subtraterpc.GetStatusRequest
+	(*GetStatusResponse)(nil),              // 22: subtraterpc.GetStatusResponse
+	(*PollChangesRequest)(nil),             // 23: subtraterpc.PollChangesRequest
+	(*PollChangesResponse)(nil),            // 24: subtraterpc.PollChangesResponse
+	(*SubscribeInboxRequest)(nil),          // 25: subtraterpc.SubscribeInboxRequest
+	(*PublishRequest)(nil),                 // 26: subtraterpc.PublishRequest
+	(*PublishResponse)(nil),                // 27: subtraterpc.PublishResponse
+	(*SubscribeRequest)(nil),               // 28: subtraterpc.SubscribeRequest
+	(*SubscribeResponse)(nil),              // 29: subtraterpc.SubscribeResponse
+	(*UnsubscribeRequest)(nil),             // 30: subtraterpc.UnsubscribeRequest
+	(*UnsubscribeResponse)(nil),            // 31: subtraterpc.UnsubscribeResponse
+	(*Topic)(nil),                          // 32: subtraterpc.Topic
+	(*ListTopicsRequest)(nil),              // 33: subtraterpc.ListTopicsRequest
+	(*ListTopicsResponse)(nil),             // 34: subtraterpc.ListTopicsResponse
+	(*SearchRequest)(nil),                  // 35: subtraterpc.SearchRequest
+	(*SearchResponse)(nil),                 // 36: subtraterpc.SearchResponse
+	(*HasUnackedStatusToRequest)(nil),      // 37: subtraterpc.HasUnackedStatusToRequest
+	(*HasUnackedStatusToResponse)(nil),     // 38: subtraterpc.HasUnackedStatusToResponse
+	(*RegisterAgentRequest)(nil),           // 39: subtraterpc.RegisterAgentRequest
+	(*RegisterAgentResponse)(nil),          // 40: subtraterpc.RegisterAgentResponse
+	(*GetAgentRequest)(nil),                // 41: subtraterpc.GetAgentRequest
+	(*GetAgentResponse)(nil),               // 42: subtraterpc.GetAgentResponse
+	(*ListAgentsRequest)(nil),              // 43: subtraterpc.ListAgentsRequest
+	(*ListAgentsResponse)(nil),             // 44: subtraterpc.ListAgentsResponse
+	(*EnsureIdentityRequest)(nil),          // 45: subtraterpc.EnsureIdentityRequest
+	(*EnsureIdentityResponse)(nil),         // 46: subtraterpc.EnsureIdentityResponse
+	(*SaveIdentityRequest)(nil),            // 47: subtraterpc.SaveIdentityRequest
+	(*SaveIdentityResponse)(nil),           // 48: subtraterpc.SaveIdentityResponse
+	(*DeleteAgentRequest)(nil),             // 49: subtraterpc.DeleteAgentRequest
+	(*DeleteAgentResponse)(nil),            // 50: subtraterpc.DeleteAgentResponse
+	(*ReplyToThreadRequest)(nil),           // 51: subtraterpc.ReplyToThreadRequest
+	(*ReplyToThreadResponse)(nil),          // 52: subtraterpc.ReplyToThreadResponse
+	(*ArchiveThreadRequest)(nil),           // 53: subtraterpc.ArchiveThreadRequest
+	(*ArchiveThreadResponse)(nil),          // 54: subtraterpc.ArchiveThreadResponse
+	(*DeleteThreadRequest)(nil),            // 55: subtraterpc.DeleteThreadRequest
+	(*DeleteThreadResponse)(nil),           // 56: subtraterpc.DeleteThreadResponse
+	(*MarkThreadUnreadRequest)(nil),        // 57: subtraterpc.MarkThreadUnreadRequest
+	(*MarkThreadUnreadResponse)(nil),       // 58: subtraterpc.MarkThreadUnreadResponse
+	(*GetTopicRequest)(nil),                // 59: subtraterpc.GetTopicRequest
+	(*GetTopicResponse)(nil),               // 60: subtraterpc.GetTopicResponse
+	(*AutocompleteRecipientsRequest)(nil),  // 61: subtraterpc.AutocompleteRecipientsRequest
+	(*AutocompleteRecipient)(nil),          // 62: subtraterpc.AutocompleteRecipient
+	(*AutocompleteRecipientsResponse)(nil), // 63: subtraterpc.AutocompleteRecipientsResponse
+	(*DeleteMessageRequest)(nil),           // 64: subtraterpc.DeleteMessageRequest
+	(*DeleteMessageResponse)(nil),          // 65: subtraterpc.DeleteMessageResponse
+	(*UpdateAgentRequest)(nil),             // 66: subtraterpc.UpdateAgentRequest
+	(*UpdateAgentResponse)(nil),            // 67: subtraterpc.UpdateAgentResponse
+	(*AgentWithStatus)(nil),                // 68: subtraterpc.AgentWithStatus
+	(*AgentStatusCounts)(nil),              // 69: subtraterpc.AgentStatusCounts
+	(*GetAgentsStatusRequest)(nil),         // 70: subtraterpc.GetAgentsStatusRequest
+	(*GetAgentsStatusResponse)(nil),        // 71: subtraterpc.GetAgentsStatusResponse
+	(*DiscoverAgentsRequest)(nil),          // 72: subtraterpc.DiscoverAgentsRequest
+	(*DiscoveredAgent)(nil),                // 73: subtraterpc.DiscoveredAgent
+	(*DiscoverAgentsResponse)(nil),         // 74: subtraterpc.DiscoverAgentsResponse
+	(*HeartbeatRequest)(nil),               // 75: subtraterpc.HeartbeatRequest
+	(*HeartbeatResponse)(nil),              // 76: subtraterpc.HeartbeatResponse
+	(*SessionInfo)(nil),                    // 77: subtraterpc.SessionInfo
+	(*ListSessionsRequest)(nil),            // 78: subtraterpc.ListSessionsRequest
+	(*ListSessionsResponse)(nil),           // 79: subtraterpc.ListSessionsResponse
+	(*GetSessionRequest)(nil),              // 80: subtraterpc.GetSessionRequest
+	(*GetSessionResponse)(nil),             // 81: subtraterpc.GetSessionResponse
+	(*StartSessionRequest)(nil),            // 82: subtraterpc.StartSessionRequest
+	(*StartSessionResponse)(nil),           // 83: subtraterpc.StartSessionResponse
+	(*CompleteSessionRequest)(nil),         // 84: subtraterpc.CompleteSessionRequest
+	(*CompleteSessionResponse)(nil),        // 85: subtraterpc.CompleteSessionResponse
+	(*ActivityInfo)(nil),                   // 86: subtraterpc.ActivityInfo
+	(*ListActivitiesRequest)(nil),          // 87: subtraterpc.ListActivitiesRequest
+	(*ListActivitiesResponse)(nil),         // 88: subtraterpc.ListActivitiesResponse
+	(*DashboardStats)(nil),                 // 89: subtraterpc.DashboardStats
+	(*GetDashboardStatsRequest)(nil),       // 90: subtraterpc.GetDashboardStatsRequest
+	(*GetDashboardStatsResponse)(nil),      // 91: subtraterpc.GetDashboardStatsResponse
+	(*HealthCheckRequest)(nil),             // 92: subtraterpc.HealthCheckRequest
+	(*HealthCheckResponse)(nil),            // 93: subtraterpc.HealthCheckResponse
+	(*BranchTarget)(nil),                   // 94: subtraterpc.BranchTarget
+	(*CommitTarget)(nil),                   // 95: subtraterpc.CommitTarget
+	(*CommitRangeTarget)(nil),              // 96: subtraterpc.CommitRangeTarget
+	(*PRTarget)(nil),                       // 97: subtraterpc.PRTarget
+	(*CreateReviewRequest)(nil),            // 98: subtraterpc.CreateReviewRequest
+	(*CreateReviewResponse)(nil),           // 99: subtraterpc.CreateReviewResponse
+	(*ListReviewsProtoRequest)(nil),        // 100: subtraterpc.ListReviewsProtoRequest
+	(*ListReviewsProtoResponse)(nil),       // 101: subtraterpc.ListReviewsProtoResponse
+	(*ReviewSummaryProto)(nil),             // 102: subtraterpc.ReviewSummaryProto
+	(*GetReviewProtoRequest)(nil),          // 103: subtraterpc.GetReviewProtoRequest
+	(*ReviewDetailResponse)(nil),           // 104: subtraterpc.ReviewDetailResponse
+	(*ReviewIterationProto)(nil),           // 105: subtraterpc.ReviewIterationProto
+	(*ResubmitReviewRequest)(nil),          // 106: subtraterpc.ResubmitReviewRequest
+	(*CancelReviewProtoRequest)(nil),       // 107: subtraterpc.CancelReviewProtoRequest
+	(*CancelReviewProtoResponse)(nil),      // 108: subtraterpc.CancelReviewProtoResponse
+	(*DeleteReviewProtoRequest)(nil),       // 109: subtraterpc.DeleteReviewProtoRequest
+	(*DeleteReviewProtoResponse)(nil),      // 110: subtraterpc.DeleteReviewProtoResponse
+	(*ListReviewIssuesRequest)(nil),        // 111: subtraterpc.ListReviewIssuesRequest
+	(*ListReviewIssuesResponse)(nil),       // 112: subtraterpc.ListReviewIssuesResponse
+	(*ReviewIssueProto)(nil),               // 113: subtraterpc.ReviewIssueProto
+	(*UpdateIssueStatusRequest)(nil),       // 114: subtraterpc.UpdateIssueStatusRequest
+	(*UpdateIssueStatusResponse)(nil),      // 115: subtraterpc.UpdateIssueStatusResponse
+	(*GetReviewDiffRequest)(nil),           // 116: subtraterpc.GetReviewDiffRequest
+	(*GetReviewDiffResponse)(nil),          // 117: subtraterpc.GetReviewDiffResponse
+	(*TaskListProto)(nil),                  // 118: subtraterpc.TaskListProto
+	(*TaskProto)(nil),                      // 119: subtraterpc.TaskProto
+	(*TaskStatsProto)(nil),                 // 120: subtraterpc.TaskStatsProto
+	(*AgentTaskStatsProto)(nil),            // 121: subtraterpc.AgentTaskStatsProto
+	(*RegisterTaskListRequest)(nil),        // 122: subtraterpc.RegisterTaskListRequest
+	(*RegisterTaskListResponse)(nil),       // 123: subtraterpc.RegisterTaskListResponse
+	(*GetTaskListRequest)(nil),             // 124: subtraterpc.GetTaskListRequest
+	(*GetTaskListResponse)(nil),            // 125: subtraterpc.GetTaskListResponse
+	(*ListTaskListsRequest)(nil),           // 126: subtraterpc.ListTaskListsRequest
+	(*ListTaskListsResponse)(nil),          // 127: subtraterpc.ListTaskListsResponse
+	(*UnregisterTaskListRequest)(nil),      // 128: subtraterpc.UnregisterTaskListRequest
+	(*UnregisterTaskListResponse)(nil),     // 129: subtraterpc.UnregisterTaskListResponse
+	(*UpsertTaskRequest)(nil),              // 130: subtraterpc.UpsertTaskRequest
+	(*UpsertTaskResponse)(nil),             // 131: subtraterpc.UpsertTaskResponse
+	(*GetTaskProtoRequest)(nil),            // 132: subtraterpc.GetTaskProtoRequest
+	(*GetTaskResponse)(nil),                // 133: subtraterpc.GetTaskResponse
+	(*ListTasksRequest)(nil),               // 134: subtraterpc.ListTasksRequest
+	(*ListTasksResponse)(nil),              // 135: subtraterpc.ListTasksResponse
+	(*UpdateTaskStatusRequest)(nil),        // 136: subtraterpc.UpdateTaskStatusRequest
+	(*UpdateTaskStatusResponse)(nil),       // 137: subtraterpc.UpdateTaskStatusResponse
+	(*UpdateTaskOwnerRequest)(nil),         // 138: subtraterpc.UpdateTaskOwnerRequest
+	(*UpdateTaskOwnerResponse)(nil),        // 139: subtraterpc.UpdateTaskOwnerResponse
+	(*DeleteTaskRequest)(nil),              // 140: subtraterpc.DeleteTaskRequest
+	(*DeleteTaskResponse)(nil),             // 141: subtraterpc.DeleteTaskResponse
+	(*GetTaskStatsRequest)(nil),            // 142: subtraterpc.GetTaskStatsRequest
+	(*GetTaskStatsResponse)(nil),           // 143: subtraterpc.GetTaskStatsResponse
+	(*GetAllAgentTaskStatsRequest)(nil),    // 144: subtraterpc.GetAllAgentTaskStatsRequest
+	(*GetAllAgentTaskStatsResponse)(nil),   // 145: subtraterpc.GetAllAgentTaskStatsResponse
+	(*SyncTaskListRequest)(nil),            // 146: subtraterpc.SyncTaskListRequest
+	(*SyncTaskListResponse)(nil),           // 147: subtraterpc.SyncTaskListResponse
+	(*PruneOldTasksRequest)(nil),           // 148: subtraterpc.PruneOldTasksRequest
+	(*PruneOldTasksResponse)(nil),          // 149: subtraterpc.PruneOldTasksResponse
+	(*PlanReviewProto)(nil),                // 150: subtraterpc.PlanReviewProto
+	(*CreatePlanReviewRequest)(nil),        // 151: subtraterpc.CreatePlanReviewRequest
+	(*GetPlanReviewRequest)(nil),           // 152: subtraterpc.GetPlanReviewRequest
+	(*GetPlanReviewByThreadRequest)(nil),   // 153: subtraterpc.GetPlanReviewByThreadRequest
+	(*GetPlanReviewBySessionRequest)(nil),  // 154: subtraterpc.GetPlanReviewBySessionRequest
+	(*ListPlanReviewsRequest)(nil),         // 155: subtraterpc.ListPlanReviewsRequest
+	(*ListPlanReviewsResponse)(nil),        // 156: subtraterpc.ListPlanReviewsResponse
+	(*UpdatePlanReviewStatusRequest)(nil),  // 157: subtraterpc.UpdatePlanReviewStatusRequest
+	(*DeletePlanReviewRequest)(nil),        // 158: subtraterpc.DeletePlanReviewRequest
+	(*DeletePlanReviewResponse)(nil),       // 159: subtraterpc.DeletePlanReviewResponse
+	(*PlanAnnotationProto)(nil),            // 160: subtraterpc.PlanAnnotationProto
+	(*DiffAnnotationProto)(nil),            // 161: subtraterpc.DiffAnnotationProto
+	(*CreatePlanAnnotationRequest)(nil),    // 162: subtraterpc.CreatePlanAnnotationRequest
+	(*ListPlanAnnotationsRequest)(nil),     // 163: subtraterpc.ListPlanAnnotationsRequest
+	(*ListPlanAnnotationsResponse)(nil),    // 164: subtraterpc.ListPlanAnnotationsResponse
+	(*UpdatePlanAnnotationRequest)(nil),    // 165: subtraterpc.UpdatePlanAnnotationRequest
+	(*DeletePlanAnnotationRequest)(nil),    // 166: subtraterpc.DeletePlanAnnotationRequest
+	(*DeleteAnnotationResponse)(nil),       // 167: subtraterpc.DeleteAnnotationResponse
+	(*CreateDiffAnnotationRequest)(nil),    // 168: subtraterpc.CreateDiffAnnotationRequest
+	(*ListDiffAnnotationsRequest)(nil),     // 169: subtraterpc.ListDiffAnnotationsRequest
+	(*ListDiffAnnotationsResponse)(nil),    // 170: subtraterpc.ListDiffAnnotationsResponse
+	(*UpdateDiffAnnotationRequest)(nil),    // 171: subtraterpc.UpdateDiffAnnotationRequest
+	(*DeleteDiffAnnotationRequest)(nil),    // 172: subtraterpc.DeleteDiffAnnotationRequest
+	nil,                                    // 173: subtraterpc.PollChangesRequest.SinceOffsetsEntry
+	nil,                                    // 174: subtraterpc.PollChangesResponse.NewOffsetsEntry
+	nil,                                    // 175: subtraterpc.SaveIdentityRequest.ConsumerOffsetsEntry
+	(*timestamppb.Timestamp)(nil),          // 176: google.protobuf.Timestamp
 }
 var file_mail_proto_depIdxs = []int32{
 	0,   // 0: subtraterpc.InboxMessage.priority:type_name -> subtraterpc.Priority
 	1,   // 1: subtraterpc.InboxMessage.state:type_name -> subtraterpc.MessageState
-	175, // 2: subtraterpc.InboxMessage.created_at:type_name -> google.protobuf.Timestamp
-	175, // 3: subtraterpc.InboxMessage.deadline_at:type_name -> google.protobuf.Timestamp
-	175, // 4: subtraterpc.InboxMessage.snoozed_until:type_name -> google.protobuf.Timestamp
-	175, // 5: subtraterpc.InboxMessage.read_at:type_name -> google.protobuf.Timestamp
-	175, // 6: subtraterpc.InboxMessage.acknowledged_at:type_name -> google.protobuf.Timestamp
+	176, // 2: subtraterpc.InboxMessage.created_at:type_name -> google.protobuf.Timestamp
+	176, // 3: subtraterpc.InboxMessage.deadline_at:type_name -> google.protobuf.Timestamp
+	176, // 4: subtraterpc.InboxMessage.snoozed_until:type_name -> google.protobuf.Timestamp
+	176, // 5: subtraterpc.InboxMessage.read_at:type_name -> google.protobuf.Timestamp
+	176, // 6: subtraterpc.InboxMessage.acknowledged_at:type_name -> google.protobuf.Timestamp
 	0,   // 7: subtraterpc.SendMailRequest.priority:type_name -> subtraterpc.Priority
-	175, // 8: subtraterpc.SendMailRequest.deadline_at:type_name -> google.protobuf.Timestamp
+	176, // 8: subtraterpc.SendMailRequest.deadline_at:type_name -> google.protobuf.Timestamp
 	1,   // 9: subtraterpc.FetchInboxRequest.state_filter:type_name -> subtraterpc.MessageState
 	7,   // 10: subtraterpc.FetchInboxResponse.messages:type_name -> subtraterpc.InboxMessage
-	7,   // 11: subtraterpc.ReadMessageResponse.message:type_name -> subtraterpc.InboxMessage
-	7,   // 12: subtraterpc.ReadThreadResponse.messages:type_name -> subtraterpc.InboxMessage
-	1,   // 13: subtraterpc.UpdateStateRequest.new_state:type_name -> subtraterpc.MessageState
-	175, // 14: subtraterpc.UpdateStateRequest.snoozed_until:type_name -> google.protobuf.Timestamp
-	172, // 15: subtraterpc.PollChangesRequest.since_offsets:type_name -> subtraterpc.PollChangesRequest.SinceOffsetsEntry
-	7,   // 16: subtraterpc.PollChangesResponse.new_messages:type_name -> subtraterpc.InboxMessage
-	173, // 17: subtraterpc.PollChangesResponse.new_offsets:type_name -> subtraterpc.PollChangesResponse.NewOffsetsEntry
-	0,   // 18: subtraterpc.PublishRequest.priority:type_name -> subtraterpc.Priority
-	175, // 19: subtraterpc.Topic.created_at:type_name -> google.protobuf.Timestamp
-	31,  // 20: subtraterpc.ListTopicsResponse.topics:type_name -> subtraterpc.Topic
-	7,   // 21: subtraterpc.SearchResponse.results:type_name -> subtraterpc.InboxMessage
-	175, // 22: subtraterpc.GetAgentResponse.created_at:type_name -> google.protobuf.Timestamp
-	175, // 23: subtraterpc.GetAgentResponse.last_active_at:type_name -> google.protobuf.Timestamp
-	41,  // 24: subtraterpc.ListAgentsResponse.agents:type_name -> subtraterpc.GetAgentResponse
-	174, // 25: subtraterpc.SaveIdentityRequest.consumer_offsets:type_name -> subtraterpc.SaveIdentityRequest.ConsumerOffsetsEntry
-	31,  // 26: subtraterpc.GetTopicResponse.topic:type_name -> subtraterpc.Topic
-	61,  // 27: subtraterpc.AutocompleteRecipientsResponse.recipients:type_name -> subtraterpc.AutocompleteRecipient
-	41,  // 28: subtraterpc.UpdateAgentResponse.agent:type_name -> subtraterpc.GetAgentResponse
-	2,   // 29: subtraterpc.AgentWithStatus.status:type_name -> subtraterpc.AgentStatus
-	175, // 30: subtraterpc.AgentWithStatus.last_active_at:type_name -> google.protobuf.Timestamp
-	67,  // 31: subtraterpc.GetAgentsStatusResponse.agents:type_name -> subtraterpc.AgentWithStatus
-	68,  // 32: subtraterpc.GetAgentsStatusResponse.counts:type_name -> subtraterpc.AgentStatusCounts
-	2,   // 33: subtraterpc.DiscoverAgentsRequest.status_filter:type_name -> subtraterpc.AgentStatus
-	2,   // 34: subtraterpc.DiscoveredAgent.status:type_name -> subtraterpc.AgentStatus
-	175, // 35: subtraterpc.DiscoveredAgent.last_active_at:type_name -> google.protobuf.Timestamp
-	72,  // 36: subtraterpc.DiscoverAgentsResponse.agents:type_name -> subtraterpc.DiscoveredAgent
-	68,  // 37: subtraterpc.DiscoverAgentsResponse.counts:type_name -> subtraterpc.AgentStatusCounts
-	175, // 38: subtraterpc.SessionInfo.started_at:type_name -> google.protobuf.Timestamp
-	175, // 39: subtraterpc.SessionInfo.ended_at:type_name -> google.protobuf.Timestamp
-	3,   // 40: subtraterpc.SessionInfo.status:type_name -> subtraterpc.SessionStatus
-	76,  // 41: subtraterpc.ListSessionsResponse.sessions:type_name -> subtraterpc.SessionInfo
-	76,  // 42: subtraterpc.GetSessionResponse.session:type_name -> subtraterpc.SessionInfo
-	76,  // 43: subtraterpc.StartSessionResponse.session:type_name -> subtraterpc.SessionInfo
-	4,   // 44: subtraterpc.ActivityInfo.type:type_name -> subtraterpc.ActivityType
-	175, // 45: subtraterpc.ActivityInfo.created_at:type_name -> google.protobuf.Timestamp
-	4,   // 46: subtraterpc.ListActivitiesRequest.type:type_name -> subtraterpc.ActivityType
-	85,  // 47: subtraterpc.ListActivitiesResponse.activities:type_name -> subtraterpc.ActivityInfo
-	88,  // 48: subtraterpc.GetDashboardStatsResponse.stats:type_name -> subtraterpc.DashboardStats
-	175, // 49: subtraterpc.HealthCheckResponse.time:type_name -> google.protobuf.Timestamp
-	93,  // 50: subtraterpc.CreateReviewRequest.branch_target:type_name -> subtraterpc.BranchTarget
-	94,  // 51: subtraterpc.CreateReviewRequest.commit_target:type_name -> subtraterpc.CommitTarget
-	95,  // 52: subtraterpc.CreateReviewRequest.commit_range_target:type_name -> subtraterpc.CommitRangeTarget
-	96,  // 53: subtraterpc.CreateReviewRequest.pr_target:type_name -> subtraterpc.PRTarget
-	101, // 54: subtraterpc.ListReviewsProtoResponse.reviews:type_name -> subtraterpc.ReviewSummaryProto
-	104, // 55: subtraterpc.ReviewDetailResponse.iteration_details:type_name -> subtraterpc.ReviewIterationProto
-	112, // 56: subtraterpc.ListReviewIssuesResponse.issues:type_name -> subtraterpc.ReviewIssueProto
-	175, // 57: subtraterpc.TaskListProto.created_at:type_name -> google.protobuf.Timestamp
-	175, // 58: subtraterpc.TaskListProto.last_synced_at:type_name -> google.protobuf.Timestamp
-	5,   // 59: subtraterpc.TaskProto.status:type_name -> subtraterpc.TaskStatus
-	175, // 60: subtraterpc.TaskProto.created_at:type_name -> google.protobuf.Timestamp
-	175, // 61: subtraterpc.TaskProto.updated_at:type_name -> google.protobuf.Timestamp
-	175, // 62: subtraterpc.TaskProto.started_at:type_name -> google.protobuf.Timestamp
-	175, // 63: subtraterpc.TaskProto.completed_at:type_name -> google.protobuf.Timestamp
-	117, // 64: subtraterpc.RegisterTaskListResponse.task_list:type_name -> subtraterpc.TaskListProto
-	117, // 65: subtraterpc.GetTaskListResponse.task_list:type_name -> subtraterpc.TaskListProto
-	117, // 66: subtraterpc.ListTaskListsResponse.task_lists:type_name -> subtraterpc.TaskListProto
-	5,   // 67: subtraterpc.UpsertTaskRequest.status:type_name -> subtraterpc.TaskStatus
-	118, // 68: subtraterpc.UpsertTaskResponse.task:type_name -> subtraterpc.TaskProto
-	118, // 69: subtraterpc.GetTaskResponse.task:type_name -> subtraterpc.TaskProto
-	5,   // 70: subtraterpc.ListTasksRequest.status:type_name -> subtraterpc.TaskStatus
-	118, // 71: subtraterpc.ListTasksResponse.tasks:type_name -> subtraterpc.TaskProto
-	5,   // 72: subtraterpc.UpdateTaskStatusRequest.status:type_name -> subtraterpc.TaskStatus
-	175, // 73: subtraterpc.GetTaskStatsRequest.today_since:type_name -> google.protobuf.Timestamp
-	119, // 74: subtraterpc.GetTaskStatsResponse.stats:type_name -> subtraterpc.TaskStatsProto
-	175, // 75: subtraterpc.GetAllAgentTaskStatsRequest.today_since:type_name -> google.protobuf.Timestamp
-	120, // 76: subtraterpc.GetAllAgentTaskStatsResponse.stats:type_name -> subtraterpc.AgentTaskStatsProto
-	175, // 77: subtraterpc.PruneOldTasksRequest.older_than:type_name -> google.protobuf.Timestamp
-	149, // 78: subtraterpc.ListPlanReviewsResponse.plan_reviews:type_name -> subtraterpc.PlanReviewProto
-	159, // 79: subtraterpc.ListPlanAnnotationsResponse.annotations:type_name -> subtraterpc.PlanAnnotationProto
-	160, // 80: subtraterpc.ListDiffAnnotationsResponse.annotations:type_name -> subtraterpc.DiffAnnotationProto
-	8,   // 81: subtraterpc.Mail.SendMail:input_type -> subtraterpc.SendMailRequest
-	10,  // 82: subtraterpc.Mail.FetchInbox:input_type -> subtraterpc.FetchInboxRequest
-	12,  // 83: subtraterpc.Mail.ReadMessage:input_type -> subtraterpc.ReadMessageRequest
-	14,  // 84: subtraterpc.Mail.ReadThread:input_type -> subtraterpc.ReadThreadRequest
-	16,  // 85: subtraterpc.Mail.UpdateState:input_type -> subtraterpc.UpdateStateRequest
-	18,  // 86: subtraterpc.Mail.AckMessage:input_type -> subtraterpc.AckMessageRequest
-	20,  // 87: subtraterpc.Mail.GetStatus:input_type -> subtraterpc.GetStatusRequest
-	22,  // 88: subtraterpc.Mail.PollChanges:input_type -> subtraterpc.PollChangesRequest
-	24,  // 89: subtraterpc.Mail.SubscribeInbox:input_type -> subtraterpc.SubscribeInboxRequest
-	25,  // 90: subtraterpc.Mail.Publish:input_type -> subtraterpc.PublishRequest
-	27,  // 91: subtraterpc.Mail.Subscribe:input_type -> subtraterpc.SubscribeRequest
-	29,  // 92: subtraterpc.Mail.Unsubscribe:input_type -> subtraterpc.UnsubscribeRequest
-	32,  // 93: subtraterpc.Mail.ListTopics:input_type -> subtraterpc.ListTopicsRequest
-	34,  // 94: subtraterpc.Mail.Search:input_type -> subtraterpc.SearchRequest
-	36,  // 95: subtraterpc.Mail.HasUnackedStatusTo:input_type -> subtraterpc.HasUnackedStatusToRequest
-	50,  // 96: subtraterpc.Mail.ReplyToThread:input_type -> subtraterpc.ReplyToThreadRequest
-	52,  // 97: subtraterpc.Mail.ArchiveThread:input_type -> subtraterpc.ArchiveThreadRequest
-	54,  // 98: subtraterpc.Mail.DeleteThread:input_type -> subtraterpc.DeleteThreadRequest
-	56,  // 99: subtraterpc.Mail.MarkThreadUnread:input_type -> subtraterpc.MarkThreadUnreadRequest
-	58,  // 100: subtraterpc.Mail.GetTopic:input_type -> subtraterpc.GetTopicRequest
-	60,  // 101: subtraterpc.Mail.AutocompleteRecipients:input_type -> subtraterpc.AutocompleteRecipientsRequest
-	63,  // 102: subtraterpc.Mail.DeleteMessage:input_type -> subtraterpc.DeleteMessageRequest
-	38,  // 103: subtraterpc.Agent.RegisterAgent:input_type -> subtraterpc.RegisterAgentRequest
-	40,  // 104: subtraterpc.Agent.GetAgent:input_type -> subtraterpc.GetAgentRequest
-	42,  // 105: subtraterpc.Agent.ListAgents:input_type -> subtraterpc.ListAgentsRequest
-	48,  // 106: subtraterpc.Agent.DeleteAgent:input_type -> subtraterpc.DeleteAgentRequest
-	65,  // 107: subtraterpc.Agent.UpdateAgent:input_type -> subtraterpc.UpdateAgentRequest
-	69,  // 108: subtraterpc.Agent.GetAgentsStatus:input_type -> subtraterpc.GetAgentsStatusRequest
-	74,  // 109: subtraterpc.Agent.Heartbeat:input_type -> subtraterpc.HeartbeatRequest
-	44,  // 110: subtraterpc.Agent.EnsureIdentity:input_type -> subtraterpc.EnsureIdentityRequest
-	46,  // 111: subtraterpc.Agent.SaveIdentity:input_type -> subtraterpc.SaveIdentityRequest
-	71,  // 112: subtraterpc.Agent.DiscoverAgents:input_type -> subtraterpc.DiscoverAgentsRequest
-	77,  // 113: subtraterpc.Session.ListSessions:input_type -> subtraterpc.ListSessionsRequest
-	79,  // 114: subtraterpc.Session.GetSession:input_type -> subtraterpc.GetSessionRequest
-	81,  // 115: subtraterpc.Session.StartSession:input_type -> subtraterpc.StartSessionRequest
-	83,  // 116: subtraterpc.Session.CompleteSession:input_type -> subtraterpc.CompleteSessionRequest
-	86,  // 117: subtraterpc.Activity.ListActivities:input_type -> subtraterpc.ListActivitiesRequest
-	89,  // 118: subtraterpc.Stats.GetDashboardStats:input_type -> subtraterpc.GetDashboardStatsRequest
-	91,  // 119: subtraterpc.Stats.HealthCheck:input_type -> subtraterpc.HealthCheckRequest
-	121, // 120: subtraterpc.TaskService.RegisterTaskList:input_type -> subtraterpc.RegisterTaskListRequest
-	123, // 121: subtraterpc.TaskService.GetTaskList:input_type -> subtraterpc.GetTaskListRequest
-	125, // 122: subtraterpc.TaskService.ListTaskLists:input_type -> subtraterpc.ListTaskListsRequest
-	127, // 123: subtraterpc.TaskService.UnregisterTaskList:input_type -> subtraterpc.UnregisterTaskListRequest
-	129, // 124: subtraterpc.TaskService.UpsertTask:input_type -> subtraterpc.UpsertTaskRequest
-	131, // 125: subtraterpc.TaskService.GetTask:input_type -> subtraterpc.GetTaskProtoRequest
-	133, // 126: subtraterpc.TaskService.ListTasks:input_type -> subtraterpc.ListTasksRequest
-	135, // 127: subtraterpc.TaskService.UpdateTaskStatus:input_type -> subtraterpc.UpdateTaskStatusRequest
-	137, // 128: subtraterpc.TaskService.UpdateTaskOwner:input_type -> subtraterpc.UpdateTaskOwnerRequest
-	139, // 129: subtraterpc.TaskService.DeleteTask:input_type -> subtraterpc.DeleteTaskRequest
-	141, // 130: subtraterpc.TaskService.GetTaskStats:input_type -> subtraterpc.GetTaskStatsRequest
-	143, // 131: subtraterpc.TaskService.GetAllAgentTaskStats:input_type -> subtraterpc.GetAllAgentTaskStatsRequest
-	145, // 132: subtraterpc.TaskService.SyncTaskList:input_type -> subtraterpc.SyncTaskListRequest
-	147, // 133: subtraterpc.TaskService.PruneOldTasks:input_type -> subtraterpc.PruneOldTasksRequest
-	97,  // 134: subtraterpc.ReviewService.CreateReview:input_type -> subtraterpc.CreateReviewRequest
-	99,  // 135: subtraterpc.ReviewService.ListReviews:input_type -> subtraterpc.ListReviewsProtoRequest
-	102, // 136: subtraterpc.ReviewService.GetReview:input_type -> subtraterpc.GetReviewProtoRequest
-	105, // 137: subtraterpc.ReviewService.ResubmitReview:input_type -> subtraterpc.ResubmitReviewRequest
-	106, // 138: subtraterpc.ReviewService.CancelReview:input_type -> subtraterpc.CancelReviewProtoRequest
-	108, // 139: subtraterpc.ReviewService.DeleteReview:input_type -> subtraterpc.DeleteReviewProtoRequest
-	110, // 140: subtraterpc.ReviewService.ListReviewIssues:input_type -> subtraterpc.ListReviewIssuesRequest
-	113, // 141: subtraterpc.ReviewService.UpdateIssueStatus:input_type -> subtraterpc.UpdateIssueStatusRequest
-	115, // 142: subtraterpc.ReviewService.GetReviewDiff:input_type -> subtraterpc.GetReviewDiffRequest
-	150, // 143: subtraterpc.PlanReviewService.CreatePlanReview:input_type -> subtraterpc.CreatePlanReviewRequest
-	151, // 144: subtraterpc.PlanReviewService.GetPlanReview:input_type -> subtraterpc.GetPlanReviewRequest
-	152, // 145: subtraterpc.PlanReviewService.GetPlanReviewByThread:input_type -> subtraterpc.GetPlanReviewByThreadRequest
-	153, // 146: subtraterpc.PlanReviewService.GetPlanReviewBySession:input_type -> subtraterpc.GetPlanReviewBySessionRequest
-	154, // 147: subtraterpc.PlanReviewService.ListPlanReviews:input_type -> subtraterpc.ListPlanReviewsRequest
-	156, // 148: subtraterpc.PlanReviewService.UpdatePlanReviewStatus:input_type -> subtraterpc.UpdatePlanReviewStatusRequest
-	157, // 149: subtraterpc.PlanReviewService.DeletePlanReview:input_type -> subtraterpc.DeletePlanReviewRequest
-	161, // 150: subtraterpc.AnnotationService.CreatePlanAnnotation:input_type -> subtraterpc.CreatePlanAnnotationRequest
-	162, // 151: subtraterpc.AnnotationService.ListPlanAnnotations:input_type -> subtraterpc.ListPlanAnnotationsRequest
-	164, // 152: subtraterpc.AnnotationService.UpdatePlanAnnotation:input_type -> subtraterpc.UpdatePlanAnnotationRequest
-	165, // 153: subtraterpc.AnnotationService.DeletePlanAnnotation:input_type -> subtraterpc.DeletePlanAnnotationRequest
-	167, // 154: subtraterpc.AnnotationService.CreateDiffAnnotation:input_type -> subtraterpc.CreateDiffAnnotationRequest
-	168, // 155: subtraterpc.AnnotationService.ListDiffAnnotations:input_type -> subtraterpc.ListDiffAnnotationsRequest
-	170, // 156: subtraterpc.AnnotationService.UpdateDiffAnnotation:input_type -> subtraterpc.UpdateDiffAnnotationRequest
-	171, // 157: subtraterpc.AnnotationService.DeleteDiffAnnotation:input_type -> subtraterpc.DeleteDiffAnnotationRequest
-	9,   // 158: subtraterpc.Mail.SendMail:output_type -> subtraterpc.SendMailResponse
-	11,  // 159: subtraterpc.Mail.FetchInbox:output_type -> subtraterpc.FetchInboxResponse
-	13,  // 160: subtraterpc.Mail.ReadMessage:output_type -> subtraterpc.ReadMessageResponse
-	15,  // 161: subtraterpc.Mail.ReadThread:output_type -> subtraterpc.ReadThreadResponse
-	17,  // 162: subtraterpc.Mail.UpdateState:output_type -> subtraterpc.UpdateStateResponse
-	19,  // 163: subtraterpc.Mail.AckMessage:output_type -> subtraterpc.AckMessageResponse
-	21,  // 164: subtraterpc.Mail.GetStatus:output_type -> subtraterpc.GetStatusResponse
-	23,  // 165: subtraterpc.Mail.PollChanges:output_type -> subtraterpc.PollChangesResponse
-	7,   // 166: subtraterpc.Mail.SubscribeInbox:output_type -> subtraterpc.InboxMessage
-	26,  // 167: subtraterpc.Mail.Publish:output_type -> subtraterpc.PublishResponse
-	28,  // 168: subtraterpc.Mail.Subscribe:output_type -> subtraterpc.SubscribeResponse
-	30,  // 169: subtraterpc.Mail.Unsubscribe:output_type -> subtraterpc.UnsubscribeResponse
-	33,  // 170: subtraterpc.Mail.ListTopics:output_type -> subtraterpc.ListTopicsResponse
-	35,  // 171: subtraterpc.Mail.Search:output_type -> subtraterpc.SearchResponse
-	37,  // 172: subtraterpc.Mail.HasUnackedStatusTo:output_type -> subtraterpc.HasUnackedStatusToResponse
-	51,  // 173: subtraterpc.Mail.ReplyToThread:output_type -> subtraterpc.ReplyToThreadResponse
-	53,  // 174: subtraterpc.Mail.ArchiveThread:output_type -> subtraterpc.ArchiveThreadResponse
-	55,  // 175: subtraterpc.Mail.DeleteThread:output_type -> subtraterpc.DeleteThreadResponse
-	57,  // 176: subtraterpc.Mail.MarkThreadUnread:output_type -> subtraterpc.MarkThreadUnreadResponse
-	59,  // 177: subtraterpc.Mail.GetTopic:output_type -> subtraterpc.GetTopicResponse
-	62,  // 178: subtraterpc.Mail.AutocompleteRecipients:output_type -> subtraterpc.AutocompleteRecipientsResponse
-	64,  // 179: subtraterpc.Mail.DeleteMessage:output_type -> subtraterpc.DeleteMessageResponse
-	39,  // 180: subtraterpc.Agent.RegisterAgent:output_type -> subtraterpc.RegisterAgentResponse
-	41,  // 181: subtraterpc.Agent.GetAgent:output_type -> subtraterpc.GetAgentResponse
-	43,  // 182: subtraterpc.Agent.ListAgents:output_type -> subtraterpc.ListAgentsResponse
-	49,  // 183: subtraterpc.Agent.DeleteAgent:output_type -> subtraterpc.DeleteAgentResponse
-	66,  // 184: subtraterpc.Agent.UpdateAgent:output_type -> subtraterpc.UpdateAgentResponse
-	70,  // 185: subtraterpc.Agent.GetAgentsStatus:output_type -> subtraterpc.GetAgentsStatusResponse
-	75,  // 186: subtraterpc.Agent.Heartbeat:output_type -> subtraterpc.HeartbeatResponse
-	45,  // 187: subtraterpc.Agent.EnsureIdentity:output_type -> subtraterpc.EnsureIdentityResponse
-	47,  // 188: subtraterpc.Agent.SaveIdentity:output_type -> subtraterpc.SaveIdentityResponse
-	73,  // 189: subtraterpc.Agent.DiscoverAgents:output_type -> subtraterpc.DiscoverAgentsResponse
-	78,  // 190: subtraterpc.Session.ListSessions:output_type -> subtraterpc.ListSessionsResponse
-	80,  // 191: subtraterpc.Session.GetSession:output_type -> subtraterpc.GetSessionResponse
-	82,  // 192: subtraterpc.Session.StartSession:output_type -> subtraterpc.StartSessionResponse
-	84,  // 193: subtraterpc.Session.CompleteSession:output_type -> subtraterpc.CompleteSessionResponse
-	87,  // 194: subtraterpc.Activity.ListActivities:output_type -> subtraterpc.ListActivitiesResponse
-	90,  // 195: subtraterpc.Stats.GetDashboardStats:output_type -> subtraterpc.GetDashboardStatsResponse
-	92,  // 196: subtraterpc.Stats.HealthCheck:output_type -> subtraterpc.HealthCheckResponse
-	122, // 197: subtraterpc.TaskService.RegisterTaskList:output_type -> subtraterpc.RegisterTaskListResponse
-	124, // 198: subtraterpc.TaskService.GetTaskList:output_type -> subtraterpc.GetTaskListResponse
-	126, // 199: subtraterpc.TaskService.ListTaskLists:output_type -> subtraterpc.ListTaskListsResponse
-	128, // 200: subtraterpc.TaskService.UnregisterTaskList:output_type -> subtraterpc.UnregisterTaskListResponse
-	130, // 201: subtraterpc.TaskService.UpsertTask:output_type -> subtraterpc.UpsertTaskResponse
-	132, // 202: subtraterpc.TaskService.GetTask:output_type -> subtraterpc.GetTaskResponse
-	134, // 203: subtraterpc.TaskService.ListTasks:output_type -> subtraterpc.ListTasksResponse
-	136, // 204: subtraterpc.TaskService.UpdateTaskStatus:output_type -> subtraterpc.UpdateTaskStatusResponse
-	138, // 205: subtraterpc.TaskService.UpdateTaskOwner:output_type -> subtraterpc.UpdateTaskOwnerResponse
-	140, // 206: subtraterpc.TaskService.DeleteTask:output_type -> subtraterpc.DeleteTaskResponse
-	142, // 207: subtraterpc.TaskService.GetTaskStats:output_type -> subtraterpc.GetTaskStatsResponse
-	144, // 208: subtraterpc.TaskService.GetAllAgentTaskStats:output_type -> subtraterpc.GetAllAgentTaskStatsResponse
-	146, // 209: subtraterpc.TaskService.SyncTaskList:output_type -> subtraterpc.SyncTaskListResponse
-	148, // 210: subtraterpc.TaskService.PruneOldTasks:output_type -> subtraterpc.PruneOldTasksResponse
-	98,  // 211: subtraterpc.ReviewService.CreateReview:output_type -> subtraterpc.CreateReviewResponse
-	100, // 212: subtraterpc.ReviewService.ListReviews:output_type -> subtraterpc.ListReviewsProtoResponse
-	103, // 213: subtraterpc.ReviewService.GetReview:output_type -> subtraterpc.ReviewDetailResponse
-	98,  // 214: subtraterpc.ReviewService.ResubmitReview:output_type -> subtraterpc.CreateReviewResponse
-	107, // 215: subtraterpc.ReviewService.CancelReview:output_type -> subtraterpc.CancelReviewProtoResponse
-	109, // 216: subtraterpc.ReviewService.DeleteReview:output_type -> subtraterpc.DeleteReviewProtoResponse
-	111, // 217: subtraterpc.ReviewService.ListReviewIssues:output_type -> subtraterpc.ListReviewIssuesResponse
-	114, // 218: subtraterpc.ReviewService.UpdateIssueStatus:output_type -> subtraterpc.UpdateIssueStatusResponse
-	116, // 219: subtraterpc.ReviewService.GetReviewDiff:output_type -> subtraterpc.GetReviewDiffResponse
-	149, // 220: subtraterpc.PlanReviewService.CreatePlanReview:output_type -> subtraterpc.PlanReviewProto
-	149, // 221: subtraterpc.PlanReviewService.GetPlanReview:output_type -> subtraterpc.PlanReviewProto
-	149, // 222: subtraterpc.PlanReviewService.GetPlanReviewByThread:output_type -> subtraterpc.PlanReviewProto
-	149, // 223: subtraterpc.PlanReviewService.GetPlanReviewBySession:output_type -> subtraterpc.PlanReviewProto
-	155, // 224: subtraterpc.PlanReviewService.ListPlanReviews:output_type -> subtraterpc.ListPlanReviewsResponse
-	149, // 225: subtraterpc.PlanReviewService.UpdatePlanReviewStatus:output_type -> subtraterpc.PlanReviewProto
-	158, // 226: subtraterpc.PlanReviewService.DeletePlanReview:output_type -> subtraterpc.DeletePlanReviewResponse
-	159, // 227: subtraterpc.AnnotationService.CreatePlanAnnotation:output_type -> subtraterpc.PlanAnnotationProto
-	163, // 228: subtraterpc.AnnotationService.ListPlanAnnotations:output_type -> subtraterpc.ListPlanAnnotationsResponse
-	159, // 229: subtraterpc.AnnotationService.UpdatePlanAnnotation:output_type -> subtraterpc.PlanAnnotationProto
-	166, // 230: subtraterpc.AnnotationService.DeletePlanAnnotation:output_type -> subtraterpc.DeleteAnnotationResponse
-	160, // 231: subtraterpc.AnnotationService.CreateDiffAnnotation:output_type -> subtraterpc.DiffAnnotationProto
-	169, // 232: subtraterpc.AnnotationService.ListDiffAnnotations:output_type -> subtraterpc.ListDiffAnnotationsResponse
-	160, // 233: subtraterpc.AnnotationService.UpdateDiffAnnotation:output_type -> subtraterpc.DiffAnnotationProto
-	166, // 234: subtraterpc.AnnotationService.DeleteDiffAnnotation:output_type -> subtraterpc.DeleteAnnotationResponse
-	158, // [158:235] is the sub-list for method output_type
-	81,  // [81:158] is the sub-list for method input_type
-	81,  // [81:81] is the sub-list for extension type_name
-	81,  // [81:81] is the sub-list for extension extendee
-	0,   // [0:81] is the sub-list for field type_name
+	12,  // 11: subtraterpc.FetchInboxResponse.category_counts:type_name -> subtraterpc.InboxCategoryCounts
+	7,   // 12: subtraterpc.ReadMessageResponse.message:type_name -> subtraterpc.InboxMessage
+	7,   // 13: subtraterpc.ReadThreadResponse.messages:type_name -> subtraterpc.InboxMessage
+	1,   // 14: subtraterpc.UpdateStateRequest.new_state:type_name -> subtraterpc.MessageState
+	176, // 15: subtraterpc.UpdateStateRequest.snoozed_until:type_name -> google.protobuf.Timestamp
+	173, // 16: subtraterpc.PollChangesRequest.since_offsets:type_name -> subtraterpc.PollChangesRequest.SinceOffsetsEntry
+	7,   // 17: subtraterpc.PollChangesResponse.new_messages:type_name -> subtraterpc.InboxMessage
+	174, // 18: subtraterpc.PollChangesResponse.new_offsets:type_name -> subtraterpc.PollChangesResponse.NewOffsetsEntry
+	0,   // 19: subtraterpc.PublishRequest.priority:type_name -> subtraterpc.Priority
+	176, // 20: subtraterpc.Topic.created_at:type_name -> google.protobuf.Timestamp
+	32,  // 21: subtraterpc.ListTopicsResponse.topics:type_name -> subtraterpc.Topic
+	7,   // 22: subtraterpc.SearchResponse.results:type_name -> subtraterpc.InboxMessage
+	176, // 23: subtraterpc.GetAgentResponse.created_at:type_name -> google.protobuf.Timestamp
+	176, // 24: subtraterpc.GetAgentResponse.last_active_at:type_name -> google.protobuf.Timestamp
+	42,  // 25: subtraterpc.ListAgentsResponse.agents:type_name -> subtraterpc.GetAgentResponse
+	175, // 26: subtraterpc.SaveIdentityRequest.consumer_offsets:type_name -> subtraterpc.SaveIdentityRequest.ConsumerOffsetsEntry
+	32,  // 27: subtraterpc.GetTopicResponse.topic:type_name -> subtraterpc.Topic
+	62,  // 28: subtraterpc.AutocompleteRecipientsResponse.recipients:type_name -> subtraterpc.AutocompleteRecipient
+	42,  // 29: subtraterpc.UpdateAgentResponse.agent:type_name -> subtraterpc.GetAgentResponse
+	2,   // 30: subtraterpc.AgentWithStatus.status:type_name -> subtraterpc.AgentStatus
+	176, // 31: subtraterpc.AgentWithStatus.last_active_at:type_name -> google.protobuf.Timestamp
+	68,  // 32: subtraterpc.GetAgentsStatusResponse.agents:type_name -> subtraterpc.AgentWithStatus
+	69,  // 33: subtraterpc.GetAgentsStatusResponse.counts:type_name -> subtraterpc.AgentStatusCounts
+	2,   // 34: subtraterpc.DiscoverAgentsRequest.status_filter:type_name -> subtraterpc.AgentStatus
+	2,   // 35: subtraterpc.DiscoveredAgent.status:type_name -> subtraterpc.AgentStatus
+	176, // 36: subtraterpc.DiscoveredAgent.last_active_at:type_name -> google.protobuf.Timestamp
+	73,  // 37: subtraterpc.DiscoverAgentsResponse.agents:type_name -> subtraterpc.DiscoveredAgent
+	69,  // 38: subtraterpc.DiscoverAgentsResponse.counts:type_name -> subtraterpc.AgentStatusCounts
+	176, // 39: subtraterpc.SessionInfo.started_at:type_name -> google.protobuf.Timestamp
+	176, // 40: subtraterpc.SessionInfo.ended_at:type_name -> google.protobuf.Timestamp
+	3,   // 41: subtraterpc.SessionInfo.status:type_name -> subtraterpc.SessionStatus
+	77,  // 42: subtraterpc.ListSessionsResponse.sessions:type_name -> subtraterpc.SessionInfo
+	77,  // 43: subtraterpc.GetSessionResponse.session:type_name -> subtraterpc.SessionInfo
+	77,  // 44: subtraterpc.StartSessionResponse.session:type_name -> subtraterpc.SessionInfo
+	4,   // 45: subtraterpc.ActivityInfo.type:type_name -> subtraterpc.ActivityType
+	176, // 46: subtraterpc.ActivityInfo.created_at:type_name -> google.protobuf.Timestamp
+	4,   // 47: subtraterpc.ListActivitiesRequest.type:type_name -> subtraterpc.ActivityType
+	86,  // 48: subtraterpc.ListActivitiesResponse.activities:type_name -> subtraterpc.ActivityInfo
+	89,  // 49: subtraterpc.GetDashboardStatsResponse.stats:type_name -> subtraterpc.DashboardStats
+	176, // 50: subtraterpc.HealthCheckResponse.time:type_name -> google.protobuf.Timestamp
+	94,  // 51: subtraterpc.CreateReviewRequest.branch_target:type_name -> subtraterpc.BranchTarget
+	95,  // 52: subtraterpc.CreateReviewRequest.commit_target:type_name -> subtraterpc.CommitTarget
+	96,  // 53: subtraterpc.CreateReviewRequest.commit_range_target:type_name -> subtraterpc.CommitRangeTarget
+	97,  // 54: subtraterpc.CreateReviewRequest.pr_target:type_name -> subtraterpc.PRTarget
+	102, // 55: subtraterpc.ListReviewsProtoResponse.reviews:type_name -> subtraterpc.ReviewSummaryProto
+	105, // 56: subtraterpc.ReviewDetailResponse.iteration_details:type_name -> subtraterpc.ReviewIterationProto
+	113, // 57: subtraterpc.ListReviewIssuesResponse.issues:type_name -> subtraterpc.ReviewIssueProto
+	176, // 58: subtraterpc.TaskListProto.created_at:type_name -> google.protobuf.Timestamp
+	176, // 59: subtraterpc.TaskListProto.last_synced_at:type_name -> google.protobuf.Timestamp
+	5,   // 60: subtraterpc.TaskProto.status:type_name -> subtraterpc.TaskStatus
+	176, // 61: subtraterpc.TaskProto.created_at:type_name -> google.protobuf.Timestamp
+	176, // 62: subtraterpc.TaskProto.updated_at:type_name -> google.protobuf.Timestamp
+	176, // 63: subtraterpc.TaskProto.started_at:type_name -> google.protobuf.Timestamp
+	176, // 64: subtraterpc.TaskProto.completed_at:type_name -> google.protobuf.Timestamp
+	118, // 65: subtraterpc.RegisterTaskListResponse.task_list:type_name -> subtraterpc.TaskListProto
+	118, // 66: subtraterpc.GetTaskListResponse.task_list:type_name -> subtraterpc.TaskListProto
+	118, // 67: subtraterpc.ListTaskListsResponse.task_lists:type_name -> subtraterpc.TaskListProto
+	5,   // 68: subtraterpc.UpsertTaskRequest.status:type_name -> subtraterpc.TaskStatus
+	119, // 69: subtraterpc.UpsertTaskResponse.task:type_name -> subtraterpc.TaskProto
+	119, // 70: subtraterpc.GetTaskResponse.task:type_name -> subtraterpc.TaskProto
+	5,   // 71: subtraterpc.ListTasksRequest.status:type_name -> subtraterpc.TaskStatus
+	119, // 72: subtraterpc.ListTasksResponse.tasks:type_name -> subtraterpc.TaskProto
+	5,   // 73: subtraterpc.UpdateTaskStatusRequest.status:type_name -> subtraterpc.TaskStatus
+	176, // 74: subtraterpc.GetTaskStatsRequest.today_since:type_name -> google.protobuf.Timestamp
+	120, // 75: subtraterpc.GetTaskStatsResponse.stats:type_name -> subtraterpc.TaskStatsProto
+	176, // 76: subtraterpc.GetAllAgentTaskStatsRequest.today_since:type_name -> google.protobuf.Timestamp
+	121, // 77: subtraterpc.GetAllAgentTaskStatsResponse.stats:type_name -> subtraterpc.AgentTaskStatsProto
+	176, // 78: subtraterpc.PruneOldTasksRequest.older_than:type_name -> google.protobuf.Timestamp
+	150, // 79: subtraterpc.ListPlanReviewsResponse.plan_reviews:type_name -> subtraterpc.PlanReviewProto
+	160, // 80: subtraterpc.ListPlanAnnotationsResponse.annotations:type_name -> subtraterpc.PlanAnnotationProto
+	161, // 81: subtraterpc.ListDiffAnnotationsResponse.annotations:type_name -> subtraterpc.DiffAnnotationProto
+	8,   // 82: subtraterpc.Mail.SendMail:input_type -> subtraterpc.SendMailRequest
+	10,  // 83: subtraterpc.Mail.FetchInbox:input_type -> subtraterpc.FetchInboxRequest
+	13,  // 84: subtraterpc.Mail.ReadMessage:input_type -> subtraterpc.ReadMessageRequest
+	15,  // 85: subtraterpc.Mail.ReadThread:input_type -> subtraterpc.ReadThreadRequest
+	17,  // 86: subtraterpc.Mail.UpdateState:input_type -> subtraterpc.UpdateStateRequest
+	19,  // 87: subtraterpc.Mail.AckMessage:input_type -> subtraterpc.AckMessageRequest
+	21,  // 88: subtraterpc.Mail.GetStatus:input_type -> subtraterpc.GetStatusRequest
+	23,  // 89: subtraterpc.Mail.PollChanges:input_type -> subtraterpc.PollChangesRequest
+	25,  // 90: subtraterpc.Mail.SubscribeInbox:input_type -> subtraterpc.SubscribeInboxRequest
+	26,  // 91: subtraterpc.Mail.Publish:input_type -> subtraterpc.PublishRequest
+	28,  // 92: subtraterpc.Mail.Subscribe:input_type -> subtraterpc.SubscribeRequest
+	30,  // 93: subtraterpc.Mail.Unsubscribe:input_type -> subtraterpc.UnsubscribeRequest
+	33,  // 94: subtraterpc.Mail.ListTopics:input_type -> subtraterpc.ListTopicsRequest
+	35,  // 95: subtraterpc.Mail.Search:input_type -> subtraterpc.SearchRequest
+	37,  // 96: subtraterpc.Mail.HasUnackedStatusTo:input_type -> subtraterpc.HasUnackedStatusToRequest
+	51,  // 97: subtraterpc.Mail.ReplyToThread:input_type -> subtraterpc.ReplyToThreadRequest
+	53,  // 98: subtraterpc.Mail.ArchiveThread:input_type -> subtraterpc.ArchiveThreadRequest
+	55,  // 99: subtraterpc.Mail.DeleteThread:input_type -> subtraterpc.DeleteThreadRequest
+	57,  // 100: subtraterpc.Mail.MarkThreadUnread:input_type -> subtraterpc.MarkThreadUnreadRequest
+	59,  // 101: subtraterpc.Mail.GetTopic:input_type -> subtraterpc.GetTopicRequest
+	61,  // 102: subtraterpc.Mail.AutocompleteRecipients:input_type -> subtraterpc.AutocompleteRecipientsRequest
+	64,  // 103: subtraterpc.Mail.DeleteMessage:input_type -> subtraterpc.DeleteMessageRequest
+	39,  // 104: subtraterpc.Agent.RegisterAgent:input_type -> subtraterpc.RegisterAgentRequest
+	41,  // 105: subtraterpc.Agent.GetAgent:input_type -> subtraterpc.GetAgentRequest
+	43,  // 106: subtraterpc.Agent.ListAgents:input_type -> subtraterpc.ListAgentsRequest
+	49,  // 107: subtraterpc.Agent.DeleteAgent:input_type -> subtraterpc.DeleteAgentRequest
+	66,  // 108: subtraterpc.Agent.UpdateAgent:input_type -> subtraterpc.UpdateAgentRequest
+	70,  // 109: subtraterpc.Agent.GetAgentsStatus:input_type -> subtraterpc.GetAgentsStatusRequest
+	75,  // 110: subtraterpc.Agent.Heartbeat:input_type -> subtraterpc.HeartbeatRequest
+	45,  // 111: subtraterpc.Agent.EnsureIdentity:input_type -> subtraterpc.EnsureIdentityRequest
+	47,  // 112: subtraterpc.Agent.SaveIdentity:input_type -> subtraterpc.SaveIdentityRequest
+	72,  // 113: subtraterpc.Agent.DiscoverAgents:input_type -> subtraterpc.DiscoverAgentsRequest
+	78,  // 114: subtraterpc.Session.ListSessions:input_type -> subtraterpc.ListSessionsRequest
+	80,  // 115: subtraterpc.Session.GetSession:input_type -> subtraterpc.GetSessionRequest
+	82,  // 116: subtraterpc.Session.StartSession:input_type -> subtraterpc.StartSessionRequest
+	84,  // 117: subtraterpc.Session.CompleteSession:input_type -> subtraterpc.CompleteSessionRequest
+	87,  // 118: subtraterpc.Activity.ListActivities:input_type -> subtraterpc.ListActivitiesRequest
+	90,  // 119: subtraterpc.Stats.GetDashboardStats:input_type -> subtraterpc.GetDashboardStatsRequest
+	92,  // 120: subtraterpc.Stats.HealthCheck:input_type -> subtraterpc.HealthCheckRequest
+	122, // 121: subtraterpc.TaskService.RegisterTaskList:input_type -> subtraterpc.RegisterTaskListRequest
+	124, // 122: subtraterpc.TaskService.GetTaskList:input_type -> subtraterpc.GetTaskListRequest
+	126, // 123: subtraterpc.TaskService.ListTaskLists:input_type -> subtraterpc.ListTaskListsRequest
+	128, // 124: subtraterpc.TaskService.UnregisterTaskList:input_type -> subtraterpc.UnregisterTaskListRequest
+	130, // 125: subtraterpc.TaskService.UpsertTask:input_type -> subtraterpc.UpsertTaskRequest
+	132, // 126: subtraterpc.TaskService.GetTask:input_type -> subtraterpc.GetTaskProtoRequest
+	134, // 127: subtraterpc.TaskService.ListTasks:input_type -> subtraterpc.ListTasksRequest
+	136, // 128: subtraterpc.TaskService.UpdateTaskStatus:input_type -> subtraterpc.UpdateTaskStatusRequest
+	138, // 129: subtraterpc.TaskService.UpdateTaskOwner:input_type -> subtraterpc.UpdateTaskOwnerRequest
+	140, // 130: subtraterpc.TaskService.DeleteTask:input_type -> subtraterpc.DeleteTaskRequest
+	142, // 131: subtraterpc.TaskService.GetTaskStats:input_type -> subtraterpc.GetTaskStatsRequest
+	144, // 132: subtraterpc.TaskService.GetAllAgentTaskStats:input_type -> subtraterpc.GetAllAgentTaskStatsRequest
+	146, // 133: subtraterpc.TaskService.SyncTaskList:input_type -> subtraterpc.SyncTaskListRequest
+	148, // 134: subtraterpc.TaskService.PruneOldTasks:input_type -> subtraterpc.PruneOldTasksRequest
+	98,  // 135: subtraterpc.ReviewService.CreateReview:input_type -> subtraterpc.CreateReviewRequest
+	100, // 136: subtraterpc.ReviewService.ListReviews:input_type -> subtraterpc.ListReviewsProtoRequest
+	103, // 137: subtraterpc.ReviewService.GetReview:input_type -> subtraterpc.GetReviewProtoRequest
+	106, // 138: subtraterpc.ReviewService.ResubmitReview:input_type -> subtraterpc.ResubmitReviewRequest
+	107, // 139: subtraterpc.ReviewService.CancelReview:input_type -> subtraterpc.CancelReviewProtoRequest
+	109, // 140: subtraterpc.ReviewService.DeleteReview:input_type -> subtraterpc.DeleteReviewProtoRequest
+	111, // 141: subtraterpc.ReviewService.ListReviewIssues:input_type -> subtraterpc.ListReviewIssuesRequest
+	114, // 142: subtraterpc.ReviewService.UpdateIssueStatus:input_type -> subtraterpc.UpdateIssueStatusRequest
+	116, // 143: subtraterpc.ReviewService.GetReviewDiff:input_type -> subtraterpc.GetReviewDiffRequest
+	151, // 144: subtraterpc.PlanReviewService.CreatePlanReview:input_type -> subtraterpc.CreatePlanReviewRequest
+	152, // 145: subtraterpc.PlanReviewService.GetPlanReview:input_type -> subtraterpc.GetPlanReviewRequest
+	153, // 146: subtraterpc.PlanReviewService.GetPlanReviewByThread:input_type -> subtraterpc.GetPlanReviewByThreadRequest
+	154, // 147: subtraterpc.PlanReviewService.GetPlanReviewBySession:input_type -> subtraterpc.GetPlanReviewBySessionRequest
+	155, // 148: subtraterpc.PlanReviewService.ListPlanReviews:input_type -> subtraterpc.ListPlanReviewsRequest
+	157, // 149: subtraterpc.PlanReviewService.UpdatePlanReviewStatus:input_type -> subtraterpc.UpdatePlanReviewStatusRequest
+	158, // 150: subtraterpc.PlanReviewService.DeletePlanReview:input_type -> subtraterpc.DeletePlanReviewRequest
+	162, // 151: subtraterpc.AnnotationService.CreatePlanAnnotation:input_type -> subtraterpc.CreatePlanAnnotationRequest
+	163, // 152: subtraterpc.AnnotationService.ListPlanAnnotations:input_type -> subtraterpc.ListPlanAnnotationsRequest
+	165, // 153: subtraterpc.AnnotationService.UpdatePlanAnnotation:input_type -> subtraterpc.UpdatePlanAnnotationRequest
+	166, // 154: subtraterpc.AnnotationService.DeletePlanAnnotation:input_type -> subtraterpc.DeletePlanAnnotationRequest
+	168, // 155: subtraterpc.AnnotationService.CreateDiffAnnotation:input_type -> subtraterpc.CreateDiffAnnotationRequest
+	169, // 156: subtraterpc.AnnotationService.ListDiffAnnotations:input_type -> subtraterpc.ListDiffAnnotationsRequest
+	171, // 157: subtraterpc.AnnotationService.UpdateDiffAnnotation:input_type -> subtraterpc.UpdateDiffAnnotationRequest
+	172, // 158: subtraterpc.AnnotationService.DeleteDiffAnnotation:input_type -> subtraterpc.DeleteDiffAnnotationRequest
+	9,   // 159: subtraterpc.Mail.SendMail:output_type -> subtraterpc.SendMailResponse
+	11,  // 160: subtraterpc.Mail.FetchInbox:output_type -> subtraterpc.FetchInboxResponse
+	14,  // 161: subtraterpc.Mail.ReadMessage:output_type -> subtraterpc.ReadMessageResponse
+	16,  // 162: subtraterpc.Mail.ReadThread:output_type -> subtraterpc.ReadThreadResponse
+	18,  // 163: subtraterpc.Mail.UpdateState:output_type -> subtraterpc.UpdateStateResponse
+	20,  // 164: subtraterpc.Mail.AckMessage:output_type -> subtraterpc.AckMessageResponse
+	22,  // 165: subtraterpc.Mail.GetStatus:output_type -> subtraterpc.GetStatusResponse
+	24,  // 166: subtraterpc.Mail.PollChanges:output_type -> subtraterpc.PollChangesResponse
+	7,   // 167: subtraterpc.Mail.SubscribeInbox:output_type -> subtraterpc.InboxMessage
+	27,  // 168: subtraterpc.Mail.Publish:output_type -> subtraterpc.PublishResponse
+	29,  // 169: subtraterpc.Mail.Subscribe:output_type -> subtraterpc.SubscribeResponse
+	31,  // 170: subtraterpc.Mail.Unsubscribe:output_type -> subtraterpc.UnsubscribeResponse
+	34,  // 171: subtraterpc.Mail.ListTopics:output_type -> subtraterpc.ListTopicsResponse
+	36,  // 172: subtraterpc.Mail.Search:output_type -> subtraterpc.SearchResponse
+	38,  // 173: subtraterpc.Mail.HasUnackedStatusTo:output_type -> subtraterpc.HasUnackedStatusToResponse
+	52,  // 174: subtraterpc.Mail.ReplyToThread:output_type -> subtraterpc.ReplyToThreadResponse
+	54,  // 175: subtraterpc.Mail.ArchiveThread:output_type -> subtraterpc.ArchiveThreadResponse
+	56,  // 176: subtraterpc.Mail.DeleteThread:output_type -> subtraterpc.DeleteThreadResponse
+	58,  // 177: subtraterpc.Mail.MarkThreadUnread:output_type -> subtraterpc.MarkThreadUnreadResponse
+	60,  // 178: subtraterpc.Mail.GetTopic:output_type -> subtraterpc.GetTopicResponse
+	63,  // 179: subtraterpc.Mail.AutocompleteRecipients:output_type -> subtraterpc.AutocompleteRecipientsResponse
+	65,  // 180: subtraterpc.Mail.DeleteMessage:output_type -> subtraterpc.DeleteMessageResponse
+	40,  // 181: subtraterpc.Agent.RegisterAgent:output_type -> subtraterpc.RegisterAgentResponse
+	42,  // 182: subtraterpc.Agent.GetAgent:output_type -> subtraterpc.GetAgentResponse
+	44,  // 183: subtraterpc.Agent.ListAgents:output_type -> subtraterpc.ListAgentsResponse
+	50,  // 184: subtraterpc.Agent.DeleteAgent:output_type -> subtraterpc.DeleteAgentResponse
+	67,  // 185: subtraterpc.Agent.UpdateAgent:output_type -> subtraterpc.UpdateAgentResponse
+	71,  // 186: subtraterpc.Agent.GetAgentsStatus:output_type -> subtraterpc.GetAgentsStatusResponse
+	76,  // 187: subtraterpc.Agent.Heartbeat:output_type -> subtraterpc.HeartbeatResponse
+	46,  // 188: subtraterpc.Agent.EnsureIdentity:output_type -> subtraterpc.EnsureIdentityResponse
+	48,  // 189: subtraterpc.Agent.SaveIdentity:output_type -> subtraterpc.SaveIdentityResponse
+	74,  // 190: subtraterpc.Agent.DiscoverAgents:output_type -> subtraterpc.DiscoverAgentsResponse
+	79,  // 191: subtraterpc.Session.ListSessions:output_type -> subtraterpc.ListSessionsResponse
+	81,  // 192: subtraterpc.Session.GetSession:output_type -> subtraterpc.GetSessionResponse
+	83,  // 193: subtraterpc.Session.StartSession:output_type -> subtraterpc.StartSessionResponse
+	85,  // 194: subtraterpc.Session.CompleteSession:output_type -> subtraterpc.CompleteSessionResponse
+	88,  // 195: subtraterpc.Activity.ListActivities:output_type -> subtraterpc.ListActivitiesResponse
+	91,  // 196: subtraterpc.Stats.GetDashboardStats:output_type -> subtraterpc.GetDashboardStatsResponse
+	93,  // 197: subtraterpc.Stats.HealthCheck:output_type -> subtraterpc.HealthCheckResponse
+	123, // 198: subtraterpc.TaskService.RegisterTaskList:output_type -> subtraterpc.RegisterTaskListResponse
+	125, // 199: subtraterpc.TaskService.GetTaskList:output_type -> subtraterpc.GetTaskListResponse
+	127, // 200: subtraterpc.TaskService.ListTaskLists:output_type -> subtraterpc.ListTaskListsResponse
+	129, // 201: subtraterpc.TaskService.UnregisterTaskList:output_type -> subtraterpc.UnregisterTaskListResponse
+	131, // 202: subtraterpc.TaskService.UpsertTask:output_type -> subtraterpc.UpsertTaskResponse
+	133, // 203: subtraterpc.TaskService.GetTask:output_type -> subtraterpc.GetTaskResponse
+	135, // 204: subtraterpc.TaskService.ListTasks:output_type -> subtraterpc.ListTasksResponse
+	137, // 205: subtraterpc.TaskService.UpdateTaskStatus:output_type -> subtraterpc.UpdateTaskStatusResponse
+	139, // 206: subtraterpc.TaskService.UpdateTaskOwner:output_type -> subtraterpc.UpdateTaskOwnerResponse
+	141, // 207: subtraterpc.TaskService.DeleteTask:output_type -> subtraterpc.DeleteTaskResponse
+	143, // 208: subtraterpc.TaskService.GetTaskStats:output_type -> subtraterpc.GetTaskStatsResponse
+	145, // 209: subtraterpc.TaskService.GetAllAgentTaskStats:output_type -> subtraterpc.GetAllAgentTaskStatsResponse
+	147, // 210: subtraterpc.TaskService.SyncTaskList:output_type -> subtraterpc.SyncTaskListResponse
+	149, // 211: subtraterpc.TaskService.PruneOldTasks:output_type -> subtraterpc.PruneOldTasksResponse
+	99,  // 212: subtraterpc.ReviewService.CreateReview:output_type -> subtraterpc.CreateReviewResponse
+	101, // 213: subtraterpc.ReviewService.ListReviews:output_type -> subtraterpc.ListReviewsProtoResponse
+	104, // 214: subtraterpc.ReviewService.GetReview:output_type -> subtraterpc.ReviewDetailResponse
+	99,  // 215: subtraterpc.ReviewService.ResubmitReview:output_type -> subtraterpc.CreateReviewResponse
+	108, // 216: subtraterpc.ReviewService.CancelReview:output_type -> subtraterpc.CancelReviewProtoResponse
+	110, // 217: subtraterpc.ReviewService.DeleteReview:output_type -> subtraterpc.DeleteReviewProtoResponse
+	112, // 218: subtraterpc.ReviewService.ListReviewIssues:output_type -> subtraterpc.ListReviewIssuesResponse
+	115, // 219: subtraterpc.ReviewService.UpdateIssueStatus:output_type -> subtraterpc.UpdateIssueStatusResponse
+	117, // 220: subtraterpc.ReviewService.GetReviewDiff:output_type -> subtraterpc.GetReviewDiffResponse
+	150, // 221: subtraterpc.PlanReviewService.CreatePlanReview:output_type -> subtraterpc.PlanReviewProto
+	150, // 222: subtraterpc.PlanReviewService.GetPlanReview:output_type -> subtraterpc.PlanReviewProto
+	150, // 223: subtraterpc.PlanReviewService.GetPlanReviewByThread:output_type -> subtraterpc.PlanReviewProto
+	150, // 224: subtraterpc.PlanReviewService.GetPlanReviewBySession:output_type -> subtraterpc.PlanReviewProto
+	156, // 225: subtraterpc.PlanReviewService.ListPlanReviews:output_type -> subtraterpc.ListPlanReviewsResponse
+	150, // 226: subtraterpc.PlanReviewService.UpdatePlanReviewStatus:output_type -> subtraterpc.PlanReviewProto
+	159, // 227: subtraterpc.PlanReviewService.DeletePlanReview:output_type -> subtraterpc.DeletePlanReviewResponse
+	160, // 228: subtraterpc.AnnotationService.CreatePlanAnnotation:output_type -> subtraterpc.PlanAnnotationProto
+	164, // 229: subtraterpc.AnnotationService.ListPlanAnnotations:output_type -> subtraterpc.ListPlanAnnotationsResponse
+	160, // 230: subtraterpc.AnnotationService.UpdatePlanAnnotation:output_type -> subtraterpc.PlanAnnotationProto
+	167, // 231: subtraterpc.AnnotationService.DeletePlanAnnotation:output_type -> subtraterpc.DeleteAnnotationResponse
+	161, // 232: subtraterpc.AnnotationService.CreateDiffAnnotation:output_type -> subtraterpc.DiffAnnotationProto
+	170, // 233: subtraterpc.AnnotationService.ListDiffAnnotations:output_type -> subtraterpc.ListDiffAnnotationsResponse
+	161, // 234: subtraterpc.AnnotationService.UpdateDiffAnnotation:output_type -> subtraterpc.DiffAnnotationProto
+	167, // 235: subtraterpc.AnnotationService.DeleteDiffAnnotation:output_type -> subtraterpc.DeleteAnnotationResponse
+	159, // [159:236] is the sub-list for method output_type
+	82,  // [82:159] is the sub-list for method input_type
+	82,  // [82:82] is the sub-list for extension type_name
+	82,  // [82:82] is the sub-list for extension extendee
+	0,   // [0:82] is the sub-list for field type_name
 }
 
 func init() { file_mail_proto_init() }
@@ -12270,7 +12375,7 @@ func file_mail_proto_init() {
 	if File_mail_proto != nil {
 		return
 	}
-	file_mail_proto_msgTypes[90].OneofWrappers = []any{
+	file_mail_proto_msgTypes[91].OneofWrappers = []any{
 		(*CreateReviewRequest_BranchTarget)(nil),
 		(*CreateReviewRequest_CommitTarget)(nil),
 		(*CreateReviewRequest_CommitRangeTarget)(nil),
@@ -12282,7 +12387,7 @@ func file_mail_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_mail_proto_rawDesc), len(file_mail_proto_rawDesc)),
 			NumEnums:      7,
-			NumMessages:   168,
+			NumMessages:   169,
 			NumExtensions: 0,
 			NumServices:   9,
 		},

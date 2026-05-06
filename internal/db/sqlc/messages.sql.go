@@ -23,6 +23,58 @@ func (q *Queries) CountArchivedByAgent(ctx context.Context, agentID int64) (int6
 	return count, err
 }
 
+const CountInboxCategories = `-- name: CountInboxCategories :one
+SELECT
+    CAST(COALESCE(SUM(CASE
+        WHEN m.subject NOT LIKE '[Permission]%'
+            AND m.subject NOT LIKE '[Notification]%'
+            AND m.subject NOT LIKE '[Idle]%'
+            AND m.subject NOT LIKE '[Status]%'
+        THEN 1 ELSE 0 END), 0) AS INTEGER) AS primary_count,
+    CAST(COALESCE(SUM(CASE
+        WHEN m.subject LIKE '[Permission]%'
+            OR m.subject LIKE '[Notification]%'
+            OR m.subject LIKE '[Idle]%'
+            OR m.subject LIKE '[Status]%'
+        THEN 1 ELSE 0 END), 0) AS INTEGER) AS notifications_count,
+    CAST(COALESCE(SUM(CASE
+        WHEN mr.state = 'unread'
+            AND m.subject NOT LIKE '[Permission]%'
+            AND m.subject NOT LIKE '[Notification]%'
+            AND m.subject NOT LIKE '[Idle]%'
+            AND m.subject NOT LIKE '[Status]%'
+        THEN 1 ELSE 0 END), 0) AS INTEGER) AS unread_count,
+    CAST(COALESCE(SUM(CASE
+        WHEN mr.state = 'starred'
+        THEN 1 ELSE 0 END), 0) AS INTEGER) AS starred_count
+FROM messages m
+JOIN message_recipients mr ON m.id = mr.message_id
+WHERE mr.agent_id = ?
+    AND mr.state NOT IN ('archived', 'trash')
+`
+
+type CountInboxCategoriesRow struct {
+	PrimaryCount       int64
+	NotificationsCount int64
+	UnreadCount        int64
+	StarredCount       int64
+}
+
+// Returns total counts per inbox category for an agent, excluding
+// archived and trashed messages. Drives tab labels and stats in the
+// web UI without forcing a second round trip.
+func (q *Queries) CountInboxCategories(ctx context.Context, agentID int64) (CountInboxCategoriesRow, error) {
+	row := q.db.QueryRowContext(ctx, CountInboxCategories, agentID)
+	var i CountInboxCategoriesRow
+	err := row.Scan(
+		&i.PrimaryCount,
+		&i.NotificationsCount,
+		&i.UnreadCount,
+		&i.StarredCount,
+	)
+	return i, err
+}
+
 const CountSentByAgent = `-- name: CountSentByAgent :one
 SELECT COUNT(*) FROM messages
 WHERE sender_id = ? AND deleted_by_sender = 0
@@ -549,6 +601,195 @@ func (q *Queries) GetInboxMessages(ctx context.Context, arg GetInboxMessagesPara
 	var items []GetInboxMessagesRow
 	for rows.Next() {
 		var i GetInboxMessagesRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.ThreadID,
+			&i.TopicID,
+			&i.LogOffset,
+			&i.SenderID,
+			&i.Subject,
+			&i.BodyMd,
+			&i.Priority,
+			&i.DeadlineAt,
+			&i.Attachments,
+			&i.CreatedAt,
+			&i.DeletedBySender,
+			&i.Metadata,
+			&i.IdempotencyKey,
+			&i.State,
+			&i.SnoozedUntil,
+			&i.ReadAt,
+			&i.AckedAt,
+			&i.SenderName,
+			&i.SenderProjectKey,
+			&i.SenderGitBranch,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const GetInboxMessagesNotifications = `-- name: GetInboxMessagesNotifications :many
+SELECT m.id, m.thread_id, m.topic_id, m.log_offset, m.sender_id, m.subject, m.body_md, m.priority, m.deadline_at, m.attachments, m.created_at, m.deleted_by_sender, m.metadata, m.idempotency_key, mr.state, mr.snoozed_until, mr.read_at, mr.acked_at,
+    a.name as sender_name, a.project_key as sender_project_key,
+    a.git_branch as sender_git_branch
+FROM messages m
+JOIN message_recipients mr ON m.id = mr.message_id
+LEFT JOIN agents a ON m.sender_id = a.id
+WHERE mr.agent_id = ?
+    AND mr.state NOT IN ('archived', 'trash')
+    AND (m.subject LIKE '[Permission]%'
+         OR m.subject LIKE '[Notification]%'
+         OR m.subject LIKE '[Idle]%'
+         OR m.subject LIKE '[Status]%')
+ORDER BY m.created_at DESC
+LIMIT ? OFFSET ?
+`
+
+type GetInboxMessagesNotificationsParams struct {
+	AgentID int64
+	Limit   int64
+	Offset  int64
+}
+
+type GetInboxMessagesNotificationsRow struct {
+	ID               int64
+	ThreadID         string
+	TopicID          int64
+	LogOffset        int64
+	SenderID         int64
+	Subject          string
+	BodyMd           string
+	Priority         string
+	DeadlineAt       sql.NullInt64
+	Attachments      sql.NullString
+	CreatedAt        int64
+	DeletedBySender  int64
+	Metadata         sql.NullString
+	IdempotencyKey   sql.NullString
+	State            string
+	SnoozedUntil     sql.NullInt64
+	ReadAt           sql.NullInt64
+	AckedAt          sql.NullInt64
+	SenderName       sql.NullString
+	SenderProjectKey sql.NullString
+	SenderGitBranch  sql.NullString
+}
+
+// Hook-generated notification messages (Permission/Idle/Status/
+// Notification subjects). Used by the Notifications tab in the web UI.
+func (q *Queries) GetInboxMessagesNotifications(ctx context.Context, arg GetInboxMessagesNotificationsParams) ([]GetInboxMessagesNotificationsRow, error) {
+	rows, err := q.db.QueryContext(ctx, GetInboxMessagesNotifications, arg.AgentID, arg.Limit, arg.Offset)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []GetInboxMessagesNotificationsRow
+	for rows.Next() {
+		var i GetInboxMessagesNotificationsRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.ThreadID,
+			&i.TopicID,
+			&i.LogOffset,
+			&i.SenderID,
+			&i.Subject,
+			&i.BodyMd,
+			&i.Priority,
+			&i.DeadlineAt,
+			&i.Attachments,
+			&i.CreatedAt,
+			&i.DeletedBySender,
+			&i.Metadata,
+			&i.IdempotencyKey,
+			&i.State,
+			&i.SnoozedUntil,
+			&i.ReadAt,
+			&i.AckedAt,
+			&i.SenderName,
+			&i.SenderProjectKey,
+			&i.SenderGitBranch,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const GetInboxMessagesPrimary = `-- name: GetInboxMessagesPrimary :many
+SELECT m.id, m.thread_id, m.topic_id, m.log_offset, m.sender_id, m.subject, m.body_md, m.priority, m.deadline_at, m.attachments, m.created_at, m.deleted_by_sender, m.metadata, m.idempotency_key, mr.state, mr.snoozed_until, mr.read_at, mr.acked_at,
+    a.name as sender_name, a.project_key as sender_project_key,
+    a.git_branch as sender_git_branch
+FROM messages m
+JOIN message_recipients mr ON m.id = mr.message_id
+LEFT JOIN agents a ON m.sender_id = a.id
+WHERE mr.agent_id = ?
+    AND mr.state NOT IN ('archived', 'trash')
+    AND m.subject NOT LIKE '[Permission]%'
+    AND m.subject NOT LIKE '[Notification]%'
+    AND m.subject NOT LIKE '[Idle]%'
+    AND m.subject NOT LIKE '[Status]%'
+ORDER BY m.created_at DESC
+LIMIT ? OFFSET ?
+`
+
+type GetInboxMessagesPrimaryParams struct {
+	AgentID int64
+	Limit   int64
+	Offset  int64
+}
+
+type GetInboxMessagesPrimaryRow struct {
+	ID               int64
+	ThreadID         string
+	TopicID          int64
+	LogOffset        int64
+	SenderID         int64
+	Subject          string
+	BodyMd           string
+	Priority         string
+	DeadlineAt       sql.NullInt64
+	Attachments      sql.NullString
+	CreatedAt        int64
+	DeletedBySender  int64
+	Metadata         sql.NullString
+	IdempotencyKey   sql.NullString
+	State            string
+	SnoozedUntil     sql.NullInt64
+	ReadAt           sql.NullInt64
+	AckedAt          sql.NullInt64
+	SenderName       sql.NullString
+	SenderProjectKey sql.NullString
+	SenderGitBranch  sql.NullString
+}
+
+// Primary inbox view: every non-archived, non-trashed message that
+// isn't hook-generated chatter. Used by the Primary tab as the
+// default "real inbox" view.
+func (q *Queries) GetInboxMessagesPrimary(ctx context.Context, arg GetInboxMessagesPrimaryParams) ([]GetInboxMessagesPrimaryRow, error) {
+	rows, err := q.db.QueryContext(ctx, GetInboxMessagesPrimary, arg.AgentID, arg.Limit, arg.Offset)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []GetInboxMessagesPrimaryRow
+	for rows.Next() {
+		var i GetInboxMessagesPrimaryRow
 		if err := rows.Scan(
 			&i.ID,
 			&i.ThreadID,

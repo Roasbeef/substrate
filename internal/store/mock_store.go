@@ -274,6 +274,119 @@ func (m *MockStore) GetInboxMessages(
 	return result, nil
 }
 
+// GetInboxMessagesByCategory filters the agent's inbox by category in
+// memory, mirroring the SQL filters used by SqlcStore.
+func (m *MockStore) GetInboxMessagesByCategory(
+	ctx context.Context, agentID int64,
+	category InboxCategory, limit, offset int,
+) ([]InboxMessage, error) {
+	if category == InboxCategoryAll {
+		return m.GetInboxMessages(ctx, agentID, limit, offset)
+	}
+
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+
+	var result []InboxMessage
+	for msgID, recipients := range m.messageRecipients {
+		recip, ok := recipients[agentID]
+		if !ok {
+			continue
+		}
+		if recip.State == "archived" || recip.State == "trash" {
+			continue
+		}
+		msg := m.messages[msgID]
+		sender := m.agents[msg.SenderID]
+		if !categoryMatches(sender.Name, msg.Subject, category) {
+			continue
+		}
+		result = append(result, InboxMessage{
+			Message:    msg,
+			SenderName: sender.Name,
+			State:      recip.State,
+			ReadAt:     recip.ReadAt,
+			AckedAt:    recip.AckedAt,
+		})
+		if len(result) >= limit {
+			break
+		}
+	}
+	return result, nil
+}
+
+// CountInboxCategories tallies messages across all categories for the
+// agent, ignoring pagination. Mirrors the SQL aggregator in
+// CountInboxCategories.
+func (m *MockStore) CountInboxCategories(
+	ctx context.Context, agentID int64,
+) (InboxCategoryCounts, error) {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+
+	var counts InboxCategoryCounts
+	for msgID, recipients := range m.messageRecipients {
+		recip, ok := recipients[agentID]
+		if !ok {
+			continue
+		}
+		if recip.State == "archived" || recip.State == "trash" {
+			continue
+		}
+		msg := m.messages[msgID]
+		isNotif := isNotificationSubject(msg.Subject)
+		if isNotif {
+			counts.Notifications++
+		} else {
+			counts.Primary++
+		}
+		if recip.State == "unread" && !isNotif {
+			counts.Unread++
+		}
+		if recip.State == "starred" {
+			counts.Starred++
+		}
+	}
+	return counts, nil
+}
+
+// isNotificationSubject reports whether a message subject matches the
+// hook-generated notification prefixes used by the inbox UI.
+func isNotificationSubject(subject string) bool {
+	for _, p := range notificationSubjectPrefixes {
+		if len(subject) >= len(p) && subject[:len(p)] == p {
+			return true
+		}
+	}
+	return false
+}
+
+// categoryMatches reports whether a message belongs to the given
+// inbox category. The Primary/Notifications classification matches
+// SqlcStore's SQL filters exactly.
+func categoryMatches(
+	_ string, subject string, category InboxCategory,
+) bool {
+	isNotif := isNotificationSubject(subject)
+	switch category {
+	case InboxCategoryPrimary:
+		return !isNotif
+	case InboxCategoryNotifications:
+		return isNotif
+	default:
+		return true
+	}
+}
+
+// notificationSubjectPrefixes mirrors the prefix list used by the SQL
+// queries and the React UI to identify hook-generated mail.
+var notificationSubjectPrefixes = []string{
+	"[Permission]",
+	"[Notification]",
+	"[Idle]",
+	"[Status]",
+}
+
 func (m *MockStore) GetUnreadMessages(
 	ctx context.Context, agentID int64, limit, offset int,
 ) ([]InboxMessage, error) {

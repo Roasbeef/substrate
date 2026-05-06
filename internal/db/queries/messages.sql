@@ -119,6 +119,75 @@ WHERE mr.agent_id = ?
 ORDER BY m.created_at DESC
 LIMIT ? OFFSET ?;
 
+-- name: GetInboxMessagesPrimary :many
+-- Primary inbox view: every non-archived, non-trashed message that
+-- isn't hook-generated chatter. Used by the Primary tab as the
+-- default "real inbox" view.
+SELECT m.*, mr.state, mr.snoozed_until, mr.read_at, mr.acked_at,
+    a.name as sender_name, a.project_key as sender_project_key,
+    a.git_branch as sender_git_branch
+FROM messages m
+JOIN message_recipients mr ON m.id = mr.message_id
+LEFT JOIN agents a ON m.sender_id = a.id
+WHERE mr.agent_id = ?
+    AND mr.state NOT IN ('archived', 'trash')
+    AND m.subject NOT LIKE '[Permission]%'
+    AND m.subject NOT LIKE '[Notification]%'
+    AND m.subject NOT LIKE '[Idle]%'
+    AND m.subject NOT LIKE '[Status]%'
+ORDER BY m.created_at DESC
+LIMIT ? OFFSET ?;
+
+-- name: GetInboxMessagesNotifications :many
+-- Hook-generated notification messages (Permission/Idle/Status/
+-- Notification subjects). Used by the Notifications tab in the web UI.
+SELECT m.*, mr.state, mr.snoozed_until, mr.read_at, mr.acked_at,
+    a.name as sender_name, a.project_key as sender_project_key,
+    a.git_branch as sender_git_branch
+FROM messages m
+JOIN message_recipients mr ON m.id = mr.message_id
+LEFT JOIN agents a ON m.sender_id = a.id
+WHERE mr.agent_id = ?
+    AND mr.state NOT IN ('archived', 'trash')
+    AND (m.subject LIKE '[Permission]%'
+         OR m.subject LIKE '[Notification]%'
+         OR m.subject LIKE '[Idle]%'
+         OR m.subject LIKE '[Status]%')
+ORDER BY m.created_at DESC
+LIMIT ? OFFSET ?;
+
+-- name: CountInboxCategories :one
+-- Returns total counts per inbox category for an agent, excluding
+-- archived and trashed messages. Drives tab labels and stats in the
+-- web UI without forcing a second round trip.
+SELECT
+    CAST(COALESCE(SUM(CASE
+        WHEN m.subject NOT LIKE '[Permission]%'
+            AND m.subject NOT LIKE '[Notification]%'
+            AND m.subject NOT LIKE '[Idle]%'
+            AND m.subject NOT LIKE '[Status]%'
+        THEN 1 ELSE 0 END), 0) AS INTEGER) AS primary_count,
+    CAST(COALESCE(SUM(CASE
+        WHEN m.subject LIKE '[Permission]%'
+            OR m.subject LIKE '[Notification]%'
+            OR m.subject LIKE '[Idle]%'
+            OR m.subject LIKE '[Status]%'
+        THEN 1 ELSE 0 END), 0) AS INTEGER) AS notifications_count,
+    CAST(COALESCE(SUM(CASE
+        WHEN mr.state = 'unread'
+            AND m.subject NOT LIKE '[Permission]%'
+            AND m.subject NOT LIKE '[Notification]%'
+            AND m.subject NOT LIKE '[Idle]%'
+            AND m.subject NOT LIKE '[Status]%'
+        THEN 1 ELSE 0 END), 0) AS INTEGER) AS unread_count,
+    CAST(COALESCE(SUM(CASE
+        WHEN mr.state = 'starred'
+        THEN 1 ELSE 0 END), 0) AS INTEGER) AS starred_count
+FROM messages m
+JOIN message_recipients mr ON m.id = mr.message_id
+WHERE mr.agent_id = ?
+    AND mr.state NOT IN ('archived', 'trash');
+
 -- name: GetStarredMessages :many
 SELECT m.*, mr.state, mr.snoozed_until, mr.read_at, mr.acked_at
 FROM messages m

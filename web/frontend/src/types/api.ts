@@ -11,6 +11,15 @@ export interface APIMeta {
   total: number;
   page: number;
   page_size: number;
+  // category_counts mirrors the proto InboxCategoryCounts message and
+  // is populated by the inbox endpoint when an agent-scoped fetch
+  // returns aggregate counts. Optional everywhere else.
+  category_counts?: {
+    primary: number;
+    notifications: number;
+    unread: number;
+    starred: number;
+  };
 }
 
 // API error response.

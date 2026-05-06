@@ -39,6 +39,16 @@ function normalizeState(state: string | undefined): MessageState {
   return 'read';
 }
 
+// Aggregate inbox counts mirrored from the proto InboxCategoryCounts.
+// All fields default to 0 when the backend omits them (e.g., for the
+// global inbox view where counts are agent-scoped).
+export interface InboxCategoryCounts {
+  primary: number;
+  notifications: number;
+  unread: number;
+  starred: number;
+}
+
 // Gateway response format.
 interface GatewayMessagesResponse {
   messages?: Array<{
@@ -60,6 +70,25 @@ interface GatewayMessagesResponse {
     acknowledged_at?: string;
     recipient_names?: string[];
   }>;
+  category_counts?: {
+    primary?: string | number;
+    notifications?: string | number;
+    unread?: string | number;
+    starred?: string | number;
+  };
+}
+
+// parseCategoryCounts normalizes proto-int64 strings into numbers.
+function parseCategoryCounts(
+  raw: GatewayMessagesResponse['category_counts'],
+): InboxCategoryCounts | undefined {
+  if (!raw) return undefined;
+  return {
+    primary: toNumber(raw.primary),
+    notifications: toNumber(raw.notifications),
+    unread: toNumber(raw.unread),
+    starred: toNumber(raw.starred),
+  };
 }
 
 // Convert gateway response to internal format.
@@ -106,11 +135,22 @@ function parseMessagesResponse(response: GatewayMessagesResponse): APIResponse<M
     }
     return result;
   });
+  const counts = parseCategoryCounts(response.category_counts);
   return {
     data: messages,
-    meta: { total: messages.length, page: 1, page_size: messages.length },
+    meta: {
+      total: messages.length,
+      page: 1,
+      page_size: messages.length,
+      ...(counts ? { category_counts: counts } : {}),
+    },
   };
 }
+
+// Server-side inbox category. Drives the Primary/Notifications
+// partition computed by the backend, separate from the route-based
+// category (sent/starred/etc). Empty string means no filter.
+export type InboxTab = 'primary' | 'notifications';
 
 // Message list filter options.
 export interface MessageListOptions {
@@ -118,6 +158,10 @@ export interface MessageListOptions {
   pageSize?: number;
   filter?: 'all' | 'unread' | 'starred';
   category?: 'inbox' | 'starred' | 'snoozed' | 'sent' | 'archive';
+  // Server-side inbox tab category. Maps to the proto `category` field
+  // and partitions the inbox into Primary / Agents / Notifications on
+  // the server, replacing the legacy client-side partition.
+  inboxTab?: InboxTab;
   agentId?: number;
   // Filter by sender name prefix (for aggregate views like CodeReviewer).
   senderNamePrefix?: string;
@@ -149,6 +193,9 @@ function buildQueryString(options: MessageListOptions): string {
   }
   if (options.senderNamePrefix) {
     params.set('sender_name_prefix', options.senderNamePrefix);
+  }
+  if (options.inboxTab) {
+    params.set('category', options.inboxTab);
   }
 
   const queryString = params.toString();

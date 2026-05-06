@@ -289,11 +289,32 @@ message FetchInboxRequest {
     // this prefix (e.g., "reviewer-" for CodeReviewer aggregate).
     string sender_name_prefix = 6;
     int32 offset = 7;           // Number of messages to skip for pagination
+    // category filters by inbox category. Recognized values: "primary"
+    // (everything that isn't hook-generated chatter) and
+    // "notifications" (hook-generated Permission/Idle/Status/
+    // Notification messages). Empty means no category filter.
+    string category = 8;
 }
 
 // FetchInboxResponse is the response for FetchInbox.
 message FetchInboxResponse {
     repeated InboxMessage messages = 1;
+    // Aggregate counts for the requesting agent's inbox, ignoring the
+    // page limit and category filter applied to `messages`. Used by the
+    // UI to drive tab labels and stats without a second round trip.
+    InboxCategoryCounts category_counts = 2;
+}
+
+// InboxCategoryCounts holds total counts per inbox category for an agent,
+// excluding archived and trashed messages.
+message InboxCategoryCounts {
+    int64 primary = 1;
+    int64 notifications = 3;
+    // Unread count across primary (notifications excluded so permission
+    // spam doesn't dominate the unread badge).
+    int64 unread = 4;
+    // Starred count across all categories.
+    int64 starred = 5;
 }
 
 // ReadMessageRequest is the request for ReadMessage.

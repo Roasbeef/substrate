@@ -400,11 +400,16 @@ func (s *Service) handleFetchInbox(ctx context.Context,
 	// Use global inbox query when no specific agent is selected (AgentID=0).
 	var msgs []store.InboxMessage
 	var err error
-	if req.AgentID == 0 {
+	switch {
+	case req.AgentID == 0:
 		msgs, err = s.store.GetAllInboxMessages(
 			ctx, limit, req.Offset,
 		)
-	} else {
+	case req.Category != store.InboxCategoryAll:
+		msgs, err = s.store.GetInboxMessagesByCategory(
+			ctx, req.AgentID, req.Category, limit, req.Offset,
+		)
+	default:
 		msgs, err = s.store.GetInboxMessages(
 			ctx, req.AgentID, limit, req.Offset,
 		)
@@ -416,6 +421,23 @@ func (s *Service) handleFetchInbox(ctx context.Context,
 
 	for _, m := range msgs {
 		response.Messages = append(response.Messages, storeInboxToMail(m))
+	}
+
+	// Populate category counts for per-agent fetches so the UI can
+	// drive tab labels and stats off the same round trip. Skip for the
+	// global view (AgentID=0) since counts are agent-scoped.
+	if req.AgentID != 0 {
+		counts, countsErr := s.store.CountInboxCategories(
+			ctx, req.AgentID,
+		)
+		if countsErr != nil {
+			response.Error = fmt.Errorf(
+				"failed to count inbox categories: %w", countsErr,
+			)
+			return response
+		}
+		response.CategoryCounts = counts
+		response.HasCategoryCounts = true
 	}
 
 	return response

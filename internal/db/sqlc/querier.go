@@ -13,6 +13,10 @@ type Querier interface {
 	ClearAllOperations(ctx context.Context) error
 	CountActivitiesByAgentToday(ctx context.Context, arg CountActivitiesByAgentTodayParams) (int64, error)
 	CountArchivedByAgent(ctx context.Context, agentID int64) (int64, error)
+	// Returns total counts per inbox category for an agent, excluding
+	// archived and trashed messages. Drives tab labels and stats in the
+	// web UI without forcing a second round trip.
+	CountInboxCategories(ctx context.Context, agentID int64) (CountInboxCategoriesRow, error)
 	CountOpenIssues(ctx context.Context, reviewID string) (int64, error)
 	CountPendingOperations(ctx context.Context) (int64, error)
 	CountReviewIssuesByStatus(ctx context.Context, arg CountReviewIssuesByStatusParams) (int64, error)
@@ -84,6 +88,13 @@ type Querier interface {
 	GetConsumerOffset(ctx context.Context, arg GetConsumerOffsetParams) (int64, error)
 	GetDiffAnnotation(ctx context.Context, annotationID string) (DiffAnnotation, error)
 	GetInboxMessages(ctx context.Context, arg GetInboxMessagesParams) ([]GetInboxMessagesRow, error)
+	// Hook-generated notification messages (Permission/Idle/Status/
+	// Notification subjects). Used by the Notifications tab in the web UI.
+	GetInboxMessagesNotifications(ctx context.Context, arg GetInboxMessagesNotificationsParams) ([]GetInboxMessagesNotificationsRow, error)
+	// Primary inbox view: every non-archived, non-trashed message that
+	// isn't hook-generated chatter. Used by the Primary tab as the
+	// default "real inbox" view.
+	GetInboxMessagesPrimary(ctx context.Context, arg GetInboxMessagesPrimaryParams) ([]GetInboxMessagesPrimaryRow, error)
 	GetLatestAgentSummary(ctx context.Context, agentID int64) (AgentSummary, error)
 	GetLatestIteration(ctx context.Context, reviewID string) (ReviewIteration, error)
 	GetMaxLogOffset(ctx context.Context, topicID int64) (interface{}, error)

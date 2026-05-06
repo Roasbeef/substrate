@@ -37,6 +37,16 @@ type QueryStore interface {
 	GetInboxMessages(
 		ctx context.Context, arg sqlc.GetInboxMessagesParams,
 	) ([]sqlc.GetInboxMessagesRow, error)
+	GetInboxMessagesPrimary(
+		ctx context.Context, arg sqlc.GetInboxMessagesPrimaryParams,
+	) ([]sqlc.GetInboxMessagesPrimaryRow, error)
+	GetInboxMessagesNotifications(
+		ctx context.Context,
+		arg sqlc.GetInboxMessagesNotificationsParams,
+	) ([]sqlc.GetInboxMessagesNotificationsRow, error)
+	CountInboxCategories(
+		ctx context.Context, agentID int64,
+	) (sqlc.CountInboxCategoriesRow, error)
 	GetUnreadMessages(
 		ctx context.Context, arg sqlc.GetUnreadMessagesParams,
 	) ([]sqlc.GetUnreadMessagesRow, error)
@@ -578,6 +588,61 @@ func (s *SqlcStore) GetUnreadMessages(ctx context.Context, agentID int64,
 		return nil, err
 	}
 	return convertUnreadRows(rows), nil
+}
+
+// GetInboxMessagesByCategory dispatches to the per-category sqlc query.
+// Unknown categories fall through to the unfiltered inbox query so the
+// caller never receives an empty result on a misspelled category.
+func (s *SqlcStore) GetInboxMessagesByCategory(ctx context.Context,
+	agentID int64, category InboxCategory, limit, offset int,
+) ([]InboxMessage, error) {
+	switch category {
+	case InboxCategoryPrimary:
+		rows, err := s.db.GetInboxMessagesPrimary(
+			ctx, sqlc.GetInboxMessagesPrimaryParams{
+				AgentID: agentID,
+				Limit:   int64(limit),
+				Offset:  int64(offset),
+			},
+		)
+		if err != nil {
+			return nil, err
+		}
+		return convertInboxPrimaryRows(rows), nil
+
+	case InboxCategoryNotifications:
+		rows, err := s.db.GetInboxMessagesNotifications(
+			ctx, sqlc.GetInboxMessagesNotificationsParams{
+				AgentID: agentID,
+				Limit:   int64(limit),
+				Offset:  int64(offset),
+			},
+		)
+		if err != nil {
+			return nil, err
+		}
+		return convertInboxNotificationsRows(rows), nil
+
+	default:
+		return s.GetInboxMessages(ctx, agentID, limit, offset)
+	}
+}
+
+// CountInboxCategories returns aggregate counts per inbox category for
+// an agent, ignoring archived and trashed messages.
+func (s *SqlcStore) CountInboxCategories(ctx context.Context,
+	agentID int64,
+) (InboxCategoryCounts, error) {
+	row, err := s.db.CountInboxCategories(ctx, agentID)
+	if err != nil {
+		return InboxCategoryCounts{}, err
+	}
+	return InboxCategoryCounts{
+		Primary:       row.PrimaryCount,
+		Notifications: row.NotificationsCount,
+		Unread:        row.UnreadCount,
+		Starred:       row.StarredCount,
+	}, nil
 }
 
 // GetArchivedMessages retrieves archived messages for an agent.
@@ -1648,6 +1713,60 @@ func (s *txSqlcStore) GetUnreadMessages(ctx context.Context, agentID int64,
 	return convertUnreadRows(rows), nil
 }
 
+// GetInboxMessagesByCategory dispatches to the per-category sqlc query
+// against the transaction's queries handle. Mirrors SqlcStore.
+func (s *txSqlcStore) GetInboxMessagesByCategory(ctx context.Context,
+	agentID int64, category InboxCategory, limit, offset int,
+) ([]InboxMessage, error) {
+	switch category {
+	case InboxCategoryPrimary:
+		rows, err := s.queries.GetInboxMessagesPrimary(
+			ctx, sqlc.GetInboxMessagesPrimaryParams{
+				AgentID: agentID,
+				Limit:   int64(limit),
+				Offset:  int64(offset),
+			},
+		)
+		if err != nil {
+			return nil, err
+		}
+		return convertInboxPrimaryRows(rows), nil
+
+	case InboxCategoryNotifications:
+		rows, err := s.queries.GetInboxMessagesNotifications(
+			ctx, sqlc.GetInboxMessagesNotificationsParams{
+				AgentID: agentID,
+				Limit:   int64(limit),
+				Offset:  int64(offset),
+			},
+		)
+		if err != nil {
+			return nil, err
+		}
+		return convertInboxNotificationsRows(rows), nil
+
+	default:
+		return s.GetInboxMessages(ctx, agentID, limit, offset)
+	}
+}
+
+// CountInboxCategories returns aggregate counts per inbox category for
+// an agent within the transaction.
+func (s *txSqlcStore) CountInboxCategories(ctx context.Context,
+	agentID int64,
+) (InboxCategoryCounts, error) {
+	row, err := s.queries.CountInboxCategories(ctx, agentID)
+	if err != nil {
+		return InboxCategoryCounts{}, err
+	}
+	return InboxCategoryCounts{
+		Primary:       row.PrimaryCount,
+		Notifications: row.NotificationsCount,
+		Unread:        row.UnreadCount,
+		Starred:       row.StarredCount,
+	}, nil
+}
+
 // GetArchivedMessages retrieves archived messages for an agent.
 func (s *txSqlcStore) GetArchivedMessages(ctx context.Context, agentID int64,
 	limit int,
@@ -2622,6 +2741,32 @@ func convertInboxRows(rows []sqlc.GetInboxMessagesRow) []InboxMessage {
 		messages[i] = msg
 	}
 	return messages
+}
+
+// convertInboxPrimaryRows reuses convertInboxRows by way of an in-place
+// type conversion. The Primary/Agents/Notifications row types share the
+// exact same fields as GetInboxMessagesRow, so the conversion is a
+// zero-copy reinterpretation rather than a deep copy.
+func convertInboxPrimaryRows(
+	rows []sqlc.GetInboxMessagesPrimaryRow,
+) []InboxMessage {
+	cast := make([]sqlc.GetInboxMessagesRow, len(rows))
+	for i, r := range rows {
+		cast[i] = sqlc.GetInboxMessagesRow(r)
+	}
+	return convertInboxRows(cast)
+}
+
+// convertInboxNotificationsRows mirrors convertInboxPrimaryRows for the
+// Notifications category.
+func convertInboxNotificationsRows(
+	rows []sqlc.GetInboxMessagesNotificationsRow,
+) []InboxMessage {
+	cast := make([]sqlc.GetInboxMessagesRow, len(rows))
+	for i, r := range rows {
+		cast[i] = sqlc.GetInboxMessagesRow(r)
+	}
+	return convertInboxRows(cast)
 }
 
 // convertUnreadRows converts sqlc unread rows to domain InboxMessage.

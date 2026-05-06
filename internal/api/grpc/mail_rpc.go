@@ -16,6 +16,7 @@ import (
 	"github.com/roasbeef/subtrate/internal/agent"
 	"github.com/roasbeef/subtrate/internal/db/sqlc"
 	"github.com/roasbeef/subtrate/internal/mail"
+	"github.com/roasbeef/subtrate/internal/store"
 )
 
 // SendMail sends a new message to one or more recipients.
@@ -155,6 +156,7 @@ func (s *Server) FetchInbox(ctx context.Context, req *FetchInboxRequest) (*Fetch
 		UnreadOnly:  req.UnreadOnly,
 		StateFilter: stateFilter,
 		SentOnly:    req.SentOnly,
+		Category:    storeInboxCategory(req.Category),
 	}
 
 	// Fetch via the shared mail client (actor system).
@@ -169,9 +171,33 @@ func (s *Server) FetchInbox(ctx context.Context, req *FetchInboxRequest) (*Fetch
 	protoMsgs := convertMessagesForList(resp.Messages)
 	s.populateRecipients(ctx, protoMsgs)
 
-	return &FetchInboxResponse{
+	pbResp := &FetchInboxResponse{
 		Messages: protoMsgs,
-	}, nil
+	}
+	if resp.HasCategoryCounts {
+		pbResp.CategoryCounts = &InboxCategoryCounts{
+			Primary:       resp.CategoryCounts.Primary,
+			Notifications: resp.CategoryCounts.Notifications,
+			Unread:        resp.CategoryCounts.Unread,
+			Starred:       resp.CategoryCounts.Starred,
+		}
+	}
+	return pbResp, nil
+}
+
+// storeInboxCategory normalizes a free-form category string from the
+// gRPC request into a typed store.InboxCategory. Unknown values fall
+// through to InboxCategoryAll so a typo never silently empties the
+// inbox.
+func storeInboxCategory(s string) store.InboxCategory {
+	switch store.InboxCategory(s) {
+	case store.InboxCategoryPrimary:
+		return store.InboxCategoryPrimary
+	case store.InboxCategoryNotifications:
+		return store.InboxCategoryNotifications
+	default:
+		return store.InboxCategoryAll
+	}
 }
 
 // ReadMessage retrieves a single message by ID and marks it as read.

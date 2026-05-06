@@ -9,7 +9,7 @@ function cn(...inputs: (string | undefined | null | false)[]) {
 }
 
 // Category types.
-export type InboxCategory = 'primary' | 'agents' | 'topics' | 'notifications';
+export type InboxCategory = 'primary' | 'topics' | 'notifications';
 
 // Tab item interface.
 export interface TabItem {
@@ -22,7 +22,6 @@ export interface TabItem {
 // Default category tabs.
 const defaultTabs: TabItem[] = [
   { id: 'primary', label: 'Primary' },
-  { id: 'agents', label: 'Agents' },
   { id: 'topics', label: 'Topics' },
   { id: 'notifications', label: 'Notifications' },
 ];

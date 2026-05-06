@@ -4,6 +4,7 @@ import (
 	"time"
 
 	"github.com/roasbeef/subtrate/internal/baselib/actor"
+	"github.com/roasbeef/subtrate/internal/store"
 )
 
 // Priority represents the priority level of a message.
@@ -184,6 +185,10 @@ type FetchInboxRequest struct {
 	// SenderNamePrefix filters to messages from agents whose name starts
 	// with this prefix (e.g., "reviewer-" for CodeReviewer aggregate).
 	SenderNamePrefix string
+
+	// Category filters the inbox by server-side partition (Primary,
+	// Agents, Notifications). Empty disables category filtering.
+	Category store.InboxCategory
 }
 
 // MessageType implements actor.Message.
@@ -212,7 +217,18 @@ type InboxMessage struct {
 // FetchInboxResponse is the response to a FetchInboxRequest.
 type FetchInboxResponse struct {
 	Messages []InboxMessage
-	Error    error
+
+	// CategoryCounts is populated when a category filter was requested.
+	// Counts ignore pagination so the UI can drive tab labels and stats
+	// without a second round trip. The empty value indicates the
+	// service did not compute counts for this request.
+	CategoryCounts store.InboxCategoryCounts
+
+	// HasCategoryCounts is true when CategoryCounts was populated.
+	// Distinguishes "all zeros" from "not computed".
+	HasCategoryCounts bool
+
+	Error error
 }
 
 // ReadMessageRequest is an actor message requesting to read a message.

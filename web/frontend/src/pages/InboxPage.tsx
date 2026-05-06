@@ -147,9 +147,15 @@ export default function InboxPage() {
       }
     }
 
-    // Apply category (would need backend support).
-    if (state.category !== 'primary') {
-      options.category = state.category;
+    // Map the active inbox tab to the server-side category filter so
+    // hook-generated notifications can't crowd out the Primary tab.
+    // The Topics tab has its own UI and bypasses this filter.
+    if (
+      routeFilter === 'inbox' &&
+      (state.category === 'primary' ||
+        state.category === 'notifications')
+    ) {
+      options.inboxTab = state.category;
     }
 
     // Apply agent filter if a single agent is selected (not aggregate).
@@ -186,15 +192,10 @@ export default function InboxPage() {
     return messages;
   }, [messagesResponse?.data, isAggregateFilter, selectedAgentIds]);
 
-  // Partition messages so hook-generated notifications (Permission /
-  // Idle / generic Notification) only appear in the Notifications tab
-  // and don't clutter Primary / Agents.
-  const categoryMessages = useMemo(() => {
-    if (state.category === 'notifications') {
-      return allMessages.filter(isNotificationMessage);
-    }
-    return allMessages.filter((m) => !isNotificationMessage(m));
-  }, [allMessages, state.category]);
+  // The server now partitions Primary / Agents / Notifications via
+  // the `category` query parameter, so the visible message list is
+  // already scoped. We keep the alias for downstream consumers.
+  const categoryMessages = allMessages;
 
   // Get unique senders for filter dropdown.
   const uniqueSenders = useMemo(() => {
@@ -245,60 +246,52 @@ export default function InboxPage() {
   // Enable real-time updates via WebSocket.
   const { isConnected: wsConnected } = useMessagesRealtime();
 
-  // Compute stats from messages, excluding hook-generated notifications
-  // so the header counters reflect real inbox activity rather than a
-  // flood of permission prompts.
+  // Stats are sourced from the backend's category_counts so they
+  // reflect the entire inbox rather than the current page. Urgent and
+  // acknowledged are computed from the visible messages until the
+  // backend exposes them (those tabs are not yet wired up).
   const stats = useMemo(() => {
-    const rawMessages = messagesResponse?.data;
-    if (!rawMessages) {
-      return { unread: 0, starred: 0, urgent: 0, acknowledged: 0 };
-    }
-
-    const userMessages = rawMessages.filter((m) => !isNotificationMessage(m));
-
+    const counts = messagesResponse?.meta?.category_counts;
+    const rawMessages = messagesResponse?.data ?? [];
     return {
-      unread: userMessages.filter(
-        (m) => m.recipients[0]?.state === 'unread',
+      unread: counts?.unread ?? rawMessages.filter(
+        (m) => m.recipients[0]?.state === 'unread' &&
+          !isNotificationMessage(m),
       ).length,
-      starred: userMessages.filter(
+      starred: counts?.starred ?? rawMessages.filter(
         (m) => m.recipients[0]?.is_starred,
       ).length,
-      urgent: userMessages.filter(
-        (m) => m.priority === 'urgent',
-      ).length,
-      acknowledged: userMessages.filter(
+      urgent: rawMessages.filter((m) => m.priority === 'urgent').length,
+      acknowledged: rawMessages.filter(
         (m) => m.recipients[0]?.state === 'acknowledged',
       ).length,
     };
   }, [messagesResponse]);
 
-  // Compute category counts for tabs.
+  // Tab counts come from the backend's category_counts when available
+  // (per-agent fetches), and fall back to a client-side tally over the
+  // current page for global views where counts are not computed.
   const categoryTabs = useMemo((): TabItem[] => {
-    const rawMessages = messagesResponse?.data;
-    if (!rawMessages) {
+    const counts = messagesResponse?.meta?.category_counts;
+    if (counts) {
       return [
-        { id: 'primary', label: 'Primary', count: 0 },
-        { id: 'agents', label: 'Agents', count: 0 },
+        { id: 'primary', label: 'Primary', count: counts.primary },
         { id: 'topics', label: 'Topics', count: 0 },
-        { id: 'notifications', label: 'Notifications', count: 0 },
+        {
+          id: 'notifications',
+          label: 'Notifications',
+          count: counts.notifications,
+        },
       ];
     }
 
-    // Primary = messages from User (human sender), excluding hook
-    // notifications. Agents = messages from other agents, excluding
-    // hook notifications. Notifications = hook-generated Permission
-    // / Idle / generic Notification messages.
+    const rawMessages = messagesResponse?.data ?? [];
     const primaryCount = rawMessages.filter(
-      (m) => m.sender_name === 'User' && !isNotificationMessage(m),
-    ).length;
-    const agentsCount = rawMessages.filter(
-      (m) => m.sender_name !== 'User' && !isNotificationMessage(m),
+      (m) => !isNotificationMessage(m),
     ).length;
     const notificationsCount = rawMessages.filter(isNotificationMessage).length;
-
     return [
       { id: 'primary', label: 'Primary', count: primaryCount },
-      { id: 'agents', label: 'Agents', count: agentsCount },
       { id: 'topics', label: 'Topics', count: 0 },
       { id: 'notifications', label: 'Notifications', count: notificationsCount },
     ];

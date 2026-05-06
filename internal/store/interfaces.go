@@ -30,6 +30,23 @@ type MessageStore interface {
 		ctx context.Context, agentID int64, limit, offset int,
 	) ([]InboxMessage, error)
 
+	// GetInboxMessagesByCategory retrieves inbox messages for an agent
+	// filtered by category. The category controls server-side
+	// partitioning of the inbox into Primary (human User), Agents (other
+	// senders), and Notifications (hook-generated). Unknown categories
+	// fall back to GetInboxMessages.
+	GetInboxMessagesByCategory(
+		ctx context.Context, agentID int64,
+		category InboxCategory, limit, offset int,
+	) ([]InboxMessage, error)
+
+	// CountInboxCategories returns aggregate counts per inbox category
+	// for an agent, ignoring pagination. Used to drive UI tab labels and
+	// stat counters.
+	CountInboxCategories(
+		ctx context.Context, agentID int64,
+	) (InboxCategoryCounts, error)
+
 	// GetUnreadMessages retrieves unread messages for an agent.
 	GetUnreadMessages(
 		ctx context.Context, agentID int64, limit, offset int,
@@ -674,6 +691,36 @@ type InboxMessage struct {
 	SnoozedUntil     *time.Time
 	ReadAt           *time.Time
 	AckedAt          *time.Time
+}
+
+// InboxCategory enumerates the server-side inbox partitions used by the
+// web UI tabs. The empty value means no category filter.
+type InboxCategory string
+
+const (
+	// InboxCategoryAll disables category filtering and returns every
+	// message visible to the agent (excluding archived/trash).
+	InboxCategoryAll InboxCategory = ""
+
+	// InboxCategoryPrimary selects every non-archived, non-trashed
+	// message that isn't hook-generated chatter. This is the default
+	// "real inbox" view shown by the Primary tab.
+	InboxCategoryPrimary InboxCategory = "primary"
+
+	// InboxCategoryNotifications selects hook-generated notification
+	// messages whose subject starts with one of the recognized prefixes
+	// ([Permission], [Notification], [Idle], [Status]).
+	InboxCategoryNotifications InboxCategory = "notifications"
+)
+
+// InboxCategoryCounts aggregates per-category totals for an agent's
+// inbox, ignoring pagination. Notifications are excluded from the
+// `Unread` count so hook chatter does not dominate the unread badge.
+type InboxCategoryCounts struct {
+	Primary       int64
+	Notifications int64
+	Unread        int64
+	Starred       int64
 }
 
 // Agent represents an agent in the system.
