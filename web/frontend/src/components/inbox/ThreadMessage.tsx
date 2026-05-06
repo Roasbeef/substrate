@@ -3,8 +3,7 @@
 import { useMemo, useState, useCallback, useEffect, lazy, Suspense } from 'react';
 import { clsx } from 'clsx';
 import { twMerge } from 'tailwind-merge';
-import { marked } from 'marked';
-import DOMPurify from 'dompurify';
+import { renderMarkdownToHtml } from '@/lib/markdown.js';
 import { Avatar } from '@/components/ui/Avatar.js';
 import { PriorityBadge } from '@/components/ui/Badge.js';
 import { Spinner } from '@/components/ui/Spinner.js';
@@ -83,25 +82,6 @@ function splitBodyAndDiff(body: string): { text: string; patch: string | null } 
     text: body.slice(0, idx).trimEnd(),
     patch: body.slice(idx + DIFF_MARKER.length).trim(),
   };
-}
-
-// Render markdown text safely using marked and DOMPurify.
-function renderMarkdownToHtml(text: string): string {
-  // Parse markdown to HTML.
-  const rawHtml = marked.parse(text, {
-    async: false, gfm: true, breaks: true,
-  }) as string;
-  // Sanitize HTML to prevent XSS.
-  return DOMPurify.sanitize(rawHtml, {
-    ALLOWED_TAGS: [
-      'p', 'br', 'strong', 'em', 'code', 'pre', 'ul', 'ol', 'li',
-      'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'a', 'blockquote', 'hr',
-      'table', 'thead', 'tbody', 'tr', 'th', 'td',
-    ],
-    // Note: style intentionally excluded to prevent CSS injection.
-    // GFM column alignment (:---:) is lost as a security trade-off.
-    ALLOWED_ATTR: ['href', 'target', 'rel'],
-  });
 }
 
 // Message with optional recipients for flexible usage.

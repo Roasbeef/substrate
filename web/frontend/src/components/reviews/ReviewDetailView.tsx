@@ -4,8 +4,7 @@ import { useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { clsx } from 'clsx';
 import { twMerge } from 'tailwind-merge';
-import { marked } from 'marked';
-import DOMPurify from 'dompurify';
+import { renderMarkdownToHtml } from '@/lib/markdown.js';
 import type { IssueStatus, Message, ReviewDetail, ReviewIterationDetail } from '@/types/api.js';
 import { useReviewIssues, useReviewDiff, useUpdateIssueStatus, useCancelReview } from '@/hooks/useReviews.js';
 import { useThread } from '@/hooks/useThreads.js';
@@ -303,20 +302,9 @@ export function ReviewDetailView({ review }: ReviewDetailViewProps) {
   );
 }
 
-// Render markdown safely using marked and DOMPurify.
-function renderMarkdown(text: string): string {
-  const rawHtml = marked.parse(text, {
-    async: false, gfm: true, breaks: true,
-  }) as string;
-  return DOMPurify.sanitize(rawHtml, {
-    ALLOWED_TAGS: [
-      'p', 'br', 'strong', 'em', 'code', 'pre', 'ul', 'ol', 'li',
-      'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'a', 'blockquote', 'hr',
-      'table', 'thead', 'tbody', 'tr', 'th', 'td',
-    ],
-    ALLOWED_ATTR: ['href', 'target', 'rel'],
-  });
-}
+// renderMarkdown delegates to the shared markdown renderer that
+// forces external links to open in a new tab.
+const renderMarkdown = renderMarkdownToHtml;
 
 // Match a thread message to an iteration by reviewer name and timing.
 function findIterationMessage(
