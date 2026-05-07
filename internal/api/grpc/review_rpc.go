@@ -101,6 +101,8 @@ func (s *Server) CreateReview(
 		Priority:    req.Priority,
 		Reviewers:   req.Reviewers,
 		Description: req.Description,
+		DiffContent: req.DiffContent,
+		DiffCommand: req.DiffCommand,
 	})
 	if err != nil {
 		return nil, status.Errorf(
@@ -260,8 +262,10 @@ func (s *Server) ResubmitReview(
 	}
 
 	resp, err := s.askReview(ctx, review.ResubmitMsg{
-		ReviewID:  reviewID,
-		CommitSHA: req.CommitSha,
+		ReviewID:    reviewID,
+		CommitSHA:   req.CommitSha,
+		DiffContent: req.DiffContent,
+		DiffCommand: req.DiffCommand,
 	})
 	if err != nil {
 		return nil, status.Errorf(

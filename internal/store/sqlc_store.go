@@ -230,6 +230,9 @@ type QueryStore interface {
 	UpdateReviewCompleted(
 		ctx context.Context, arg sqlc.UpdateReviewCompletedParams,
 	) error
+	UpdateReviewDiff(
+		ctx context.Context, arg sqlc.UpdateReviewDiffParams,
+	) error
 
 	// Review iteration operations.
 	CreateReviewIteration(

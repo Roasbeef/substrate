@@ -3,9 +3,15 @@ INSERT INTO reviews (
     review_id, thread_id, requester_id,
     pr_number, branch, base_branch, commit_sha, repo_path, remote_url,
     review_type, priority, state,
+    diff_content, diff_command,
     created_at, updated_at
-) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 RETURNING *;
+
+-- name: UpdateReviewDiff :exec
+UPDATE reviews
+SET diff_content = ?, diff_command = ?, updated_at = ?
+WHERE review_id = ?;
 
 -- name: GetReview :one
 SELECT * FROM reviews WHERE review_id = ?;
