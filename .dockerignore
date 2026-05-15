@@ -1,0 +1,7 @@
+.git
+node_modules
+web/frontend/node_modules
+web/frontend/dist
+*.db
+.sessions
+.claude

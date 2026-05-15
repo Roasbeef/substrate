@@ -146,9 +146,11 @@ export function ComposeModal({
         return;
       }
 
-      const currentAgent = useAuthStore.getState().currentAgent;
+      const { currentAgent, availableAgents } = useAuthStore.getState();
+      const userAgent = availableAgents.find((a) => a.name === 'User');
+      const senderId = currentAgent?.id ?? userAgent?.id ?? 0;
       const data: SendMessageRequest = {
-        sender_id: currentAgent?.id ?? 0,
+        sender_id: senderId,
         recipient_names: form.recipients.map((r) => r.name),
         subject: form.subject.trim(),
         body: form.body.trim(),
