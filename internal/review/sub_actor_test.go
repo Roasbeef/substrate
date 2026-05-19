@@ -1619,3 +1619,58 @@ func TestHandleSubActorResult_AuthError(t *testing.T) {
 
 // fmt is used in TestHandleSubActorResult_Error.
 var _ = fmt.Errorf
+
+// TestIsOnlyBenignRedirect verifies that the redirect classifier allows
+// only safe diagnostic patterns: stderr→stdout merges and redirects to
+// /dev/null. Any redirect that could write a workspace file must be
+// rejected so that checkBashCommand denies it.
+func TestIsOnlyBenignRedirect(t *testing.T) {
+	t.Parallel()
+
+	cases := []struct {
+		name string
+		cmd  string
+		want bool
+	}{
+		// Commands with no redirects at all are trivially benign.
+		{"no redirect", "go test ./...", true},
+
+		// Classic stderr-to-stdout merge for combined output.
+		{"stderr merge", "make build 2>&1", true},
+
+		// Discarding stderr — the exact case the user hit.
+		{"stderr to devnull no space", "gopls symbols foo.go 2>/dev/null", true},
+		{"stderr to devnull spaced", "gopls symbols foo.go 2> /dev/null", true},
+
+		// Discarding stdout — also harmless, /dev/null is special.
+		{"stdout to devnull", "noisy >/dev/null", true},
+		{"explicit stdout fd", "noisy 1>/dev/null", true},
+
+		// Bash combined-stream discard.
+		{"combined to devnull", "noisy &>/dev/null", true},
+		{"combined spaced", "noisy &> /dev/null", true},
+
+		// POSIX combined discard via two redirects.
+		{"posix combined discard", "noisy >/dev/null 2>&1", true},
+
+		// Real file targets must still be denied.
+		{"stdout to file", "echo hi > out.txt", false},
+		{"stderr to file", "make 2> errs.log", false},
+		{"append to file", "echo hi >> log.txt", false},
+
+		// Mixed: a benign redirect alongside a file-writing one.
+		{"mixed benign and file", "make 2>&1 > out.log", false},
+	}
+
+	for _, tc := range cases {
+		tc := tc
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			got := isOnlyBenignRedirect(tc.cmd)
+			require.Equal(t, tc.want, got,
+				"cmd=%q", tc.cmd,
+			)
+		})
+	}
+}

@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"sync"
 	"time"
@@ -1846,9 +1847,10 @@ func checkBashCommand(
 
 	// Deny output redirects that create/overwrite files. The
 	// reviewer should use the Write tool for file creation (writing
-	// to .reviews/), not Bash redirects. Allow stderr redirects
-	// (2>&1) since those are diagnostic.
-	if strings.Contains(cmd, ">") && !isOnlyStderrRedirect(cmd) {
+	// to .reviews/), not Bash redirects. Allow benign redirects
+	// (2>&1 and any redirect to /dev/null) since they are diagnostic
+	// and never touch the workspace.
+	if strings.Contains(cmd, ">") && !isOnlyBenignRedirect(cmd) {
 		log.Infof("Reviewer Bash redirect DENIED: cmd=%s",
 			truncateStr(cmd, 200),
 		)
@@ -1880,11 +1882,21 @@ func splitOnChainOperators(cmd string) []string {
 	return strings.Split(result, sentinel)
 }
 
-// isOnlyStderrRedirect returns true when the command's only redirect
-// is 2>&1, which is a safe diagnostic pattern.
-func isOnlyStderrRedirect(cmd string) bool {
-	// Remove all occurrences of 2>&1 and check if any > remains.
-	stripped := strings.ReplaceAll(cmd, "2>&1", "")
+// benignRedirectRe matches redirects that do not write to a workspace
+// file: stderr→stdout merge (2>&1) and any FD redirected to /dev/null.
+// Examples matched: "2>&1", "2>/dev/null", "> /dev/null",
+// "1> /dev/null", "&> /dev/null".
+var benignRedirectRe = regexp.MustCompile(
+	`(?:2>&1|(?:[12]?|&)>\s*/dev/null)`,
+)
+
+// isOnlyBenignRedirect returns true when every redirect operator in cmd
+// is either 2>&1 or a redirect to /dev/null. Both are safe diagnostic
+// patterns: they cannot create or overwrite files in the workspace.
+func isOnlyBenignRedirect(cmd string) bool {
+	// Strip every benign redirect occurrence; if any > remains, the
+	// command also contains a non-benign redirect.
+	stripped := benignRedirectRe.ReplaceAllString(cmd, "")
 
 	return !strings.Contains(stripped, ">")
 }
