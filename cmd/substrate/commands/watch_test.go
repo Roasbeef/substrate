@@ -152,6 +152,59 @@ func TestPidAlive(t *testing.T) {
 	require.False(t, pidAlive(cmd.Process.Pid))
 }
 
+// TestWatchWatermarkRoundTrip verifies watermark persistence: missing
+// file reads as 0, writes round-trip, and malformed content reads as 0.
+func TestWatchWatermarkRoundTrip(t *testing.T) {
+	withTempHome(t)
+
+	require.Equal(t, int64(0), readWatchWatermark(42))
+
+	writeWatchWatermark(42, 7428)
+	require.Equal(t, int64(7428), readWatchWatermark(42))
+
+	// Watermarks are per-agent.
+	require.Equal(t, int64(0), readWatchWatermark(43))
+
+	// Malformed content reads as 0.
+	path, err := watchWatermarkPath(42)
+	require.NoError(t, err)
+	require.NoError(t, os.WriteFile(path, []byte("junk"), 0o644))
+	require.Equal(t, int64(0), readWatchWatermark(42))
+}
+
+// TestFilterFreshMessages verifies that messages at or below the
+// watermark are dropped and the max fresh ID is reported, preventing
+// the re-arm wake loop on an already-digested backlog.
+func TestFilterFreshMessages(t *testing.T) {
+	msgs := []mail.InboxMessage{
+		{ID: 5}, {ID: 10}, {ID: 7},
+	}
+
+	// No watermark: everything is fresh.
+	fresh, maxID := filterFreshMessages(msgs, 0)
+	require.Len(t, fresh, 3)
+	require.Equal(t, int64(10), maxID)
+
+	// Mid watermark: only newer messages survive.
+	fresh, maxID = filterFreshMessages(msgs, 7)
+	require.Len(t, fresh, 1)
+	require.Equal(t, int64(10), fresh[0].ID)
+	require.Equal(t, int64(10), maxID)
+
+	// Watermark at the top: nothing fresh, no wake.
+	fresh, maxID = filterFreshMessages(msgs, 10)
+	require.Empty(t, fresh)
+	require.Equal(t, int64(0), maxID)
+}
+
+// TestErrWatchInterruptedExitCode verifies the signal-interrupt error
+// carries the 128+SIGINT exit code so a kill is distinguishable from a
+// wake (0) and a fatal error (1).
+func TestErrWatchInterruptedExitCode(t *testing.T) {
+	require.Equal(t, ExitInterrupted, errWatchInterrupted.ExitCode())
+	require.Equal(t, 130, ExitInterrupted)
+}
+
 // TestFormatWatchDigest verifies the wake digest includes message
 // payloads, truncation, overflow counts, and the re-arm footer.
 func TestFormatWatchDigest(t *testing.T) {

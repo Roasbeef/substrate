@@ -11,11 +11,14 @@
 # 1. Quick mail check - if mail exists, block with the digest (the agent
 #    will read mail via tool calls, which resets Claude Code's
 #    consecutive-block counter).
-# 2. If stop_hook_active is true, allow exit - we already nudged once
-#    this stop cycle. This respects the Claude Code 2.1.143+ cap on
-#    consecutive Stop hook blocks (default 8).
-# 3. If a watcher is armed, allow exit - the agent will be woken by the
+# 2. If a watcher is armed, allow exit - the agent will be woken by the
 #    watcher's exit notification when there is work.
+# 3. If the arming nudge already fired this stop cycle (tracked via a
+#    stamp file, NOT stop_hook_active - a mail block also sets
+#    stop_hook_active and must not suppress the arming nudge), allow
+#    exit. This respects the Claude Code 2.1.143+ cap on consecutive
+#    Stop hook blocks (default 8): we emit at most one arming block
+#    per stop cycle.
 # 4. Otherwise block ONCE with arming instructions (folding in a
 #    reminder about incomplete tasks, if any).
 #
@@ -26,10 +29,26 @@ input=$(cat)
 session_id=$(echo "$input" | jq -r '.session_id // empty')
 stop_hook_active=$(echo "$input" | jq -r '.stop_hook_active // false')
 
-# Build session ID args if available (critical for agent identity resolution).
-session_args=""
+# Build session ID args if available (critical for agent identity
+# resolution). Use a bash array so a session_id containing whitespace
+# or glob metacharacters cannot word-split or expand into extra args.
+session_args=()
 if [ -n "$session_id" ]; then
-    session_args="--session-id $session_id"
+    session_args=(--session-id "$session_id")
+fi
+
+# Arming-nudge stamp: marks that we already blocked once for arming in
+# this stop cycle. stop_hook_active alone cannot distinguish "blocked
+# for mail" from "blocked for arming", and a mail block must not
+# suppress the arming nudge (that would strand the agent watcher-less
+# after every mail interaction). A fresh stop cycle is detected by
+# stop_hook_active=false, which clears the stamp.
+stamp_dir="$HOME/.subtrate/watch"
+mkdir -p "$stamp_dir" 2>/dev/null
+nudge_stamp="$stamp_dir/nudged-${session_id:-default}"
+
+if [ "$stop_hook_active" != "true" ]; then
+    rm -f "$nudge_stamp"
 fi
 
 # ============================================================================
@@ -37,10 +56,10 @@ fi
 # ============================================================================
 
 # Record heartbeat (best effort)
-substrate heartbeat $session_args --format context 2>/dev/null || true
+substrate heartbeat "${session_args[@]}" --format context 2>/dev/null || true
 
 # Quick (non-blocking) check for mail
-quick_result=$(substrate poll $session_args --format hook --quiet 2>/dev/null || echo '{}')
+quick_result=$(substrate poll "${session_args[@]}" --format hook --quiet 2>/dev/null || echo '{}')
 quick_decision=$(echo "$quick_result" | jq -r '.decision // empty')
 
 if [ "$quick_decision" = "block" ]; then
@@ -50,23 +69,25 @@ if [ "$quick_decision" = "block" ]; then
 fi
 
 # ============================================================================
-# Step 2: Respect stop_hook_active - never block twice in a row
+# Step 2: If a watcher is armed, exit cleanly
 # ============================================================================
 
-# stop_hook_active=true means Claude is stopping after a previous block
-# from this hook. Allow exit so we never accumulate consecutive blocks
-# (Claude Code force-ends the turn after 8 by default). Note: allow is
-# an empty object — newer Claude Code rejects {"decision": null}.
-if [ "$stop_hook_active" = "true" ]; then
+# Note: allow is an empty object — newer Claude Code rejects
+# {"decision": null}.
+if substrate watch --check "${session_args[@]}" >/dev/null 2>&1; then
+    rm -f "$nudge_stamp"
     echo '{}'
     exit 0
 fi
 
 # ============================================================================
-# Step 3: If a watcher is armed, exit cleanly
+# Step 3: Allow exit if the arming nudge already fired this cycle
 # ============================================================================
 
-if substrate watch --check $session_args >/dev/null 2>&1; then
+# We already blocked once with arming instructions this stop cycle and
+# the agent still has no watcher; allow exit rather than accumulate
+# consecutive blocks. The next user prompt or session start re-nudges.
+if [ -f "$nudge_stamp" ]; then
     echo '{}'
     exit 0
 fi
@@ -109,5 +130,8 @@ if [ -n "$session_id" ]; then
 fi
 
 reason="No mail watcher is armed. ${task_note}Arm the watcher now: run \`substrate watch --session-id ${session_id:-\$CLAUDE_SESSION_ID}\` via the Bash tool with run_in_background set to true, then end your turn. The watcher exits when mail arrives, which wakes you automatically with a digest; re-arm it after handling each wake."
+
+# Record that the nudge fired so we do not block again this cycle.
+touch "$nudge_stamp" 2>/dev/null
 
 jq -cn --arg reason "$reason" '{"decision": "block", "reason": $reason}'

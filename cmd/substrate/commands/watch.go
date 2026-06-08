@@ -46,6 +46,21 @@ var ErrWatcherArmed = &CLIError{
 	Message: "another watcher is already armed for this agent",
 }
 
+// ExitInterrupted is the exit code when the watcher is killed by a
+// signal. It follows the 128+SIGINT convention so a deliberate kill is
+// distinguishable from a wake (0) and from fatal errors (1) — the
+// agent must not treat an interrupted watcher as a wake and re-arm.
+const ExitInterrupted = 130
+
+// errWatchInterrupted is returned when SIGINT/SIGTERM cancels the
+// watcher. The message lands on stderr (not stdout), so no digest is
+// emitted and the wake notification carries an explicit do-not-re-arm
+// signal instead of empty output.
+var errWatchInterrupted = &CLIError{
+	Code:    ExitInterrupted,
+	Message: "watch interrupted by signal; not a wake, do not re-arm",
+}
+
 var watchCmd = &cobra.Command{
 	Use:   "watch",
 	Short: "Block until there is work, then exit with a digest",
@@ -67,9 +82,10 @@ Behaviors:
   - Server-down: retries with backoff internally rather than exiting.
 
 Exit codes:
-  0  woke with a digest on stdout (or --timeout expired)
-  1  fatal error (identity resolution, lease I/O)
-  5  another watcher is already armed for this agent
+  0    woke with a digest on stdout (or --timeout expired)
+  1    fatal error (identity resolution, lease I/O)
+  5    another watcher is already armed for this agent
+  130  interrupted by signal (not a wake; do not re-arm)
 
 Use --check to test the lease without arming: exit 0 if a live watcher
 is armed, exit 1 otherwise (for hook scripts).`,
@@ -169,6 +185,80 @@ func watcherArmed(agentID int64) (bool, error) {
 	return pidAlive(readLeasePID(path)), nil
 }
 
+// watchWatermarkPath returns the digest watermark file path for an
+// agent. The watermark records the highest message ID already emitted
+// in a wake digest, so a re-armed watcher does not re-wake on the same
+// unread backlog (the agent may act on a digest without marking the
+// messages read, e.g. replying via send).
+func watchWatermarkPath(agentID int64) (string, error) {
+	dir, err := watchLockDir()
+	if err != nil {
+		return "", err
+	}
+
+	return filepath.Join(
+		dir, fmt.Sprintf("agent-%d.watermark", agentID),
+	), nil
+}
+
+// readWatchWatermark returns the stored watermark for an agent, or 0
+// if missing or malformed.
+func readWatchWatermark(agentID int64) int64 {
+	path, err := watchWatermarkPath(agentID)
+	if err != nil {
+		return 0
+	}
+
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return 0
+	}
+
+	id, err := strconv.ParseInt(strings.TrimSpace(string(data)), 10, 64)
+	if err != nil {
+		return 0
+	}
+
+	return id
+}
+
+// writeWatchWatermark persists the highest digested message ID for an
+// agent. Best effort: a failed write only risks one duplicate wake.
+func writeWatchWatermark(agentID, id int64) {
+	path, err := watchWatermarkPath(agentID)
+	if err != nil {
+		return
+	}
+
+	_ = os.WriteFile(
+		path, []byte(strconv.FormatInt(id, 10)), 0o644,
+	)
+}
+
+// filterFreshMessages returns the messages with IDs above the
+// watermark, plus the highest ID seen across the fresh set (0 if
+// none). Messages at or below the watermark were already delivered in
+// a previous wake digest and must not re-trigger a wake.
+func filterFreshMessages(
+	msgs []mail.InboxMessage, watermark int64,
+) ([]mail.InboxMessage, int64) {
+	var fresh []mail.InboxMessage
+	maxID := int64(0)
+
+	for _, msg := range msgs {
+		if msg.ID <= watermark {
+			continue
+		}
+
+		fresh = append(fresh, msg)
+		if msg.ID > maxID {
+			maxID = msg.ID
+		}
+	}
+
+	return fresh, maxID
+}
+
 // acquireWatchLease claims the watcher lease for an agent by writing
 // this process's PID. Stale leases (dead PID) are reclaimed. Returns a
 // release function, or ErrWatcherArmed if a live watcher exists.
@@ -251,17 +341,31 @@ func runWatch(cmd *cobra.Command, args []string) error {
 	}
 
 	lastHeartbeat := time.Now()
+	watermark := readWatchWatermark(agentID)
 
 	for {
-		// Self-draining check: any unread mail ends the park
-		// immediately, including backlog present at arm time.
+		// Self-draining check: unread mail newer than the digest
+		// watermark ends the park immediately, including backlog
+		// that arrived while no watcher was armed. Messages at or
+		// below the watermark were already delivered in a prior
+		// wake digest, so they do not re-wake the agent — without
+		// this, an agent that acts on a digest without marking
+		// the mail read would re-arm into an instant, unbounded
+		// wake loop on the same backlog.
 		msgs, _, err := client.PollChanges(ctx, agentID, nil)
 		switch {
 		case err == nil && len(msgs) > 0:
-			fmt.Print(formatWatchDigest(
-				msgs, agentNameStr, watchMaxMsgs,
-			))
-			return nil
+			fresh, maxID := filterFreshMessages(
+				msgs, watermark,
+			)
+			if len(fresh) > 0 {
+				writeWatchWatermark(agentID, maxID)
+				fmt.Print(formatWatchDigest(
+					fresh, agentNameStr, watchMaxMsgs,
+				))
+				return nil
+			}
+			// Only already-digested backlog: keep parking.
 
 		case err != nil:
 			// Transient failure (server down, DB busy): park
@@ -269,7 +373,7 @@ func runWatch(cmd *cobra.Command, args []string) error {
 			// error. The context check below still honors
 			// kill signals during the retry sleep.
 			if !sleepCtx(ctx, watchRetryInterval) {
-				return nil
+				return errWatchInterrupted
 			}
 			continue
 		}
@@ -291,7 +395,7 @@ func runWatch(cmd *cobra.Command, args []string) error {
 		}
 
 		if !sleepCtx(ctx, watchPollInterval) {
-			return nil
+			return errWatchInterrupted
 		}
 	}
 }
