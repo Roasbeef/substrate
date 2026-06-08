@@ -31,7 +31,7 @@ suitable for Stop/SubagentStop hooks:
 
 The --always-block flag outputs {"decision": "block"} even when there are no
 messages, keeping the agent alive indefinitely (useful for main agents).
-Without it, {"decision": null} is output when no messages exist.`,
+Without it, {} (allow) is output when no messages exist.`,
 	RunE: runPoll,
 }
 
@@ -45,9 +45,12 @@ func init() {
 }
 
 // hookDecision represents the JSON output for Claude Code Stop hooks.
+// The decision field must be omitted entirely (not null) for the allow
+// case: newer Claude Code versions validate hook output strictly and
+// reject {"decision": null}.
 type hookDecision struct {
-	Decision *string `json:"decision"`         // "block" or null
-	Reason   string  `json:"reason,omitempty"` // Explanation shown to Claude
+	Decision *string `json:"decision,omitempty"` // "block" or absent
+	Reason   string  `json:"reason,omitempty"`   // Explanation shown to Claude
 }
 
 func runPoll(cmd *cobra.Command, args []string) error {

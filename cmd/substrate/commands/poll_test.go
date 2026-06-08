@@ -34,9 +34,11 @@ func TestHookDecisionBlock_NoStandbyText(t *testing.T) {
 	require.Contains(t, jsonStr, "block")
 }
 
-// TestHookDecisionAllow_NullDecision verifies that allow decisions use null
-// for the decision field (not "allow" or empty string).
-func TestHookDecisionAllow_NullDecision(t *testing.T) {
+// TestHookDecisionAllow_OmitsDecision verifies that allow decisions omit
+// the decision field entirely. Newer Claude Code versions validate hook
+// output strictly and reject {"decision": null}, so the allow case must
+// serialize as {}.
+func TestHookDecisionAllow_OmitsDecision(t *testing.T) {
 	t.Parallel()
 
 	output := hookDecision{
@@ -45,12 +47,14 @@ func TestHookDecisionAllow_NullDecision(t *testing.T) {
 
 	data, err := json.Marshal(output)
 	require.NoError(t, err)
+	require.Equal(t, "{}", string(data))
 
 	var parsed map[string]any
 	err = json.Unmarshal(data, &parsed)
 	require.NoError(t, err)
 
-	require.Nil(t, parsed["decision"])
+	_, present := parsed["decision"]
+	require.False(t, present, "decision must be absent, not null")
 }
 
 // TestHookDecisionBlock_ValidJSON verifies that block decisions produce

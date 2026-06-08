@@ -22,12 +22,14 @@ if [ -n "$session_id" ]; then
 fi
 
 # If we already blocked once and Claude processed messages, allow exit.
-# stop_hook_active=true means Claude is trying to stop after our previous block.
+# stop_hook_active=true means Claude is trying to stop after our previous
+# block. Allow is an empty object — newer Claude Code rejects
+# {"decision": null}.
 if [ "$stop_hook_active" = "true" ]; then
-    echo '{"decision": null}'
+    echo '{}'
     exit 0
 fi
 
 # First stop - quick check for messages (no long-polling).
 # Block only if there are pending messages.
-substrate poll $session_args --format hook 2>/dev/null || echo '{"decision": null}'
+substrate poll $session_args --format hook 2>/dev/null || echo '{}'
