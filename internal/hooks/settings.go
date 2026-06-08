@@ -53,10 +53,11 @@ var HookDefinitions = map[string]HookEntry{
 		Hooks: []HookCommand{{
 			Type:    "command",
 			Command: "~/.claude/hooks/substrate/stop.sh",
-			// Long timeout (4 days) keeps the agent alive indefinitely,
-			// following plannotator's strategy. The stop hook polls for
-			// new work from other agents. Ctrl+C to force exit.
-			Timeout: 345600,
+			// The stop hook is quick now: it checks mail, verifies
+			// a background watcher is armed, and at most blocks
+			// once with arming instructions. Persistence lives in
+			// `substrate watch` (a background task), not here.
+			Timeout: 60,
 		}},
 	},
 	"SubagentStop": {
