@@ -143,6 +143,7 @@ func init() {
 	rootCmd.AddCommand(searchCmd)
 	rootCmd.AddCommand(statusCmd)
 	rootCmd.AddCommand(pollCmd)
+	rootCmd.AddCommand(watchCmd)
 	rootCmd.AddCommand(identityCmd)
 	rootCmd.AddCommand(agentCmd)
 	rootCmd.AddCommand(topicsCmd)
