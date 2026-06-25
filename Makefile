@@ -140,10 +140,31 @@ ci-frontend: bun-install bun-lint bun-test
 ci: ci-go ci-frontend
 	@echo "All CI checks passed."
 
+# GOBIN is where `go install` places binaries: $(go env GOBIN), or
+# $(go env GOPATH)/bin when GOBIN is unset.
+GO_BIN_DIR := $(or $(shell go env GOBIN),$(shell go env GOPATH)/bin)
+
 .PHONY: install
 install: bun-install bun-build
 	go install $(DEV_LDFLAGS) ./cmd/substrate
 	go install $(DEV_LDFLAGS) ./cmd/substrated
+	@# Symlink into /usr/local/bin so agents spawned in sandboxes or
+	@# worktrees (workflow/SDK reviewers) — whose minimal PATH omits
+	@# the Go bin dir — can still resolve a bare `substrate`. The real
+	@# binary stays in $(GO_BIN_DIR); this only adds a PATH-visible
+	@# alias. Skipped when GOBIN already points at /usr/local/bin (the
+	@# binary is installed there directly, so a symlink would be a
+	@# self-reference) or when /usr/local/bin is not writable.
+	@if [ "$(GO_BIN_DIR)" = "/usr/local/bin" ]; then \
+		echo "Binaries installed directly to /usr/local/bin (GOBIN)"; \
+	elif [ -w /usr/local/bin ]; then \
+		ln -sf "$(GO_BIN_DIR)/substrate" /usr/local/bin/substrate; \
+		ln -sf "$(GO_BIN_DIR)/substrated" /usr/local/bin/substrated; \
+		echo "Linked substrate, substrated into /usr/local/bin"; \
+	else \
+		echo "Note: /usr/local/bin not writable; skipped symlink"; \
+		echo "  (binaries installed to $(GO_BIN_DIR))"; \
+	fi
 
 # Testing targets
 .PHONY: test
