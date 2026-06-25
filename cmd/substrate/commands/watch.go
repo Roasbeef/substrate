@@ -39,12 +39,14 @@ var watchRetryInterval = 30 * time.Second
 // not need a follow-up inbox round-trip, without flooding its context.
 const watchBodyLimit = 2000
 
-// ErrWatcherArmed is returned when another live watcher already holds
-// the lease for this agent.
-var ErrWatcherArmed = &CLIError{
-	Code:    ExitConflict,
-	Message: "another watcher is already armed for this agent",
-}
+// errAlreadyArmed is returned by acquireWatchLease when another live
+// watcher already holds the advisory lock for this agent. It is a
+// benign condition, not a fatal error: runWatch treats it as an exit-0
+// no-op rather than a conflict, so a redundant re-arm does not surface
+// as a failed background task.
+var errAlreadyArmed = errors.New(
+	"another watcher is already armed for this agent",
+)
 
 // ExitInterrupted is the exit code when the watcher is killed by a
 // signal. It follows the 128+SIGINT convention so a deliberate kill is
@@ -75,16 +77,20 @@ instruction.
 Behaviors:
   - Self-draining: if unread mail already exists on startup, the
     watcher exits immediately with the backlog.
-  - Lease: only one watcher per agent. A second invocation exits with
-    code 5 (conflict) without disturbing the first.
+  - Lease: only one watcher per agent, enforced by an advisory file
+    lock (flock). A second invocation while one is live is a benign
+    no-op: it prints an "already armed" notice and exits 0 without
+    disturbing the active watcher. The kernel releases the lock
+    automatically if a watcher dies, so there is no stale-lock or
+    PID-reuse hazard.
   - Heartbeats: sends liveness heartbeats while parked, so agent
     status stays accurate without any hook churn.
   - Server-down: retries with backoff internally rather than exiting.
 
 Exit codes:
-  0    woke with a digest on stdout (or --timeout expired)
+  0    woke with a digest on stdout, --timeout expired, or a watcher
+       was already armed (no-op; do not re-arm)
   1    fatal error (identity resolution, lease I/O)
-  5    another watcher is already armed for this agent
   130  interrupted by signal (not a wake; do not re-arm)
 
 Use --check to test the lease without arming: exit 0 if a live watcher
@@ -137,29 +143,10 @@ func watchLockPath(agentID int64) (string, error) {
 	return filepath.Join(dir, fmt.Sprintf("agent-%d.lock", agentID)), nil
 }
 
-// pidAlive reports whether a process with the given PID is running. On
-// Unix, signal 0 probes existence without delivering a signal.
-func pidAlive(pid int) bool {
-	if pid <= 0 {
-		return false
-	}
-
-	proc, err := os.FindProcess(pid)
-	if err != nil {
-		return false
-	}
-
-	err = proc.Signal(syscall.Signal(0))
-	if err == nil {
-		return true
-	}
-
-	// EPERM means the process exists but belongs to another user.
-	return errors.Is(err, syscall.EPERM)
-}
-
 // readLeasePID reads the PID stored in a lease file. Returns 0 if the
-// file does not exist or is malformed.
+// file does not exist or is malformed. The PID is advisory only: the
+// flock, not this content, is the source of truth for ownership. It is
+// written so `--check` and crash forensics can name the holder.
 func readLeasePID(path string) int {
 	data, err := os.ReadFile(path)
 	if err != nil {
@@ -174,15 +161,45 @@ func readLeasePID(path string) int {
 	return pid
 }
 
-// watcherArmed reports whether a live watcher process holds the lease
-// for the given agent.
+// watcherArmed reports whether a live watcher holds the advisory lock
+// for the given agent. It probes with a non-blocking flock: if the lock
+// is held the probe fails with EWOULDBLOCK (armed); if it succeeds no
+// watcher is live, so it immediately drops the lock again. The kernel
+// frees the lock when a holder dies, so a crashed watcher never reads
+// as armed — there is no stale-lock or PID-reuse hazard.
 func watcherArmed(agentID int64) (bool, error) {
 	path, err := watchLockPath(agentID)
 	if err != nil {
 		return false, err
 	}
 
-	return pidAlive(readLeasePID(path)), nil
+	// O_RDONLY is enough: flock is independent of the open mode, and a
+	// missing file means no watcher has ever armed.
+	f, err := os.Open(path)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return false, nil
+		}
+
+		return false, err
+	}
+	defer f.Close()
+
+	err = syscall.Flock(
+		int(f.Fd()), syscall.LOCK_EX|syscall.LOCK_NB,
+	)
+	if err != nil {
+		if errors.Is(err, syscall.EWOULDBLOCK) {
+			return true, nil
+		}
+
+		return false, err
+	}
+
+	// We took the lock, so nobody holds it. Release it before exit.
+	_ = syscall.Flock(int(f.Fd()), syscall.LOCK_UN)
+
+	return false, nil
 }
 
 // watchWatermarkPath returns the digest watermark file path for an
@@ -259,34 +276,64 @@ func filterFreshMessages(
 	return fresh, maxID
 }
 
-// acquireWatchLease claims the watcher lease for an agent by writing
-// this process's PID. Stale leases (dead PID) are reclaimed. Returns a
-// release function, or ErrWatcherArmed if a live watcher exists.
-func acquireWatchLease(agentID int64) (func(), error) {
+// watchLease holds the exclusive advisory lock for an agent's watcher.
+// The lock lives for the lifetime of the open file descriptor; closing
+// it (via release) drops the lock, and the kernel drops it too if the
+// process dies, so there is no stale-lock bookkeeping.
+type watchLease struct {
+	f *os.File
+}
+
+// acquireWatchLease claims the watcher lock for an agent with a
+// non-blocking exclusive flock. The check and the claim are a single
+// atomic kernel operation, so two watchers racing to arm cannot both
+// win — exactly one gets the lock and the rest get errAlreadyArmed.
+// This closes the TOCTOU hole in the old check-then-write lease, which
+// could leave two live watchers for one agent. Returns the held lease,
+// errAlreadyArmed if a live watcher already holds it, or a wrapped
+// error on I/O failure.
+func acquireWatchLease(agentID int64) (*watchLease, error) {
 	path, err := watchLockPath(agentID)
 	if err != nil {
 		return nil, err
 	}
 
-	if pidAlive(readLeasePID(path)) {
-		return nil, ErrWatcherArmed
-	}
-
-	pid := os.Getpid()
-	err = os.WriteFile(path, []byte(strconv.Itoa(pid)), 0o644)
+	f, err := os.OpenFile(path, os.O_CREATE|os.O_RDWR, 0o644)
 	if err != nil {
-		return nil, fmt.Errorf("failed to write lease: %w", err)
+		return nil, fmt.Errorf("failed to open lease: %w", err)
 	}
 
-	release := func() {
-		// Only remove the lease if we still own it; a successor
-		// may have reclaimed a lease we left stale.
-		if readLeasePID(path) == pid {
-			_ = os.Remove(path)
+	err = syscall.Flock(
+		int(f.Fd()), syscall.LOCK_EX|syscall.LOCK_NB,
+	)
+	if err != nil {
+		_ = f.Close()
+		if errors.Is(err, syscall.EWOULDBLOCK) {
+			return nil, errAlreadyArmed
 		}
+
+		return nil, fmt.Errorf("failed to lock lease: %w", err)
 	}
 
-	return release, nil
+	// We hold the lock. Record our PID for observability only — the
+	// flock above, not this content, gates ownership.
+	if err := f.Truncate(0); err == nil {
+		_, _ = f.WriteAt([]byte(strconv.Itoa(os.Getpid())), 0)
+	}
+
+	return &watchLease{f: f}, nil
+}
+
+// release drops the advisory lock and closes the descriptor. The lease
+// file is left in place: a waiter may already hold a descriptor on it,
+// and ownership is gated by the flock, not by the file's existence.
+func (l *watchLease) release() {
+	if l == nil || l.f == nil {
+		return
+	}
+
+	_ = syscall.Flock(int(l.f.Fd()), syscall.LOCK_UN)
+	_ = l.f.Close()
 }
 
 // runWatch implements the watch command. It arms the lease, parks until
@@ -326,11 +373,20 @@ func runWatch(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("not armed (agent %s)", agentNameStr)
 	}
 
-	release, err := acquireWatchLease(agentID)
-	if err != nil {
+	lease, err := acquireWatchLease(agentID)
+	switch {
+	case errors.Is(err, errAlreadyArmed):
+		// A live watcher already covers this agent. Re-arming is a
+		// benign no-op, not a failure: print a notice and exit 0 so
+		// the background task does not surface as a red failure and
+		// the agent does not burn a turn investigating it.
+		fmt.Print(formatAlreadyArmed(agentNameStr, agentID))
+		return nil
+
+	case err != nil:
 		return err
 	}
-	defer release()
+	defer lease.release()
 
 	// Initial heartbeat marks the agent active immediately.
 	_ = client.UpdateHeartbeat(ctx, agentID)
@@ -474,6 +530,33 @@ func formatWatchTimeout(agentName string, timeout time.Duration) string {
 		"== substrate watch: no events after %s for %s ==\n\n",
 		timeout, agentName)
 	sb.WriteString(watchRearmFooter())
+
+	return sb.String()
+}
+
+// formatAlreadyArmed renders the no-op notice emitted when a watcher is
+// re-armed while a live one already holds the lease. It exits 0, so the
+// message must make clear this is expected and that the agent should
+// NOT re-arm again — otherwise the agent could loop, arming repeatedly.
+func formatAlreadyArmed(agentName string, agentID int64) string {
+	holder := ""
+	if path, err := watchLockPath(agentID); err == nil {
+		if pid := readLeasePID(path); pid > 0 {
+			holder = fmt.Sprintf(" (held by PID %d)", pid)
+		}
+	}
+
+	var sb strings.Builder
+
+	fmt.Fprintf(&sb,
+		"== substrate watch: already armed for %s%s — no-op ==\n\n",
+		agentName, holder)
+	sb.WriteString(
+		"A live watcher is already parked for this agent, so this " +
+			"invocation did nothing. This is expected and harmless. " +
+			"Do NOT run `substrate watch` again: end your turn, and " +
+			"the existing watcher will wake you when mail arrives.\n",
+	)
 
 	return sb.String()
 }

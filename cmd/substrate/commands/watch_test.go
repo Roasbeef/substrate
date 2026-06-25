@@ -1,11 +1,13 @@
 package commands
 
 import (
+	"errors"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"strconv"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -25,11 +27,14 @@ func withTempHome(t *testing.T) string {
 }
 
 // TestWatchLeaseAcquireRelease verifies the basic lease lifecycle:
-// acquire writes our PID, release removes the file.
+// acquire takes the lock and records our PID, watcherArmed reports
+// armed while held, and release drops the lock so the agent reads as
+// unarmed again. The lease file is intentionally left in place after
+// release — ownership is gated by the flock, not the file's existence.
 func TestWatchLeaseAcquireRelease(t *testing.T) {
 	withTempHome(t)
 
-	release, err := acquireWatchLease(42)
+	lease, err := acquireWatchLease(42)
 	require.NoError(t, err)
 
 	path, err := watchLockPath(42)
@@ -40,51 +45,37 @@ func TestWatchLeaseAcquireRelease(t *testing.T) {
 	require.NoError(t, err)
 	require.True(t, armed)
 
-	release()
-
-	_, err = os.Stat(path)
-	require.True(t, os.IsNotExist(err))
+	lease.release()
 
 	armed, err = watcherArmed(42)
 	require.NoError(t, err)
-	require.False(t, armed)
+	require.False(t, armed, "lease must read unarmed after release")
 }
 
 // TestWatchLeaseConflict verifies that a live lease blocks a second
-// acquisition with ErrWatcherArmed (exit code 5, conflict).
+// acquisition with errAlreadyArmed. Because flock is keyed on the open
+// file description, a second acquire in this same process contends with
+// the first exactly as a separate process would.
 func TestWatchLeaseConflict(t *testing.T) {
 	withTempHome(t)
 
-	// Use a long-lived child process as the lease holder so the PID
-	// is alive but is not our own process.
-	cmd := exec.Command("sleep", "60")
-	require.NoError(t, cmd.Start())
-	t.Cleanup(func() {
-		_ = cmd.Process.Kill()
-		_, _ = cmd.Process.Wait()
-	})
-
-	path, err := watchLockPath(7)
+	lease, err := acquireWatchLease(7)
 	require.NoError(t, err)
-	err = os.WriteFile(
-		path, []byte(strconv.Itoa(cmd.Process.Pid)), 0o644,
-	)
-	require.NoError(t, err)
+	defer lease.release()
 
 	_, err = acquireWatchLease(7)
-	require.ErrorIs(t, err, ErrWatcherArmed)
-
-	cliErr, ok := err.(*CLIError)
-	require.True(t, ok)
-	require.Equal(t, ExitConflict, cliErr.ExitCode())
+	require.ErrorIs(t, err, errAlreadyArmed)
 }
 
-// TestWatchLeaseStaleReclaim verifies that a lease held by a dead PID
-// is reclaimed by the next acquisition.
+// TestWatchLeaseStaleReclaim verifies that a lease file left behind by
+// a dead watcher (content present, no flock held) does not block a new
+// acquisition. The kernel released the dead holder's lock, so the file
+// is just stale bytes — acquire succeeds and overwrites the PID.
 func TestWatchLeaseStaleReclaim(t *testing.T) {
 	withTempHome(t)
 
-	// Spawn and immediately reap a child so its PID is known-dead.
+	// Spawn and immediately reap a child so its PID is known-dead,
+	// then plant it as leftover lease content with no lock held.
 	cmd := exec.Command("true")
 	require.NoError(t, cmd.Run())
 	deadPID := cmd.Process.Pid
@@ -96,34 +87,69 @@ func TestWatchLeaseStaleReclaim(t *testing.T) {
 
 	armed, err := watcherArmed(9)
 	require.NoError(t, err)
-	require.False(t, armed, "dead PID should not count as armed")
+	require.False(t, armed, "unlocked stale file must not read armed")
 
-	release, err := acquireWatchLease(9)
+	lease, err := acquireWatchLease(9)
 	require.NoError(t, err)
-	defer release()
+	defer lease.release()
 
 	require.Equal(t, os.Getpid(), readLeasePID(path))
 }
 
-// TestWatchLeaseReleaseRespectsSuccessor verifies that releasing a
-// lease we no longer own (because a successor reclaimed it) does not
-// remove the successor's lease file.
-func TestWatchLeaseReleaseRespectsSuccessor(t *testing.T) {
+// TestWatchLeaseConcurrent is the core mutual-exclusion guarantee:
+// when N goroutines race to arm the same agent, exactly one wins and
+// the rest get errAlreadyArmed. The winner holds its lock until every
+// attempt has resolved, so this exercises true contention rather than
+// sequential acquire/release. This is the regression test for the
+// TOCTOU hole that previously let two live watchers share one agent.
+func TestWatchLeaseConcurrent(t *testing.T) {
 	withTempHome(t)
 
-	release, err := acquireWatchLease(11)
-	require.NoError(t, err)
+	const n = 16
 
-	// Simulate a successor overwriting the lease with another PID.
-	path, err := watchLockPath(11)
-	require.NoError(t, err)
-	err = os.WriteFile(path, []byte("999999"), 0o644)
-	require.NoError(t, err)
+	var (
+		wg      sync.WaitGroup
+		start   = make(chan struct{})
+		mu      sync.Mutex
+		winners []*watchLease
+		armedNo int
+	)
 
-	release()
+	for i := 0; i < n; i++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
 
-	// The successor's lease must survive our release.
-	require.Equal(t, 999999, readLeasePID(path))
+			// Block until released so all attempts contend at once.
+			<-start
+
+			lease, err := acquireWatchLease(123)
+
+			mu.Lock()
+			defer mu.Unlock()
+			switch {
+			case err == nil:
+				winners = append(winners, lease)
+			case errors.Is(err, errAlreadyArmed):
+				armedNo++
+			default:
+				t.Errorf("unexpected acquire error: %v", err)
+			}
+		}()
+	}
+
+	close(start)
+	wg.Wait()
+
+	require.Len(t, winners, 1, "exactly one watcher may hold the lease")
+	require.Equal(t, n-1, armedNo, "all losers must see errAlreadyArmed")
+
+	// Releasing the sole winner frees the lease for a fresh acquire.
+	winners[0].release()
+
+	lease, err := acquireWatchLease(123)
+	require.NoError(t, err)
+	lease.release()
 }
 
 // TestReadLeasePIDMalformed verifies malformed or missing lease files
@@ -138,18 +164,6 @@ func TestReadLeasePIDMalformed(t *testing.T) {
 	bad := filepath.Join(home, "bad.lock")
 	require.NoError(t, os.WriteFile(bad, []byte("not-a-pid"), 0o644))
 	require.Equal(t, 0, readLeasePID(bad))
-}
-
-// TestPidAlive verifies liveness probing for our own PID and a
-// known-dead PID.
-func TestPidAlive(t *testing.T) {
-	require.True(t, pidAlive(os.Getpid()))
-	require.False(t, pidAlive(0))
-	require.False(t, pidAlive(-1))
-
-	cmd := exec.Command("true")
-	require.NoError(t, cmd.Run())
-	require.False(t, pidAlive(cmd.Process.Pid))
 }
 
 // TestWatchWatermarkRoundTrip verifies watermark persistence: missing
