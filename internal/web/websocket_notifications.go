@@ -127,6 +127,19 @@ func (b *HubNotificationBridge) syncSubscriptions() {
 	ctx, cancel := context.WithTimeout(b.ctx, 5*time.Second)
 	defer cancel()
 
+	// Clients in the global bucket (agent_id=0) are inbox viewers that
+	// haven't picked an identity; deliver them the human operator's
+	// (User agent) notifications so dashboards update in real time.
+	if connectedAgents[0] && b.hub.server != nil {
+		userAgent, err := b.hub.server.store.GetAgentByName(
+			ctx, UserAgentName,
+		)
+		if err == nil {
+			connectedAgents[userAgent.ID] = true
+		}
+		delete(connectedAgents, 0)
+	}
+
 	// Subscribe to new agents.
 	for agentID := range connectedAgents {
 		if !b.subscriptions[agentID] {
