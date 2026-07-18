@@ -2,6 +2,7 @@
 // Separated from router.tsx to avoid circular dependencies.
 
 export const routes = {
+  command: '/command',
   inbox: '/inbox',
   inboxCategory: (category: string) => `/inbox/${category}`,
   starred: '/starred',
