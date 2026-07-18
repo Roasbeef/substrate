@@ -354,11 +354,13 @@ React 18 + TypeScript SPA built with Vite and bun in `web/frontend/`.
 **Tech stack:** TanStack Query (server state), Zustand (client state),
 Tailwind CSS (styling), Headless UI (accessible components), Playwright (E2E).
 
-The Command Center (`/command`, default landing page) is the mission-control
-view: one lane per agent with live digests, classified event timelines,
-inline plan approval/diffs, and steering composers. See
-`docs/command-center.md`. Its feed API is `GET /api/v1/command/feed`
-(hand-registered in `internal/web/api_command.go`).
+The Command Center (`/command`, default landing page) is an infinite
+canvas: draggable per-agent dossier cards on a pannable/zoomable surface
+with live digests, classified event feeds, inline plan approval/diffs,
+steering composers, liveness filters, an attention tray, and a minimap.
+See `docs/command-center.md`. Its feed API is `GET /api/v1/command/feed`
+(hand-registered in `internal/web/api_command.go`); canvas layout state
+lives in `web/frontend/src/stores/canvas.ts`.
 
 ```
 web/frontend/src/

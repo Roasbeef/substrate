@@ -1,7 +1,6 @@
-// SteerComposer is the always-visible one-line input pinned to the
-// bottom of an agent lane. It sends steering messages straight to the
-// agent, optionally as a reply to a thread the user picked via an
-// event's Reply button.
+// SteerComposer is the one-line input at the foot of an agent card.
+// It sends steering messages straight to the agent, optionally as a
+// reply to a thread picked via an event's Reply button.
 
 import { useEffect, useRef, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
@@ -94,16 +93,16 @@ export function SteerComposer({
   };
 
   return (
-    <div className="border-t border-slate-800 bg-slate-900/90 p-2">
+    <div className="border-t border-[#EDEBE4] px-3 py-2">
       {replyTarget && (
-        <div className="mb-1.5 flex items-center gap-2 rounded bg-slate-800/80 px-2 py-1 text-[11px] text-slate-400">
+        <div className="mb-1 flex items-center gap-2 text-[11px] text-[#6B7280]">
           <span className="truncate">
-            Replying to: {replyTarget.subject}
+            Reply to: {replyTarget.subject}
           </span>
           <button
             type="button"
             onClick={onClearReply}
-            className="ml-auto shrink-0 text-slate-500 hover:text-slate-300"
+            className="ml-auto shrink-0 text-[#9BA0A6] hover:text-[#4A4F55]"
             aria-label="Cancel reply"
           >
             ✕
@@ -128,17 +127,17 @@ export function SteerComposer({
               ? 'Type your reply…'
               : `Steer ${agentName}…`
           }
-          className="max-h-28 min-h-[34px] flex-1 resize-none rounded-md border border-slate-700 bg-slate-950 px-2.5 py-1.5 text-[13px] text-slate-200 placeholder:text-slate-600 focus:border-sky-600 focus:outline-none"
+          className="max-h-24 min-h-[30px] flex-1 resize-none border-b border-transparent bg-transparent py-1 text-[13px] text-[#22262A] placeholder:text-[#B0ADA4] focus:border-[#22262A] focus:outline-none"
         />
         <button
           type="button"
           onClick={() => setUrgent((v) => !v)}
           title="Mark urgent"
           className={clsx(
-            'rounded-md border px-2 py-1.5 text-[11px] font-semibold',
+            'rounded-md px-1.5 py-1 font-mono text-[11px] font-bold',
             urgent
-              ? 'border-red-500 bg-red-500/20 text-red-300'
-              : 'border-slate-700 text-slate-500 hover:text-slate-300',
+              ? 'bg-[#B3372B]/10 text-[#B3372B]'
+              : 'text-[#C0BDB4] hover:text-[#6B7280]',
           )}
         >
           !
@@ -147,7 +146,7 @@ export function SteerComposer({
           type="button"
           onClick={() => void submit()}
           disabled={!text.trim() || isSending}
-          className="rounded-md bg-sky-600 px-3 py-1.5 text-[13px] font-medium text-white hover:bg-sky-500 disabled:opacity-40"
+          className="rounded-md bg-[#22262A] px-2.5 py-1 text-[12px] font-medium text-white hover:bg-[#3A4046] disabled:opacity-30"
         >
           {isSending ? '…' : 'Send'}
         </button>

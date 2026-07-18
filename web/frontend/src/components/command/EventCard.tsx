@@ -1,6 +1,6 @@
-// EventCard renders one classified feed entry inside an agent lane.
-// Non-actionable events collapse to a single line; actionable events
-// expand with inline markdown, diff viewing, and plan approval.
+// EventCard renders one classified feed entry inside an agent card.
+// Non-actionable events collapse to a single quiet row; actionable
+// events expand with inline markdown, diff viewing, and plan approval.
 
 import { lazy, Suspense, useMemo, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
@@ -39,13 +39,13 @@ function splitBodyAndDiff(body: string): {
 
 export interface EventCardProps {
   event: CommandEvent;
-  // Called when the user hits "Reply" so the lane composer can focus
+  // Called when the user hits "Reply" so the card composer can focus
   // with the thread context attached.
   onReply: (event: CommandEvent) => void;
 }
 
 export function EventCard({ event, onReply }: EventCardProps) {
-  // Actionable events start expanded so the pane shows work items
+  // Actionable events start expanded so the canvas shows work items
   // without a click; informational ones start collapsed.
   const [expanded, setExpanded] = useState(event.needs_action);
   const [planComment, setPlanComment] = useState('');
@@ -93,76 +93,70 @@ export function EventCard({ event, onReply }: EventCardProps) {
   return (
     <div
       className={clsx(
-        'rounded-lg border border-slate-800 bg-slate-900/70',
         'border-l-2 transition-colors',
-        kind.stripe,
-        event.needs_action && 'ring-1 ring-inset ring-slate-700/60',
+        expanded ? kind.stripe : 'border-l-transparent',
       )}
     >
       {/* Collapsed row: kind icon, subject, time. */}
       <button
         type="button"
         onClick={() => setExpanded((v) => !v)}
-        className="flex w-full items-start gap-2 px-3 py-2 text-left"
+        className="flex w-full items-baseline gap-2 px-3 py-[7px] text-left hover:bg-[#F4F3EE]"
       >
-        <span className={clsx('mt-0.5 shrink-0', kind.text)}>
+        <span
+          className={clsx(
+            'relative top-[1.5px] shrink-0',
+            kind.text,
+          )}
+        >
           {kind.icon}
         </span>
-        <span className="min-w-0 flex-1">
+        <span
+          className={clsx(
+            'min-w-0 flex-1 truncate text-[13px] leading-5',
+            event.state === 'unread' && event.needs_action
+              ? 'font-semibold text-[#22262A]'
+              : 'text-[#4A4F55]',
+          )}
+        >
+          {event.subject}
+        </span>
+        {event.kind === 'plan' && event.plan_state && (
           <span
             className={clsx(
-              'block truncate text-[13px] leading-5',
-              event.state === 'unread'
-                ? 'font-semibold text-slate-100'
-                : 'text-slate-300',
+              'shrink-0 rounded-[3px] px-1 py-px font-mono text-[9.5px] uppercase tracking-[0.08em]',
+              planPending
+                ? 'bg-[#C98A1B]/12 text-[#92610E]'
+                : 'bg-[#178A5B]/10 text-[#178A5B]',
             )}
           >
-            {event.subject}
+            {event.plan_state.replace('_', ' ')}
           </span>
-          <span className="flex items-center gap-2 text-[11px] text-slate-500">
-            <span className={clsx('rounded px-1 py-px', kind.chip)}>
-              {kind.label}
-            </span>
-            {event.plan_state && event.kind === 'plan' && (
-              <span className="uppercase tracking-wide">
-                {event.plan_state.replace('_', ' ')}
-              </span>
-            )}
-            <span>{timeAgo(event.created_at)}</span>
-          </span>
+        )}
+        <span className="shrink-0 font-mono text-[10px] text-[#9BA0A6]">
+          {timeAgo(event.created_at)}
         </span>
-        <svg
-          className={clsx(
-            'mt-1 h-3 w-3 shrink-0 text-slate-600 transition-transform',
-            expanded && 'rotate-180',
-          )}
-          fill="none" viewBox="0 0 24 24" stroke="currentColor"
-          strokeWidth={2}
-        >
-          <path strokeLinecap="round" strokeLinejoin="round"
-            d="M19 9l-7 7-7-7" />
-        </svg>
       </button>
 
       {expanded && (
-        <div className="border-t border-slate-800 px-3 py-2">
+        <div className="px-3 pb-2.5 pl-[34px]">
           {/* Plan decisions live above the plan body so approving
               never requires scrolling past the full plan text. */}
           {event.kind === 'plan' && planPending && (
-            <div className="mb-2 space-y-2 rounded-md border border-violet-800/40 bg-violet-500/5 p-2">
+            <div className="mb-2 space-y-1.5">
               <input
                 type="text"
                 value={planComment}
                 onChange={(e) => setPlanComment(e.target.value)}
-                placeholder="Optional comment for the agent…"
-                className="w-full rounded border border-slate-700 bg-slate-950 px-2 py-1.5 text-[13px] text-slate-200 placeholder:text-slate-600 focus:border-slate-500 focus:outline-none"
+                placeholder="Note to agent (optional)"
+                className="w-full border-b border-[#E6E4DD] bg-transparent pb-1 text-[13px] text-[#22262A] placeholder:text-[#B0ADA4] focus:border-[#22262A] focus:outline-none"
               />
-              <div className="flex gap-2">
+              <div className="flex gap-1.5 pt-0.5">
                 <button
                   type="button"
                   onClick={() => decidePlan('approved')}
                   disabled={updatePlan.isPending}
-                  className="rounded bg-emerald-600 px-2.5 py-1.5 text-xs font-medium text-white hover:bg-emerald-500 disabled:opacity-50"
+                  className="rounded-md bg-[#178A5B] px-2.5 py-1 text-[12px] font-medium text-white hover:bg-[#116D48] disabled:opacity-50"
                 >
                   Approve
                 </button>
@@ -170,7 +164,7 @@ export function EventCard({ event, onReply }: EventCardProps) {
                   type="button"
                   onClick={() => decidePlan('changes_requested')}
                   disabled={updatePlan.isPending}
-                  className="rounded border border-slate-600 px-2.5 py-1.5 text-xs font-medium text-slate-300 hover:bg-slate-800 disabled:opacity-50"
+                  className="rounded-md border border-[#D8D6CE] px-2.5 py-1 text-[12px] font-medium text-[#4A4F55] hover:bg-[#F4F3EE] disabled:opacity-50"
                 >
                   Request changes
                 </button>
@@ -178,7 +172,7 @@ export function EventCard({ event, onReply }: EventCardProps) {
                   type="button"
                   onClick={() => decidePlan('rejected')}
                   disabled={updatePlan.isPending}
-                  className="rounded border border-rose-700/60 px-2.5 py-1.5 text-xs font-medium text-rose-300 hover:bg-rose-900/30 disabled:opacity-50"
+                  className="rounded-md px-2 py-1 text-[12px] font-medium text-[#B3372B] hover:bg-[#B3372B]/8 disabled:opacity-50"
                 >
                   Reject
                 </button>
@@ -188,13 +182,13 @@ export function EventCard({ event, onReply }: EventCardProps) {
 
           {text && (
             <div
-              className="scrollbar-thin prose prose-command max-h-96 max-w-none overflow-y-auto text-[13px] leading-relaxed text-slate-300"
+              className="scrollbar-thin prose prose-command max-h-80 max-w-none overflow-y-auto text-[13px] leading-relaxed text-[#33383D]"
               dangerouslySetInnerHTML={{ __html: renderedBody }}
             />
           )}
 
           {patch && (
-            <div className="mt-2 overflow-hidden rounded border border-slate-800">
+            <div className="mt-2 overflow-hidden rounded-md border border-[#E6E4DD]">
               <Suspense
                 fallback={
                   <div className="flex justify-center p-4">
@@ -207,20 +201,20 @@ export function EventCard({ event, onReply }: EventCardProps) {
             </div>
           )}
 
-          <div className="mt-2 flex items-center gap-3">
+          <div className="mt-1.5 flex items-center gap-3">
             <button
               type="button"
               onClick={() => onReply(event)}
-              className="text-[12px] font-medium text-sky-400 hover:text-sky-300"
+              className="text-[12px] font-medium text-[#33608D] hover:underline"
             >
               Reply
             </button>
             {event.thread_id && (
               <a
                 href={`/thread/${event.thread_id}`}
-                className="text-[12px] text-slate-500 hover:text-slate-300"
+                className="text-[12px] text-[#9BA0A6] hover:text-[#4A4F55]"
               >
-                Open thread →
+                Open thread
               </a>
             )}
           </div>

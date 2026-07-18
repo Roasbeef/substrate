@@ -333,74 +333,17 @@
     font-size: 0.875rem;
   }
 
-  /* Dark variant for markdown rendered on the command center surface. */
-  .prose-command strong {
-    color: #E2E8F0;
-  }
-
-  .prose-command h1, .prose-command h2, .prose-command h3,
-  .prose-command h4 {
-    color: #E2E8F0;
-  }
-
+  /* Compact markdown sizing for command canvas cards. */
   .prose-command h1 {
-    font-size: 1.1em;
+    font-size: 1.05em;
   }
 
   .prose-command h2 {
-    font-size: 1.05em;
+    font-size: 1em;
   }
 
   .prose-command h3, .prose-command h4 {
     font-size: 1em;
-  }
-
-  .prose-command code {
-    background-color: rgba(148, 163, 184, 0.15);
-    color: #BAE6FD;
-  }
-
-  .prose-command pre {
-    background-color: #020617;
-    border: 1px solid #1E293B;
-  }
-
-  .prose-command pre code {
-    color: #CBD5E1;
-  }
-
-  .prose-command blockquote {
-    border-left-color: #334155;
-    color: #94A3B8;
-  }
-
-  .prose-command a {
-    color: #7DD3FC;
-  }
-
-  .prose-command a:hover {
-    color: #BAE6FD;
-  }
-
-  .prose-command hr {
-    border-top-color: #1E293B;
-  }
-
-  .prose-command thead {
-    border-bottom-color: #334155;
-  }
-
-  .prose-command th {
-    color: #E2E8F0;
-    background-color: rgba(30, 41, 59, 0.6);
-  }
-
-  .prose-command td {
-    border-bottom-color: #1E293B;
-  }
-
-  .prose-command tbody tr:hover {
-    background-color: rgba(30, 41, 59, 0.4);
   }
 }
 
@@ -415,5 +358,51 @@
   a:focus:not(:focus-visible),
   input:focus:not(:focus-visible) {
     outline: none;
+  }
+}
+
+/* Command canvas surface and the heartbeat trace signature element. */
+@layer components {
+  .canvas-dots {
+    background-color: #F7F6F3;
+    background-image: radial-gradient(#DDDBD2 1px, transparent 1.2px);
+  }
+
+  .trace-beat {
+    stroke-dasharray: 110;
+    stroke-dashoffset: 110;
+    animation: trace-sweep 2.4s linear infinite;
+  }
+
+  .trace-idle {
+    animation: trace-fade 3.6s ease-in-out infinite;
+  }
+
+  @keyframes trace-sweep {
+    0% {
+      stroke-dashoffset: 110;
+      opacity: 0.25;
+    }
+    45% {
+      stroke-dashoffset: 0;
+      opacity: 1;
+    }
+    70% {
+      stroke-dashoffset: 0;
+      opacity: 1;
+    }
+    100% {
+      stroke-dashoffset: -110;
+      opacity: 0.25;
+    }
+  }
+
+  @keyframes trace-fade {
+    0%, 100% {
+      opacity: 0.35;
+    }
+    50% {
+      opacity: 0.9;
+    }
   }
 }
