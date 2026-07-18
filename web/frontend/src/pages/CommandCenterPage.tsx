@@ -52,8 +52,7 @@ export default function CommandCenterPage() {
   const filters = useCanvasStore((s) => s.filters);
   const toggleFilter = useCanvasStore((s) => s.toggleFilter);
   const zOrder = useCanvasStore((s) => s.zOrder);
-  const openCard = useCanvasStore((s) => s.openCard);
-  const setOpenCard = useCanvasStore((s) => s.setOpenCard);
+  const sizes = useCanvasStore((s) => s.sizes);
   const bringToFront = useCanvasStore((s) => s.bringToFront);
 
   const containerRef = useRef<HTMLDivElement>(null);
@@ -227,10 +226,11 @@ export default function CommandCenterPage() {
       if (!p) {
         continue;
       }
+      const s = sizes[lane.agent.id];
       minX = Math.min(minX, p.x);
       minY = Math.min(minY, p.y);
-      maxX = Math.max(maxX, p.x + CARD_WIDTH);
-      maxY = Math.max(maxY, p.y + 460);
+      maxX = Math.max(maxX, p.x + (s?.w ?? CARD_WIDTH));
+      maxY = Math.max(maxY, p.y + (s?.h ?? 460));
     }
     const pad = 48;
     const spanX = maxX - minX + pad * 2;
@@ -249,7 +249,7 @@ export default function CommandCenterPage() {
         (screen.height - spanY * scale) / 2,
       scale,
     });
-  }, [visibleLanes, positions, screen, setViewport]);
+  }, [visibleLanes, positions, sizes, screen, setViewport]);
 
   // flyTo centers the viewport on an agent's card.
   const flyTo = useCallback(
@@ -338,9 +338,9 @@ export default function CommandCenterPage() {
               lane={lane}
               summary={summariesByAgent.get(lane.agent.id)}
               position={p}
+              size={sizes[lane.agent.id]}
               scale={viewport.scale}
               zIndex={zOrder[lane.agent.id] ?? 1}
-              open={openCard === lane.agent.id}
             />
           );
         })}
@@ -443,22 +443,9 @@ export default function CommandCenterPage() {
 
         {/* Hint line, bottom-left. */}
         <p className="absolute bottom-4 left-4 select-none font-mono text-[10px] text-[#B0ADA4]">
-          drag cards · drag canvas to pan · ⌘+scroll to zoom
+          drag cards · corner resizes · drag canvas to pan · ⌘+scroll to zoom
         </p>
       </div>
-
-      {/* Card widen overlay close target: clicking the backdrop when a
-          card is open shrinks it back. */}
-      {openCard !== null && (
-        <button
-          type="button"
-          aria-label="Close expanded card"
-          className="absolute inset-0 -z-0 cursor-default"
-          onClick={() => setOpenCard(null)}
-          tabIndex={-1}
-          style={{ background: 'transparent', pointerEvents: 'none' }}
-        />
-      )}
     </div>
   );
 }

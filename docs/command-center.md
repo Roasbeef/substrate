@@ -28,7 +28,8 @@ of the web UI.
 Each card is one agent's dossier:
 
 - **Header** — name, the heartbeat trace (see below), last-seen time,
-  unread count, and a widen/shrink toggle; drag it to move the card.
+  and unread count; drag it to move the card. Drag the bottom-right
+  corner to resize — sizes persist alongside positions.
 - **Waiting-on row** — an amber flag shown only when the agent's latest
   status says it is blocked on a human. Benign values ("nothing yet",
   "none") never surface.

@@ -8,7 +8,7 @@ import { clsx } from 'clsx';
 import type { CommandEvent, CommandLane } from '@/api/command.js';
 import type { AgentSummary } from '@/types/api.js';
 import { useCanvasStore } from '@/stores/canvas.js';
-import type { CardPosition } from '@/stores/canvas.js';
+import type { CardPosition, CardSize } from '@/stores/canvas.js';
 import { EventCard } from './EventCard.js';
 import { SteerComposer } from './SteerComposer.js';
 import type { ReplyTarget } from './SteerComposer.js';
@@ -22,20 +22,22 @@ export interface AgentCanvasCardProps {
   lane: CommandLane;
   summary?: AgentSummary | undefined;
   position: CardPosition;
+  // Explicit size from drag-resizing; undefined means default width
+  // with automatic height.
+  size?: CardSize | undefined;
   // Current canvas zoom, needed to convert pointer deltas into canvas
   // coordinates while dragging.
   scale: number;
   zIndex: number;
-  open: boolean;
 }
 
 export function AgentCanvasCard({
   lane,
   summary,
   position,
+  size,
   scale,
   zIndex,
-  open,
 }: AgentCanvasCardProps) {
   const { agent } = lane;
   const [replyTarget, setReplyTarget] = useState<ReplyTarget | null>(
@@ -43,10 +45,11 @@ export function AgentCanvasCard({
   );
   const [showAll, setShowAll] = useState(false);
   const [dragging, setDragging] = useState(false);
+  const [resizing, setResizing] = useState(false);
 
   const setPosition = useCanvasStore((s) => s.setPosition);
+  const setSize = useCanvasStore((s) => s.setSize);
   const bringToFront = useCanvasStore((s) => s.bringToFront);
-  const setOpenCard = useCanvasStore((s) => s.setOpenCard);
 
   // Drag bookkeeping lives in a ref; only the store position renders.
   const dragRef = useRef<{
@@ -56,6 +59,15 @@ export function AgentCanvasCard({
     origX: number;
     origY: number;
     moved: boolean;
+  } | null>(null);
+
+  // Resize bookkeeping for the corner handle.
+  const resizeRef = useRef<{
+    pointerId: number;
+    startX: number;
+    startY: number;
+    origW: number;
+    origH: number;
   } | null>(null);
 
   const visibleEvents = useMemo(
@@ -112,6 +124,46 @@ export function AgentCanvasCard({
     }
   };
 
+  // Corner handle: drag to resize the card in canvas coordinates.
+  const onResizePointerDown = (e: React.PointerEvent) => {
+    if (e.button !== 0) {
+      return;
+    }
+    e.stopPropagation();
+    (e.target as Element).setPointerCapture?.(e.pointerId);
+    // Measure the rendered card so auto-height cards don't jump on
+    // the first resize. offsetWidth/Height are pre-transform values,
+    // i.e. already in canvas units.
+    const card = e.currentTarget.parentElement as HTMLElement;
+    resizeRef.current = {
+      pointerId: e.pointerId,
+      startX: e.clientX,
+      startY: e.clientY,
+      origW: card?.offsetWidth ?? size?.w ?? 380,
+      origH: card?.offsetHeight ?? size?.h ?? 480,
+    };
+    setResizing(true);
+    bringToFront(agent.id);
+  };
+
+  const onResizePointerMove = (e: React.PointerEvent) => {
+    const r = resizeRef.current;
+    if (!r || e.pointerId !== r.pointerId) {
+      return;
+    }
+    setSize(agent.id, {
+      w: r.origW + (e.clientX - r.startX) / scale,
+      h: r.origH + (e.clientY - r.startY) / scale,
+    });
+  };
+
+  const onResizePointerUp = (e: React.PointerEvent) => {
+    if (resizeRef.current?.pointerId === e.pointerId) {
+      resizeRef.current = null;
+      setResizing(false);
+    }
+  };
+
   return (
     <article
       id={`card-${agent.id}`}
@@ -124,18 +176,21 @@ export function AgentCanvasCard({
       }}
       onWheel={(e) => e.stopPropagation()}
       className={clsx(
-        'absolute flex max-h-[640px] flex-col overflow-hidden rounded-xl',
+        'absolute flex flex-col overflow-hidden rounded-xl',
         'border bg-white',
-        dragging
+        dragging || resizing
           ? 'border-[#C9C7BF] shadow-[0_12px_32px_rgba(28,32,36,0.16)]'
           : 'border-[#E6E4DD] shadow-[0_1px_2px_rgba(28,32,36,0.05),0_10px_28px_rgba(28,32,36,0.07)]',
-        'transition-[width,box-shadow] duration-150',
+        !resizing && 'transition-shadow duration-150',
       )}
       style={{
         left: 0,
         top: 0,
         transform: `translate(${position.x}px, ${position.y}px)`,
-        width: open ? 600 : 380,
+        width: size?.w ?? 380,
+        ...(size
+          ? { height: size.h }
+          : { maxHeight: 640 }),
         zIndex,
       }}
     >
@@ -163,29 +218,6 @@ export function AgentCanvasCard({
               {lane.unread_count}
             </span>
           )}
-          <button
-            type="button"
-            onPointerDown={(e) => e.stopPropagation()}
-            onClick={() => setOpenCard(open ? null : agent.id)}
-            title={open ? 'Shrink card' : 'Widen card'}
-            className="rounded p-0.5 text-[#B0ADA4] hover:bg-[#F4F3EE] hover:text-[#4A4F55]"
-          >
-            {open ? (
-              <svg className="h-3.5 w-3.5" fill="none"
-                viewBox="0 0 24 24" stroke="currentColor"
-                strokeWidth={1.8}>
-                <path strokeLinecap="round" strokeLinejoin="round"
-                  d="M9 9L4 4m0 0v4m0-4h4m7 5l5-5m0 0v4m0-4h-4M9 15l-5 5m0 0v-4m0 4h4m7-5l5 5m0 0v-4m0 4h-4" />
-              </svg>
-            ) : (
-              <svg className="h-3.5 w-3.5" fill="none"
-                viewBox="0 0 24 24" stroke="currentColor"
-                strokeWidth={1.8}>
-                <path strokeLinecap="round" strokeLinejoin="round"
-                  d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4" />
-              </svg>
-            )}
-          </button>
         </div>
         <p className="mt-0.5 truncate font-mono text-[10.5px] text-[#8A8F96]">
           {agent.project_key || 'unassigned'}
@@ -260,6 +292,23 @@ export function AgentCanvasCard({
         replyTarget={replyTarget}
         onClearReply={() => setReplyTarget(null)}
       />
+
+      {/* Corner resize handle: drag to grow or shrink the card. */}
+      <div
+        role="presentation"
+        title="Drag to resize"
+        onPointerDown={onResizePointerDown}
+        onPointerMove={onResizePointerMove}
+        onPointerUp={onResizePointerUp}
+        className="absolute bottom-0 right-0 flex h-5 w-5 cursor-nwse-resize items-end justify-end p-[3px] text-[#C9C7BF] hover:text-[#8A8F96]"
+        style={{ touchAction: 'none' }}
+      >
+        <svg className="h-2.5 w-2.5" viewBox="0 0 10 10"
+          fill="none" stroke="currentColor" strokeWidth={1.4}
+          strokeLinecap="round">
+          <path d="M9 1L1 9M9 5L5 9" />
+        </svg>
+      </div>
     </article>
   );
 }

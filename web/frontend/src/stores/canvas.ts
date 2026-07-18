@@ -11,6 +11,19 @@ export interface CardPosition {
   y: number;
 }
 
+// A card's explicit size, set by drag-resizing. Cards without a stored
+// size use the default width with automatic height.
+export interface CardSize {
+  w: number;
+  h: number;
+}
+
+// Resize clamps keep cards usable at both extremes.
+export const MIN_CARD_W = 320;
+export const MAX_CARD_W = 820;
+export const MIN_CARD_H = 220;
+export const MAX_CARD_H = 940;
+
 // The viewport transform: canvas offset and zoom scale.
 export interface Viewport {
   x: number;
@@ -32,20 +45,20 @@ const CARD_HEIGHT_ESTIMATE = 420;
 
 interface CanvasState {
   positions: Record<number, CardPosition>;
+  sizes: Record<number, CardSize>;
   viewport: Viewport;
   filters: StatusFilters;
   // Monotonic counter handing out z-order; the last touched card sits
   // on top.
   zTop: number;
   zOrder: Record<number, number>;
-  openCard: number | null;
 
   setPosition: (agentId: number, pos: CardPosition) => void;
+  setSize: (agentId: number, size: CardSize) => void;
   ensurePositions: (agentIds: number[]) => void;
   setViewport: (v: Viewport) => void;
   toggleFilter: (key: keyof StatusFilters) => void;
   bringToFront: (agentId: number) => void;
-  setOpenCard: (agentId: number | null) => void;
 }
 
 // autoPlace lays out cards without stored positions in rows of three,
@@ -92,15 +105,30 @@ export const useCanvasStore = create<CanvasState>()(
   persist(
     (set, get) => ({
       positions: {},
+      sizes: {},
       viewport: { x: 0, y: 0, scale: 1 },
       filters: { active: true, idle: false, offline: false },
       zTop: 1,
       zOrder: {},
-      openCard: null,
 
       setPosition: (agentId, pos) =>
         set((s) => ({
           positions: { ...s.positions, [agentId]: pos },
+        })),
+
+      setSize: (agentId, size) =>
+        set((s) => ({
+          sizes: {
+            ...s.sizes,
+            [agentId]: {
+              w: Math.min(
+                MAX_CARD_W, Math.max(MIN_CARD_W, size.w),
+              ),
+              h: Math.min(
+                MAX_CARD_H, Math.max(MIN_CARD_H, size.h),
+              ),
+            },
+          },
         })),
 
       ensurePositions: (agentIds) => {
@@ -124,13 +152,12 @@ export const useCanvasStore = create<CanvasState>()(
           zTop: s.zTop + 1,
           zOrder: { ...s.zOrder, [agentId]: s.zTop + 1 },
         })),
-
-      setOpenCard: (openCard) => set({ openCard }),
     }),
     {
       name: 'substrate-command-canvas',
       partialize: (s) => ({
         positions: s.positions,
+        sizes: s.sizes,
         viewport: s.viewport,
         filters: s.filters,
       }),
