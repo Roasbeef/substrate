@@ -24,6 +24,19 @@ interface NavItem {
 }
 
 // Icon components for navigation.
+function CommandIcon() {
+  return (
+    <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+      <path
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        strokeWidth={2}
+        d="M9 3H5a2 2 0 00-2 2v4m6-6h10a2 2 0 012 2v4M9 3v18m0 0h10a2 2 0 002-2V9M9 21H5a2 2 0 01-2-2V9m0 0h18"
+      />
+    </svg>
+  );
+}
+
 function InboxIcon() {
   return (
     <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -173,6 +186,7 @@ function SmallPlusIcon() {
 
 // Default navigation items.
 const navItems: NavItem[] = [
+  { id: 'command', label: 'Command', path: routes.command, icon: <CommandIcon /> },
   { id: 'inbox', label: 'Inbox', path: routes.inbox, icon: <InboxIcon /> },
   { id: 'sent', label: 'Sent', path: routes.sent, icon: <SendIcon /> },
   { id: 'agents', label: 'Agents', path: routes.agents, icon: <UsersIcon /> },
@@ -368,6 +382,7 @@ function useActiveSection(): SidebarSection {
   const location = useLocation();
   const path = location.pathname;
 
+  if (path.startsWith('/command')) return 'command';
   if (path.startsWith('/agents')) return 'agents';
   if (path.startsWith('/reviews')) return 'reviews';
   if (path.startsWith('/tasks')) return 'tasks';

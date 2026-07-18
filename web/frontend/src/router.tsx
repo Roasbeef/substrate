@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/Button';
 
 // Lazy load pages for code splitting.
 const InboxPage = lazy(() => import('@/pages/InboxPage'));
+const CommandCenterPage = lazy(() => import('@/pages/CommandCenterPage'));
 const AgentsDashboard = lazy(() => import('@/pages/AgentsDashboard'));
 const SessionsPage = lazy(() => import('@/pages/SessionsPage'));
 const SettingsPage = lazy(() => import('@/pages/SettingsPage'));
@@ -115,10 +116,16 @@ export const router = createBrowserRouter([
     element: <RootLayout />,
     errorElement: <RouteErrorBoundary />,
     children: [
-      // Default redirect to inbox.
+      // Default redirect to the command center.
       {
         index: true,
-        element: <Navigate to="/inbox" replace />,
+        element: <Navigate to="/command" replace />,
+      },
+      // Command center route.
+      {
+        path: 'command',
+        element: <CommandCenterPage />,
+        errorElement: <RouteErrorBoundary />,
       },
       // Inbox routes.
       {
