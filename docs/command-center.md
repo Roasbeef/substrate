@@ -1,75 +1,79 @@
 # Command Center
 
-The Command Center (`/command`) is the mission-control view for running a
-fleet of long-lived autonomous agents. It replaces "check five pages" with
-one infinite, horizontally scrolling pane: one live lane per agent, plus a
-cross-agent attention queue. It is the default landing page of the web UI.
+The Command Center (`/command`) is an infinite canvas for running a fleet
+of long-lived autonomous agents. Every agent is a draggable dossier card
+on a pannable, zoomable surface — arrange the agents you're actively
+steering side by side, park the rest off-screen, and let the attention
+tray pull you to whatever needs a human. It is the default landing page
+of the web UI.
 
-![Command Center](images/command-center.png)
+![Command Center canvas](images/command-center.png)
 
-## Layout
+## The canvas
 
-```
-┌────────────┬──────────────┬──────────────┬──────────────┬───▶ scroll
-│  Needs you │  Agent lane  │  Agent lane  │  Agent lane  │
-│  (queue)   │              │              │              │
-│            │  header      │  header      │  header      │
-│  [plan]    │  digest      │  digest      │  digest      │
-│  [question]│  events…     │  events…     │  events…     │
-│            │  composer    │  composer    │  composer    │
-└────────────┴──────────────┴──────────────┴──────────────┴───▶
-```
+- **Pan** by dragging empty canvas (or scrolling); **zoom** with
+  ⌘/Ctrl+scroll, the − / + controls, or **Fit** to frame every visible
+  card. The viewport and zoom persist across reloads.
+- **Drag cards** by their header to arrange them; positions are
+  remembered per agent (localStorage).
+- **Filters** (top right) show one chip per liveness bucket with counts:
+  `live` (active + busy), `idle`, `off`. Live agents are on by default;
+  agents that need the operator are always shown regardless of filters.
+- The **minimap** (bottom right) shows card footprints — amber when the
+  card needs you, green when live — plus the current viewport rectangle;
+  click to jump.
 
-### Attention queue ("Needs you")
+## Agent cards
 
-Aggregates everything actionable across all agents, most pressing first:
+Each card is one agent's dossier:
 
-- **Plans** awaiting approval
-- **Questions** (urgent messages, interrogative subjects, decision requests)
-- **Urgent** unread messages
-- **Blocked** agents whose latest status reports waiting on a human
-
-Clicking an item focuses the owning agent's lane.
-
-### Agent lanes
-
-Lanes are ordered by "needs me first", then liveness (busy/active → idle →
-offline), then recency. Each lane contains:
-
-- **Header** — status pulse, project key, git branch, unread badge, and a
-  focus toggle that widens the lane (click-to-focus, click again to
-  collapse).
-- **Digest** — the agent's live activity summary (from the Haiku
-  summarizer) with delta, falling back to the agent's registered purpose,
-  plus an amber "waiting on" chip when the agent is blocked on you.
-- **Event timeline** — classified message traffic, newest first. Kinds:
+- **Header** — name, the heartbeat trace (see below), last-seen time,
+  unread count, and a widen/shrink toggle; drag it to move the card.
+- **Waiting-on row** — an amber flag shown only when the agent's latest
+  status says it is blocked on a human. Benign values ("nothing yet",
+  "none") never surface.
+- **Digest** — the live activity summary from the Haiku summarizer with
+  its delta, falling back to the agent's registered purpose.
+- **Event feed** — classified message traffic, newest first. Kinds:
   `plan`, `diff`, `question`, `review`, `status`, `message`. Actionable
-  events start expanded; informational ones collapse to a single line.
-  Plans render inline **Approve / Request changes / Reject** controls
-  (decision buttons above the plan body); diffs render the full syntax-
-  highlighted diff viewer inline.
-- **Steer composer** — pinned to the lane bottom. Sends a direct message
-  to the agent (Enter to send, `!` toggles urgent). Hitting **Reply** on an
+  events start expanded with a colored edge; informational ones collapse
+  to a single line, and anything past six folds behind an `n older`
+  control. Plans render inline **Approve / Request changes / Reject**
+  controls above the plan body; diffs embed the syntax-highlighted diff
+  viewer.
+- **Steer composer** — one line pinned to the card foot. Enter sends a
+  direct message to the agent, `!` toggles urgent, and **Reply** on any
   event retargets the composer at that thread.
 
-![Focused lane with inline diff](images/command-center-focused-diff.png)
+### The heartbeat trace
+
+The card header carries the canvas's signature element: a small EKG
+trace. Active agents beat in green, idle agents drift in a slow amber
+wave, offline agents flatline as a dotted rule. Liveness is legible at a
+glance across the whole canvas without a single status word.
+
+![All agents visible on the canvas](images/command-center-canvas-all.png)
+
+## Attention tray
+
+The floating "Needs you" tray (top left) aggregates everything
+actionable across the fleet — plans awaiting approval, open questions,
+urgent unread messages, and blocked agents — most pressing first.
+Selecting an item flies the viewport to the owning agent's card.
 
 ## Noise control
 
 Real-time updates arrive over the existing WebSocket hub, but visual
-weight is proportional to actionability:
-
-- Heartbeats only refresh the header status dot — no feed entries.
-- Status updates and diffs collapse to one line until expanded.
-- Questions, urgent messages, and pending plans get accent stripes, start
-  expanded, and surface in the attention queue.
-- Lanes beyond eight events fold behind a "Show older" control.
+weight is proportional to actionability: heartbeats only animate the
+trace, status updates and diffs stay collapsed until expanded, while
+questions, urgent messages, and pending plans get accent edges, start
+expanded, and surface in the tray.
 
 ## Backend
 
 `GET /api/v1/command/feed` (hand-registered in
 `internal/web/api_command.go`, outside the grpc-gateway) aggregates the
-whole pane in one round trip:
+whole canvas in one round trip:
 
 ```json
 {
@@ -103,14 +107,13 @@ functions: `[PLAN]`/plan-review linkage → plan, the
 `<!-- substrate:diff -->` marker or `[Diff]` prefix → diff, urgent
 priority / interrogative subject / "decision needed" markers → question,
 `[Status]`-family prefixes → status. Status bodies have their trailing
-`Waiting for: …` line parsed out; benign values ("nothing yet", "none")
-are filtered so the waiting chip only appears when a human is actually
-needed.
+`Waiting for: …` line parsed out; benign values are filtered so the
+waiting flag only appears when a human is actually needed.
 
 Real-time delivery reuses the WebSocket hub (`new_message`,
 `agent_update`, `task_update`, `summary_updated`). Viewers connected in
 the global bucket (agent_id=0) are subscribed to the **User** agent's
-mail notifications so the pane updates even before an identity is
+mail notifications so the canvas updates even before an identity is
 selected.
 
 Interactions reuse existing APIs: steering goes through `POST
