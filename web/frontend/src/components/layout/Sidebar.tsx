@@ -8,6 +8,7 @@ import { useUIStore, type SidebarSection } from '@/stores/ui.js';
 import { useAgentsStatus } from '@/hooks/useAgents.js';
 import { useTopics } from '@/hooks/useTopics.js';
 import { routes } from '@/lib/routes.js';
+import { HeartbeatTrace } from '@/components/command/HeartbeatTrace.js';
 
 // Combine clsx and tailwind-merge for class name handling.
 function cn(...inputs: (string | undefined | null | false)[]) {
@@ -186,10 +187,10 @@ function SmallPlusIcon() {
 
 // Default navigation items.
 const navItems: NavItem[] = [
-  { id: 'command', label: 'Command', path: routes.command, icon: <CommandIcon /> },
-  { id: 'inbox', label: 'Inbox', path: routes.inbox, icon: <InboxIcon /> },
+  { id: 'command', label: 'Canvas', path: routes.command, icon: <CommandIcon /> },
+  { id: 'inbox', label: 'Signals', path: routes.inbox, icon: <InboxIcon /> },
   { id: 'sent', label: 'Sent', path: routes.sent, icon: <SendIcon /> },
-  { id: 'agents', label: 'Agents', path: routes.agents, icon: <UsersIcon /> },
+  { id: 'agents', label: 'Fleet', path: routes.agents, icon: <UsersIcon /> },
   { id: 'reviews', label: 'Reviews', path: routes.reviews, icon: <CodeReviewIcon /> },
   { id: 'tasks', label: 'Tasks', path: routes.tasks, icon: <TasksIcon /> },
   { id: 'plans', label: 'Plans', path: routes.plans, icon: <PlansIcon /> },
@@ -220,20 +221,20 @@ function NavLink({ item, isActive, collapsed = false }: NavLinkProps) {
       className={cn(
         'flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors',
         isActive
-          ? 'bg-blue-50 text-blue-700'
-          : 'text-gray-700 hover:bg-gray-100 hover:text-gray-900',
+          ? 'border border-[#E6E4DD] bg-white font-semibold text-[#22262A] shadow-[0_1px_2px_rgba(28,32,36,0.06)]'
+          : 'text-[#6B7280] hover:bg-[#F1EFE9] hover:text-[#22262A]',
         collapsed ? 'justify-center' : '',
       )}
       title={collapsed ? item.label : undefined}
     >
-      <span className={cn(isActive ? 'text-blue-600' : 'text-gray-400')}>
+      <span className={cn(isActive ? 'text-[#22262A]' : 'text-[#B0ADA4]')}>
         {item.icon}
       </span>
       {!collapsed ? (
         <>
           <span className="flex-1">{item.label}</span>
           {item.badge && item.badge > 0 ? (
-            <span className="rounded-full bg-blue-100 px-2 py-0.5 text-xs font-medium text-blue-700">
+            <span className="font-mono text-[10.5px] text-[#9BA0A6]">
               {item.badge}
             </span>
           ) : null}
@@ -277,7 +278,7 @@ function SidebarSectionHeader({
         <span className="text-gray-400">{icon}</span>
         <span>{label}</span>
         {count !== undefined && count > 0 ? (
-          <span className="rounded-full bg-gray-100 px-2 py-0.5 text-xs text-gray-500">
+          <span className="font-mono text-[10.5px] text-[#9BA0A6]">
             {count}
           </span>
         ) : null}
@@ -286,7 +287,7 @@ function SidebarSectionHeader({
         <button
           type="button"
           onClick={onAddClick}
-          className="rounded p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-600"
+          className="rounded p-1 text-[#B0ADA4] hover:bg-[#F1EFE9] hover:text-[#4A4F55]"
           title={`Add ${label.slice(0, -1)}`}
         >
           <SmallPlusIcon />
@@ -312,18 +313,18 @@ function TopicItem({ name, messageCount, onClick, isActive = false }: TopicItemP
       className={cn(
         'flex w-full items-center gap-2 rounded-lg px-3 py-1.5 text-sm',
         isActive
-          ? 'bg-blue-50 text-blue-700'
-          : 'text-gray-700 hover:bg-gray-100',
+          ? 'bg-[#F1EFE9] text-[#22262A]'
+          : 'text-[#6B7280] hover:bg-[#F1EFE9]',
       )}
     >
-      <span className={isActive ? 'text-blue-500' : 'text-gray-400'}>
+      <span className={isActive ? 'text-[#22262A]' : 'text-[#B0ADA4]'}>
         <HashtagIcon />
       </span>
       <span className="flex-1 truncate text-left">{name}</span>
       {messageCount !== undefined && messageCount > 0 ? (
         <span className={cn(
           'text-xs',
-          isActive ? 'text-blue-600' : 'text-gray-400',
+          isActive ? 'text-[#22262A]' : 'text-[#9BA0A6]',
         )}>{messageCount}</span>
       ) : null}
     </button>
@@ -338,27 +339,15 @@ interface AgentItemProps {
 }
 
 function AgentItem({ name, status, onClick }: AgentItemProps) {
-  const statusColors = {
-    active: 'bg-green-400',
-    busy: 'bg-yellow-400',
-    idle: 'bg-gray-400',
-    offline: 'bg-gray-300',
-  };
-
   return (
     <button
       type="button"
       onClick={onClick}
-      className="flex w-full items-center gap-2 rounded-lg px-3 py-1.5 text-sm text-gray-700 hover:bg-gray-100"
+      className="flex w-full items-center gap-2.5 rounded-lg px-3 py-1.5 text-sm text-[#6B7280] hover:bg-[#F1EFE9] hover:text-[#22262A]"
+      title={status}
     >
-      <span className="text-gray-400">
-        <UserCircleIcon />
-      </span>
+      <HeartbeatTrace status={status} className="w-9 shrink-0" />
       <span className="flex-1 truncate text-left">{name}</span>
-      <span
-        className={cn('h-2 w-2 rounded-full', statusColors[status])}
-        title={status}
-      />
     </button>
   );
 }
@@ -430,7 +419,7 @@ export function Sidebar({
   return (
     <aside
       className={cn(
-        'flex h-full w-64 flex-col border-r border-gray-200 bg-white',
+        'flex h-full w-64 flex-col border-r border-[#E6E4DD] bg-[#F7F6F3]',
         className,
       )}
     >
@@ -443,9 +432,9 @@ export function Sidebar({
             onClick={() => openModal('compose')}
             className={cn(
               'flex w-full items-center justify-center gap-2 rounded-2xl px-6 py-3',
-              'bg-blue-600 text-white font-medium shadow-md',
-              'hover:bg-blue-700 hover:shadow-lg transition-all',
-              'focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2',
+              'bg-[#22262A] text-white font-medium',
+              'hover:bg-[#3A4046] transition-colors',
+              'focus:outline-none focus:ring-2 focus:ring-[#22262A]/30 focus:ring-offset-2',
             )}
           >
             <PlusIcon />
@@ -525,7 +514,7 @@ export function Sidebar({
         <div className="border-t border-gray-200 p-3">
           <Link
             to={routes.settings}
-            className="flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-100"
+            className="flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium text-[#6B7280] hover:bg-[#F1EFE9] hover:text-[#22262A]"
           >
             <span className="text-gray-400">
               <SettingsIcon />
@@ -546,7 +535,7 @@ export function CollapsedSidebar({ className }: { className?: string }) {
   return (
     <aside
       className={cn(
-        'flex h-full w-16 flex-col border-r border-gray-200 bg-white',
+        'flex h-full w-16 flex-col border-r border-[#E6E4DD] bg-[#F7F6F3]',
         className,
       )}
     >
@@ -558,8 +547,8 @@ export function CollapsedSidebar({ className }: { className?: string }) {
           onClick={() => openModal('compose')}
           className={cn(
             'flex h-10 w-10 items-center justify-center rounded-lg',
-            'bg-blue-600 text-white hover:bg-blue-700',
-            'focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2',
+            'bg-[#22262A] text-white hover:bg-[#3A4046]',
+            'focus:outline-none focus:ring-2 focus:ring-[#22262A]/30 focus:ring-offset-2',
           )}
           aria-label="Compose"
         >
@@ -583,7 +572,7 @@ export function CollapsedSidebar({ className }: { className?: string }) {
           to={routes.settings}
           className={cn(
             'flex h-10 w-10 items-center justify-center rounded-lg',
-            'text-gray-400 hover:bg-gray-100 hover:text-gray-500',
+            'text-[#B0ADA4] hover:bg-[#F1EFE9] hover:text-[#4A4F55]',
           )}
           aria-label="Settings"
         >

@@ -64,7 +64,7 @@ function TabButton({ tab, isSelected, onClick, disabled, variant }: TabButtonPro
           baseStyles,
           'rounded-full px-4 py-2',
           isSelected
-            ? 'bg-blue-100 text-blue-700'
+            ? 'bg-[#22262A] text-white'
             : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900',
           disabled ? 'cursor-not-allowed opacity-50' : '',
         )}
@@ -76,7 +76,7 @@ function TabButton({ tab, isSelected, onClick, disabled, variant }: TabButtonPro
           <span
             className={cn(
               'ml-1 rounded-full px-2 py-0.5 text-xs',
-              isSelected ? 'bg-blue-200 text-blue-800' : 'bg-gray-200 text-gray-600',
+              isSelected ? 'bg-white/20 text-white' : 'bg-[#F1EFE9] text-[#6B7280]',
             )}
           >
             {tab.count}
@@ -96,7 +96,7 @@ function TabButton({ tab, isSelected, onClick, disabled, variant }: TabButtonPro
         baseStyles,
         'border-b-2 pb-3 pt-2 px-1',
         isSelected
-          ? 'border-blue-500 text-blue-600'
+          ? 'border-[#22262A] text-[#22262A]'
           : 'border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700',
         disabled ? 'cursor-not-allowed opacity-50' : '',
       )}
@@ -108,7 +108,7 @@ function TabButton({ tab, isSelected, onClick, disabled, variant }: TabButtonPro
         <span
           className={cn(
             'ml-2 rounded-full px-2 py-0.5 text-xs',
-            isSelected ? 'bg-blue-100 text-blue-600' : 'bg-gray-100 text-gray-600',
+            isSelected ? 'bg-[#F1EFE9] text-[#22262A]' : 'bg-[#F1EFE9] text-[#6B7280]',
           )}
         >
           {tab.count}

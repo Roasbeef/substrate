@@ -3,10 +3,13 @@
 /* Substrate Design System */
 @layer base {
   :root {
-    /* Primary blue palette - matches header */
-    --color-primary: #3B82F6;
-    --color-primary-hover: #2563EB;
-    --color-primary-light: #EFF6FF;
+    /* Accent: muted steel blue for links and focus; chrome is ink. */
+    --color-primary: #33608D;
+    --color-primary-hover: #2A5075;
+    --color-primary-light: #EEF2F6;
+    --color-ink: #22262A;
+    --color-paper: #F7F6F3;
+    --color-hairline: #E6E4DD;
 
     /* Status colors */
     --color-success: #22C55E;
@@ -36,8 +39,8 @@
   body {
     margin: 0;
     min-height: 100vh;
-    background-color: var(--color-gray-50);
-    color: var(--color-gray-900);
+    background-color: var(--color-paper);
+    color: var(--color-ink);
   }
 
   /* Better text rendering for headers */

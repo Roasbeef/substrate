@@ -162,27 +162,8 @@ function IconButton({
 }
 
 
-// Envelope icon for branding.
-function EnvelopeIcon({ className }: { className?: string }) {
-  return (
-    <svg
-      className={cn('h-6 w-6', className)}
-      fill="none"
-      viewBox="0 0 24 24"
-      stroke="currentColor"
-      strokeWidth={1.5}
-    >
-      <path
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        d="M21.75 6.75v10.5a2.25 2.25 0 01-2.25 2.25h-15a2.25 2.25 0 01-2.25-2.25V6.75m19.5 0A2.25 2.25 0 0019.5 4.5h-15a2.25 2.25 0 00-2.25 2.25m19.5 0v.243a2.25 2.25 0 01-1.07 1.916l-7.5 4.615a2.25 2.25 0 01-2.36 0L3.32 8.91a2.25 2.25 0 01-1.07-1.916V6.75"
-      />
-    </svg>
-  );
-}
-
-// Blue header search bar - centered and wider.
-function BlueHeaderSearchBar() {
+// Quiet paper search bar - centered.
+function HeaderSearchBar() {
   const toggleSearch = useUIStore((state) => state.toggleSearch);
 
   return (
@@ -190,19 +171,39 @@ function BlueHeaderSearchBar() {
       type="button"
       onClick={toggleSearch}
       className={cn(
-        'flex items-center gap-2 rounded-lg bg-blue-500/80 px-4 py-2',
-        'text-sm text-white/90 placeholder-white/60',
-        'hover:bg-blue-400/80 transition-colors',
-        'focus:outline-none focus:ring-2 focus:ring-white/50',
+        'flex items-center gap-2 rounded-lg border border-[#E6E4DD] bg-white px-4 py-1.5',
+        'text-sm text-[#9BA0A6] transition-colors hover:border-[#C9C7BF]',
+        'focus:outline-none focus:ring-2 focus:ring-[#22262A]/20',
         'w-full max-w-xl',
       )}
     >
-      <SearchIcon className="text-white/70" />
-      <span className="flex-1 text-left text-white/80">Search mail...</span>
-      <kbd className="hidden rounded bg-blue-400/50 px-1.5 py-0.5 text-xs font-medium text-white/70 md:inline-block">
+      <SearchIcon className="h-4 w-4 text-[#B0ADA4]" />
+      <span className="flex-1 text-left">
+        Search agents, threads, plans…
+      </span>
+      <kbd className="hidden rounded border border-[#E6E4DD] px-1.5 py-0.5 font-mono text-[10px] font-medium text-[#9BA0A6] md:inline-block">
         ⌘K
       </kbd>
     </button>
+  );
+}
+
+// The wordmark: tracked mono caps with the heartbeat trace, the
+// product's signature element carried into the chrome.
+function Wordmark() {
+  return (
+    <span className="flex items-center gap-2.5">
+      <span className="font-mono text-[13px] font-bold tracking-[0.18em] text-[#22262A]">
+        SUBSTRATE
+      </span>
+      <svg className="h-3 w-11" viewBox="0 0 64 16" aria-hidden="true">
+        <path
+          d="M0 8 H14 L18 8 L21 3 L25 13 L28 8 H40 L44 8 L47 5 L50 11 L52 8 H64"
+          fill="none" stroke="#178A5B" strokeWidth="1.5"
+          strokeLinecap="round" strokeLinejoin="round"
+        />
+      </svg>
+    </span>
   );
 }
 
@@ -225,7 +226,7 @@ export function Header({ className, leftContent, rightContent }: HeaderProps) {
   return (
     <header
       className={cn(
-        'flex h-14 items-center bg-blue-600 px-4 shadow-sm',
+        'flex h-12 items-center border-b border-[#E6E4DD] bg-[#F7F6F3] px-4',
         className,
       )}
     >
@@ -234,20 +235,15 @@ export function Header({ className, leftContent, rightContent }: HeaderProps) {
         <button
           type="button"
           onClick={toggleSidebar}
-          className="rounded-md p-2 text-white/80 hover:bg-blue-500/50 hover:text-white focus:outline-none focus:ring-2 focus:ring-white/50 md:hidden"
+          className="rounded-md p-2 text-[#6B7280] hover:bg-[#F1EFE9] hover:text-[#22262A] focus:outline-none md:hidden"
           aria-label="Toggle sidebar"
         >
-          <MenuIcon className="text-white" />
+          <MenuIcon />
         </button>
 
-        {/* Logo and brand name. */}
-        <Link to={routes.inbox} className="flex items-center gap-2.5">
-          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-white/10">
-            <EnvelopeIcon className="text-white" />
-          </div>
-          <span className="hidden text-xl font-semibold tracking-tight text-white sm:inline">
-            Substrate
-          </span>
+        {/* Wordmark. */}
+        <Link to={routes.command} className="flex items-center">
+          <Wordmark />
         </Link>
 
         {leftContent}
@@ -255,20 +251,20 @@ export function Header({ className, leftContent, rightContent }: HeaderProps) {
 
       {/* Center section - search bar (takes remaining space). */}
       <div className="flex-1 flex justify-center px-4 hidden md:flex">
-        <BlueHeaderSearchBar />
+        <HeaderSearchBar />
       </div>
 
       {/* Right section - actions and custom content. */}
-      <div className="flex items-center gap-1 flex-shrink-0">
+      <div className="flex items-center gap-1 flex-shrink-0 text-[#6B7280]">
         {/* Mobile search button. */}
         <div className="md:hidden">
           <button
             type="button"
             onClick={toggleSearch}
-            className="rounded-md p-2 text-white/80 hover:bg-blue-500/50 hover:text-white focus:outline-none focus:ring-2 focus:ring-white/50"
+            className="rounded-md p-2 hover:bg-[#F1EFE9] hover:text-[#22262A] focus:outline-none"
             aria-label="Search"
           >
-            <SearchIcon className="text-white" />
+            <SearchIcon />
           </button>
         </div>
 
@@ -277,10 +273,10 @@ export function Header({ className, leftContent, rightContent }: HeaderProps) {
           type="button"
           onClick={() => setCurrentAgent(null)}
           className={cn(
-            'rounded-md p-2 transition-colors focus:outline-none focus:ring-2 focus:ring-white/50',
+            'rounded-md p-2 transition-colors focus:outline-none',
             isGlobalSelected
-              ? 'bg-white/20 text-white'
-              : 'text-white/70 hover:bg-blue-500/50 hover:text-white',
+              ? 'bg-[#22262A] text-white'
+              : 'hover:bg-[#F1EFE9] hover:text-[#22262A]',
           )}
           aria-label="View all agents"
           title="Global - View all agents"
@@ -300,22 +296,22 @@ export function Header({ className, leftContent, rightContent }: HeaderProps) {
         {/* Notifications button. */}
         <button
           type="button"
-          className="relative rounded-md p-2 text-white/80 hover:bg-blue-500/50 hover:text-white focus:outline-none focus:ring-2 focus:ring-white/50"
+          className="relative rounded-md p-2 hover:bg-[#F1EFE9] hover:text-[#22262A] focus:outline-none"
           aria-label="View notifications"
         >
-          <BellIcon className="text-white" />
+          <BellIcon />
           {totalUnreadCount > 0 ? (
-            <span className="absolute right-1.5 top-1.5 block h-2 w-2 rounded-full bg-red-500 ring-2 ring-blue-600" />
+            <span className="absolute right-1.5 top-1.5 block h-2 w-2 rounded-full bg-[#B3372B] ring-2 ring-[#F7F6F3]" />
           ) : null}
         </button>
 
         {/* Settings link. */}
         <Link
           to={routes.settings}
-          className="rounded-md p-2 text-white/80 hover:bg-blue-500/50 hover:text-white focus:outline-none focus:ring-2 focus:ring-white/50"
+          className="rounded-md p-2 hover:bg-[#F1EFE9] hover:text-[#22262A] focus:outline-none"
           aria-label="Settings"
         >
-          <SettingsIcon className="text-white" />
+          <SettingsIcon />
         </Link>
 
         {rightContent}

@@ -107,23 +107,23 @@ const variantStyles = {
     text: 'text-gray-900',
   },
   blue: {
-    bg: 'bg-blue-50',
-    icon: 'bg-blue-100 text-blue-600',
-    text: 'text-blue-900',
+    bg: 'bg-white border border-[#E6E4DD]',
+    icon: 'bg-[#F1EFE9] text-[#33608D]',
+    text: 'text-[#22262A]',
   },
   yellow: {
-    bg: 'bg-yellow-50',
-    icon: 'bg-yellow-100 text-yellow-600',
+    bg: 'bg-white border border-[#E6E4DD]',
+    icon: 'bg-[#F1EFE9] text-[#92610E]',
     text: 'text-yellow-900',
   },
   red: {
-    bg: 'bg-red-50',
-    icon: 'bg-red-100 text-red-600',
+    bg: 'bg-white border border-[#E6E4DD]',
+    icon: 'bg-[#F1EFE9] text-[#B3372B]',
     text: 'text-red-900',
   },
   green: {
-    bg: 'bg-green-50',
-    icon: 'bg-green-100 text-green-600',
+    bg: 'bg-white border border-[#E6E4DD]',
+    icon: 'bg-[#F1EFE9] text-[#178A5B]',
     text: 'text-green-900',
   },
 };
