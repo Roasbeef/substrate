@@ -271,7 +271,7 @@ export default function SearchResultsPage() {
             <button
               type="button"
               onClick={() => setInputValue('')}
-              className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-[#9BA0A6] hover:text-[#6B7280]"
             >
               <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -285,7 +285,7 @@ export default function SearchResultsPage() {
       </form>
 
       {/* Filter tabs. */}
-      <div className="flex gap-2 border-b border-gray-200 pb-3">
+      <div className="flex gap-2 border-b border-[#E6E4DD] pb-3">
         {filterOptions.map((option) => {
           const count =
             option.value === 'all'
@@ -299,8 +299,8 @@ export default function SearchResultsPage() {
               className={cn(
                 'rounded-full px-4 py-1.5 text-sm font-medium transition-colors',
                 filter === option.value
-                  ? 'bg-blue-600 text-white'
-                  : 'bg-gray-100 text-gray-600 hover:bg-gray-200',
+                  ? 'bg-[#22262A] text-white'
+                  : 'bg-[#F1EFE9] text-[#6B7280] hover:bg-[#E6E4DD]',
               )}
             >
               {option.label}
@@ -308,7 +308,7 @@ export default function SearchResultsPage() {
                 <span
                   className={cn(
                     'ml-1.5 inline-flex h-5 min-w-[20px] items-center justify-center rounded-full text-xs',
-                    filter === option.value ? 'bg-blue-500 text-white' : 'bg-gray-200 text-gray-600',
+                    filter === option.value ? 'bg-white/20 text-white' : 'bg-[#E6E4DD] text-[#6B7280]',
                   )}
                 >
                   {count}
@@ -328,8 +328,8 @@ export default function SearchResultsPage() {
         )}
 
         {isError && (
-          <div className="rounded-lg bg-red-50 p-4 text-center">
-            <p className="text-sm text-red-600">
+          <div className="rounded-lg bg-[#B3372B]/10 p-4 text-center">
+            <p className="text-sm text-[#B3372B]">
               {error instanceof Error ? error.message : 'Failed to search. Please try again.'}
             </p>
             <Button variant="outline" size="sm" className="mt-2" onClick={handleClear}>

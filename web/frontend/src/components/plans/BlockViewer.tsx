@@ -259,9 +259,9 @@ const BlockRenderer = memo(function BlockRenderer({
 
   // Base classes for annotated blocks.
   const annotatedClass = hasAnnotations
-    ? 'relative ring-1 ring-yellow-200 rounded-sm'
+    ? 'relative ring-1 ring-[#C98A1B]/30 rounded-sm'
     : '';
-  const selectedClass = isSelected ? 'ring-2 ring-blue-400' : '';
+  const selectedClass = isSelected ? 'ring-2 ring-[#5B5BD6]' : '';
 
   const handleClick = () => {
     if (hasAnnotations) {
@@ -276,8 +276,8 @@ const BlockRenderer = memo(function BlockRenderer({
       );
       const styles: Record<number, string> = {
         1: 'text-2xl font-bold mb-4 mt-6 first:mt-0 tracking-tight',
-        2: 'text-xl font-semibold mb-3 mt-8 text-gray-800',
-        3: 'text-base font-semibold mb-2 mt-6 text-gray-700',
+        2: 'text-xl font-semibold mb-3 mt-8 text-[#22262A]',
+        3: 'text-base font-semibold mb-2 mt-6 text-[#22262A]',
       };
       const className =
         styles[block.level || 1] ||
@@ -298,7 +298,7 @@ const BlockRenderer = memo(function BlockRenderer({
     case 'paragraph':
       return (
         <p
-          className={`mb-4 leading-relaxed text-gray-700 text-[15px] ${annotatedClass} ${selectedClass}`}
+          className={`mb-4 leading-relaxed text-[#22262A] text-[15px] ${annotatedClass} ${selectedClass}`}
           data-block-id={block.id}
           onClick={handleClick}
         >
@@ -324,12 +324,12 @@ const BlockRenderer = memo(function BlockRenderer({
           style={{ marginLeft: `${indent}rem` }}
           onClick={handleClick}
         >
-          <span className="select-none shrink-0 flex items-center text-gray-400">
+          <span className="select-none shrink-0 flex items-center text-[#9BA0A6]">
             {isCheckbox ? (
               block.checked ? (
-                <span className="text-green-600">&#x2713;</span>
+                <span className="text-[#178A5B]">&#x2713;</span>
               ) : (
-                <span className="text-gray-400">&#x25CB;</span>
+                <span className="text-[#9BA0A6]">&#x25CB;</span>
               )
             ) : (
               <span>{bullet}</span>
@@ -338,8 +338,8 @@ const BlockRenderer = memo(function BlockRenderer({
           <span
             className={`text-sm leading-relaxed ${
               isCheckbox && block.checked
-                ? 'text-gray-400 line-through'
-                : 'text-gray-700'
+                ? 'text-[#9BA0A6] line-through'
+                : 'text-[#22262A]'
             }`}
           >
             <InlineContent content={block.content} />
@@ -352,7 +352,7 @@ const BlockRenderer = memo(function BlockRenderer({
     case 'blockquote':
       return (
         <blockquote
-          className={`border-l-2 border-blue-300 pl-4 my-4 text-gray-500 italic ${annotatedClass} ${selectedClass}`}
+          className={`border-l-2 border-[#D8D6CE] pl-4 my-4 text-[#6B7280] italic ${annotatedClass} ${selectedClass}`}
           data-block-id={block.id}
           onClick={handleClick}
         >

@@ -109,8 +109,8 @@ function Tab({
       className={cn(
         'border-b-2 px-4 py-2 text-sm font-medium transition-colors',
         isActive
-          ? 'border-blue-500 text-blue-600'
-          : 'border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700',
+          ? 'border-[#22262A] text-[#22262A]'
+          : 'border-transparent text-[#6B7280] hover:border-[#E6E4DD] hover:text-[#22262A]',
       )}
     >
       {label}
@@ -128,40 +128,40 @@ function OverviewTab({ session }: { session: Session }) {
       <div className="flex items-center gap-4">
         <Avatar name={session.agent_name} size="lg" />
         <div>
-          <h3 className="text-lg font-medium text-gray-900">{session.agent_name}</h3>
-          <p className="text-sm text-gray-500">Session #{session.id}</p>
+          <h3 className="text-lg font-medium text-[#22262A]">{session.agent_name}</h3>
+          <p className="text-sm text-[#6B7280]">Session #{session.id}</p>
         </div>
       </div>
 
       {/* Session details. */}
       <div className="grid gap-4 sm:grid-cols-2">
-        <div className="rounded-lg border border-gray-200 p-4">
-          <dt className="text-xs font-medium uppercase tracking-wider text-gray-500">
+        <div className="rounded-lg border border-[#E6E4DD] p-4">
+          <dt className="text-xs font-medium uppercase tracking-wider text-[#6B7280]">
             Project
           </dt>
-          <dd className="mt-1 text-sm text-gray-900">
+          <dd className="mt-1 text-sm text-[#22262A]">
             {session.project ?? '—'}
           </dd>
         </div>
 
-        <div className="rounded-lg border border-gray-200 p-4">
-          <dt className="text-xs font-medium uppercase tracking-wider text-gray-500">
+        <div className="rounded-lg border border-[#E6E4DD] p-4">
+          <dt className="text-xs font-medium uppercase tracking-wider text-[#6B7280]">
             Branch
           </dt>
-          <dd className="mt-1 text-sm font-mono text-gray-900">
+          <dd className="mt-1 text-sm font-mono text-[#22262A]">
             {session.branch ?? '—'}
           </dd>
         </div>
 
-        <div className="rounded-lg border border-gray-200 p-4">
-          <dt className="text-xs font-medium uppercase tracking-wider text-gray-500">
+        <div className="rounded-lg border border-[#E6E4DD] p-4">
+          <dt className="text-xs font-medium uppercase tracking-wider text-[#6B7280]">
             Duration
           </dt>
-          <dd className="mt-1 text-sm text-gray-900">{duration}</dd>
+          <dd className="mt-1 text-sm text-[#22262A]">{duration}</dd>
         </div>
 
-        <div className="rounded-lg border border-gray-200 p-4">
-          <dt className="text-xs font-medium uppercase tracking-wider text-gray-500">
+        <div className="rounded-lg border border-[#E6E4DD] p-4">
+          <dt className="text-xs font-medium uppercase tracking-wider text-[#6B7280]">
             Status
           </dt>
           <dd className="mt-1">
@@ -173,21 +173,21 @@ function OverviewTab({ session }: { session: Session }) {
       </div>
 
       {/* Timestamps. */}
-      <div className="rounded-lg border border-gray-200 p-4">
-        <h4 className="text-xs font-medium uppercase tracking-wider text-gray-500">
+      <div className="rounded-lg border border-[#E6E4DD] p-4">
+        <h4 className="text-xs font-medium uppercase tracking-wider text-[#6B7280]">
           Timeline
         </h4>
         <dl className="mt-2 space-y-2">
           <div className="flex justify-between">
-            <dt className="text-sm text-gray-500">Started</dt>
-            <dd className="text-sm text-gray-900">
+            <dt className="text-sm text-[#6B7280]">Started</dt>
+            <dd className="text-sm text-[#22262A]">
               {formatTimestamp(session.started_at)}
             </dd>
           </div>
           {session.ended_at ? (
             <div className="flex justify-between">
-              <dt className="text-sm text-gray-500">Ended</dt>
-              <dd className="text-sm text-gray-900">
+              <dt className="text-sm text-[#6B7280]">Ended</dt>
+              <dd className="text-sm text-[#22262A]">
                 {formatTimestamp(session.ended_at)}
               </dd>
             </div>
@@ -205,31 +205,31 @@ function LogEntryIcon({ type }: { type: SessionLogEntry['type'] }) {
   switch (type) {
     case 'progress':
       return (
-        <svg className={cn(iconClass, 'text-green-500')} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <svg className={cn(iconClass, 'text-[#178A5B]')} fill="none" viewBox="0 0 24 24" stroke="currentColor">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
         </svg>
       );
     case 'discovery':
       return (
-        <svg className={cn(iconClass, 'text-blue-500')} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <svg className={cn(iconClass, 'text-[#33608D]')} fill="none" viewBox="0 0 24 24" stroke="currentColor">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
         </svg>
       );
     case 'decision':
       return (
-        <svg className={cn(iconClass, 'text-purple-500')} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <svg className={cn(iconClass, 'text-[#5B5BD6]')} fill="none" viewBox="0 0 24 24" stroke="currentColor">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 9l4-4 4 4m0 6l-4 4-4-4" />
         </svg>
       );
     case 'blocker':
       return (
-        <svg className={cn(iconClass, 'text-red-500')} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <svg className={cn(iconClass, 'text-[#B3372B]')} fill="none" viewBox="0 0 24 24" stroke="currentColor">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
         </svg>
       );
     case 'checkpoint':
       return (
-        <svg className={cn(iconClass, 'text-gray-500')} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <svg className={cn(iconClass, 'text-[#6B7280]')} fill="none" viewBox="0 0 24 24" stroke="currentColor">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z" />
         </svg>
       );
@@ -243,7 +243,7 @@ function LogTab({ entries }: { entries: SessionLogEntry[] }) {
   if (entries.length === 0) {
     return (
       <div className="py-8 text-center">
-        <p className="text-sm text-gray-500">No log entries yet</p>
+        <p className="text-sm text-[#6B7280]">No log entries yet</p>
       </div>
     );
   }
@@ -256,8 +256,8 @@ function LogTab({ entries }: { entries: SessionLogEntry[] }) {
             <LogEntryIcon type={entry.type} />
           </div>
           <div className="min-w-0 flex-1">
-            <p className="text-sm text-gray-900">{entry.message}</p>
-            <p className="mt-0.5 text-xs text-gray-500">
+            <p className="text-sm text-[#22262A]">{entry.message}</p>
+            <p className="mt-0.5 text-xs text-[#6B7280]">
               {formatTimestamp(entry.timestamp)}
             </p>
           </div>
@@ -272,7 +272,7 @@ function TaskStatusIcon({ status }: { status: SessionTask['status'] }) {
   switch (status) {
     case 'completed':
       return (
-        <svg className="h-5 w-5 text-green-500" fill="currentColor" viewBox="0 0 20 20">
+        <svg className="h-5 w-5 text-[#178A5B]" fill="currentColor" viewBox="0 0 20 20">
           <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
         </svg>
       );
@@ -281,7 +281,7 @@ function TaskStatusIcon({ status }: { status: SessionTask['status'] }) {
     case 'pending':
     default:
       return (
-        <div className="h-5 w-5 rounded-full border-2 border-gray-300" />
+        <div className="h-5 w-5 rounded-full border-2 border-[#E6E4DD]" />
       );
   }
 }
@@ -291,7 +291,7 @@ function TasksTab({ tasks }: { tasks: SessionTask[] }) {
   if (tasks.length === 0) {
     return (
       <div className="py-8 text-center">
-        <p className="text-sm text-gray-500">No tasks in this session</p>
+        <p className="text-sm text-[#6B7280]">No tasks in this session</p>
       </div>
     );
   }
@@ -301,18 +301,18 @@ function TasksTab({ tasks }: { tasks: SessionTask[] }) {
       {tasks.map((task) => (
         <div
           key={task.id}
-          className="flex items-start gap-3 rounded-lg border border-gray-200 p-3"
+          className="flex items-start gap-3 rounded-lg border border-[#E6E4DD] p-3"
         >
           <TaskStatusIcon status={task.status} />
           <div className="min-w-0 flex-1">
             <p className={cn(
               'text-sm',
-              task.status === 'completed' ? 'text-gray-500 line-through' : 'text-gray-900',
+              task.status === 'completed' ? 'text-[#6B7280] line-through' : 'text-[#22262A]',
             )}>
               {task.subject}
             </p>
             {task.description ? (
-              <p className="mt-0.5 text-xs text-gray-500">{task.description}</p>
+              <p className="mt-0.5 text-xs text-[#6B7280]">{task.description}</p>
             ) : null}
           </div>
           <Badge
@@ -373,12 +373,12 @@ export function SessionDetail({
         <LoadingState />
       ) : !session ? (
         <div className="py-8 text-center">
-          <p className="text-sm text-gray-500">Session not found</p>
+          <p className="text-sm text-[#6B7280]">Session not found</p>
         </div>
       ) : (
         <div className="space-y-4">
           {/* Tabs. */}
-          <div className="border-b border-gray-200">
+          <div className="border-b border-[#E6E4DD]">
             <nav className="-mb-px flex gap-4">
               <Tab
                 label="Overview"
@@ -411,7 +411,7 @@ export function SessionDetail({
 
           {/* Actions. */}
           {session.status === 'active' && onComplete ? (
-            <div className="flex justify-end gap-3 border-t border-gray-200 pt-4">
+            <div className="flex justify-end gap-3 border-t border-[#E6E4DD] pt-4">
               <Button variant="secondary" onClick={onClose}>
                 Close
               </Button>
@@ -425,7 +425,7 @@ export function SessionDetail({
               </Button>
             </div>
           ) : (
-            <div className="flex justify-end border-t border-gray-200 pt-4">
+            <div className="flex justify-end border-t border-[#E6E4DD] pt-4">
               <Button variant="secondary" onClick={onClose}>
                 Close
               </Button>
