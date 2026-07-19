@@ -369,12 +369,12 @@ const BlockRenderer = memo(function BlockRenderer({
           onClick={handleClick}
         >
           {block.language && (
-            <div className="absolute top-0 right-0 rounded-bl-lg rounded-tr-lg bg-gray-200 px-2 py-0.5 text-[10px] font-mono text-gray-500">
+            <div className="absolute top-0 right-0 rounded-bl-lg rounded-tr-lg bg-[#F1EFE9] px-2 py-0.5 text-[10px] font-mono text-[#6B7280]">
               {block.language}
             </div>
           )}
-          <pre className="rounded-lg text-[13px] overflow-x-auto bg-gray-50 border border-gray-200 p-4">
-            <code className="font-mono text-gray-800 whitespace-pre">
+          <pre className="rounded-lg text-[13px] overflow-x-auto bg-[#F7F6F3] border border-[#E6E4DD] p-4">
+            <code className="font-mono text-[#22262A] whitespace-pre">
               {block.content}
             </code>
           </pre>
@@ -397,7 +397,7 @@ const BlockRenderer = memo(function BlockRenderer({
     case 'hr':
       return (
         <hr
-          className="border-gray-200 my-8"
+          className="border-[#E6E4DD] my-8"
           data-block-id={block.id}
         />
       );
@@ -405,7 +405,7 @@ const BlockRenderer = memo(function BlockRenderer({
     default:
       return (
         <p
-          className={`mb-4 leading-relaxed text-gray-700 ${annotatedClass} ${selectedClass}`}
+          className={`mb-4 leading-relaxed text-[#22262A] ${annotatedClass} ${selectedClass}`}
           data-block-id={block.id}
           onClick={handleClick}
         >
@@ -457,7 +457,7 @@ function InlineContent({ content }: { content: string }) {
       parts.push(
         <code
           key={key++}
-          className="px-1.5 py-0.5 rounded bg-gray-100 text-sm font-mono text-gray-800"
+          className="px-1.5 py-0.5 rounded bg-[#F1EFE9] text-sm font-mono text-[#22262A]"
         >
           {match[1]}
         </code>,
@@ -484,7 +484,7 @@ function InlineContent({ content }: { content: string }) {
             href={linkUrl}
             target="_blank"
             rel="noopener noreferrer"
-            className="text-blue-600 underline underline-offset-2 hover:text-blue-800"
+            className="text-[#33608D] underline underline-offset-2 hover:text-[#22262A]"
           >
             {match[1]}
           </a>,
@@ -492,7 +492,7 @@ function InlineContent({ content }: { content: string }) {
       } else {
         // Unsafe protocol (e.g., javascript:) — render as plain text.
         parts.push(
-          <span key={key++} className="text-blue-600">
+          <span key={key++} className="text-[#33608D]">
             {match[1]}
           </span>,
         );
@@ -542,11 +542,11 @@ function TableContent({ content }: { content: string }) {
   return (
     <table className="min-w-full border-collapse text-sm">
       <thead>
-        <tr className="border-b border-gray-200">
+        <tr className="border-b border-[#E6E4DD]">
           {headers.map((header, i) => (
             <th
               key={i}
-              className="px-3 py-2 text-left font-semibold text-gray-800 bg-gray-50"
+              className="px-3 py-2 text-left font-semibold text-[#22262A] bg-[#F7F6F3]"
             >
               <InlineContent content={header} />
             </th>
@@ -557,10 +557,10 @@ function TableContent({ content }: { content: string }) {
         {rows.map((row, rowIdx) => (
           <tr
             key={rowIdx}
-            className="border-b border-gray-100 hover:bg-gray-50/50"
+            className="border-b border-[#F1EFE9] hover:bg-[#F4F3EE]"
           >
             {row.map((cell, cellIdx) => (
-              <td key={cellIdx} className="px-3 py-2 text-gray-600">
+              <td key={cellIdx} className="px-3 py-2 text-[#6B7280]">
                 <InlineContent content={cell} />
               </td>
             ))}
@@ -590,14 +590,14 @@ function AnnotationMarkers({
           key={ann.id}
           className={`inline-block h-2 w-2 rounded-full ${
             ann.type === PlanAnnotationType.COMMENT
-              ? 'bg-yellow-400'
+              ? 'bg-[#33608D]'
               : ann.type === PlanAnnotationType.DELETION
-                ? 'bg-red-400'
+                ? 'bg-[#B3372B]'
                 : ann.type === PlanAnnotationType.REPLACEMENT
-                  ? 'bg-blue-400'
+                  ? 'bg-[#C98A1B]'
                   : ann.type === PlanAnnotationType.INSERTION
-                    ? 'bg-green-400'
-                    : 'bg-gray-400'
+                    ? 'bg-[#178A5B]'
+                    : 'bg-[#9BA0A6]'
           }`}
           title={ann.text || ann.type}
         />

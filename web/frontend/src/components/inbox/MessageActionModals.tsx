@@ -115,14 +115,14 @@ export function DeleteConfirmationModal({
           >
             <DialogPanel className="w-full max-w-md rounded-xl bg-white p-6 shadow-xl">
               <div className="flex items-start gap-4">
-                <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full bg-red-100">
-                  <WarningIcon className="text-red-600" />
+                <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full bg-[#B3372B]/10">
+                  <WarningIcon className="text-[#B3372B]" />
                 </div>
                 <div className="flex-1">
-                  <DialogTitle className="text-lg font-semibold text-gray-900">
+                  <DialogTitle className="text-lg font-semibold text-[#22262A]">
                     {title}
                   </DialogTitle>
-                  <p className="mt-2 text-sm text-gray-500">{description}</p>
+                  <p className="mt-2 text-sm text-[#6B7280]">{description}</p>
                 </div>
               </div>
 
@@ -221,11 +221,11 @@ export function SnoozePickerModal({
             leaveTo="opacity-0 scale-95"
           >
             <DialogPanel className="w-full max-w-sm rounded-xl bg-white shadow-xl">
-              <div className="flex items-center gap-3 border-b border-gray-200 px-6 py-4">
-                <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full bg-blue-100">
-                  <ClockIcon className="text-blue-600" />
+              <div className="flex items-center gap-3 border-b border-[#E6E4DD] px-6 py-4">
+                <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full bg-[#33608D]/10">
+                  <ClockIcon className="text-[#33608D]" />
                 </div>
-                <DialogTitle className="text-lg font-semibold text-gray-900">
+                <DialogTitle className="text-lg font-semibold text-[#22262A]">
                   Snooze until
                 </DialogTitle>
               </div>
@@ -241,15 +241,15 @@ export function SnoozePickerModal({
                       disabled={isSnoozing}
                       className={cn(
                         'flex w-full items-center justify-between rounded-lg px-4 py-3',
-                        'text-left hover:bg-gray-50 focus:bg-gray-50',
-                        'focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-inset',
+                        'text-left hover:bg-[#F4F3EE] focus:bg-[#F4F3EE]',
+                        'focus:outline-none focus:ring-2 focus:ring-[#22262A]/30 focus:ring-inset',
                         isSnoozing ? 'cursor-not-allowed opacity-50' : '',
                       )}
                     >
-                      <span className="font-medium text-gray-900">
+                      <span className="font-medium text-[#22262A]">
                         {duration.label}
                       </span>
-                      <span className="text-sm text-gray-500">
+                      <span className="text-sm text-[#6B7280]">
                         {formatPresetDate(duration)}
                       </span>
                     </button>
@@ -258,9 +258,9 @@ export function SnoozePickerModal({
 
                 {/* Divider. */}
                 <div className="my-4 flex items-center gap-2">
-                  <div className="h-px flex-1 bg-gray-200" />
-                  <span className="text-xs text-gray-400">or pick a date</span>
-                  <div className="h-px flex-1 bg-gray-200" />
+                  <div className="h-px flex-1 bg-[#E6E4DD]" />
+                  <span className="text-xs text-[#9BA0A6]">or pick a date</span>
+                  <div className="h-px flex-1 bg-[#E6E4DD]" />
                 </div>
 
                 {/* Custom date/time picker. */}
@@ -271,8 +271,8 @@ export function SnoozePickerModal({
                     onChange={(e) => setCustomDate(e.target.value)}
                     min={new Date().toISOString().split('T')[0]}
                     className={cn(
-                      'flex-1 rounded-lg border border-gray-200 px-3 py-2',
-                      'text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500',
+                      'flex-1 rounded-lg border border-[#E6E4DD] px-3 py-2',
+                      'text-sm focus:border-[#22262A] focus:outline-none focus:ring-1 focus:ring-[#22262A]/30',
                     )}
                     disabled={isSnoozing}
                   />
@@ -281,8 +281,8 @@ export function SnoozePickerModal({
                     value={customTime}
                     onChange={(e) => setCustomTime(e.target.value)}
                     className={cn(
-                      'w-24 rounded-lg border border-gray-200 px-3 py-2',
-                      'text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500',
+                      'w-24 rounded-lg border border-[#E6E4DD] px-3 py-2',
+                      'text-sm focus:border-[#22262A] focus:outline-none focus:ring-1 focus:ring-[#22262A]/30',
                     )}
                     disabled={isSnoozing}
                   />
@@ -290,7 +290,7 @@ export function SnoozePickerModal({
               </div>
 
               {/* Actions. */}
-              <div className="flex justify-end gap-3 border-t border-gray-200 px-6 py-4">
+              <div className="flex justify-end gap-3 border-t border-[#E6E4DD] px-6 py-4">
                 <Button variant="outline" onClick={onClose} disabled={isSnoozing}>
                   Cancel
                 </Button>
@@ -345,11 +345,11 @@ export function BulkActionsToolbar({
   return (
     <div
       className={cn(
-        'flex items-center gap-4 rounded-lg bg-blue-50 px-4 py-3',
+        'flex items-center gap-4 rounded-lg bg-[#33608D]/10 px-4 py-3',
         className,
       )}
     >
-      <span className="text-sm font-medium text-blue-900">
+      <span className="text-sm font-medium text-[#33608D]">
         {selectedCount} selected
       </span>
 
@@ -393,7 +393,7 @@ export function BulkActionsToolbar({
             size="sm"
             onClick={onDelete}
             disabled={isLoading}
-            className="text-red-600 hover:bg-red-50 hover:text-red-700"
+            className="text-[#B3372B] hover:bg-[#B3372B]/10 hover:text-[#B3372B]"
           >
             Delete
           </Button>
