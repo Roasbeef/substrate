@@ -141,7 +141,7 @@ export function AgentsSidebar({
           {hasMore ? (
             <button
               onClick={onViewAllClick}
-              className="w-full rounded-md px-3 py-2 text-left text-sm text-gray-500 hover:bg-gray-50"
+              className="w-full rounded-md px-3 py-2 text-left text-sm text-[#6B7280] hover:bg-[#F1EFE9]"
             >
               +{totalCount - maxVisible} more...
             </button>
@@ -179,7 +179,7 @@ export function AgentStatusList({
         {Array.from({ length: maxVisible }, (_, i) => (
           <div
             key={i}
-            className="h-3 w-3 animate-pulse rounded-full bg-gray-200"
+            className="h-3 w-3 animate-pulse rounded-full bg-[#E6E4DD]"
           />
         ))}
       </div>
@@ -206,7 +206,7 @@ export function AgentStatusList({
         </button>
       ))}
       {hasMore ? (
-        <span className="text-xs text-gray-400">
+        <span className="text-xs text-[#9BA0A6]">
           +{agents.length - maxVisible}
         </span>
       ) : null}

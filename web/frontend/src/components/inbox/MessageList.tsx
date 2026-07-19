@@ -70,9 +70,9 @@ function groupThreadsByDate(threadGroups: ThreadGroup[]): Map<string, ThreadGrou
 // Date divider component.
 function DateDivider({ label }: { label: string }) {
   return (
-    <div className="flex items-center gap-3 bg-gray-50 px-4 py-2 border-b border-gray-100">
-      <span className="text-xs font-semibold text-gray-500 tracking-wide">{label}</span>
-      <div className="flex-1 h-px bg-gray-200" />
+    <div className="flex items-center gap-3 bg-[#F7F6F3] px-4 py-2 border-b border-[#F1EFE9]">
+      <span className="text-xs font-semibold text-[#6B7280] tracking-wide">{label}</span>
+      <div className="flex-1 h-px bg-[#E6E4DD]" />
     </div>
   );
 }
@@ -90,10 +90,10 @@ function EmptyState({
   return (
     <div className="flex flex-col items-center justify-center py-16 px-4 text-center">
       {icon ? (
-        <div className="mb-4 text-gray-400">{icon}</div>
+        <div className="mb-4 text-[#9BA0A6]">{icon}</div>
       ) : (
         <svg
-          className="mb-4 h-12 w-12 text-gray-400"
+          className="mb-4 h-12 w-12 text-[#9BA0A6]"
           fill="none"
           viewBox="0 0 24 24"
           stroke="currentColor"
@@ -106,9 +106,9 @@ function EmptyState({
           />
         </svg>
       )}
-      <h3 className="text-lg font-medium text-gray-900">{title}</h3>
+      <h3 className="text-lg font-medium text-[#22262A]">{title}</h3>
       {description ? (
-        <p className="mt-1 text-sm text-gray-500">{description}</p>
+        <p className="mt-1 text-sm text-[#6B7280]">{description}</p>
       ) : null}
     </div>
   );
@@ -118,7 +118,7 @@ function EmptyState({
 function MessageSkeleton({ compact = false }: { compact?: boolean }) {
   if (compact) {
     return (
-      <div className="flex items-center gap-3 border-b border-gray-100 px-3 py-2">
+      <div className="flex items-center gap-3 border-b border-[#F1EFE9] px-3 py-2">
         <div className="h-6 w-6 animate-pulse rounded-full bg-gray-200" />
         <div className="flex-1">
           <div className="h-4 w-3/4 animate-pulse rounded bg-gray-200" />
@@ -129,7 +129,7 @@ function MessageSkeleton({ compact = false }: { compact?: boolean }) {
   }
 
   return (
-    <div className="flex items-center gap-3 border-b border-gray-100 px-4 py-3">
+    <div className="flex items-center gap-3 border-b border-[#F1EFE9] px-4 py-3">
       <div className="h-4 w-4 animate-pulse rounded bg-gray-200" />
       <div className="h-4 w-4 animate-pulse rounded bg-gray-200" />
       <div className="h-8 w-8 animate-pulse rounded-full bg-gray-200" />
@@ -259,7 +259,7 @@ export function MessageList({
   // Show loading skeletons.
   if (isLoading) {
     return (
-      <div className={cn('divide-y divide-gray-100', className)}>
+      <div className={cn('divide-y divide-[#F1EFE9]', className)}>
         {Array.from({ length: loadingRows }, (_, i) => (
           <MessageSkeleton key={i} compact={compact} />
         ))}
@@ -275,7 +275,7 @@ export function MessageList({
   // Render compact variant (no thread grouping in compact mode).
   if (compact) {
     return (
-      <div className={cn('divide-y divide-gray-100', className)}>
+      <div className={cn('divide-y divide-[#F1EFE9]', className)}>
         {messages.map((message) => (
           <CompactMessageRow
             key={message.id}
@@ -350,7 +350,7 @@ export function MessageList({
       const grouped = groupThreadsByDate(threadGroups);
 
       return (
-        <div className={cn('divide-y divide-gray-100', className)}>
+        <div className={cn('divide-y divide-[#F1EFE9]', className)}>
           {Array.from(grouped.entries()).map(([dateLabel, groups]) => (
             <div key={dateLabel}>
               <DateDivider label={dateLabel} />
@@ -362,7 +362,7 @@ export function MessageList({
     }
 
     return (
-      <div className={cn('divide-y divide-gray-100', className)}>
+      <div className={cn('divide-y divide-[#F1EFE9]', className)}>
         {threadGroups.map(renderThreadGroupRow)}
       </div>
     );
@@ -373,7 +373,7 @@ export function MessageList({
     const groupedMessages = groupMessagesByDate(messages);
 
     return (
-      <div className={cn('divide-y divide-gray-100', className)}>
+      <div className={cn('divide-y divide-[#F1EFE9]', className)}>
         {Array.from(groupedMessages.entries()).map(([dateLabel, groupMessages]) => (
           <div key={dateLabel}>
             <DateDivider label={dateLabel} />
@@ -386,7 +386,7 @@ export function MessageList({
 
   // Render without date grouping.
   return (
-    <div className={cn('divide-y divide-gray-100', className)}>
+    <div className={cn('divide-y divide-[#F1EFE9]', className)}>
       {messages.map(renderMessageRow)}
     </div>
   );
@@ -494,7 +494,7 @@ export function ConnectedMessageList({
         description={error.message}
         icon={
           <svg
-            className="h-12 w-12 text-red-400"
+            className="h-12 w-12 text-[#B3372B]"
             fill="none"
             viewBox="0 0 24 24"
             stroke="currentColor"
