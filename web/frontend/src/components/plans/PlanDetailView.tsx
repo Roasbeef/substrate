@@ -179,7 +179,7 @@ export function PlanDetailView({ planReview }: PlanDetailViewProps) {
       <button
         type="button"
         onClick={() => navigate(routes.plans)}
-        className="flex items-center gap-1 text-sm text-gray-500 hover:text-gray-700"
+        className="flex items-center gap-1 text-sm text-[#6B7280] hover:text-[#22262A]"
       >
         <svg
           className="h-4 w-4"
@@ -198,18 +198,18 @@ export function PlanDetailView({ planReview }: PlanDetailViewProps) {
       </button>
 
       {/* Plan header card. */}
-      <div className="rounded-lg border border-gray-200 bg-white p-6">
+      <div className="rounded-lg border border-[#E6E4DD] bg-white p-6">
         <div className="flex items-start justify-between">
           <div>
             <div className="flex items-center gap-3">
-              <h2 className="text-lg font-semibold text-gray-900">
+              <h2 className="text-lg font-semibold text-[#22262A]">
                 {title}
               </h2>
               <PlanStateBadge state={planReview.state} />
             </div>
             {planReview.plan_path ? (
-              <p className="mt-1 text-sm text-gray-500">
-                <code className="text-gray-600">
+              <p className="mt-1 text-sm text-[#6B7280]">
+                <code className="font-mono text-[#9BA0A6]">
                   {planReview.plan_path}
                 </code>
               </p>
@@ -220,44 +220,44 @@ export function PlanDetailView({ planReview }: PlanDetailViewProps) {
         {/* Metadata grid. */}
         <div className="mt-4 grid grid-cols-2 gap-4 sm:grid-cols-4">
           <div>
-            <dt className="text-xs font-medium text-gray-500">
+            <dt className="text-xs font-medium text-[#6B7280]">
               Reviewer
             </dt>
-            <dd className="mt-1 text-sm font-medium text-gray-900">
+            <dd className="mt-1 text-sm font-medium text-[#22262A]">
               {planReview.reviewer_name || '--'}
             </dd>
           </div>
           <div>
-            <dt className="text-xs font-medium text-gray-500">
+            <dt className="text-xs font-medium text-[#6B7280]">
               Created
             </dt>
-            <dd className="mt-1 text-sm font-medium text-gray-900">
+            <dd className="mt-1 text-sm font-medium text-[#22262A]">
               {formatTimestamp(planReview.created_at)}
             </dd>
           </div>
           <div>
-            <dt className="text-xs font-medium text-gray-500">
+            <dt className="text-xs font-medium text-[#6B7280]">
               Updated
             </dt>
-            <dd className="mt-1 text-sm font-medium text-gray-900">
+            <dd className="mt-1 text-sm font-medium text-[#22262A]">
               {formatTimestamp(planReview.updated_at)}
             </dd>
           </div>
           {planReview.reviewed_at > 0 ? (
             <div>
-              <dt className="text-xs font-medium text-gray-500">
+              <dt className="text-xs font-medium text-[#6B7280]">
                 Reviewed
               </dt>
-              <dd className="mt-1 text-sm font-medium text-gray-900">
+              <dd className="mt-1 text-sm font-medium text-[#22262A]">
                 {formatTimestamp(planReview.reviewed_at)}
               </dd>
             </div>
           ) : (
             <div>
-              <dt className="text-xs font-medium text-gray-500">
+              <dt className="text-xs font-medium text-[#6B7280]">
                 Session
               </dt>
-              <dd className="mt-1 text-sm font-medium text-gray-900">
+              <dd className="mt-1 text-sm font-medium text-[#22262A]">
                 {planReview.session_id
                   ? planReview.session_id.slice(0, 12)
                   : '--'}
@@ -267,12 +267,12 @@ export function PlanDetailView({ planReview }: PlanDetailViewProps) {
         </div>
 
         {/* IDs row. */}
-        <div className="mt-4 border-t border-gray-100 pt-3">
-          <span className="text-xs text-gray-400">
+        <div className="mt-4 border-t border-[#F1EFE9] pt-3">
+          <span className="font-mono text-xs text-[#9BA0A6]">
             ID: {planReview.plan_review_id}
           </span>
           {planReview.thread_id ? (
-            <span className="ml-4 text-xs text-gray-400">
+            <span className="ml-4 font-mono text-xs text-[#9BA0A6]">
               Thread: {planReview.thread_id}
             </span>
           ) : null}
@@ -282,11 +282,11 @@ export function PlanDetailView({ planReview }: PlanDetailViewProps) {
       {/* AI Summary section (if available and distinct from body). */}
       {planReview.plan_summary &&
       planReview.plan_summary !== planBody ? (
-        <div className="rounded-lg border border-blue-100 bg-blue-50/50 p-4">
-          <h3 className="mb-2 text-sm font-semibold text-blue-900">
+        <div className="rounded-lg border border-[#33608D]/20 bg-[#33608D]/8 p-4">
+          <h3 className="mb-2 text-sm font-semibold text-[#33608D]">
             AI Summary
           </h3>
-          <p className="text-sm text-blue-800 whitespace-pre-wrap">
+          <p className="text-sm text-[#33608D] whitespace-pre-wrap">
             {planReview.plan_summary}
           </p>
         </div>
@@ -298,20 +298,20 @@ export function PlanDetailView({ planReview }: PlanDetailViewProps) {
           className={cn(
             'rounded-lg border p-4',
             planReview.state === 'approved'
-              ? 'border-green-100 bg-green-50/50'
+              ? 'border-[#178A5B]/20 bg-[#178A5B]/8'
               : planReview.state === 'rejected'
-                ? 'border-red-100 bg-red-50/50'
-                : 'border-yellow-100 bg-yellow-50/50',
+                ? 'border-[#B3372B]/20 bg-[#B3372B]/8'
+                : 'border-[#C98A1B]/25 bg-[#C98A1B]/8',
           )}
         >
           <h3
             className={cn(
               'mb-2 text-sm font-semibold',
               planReview.state === 'approved'
-                ? 'text-green-900'
+                ? 'text-[#178A5B]'
                 : planReview.state === 'rejected'
-                  ? 'text-red-900'
-                  : 'text-yellow-900',
+                  ? 'text-[#B3372B]'
+                  : 'text-[#92610E]',
             )}
           >
             Reviewer Comment
@@ -320,10 +320,10 @@ export function PlanDetailView({ planReview }: PlanDetailViewProps) {
             className={cn(
               'text-sm whitespace-pre-wrap',
               planReview.state === 'approved'
-                ? 'text-green-800'
+                ? 'text-[#178A5B]'
                 : planReview.state === 'rejected'
-                  ? 'text-red-800'
-                  : 'text-yellow-800',
+                  ? 'text-[#B3372B]'
+                  : 'text-[#92610E]',
             )}
           >
             {planReview.reviewer_comment}
@@ -333,8 +333,8 @@ export function PlanDetailView({ planReview }: PlanDetailViewProps) {
 
       {/* Plan content — 3-column layout when pending, single column otherwise. */}
       {threadLoading ? (
-        <div className="rounded-lg border border-gray-200 bg-white p-6">
-          <div className="flex items-center gap-2 py-8 text-sm text-gray-500">
+        <div className="rounded-lg border border-[#E6E4DD] bg-white p-6">
+          <div className="flex items-center gap-2 py-8 text-sm text-[#6B7280]">
             <svg
               className="h-4 w-4 animate-spin"
               viewBox="0 0 24 24"
@@ -363,7 +363,7 @@ export function PlanDetailView({ planReview }: PlanDetailViewProps) {
           {/* Left: Table of Contents. */}
           {tocItems.length > 0 && (
             <div className="hidden w-48 flex-shrink-0 lg:block">
-              <div className="sticky top-4 rounded-lg border border-gray-200 bg-white py-3">
+              <div className="sticky top-4 rounded-lg border border-[#E6E4DD] bg-white py-3">
                 <PlanToc
                   items={tocItems}
                   onScrollToBlock={handleScrollToBlock}
@@ -374,14 +374,14 @@ export function PlanDetailView({ planReview }: PlanDetailViewProps) {
 
           {/* Center: Plan content with block-based rendering. */}
           <div className="min-w-0 flex-1">
-            <div className="rounded-lg border border-gray-200 bg-white p-6">
+            <div className="rounded-lg border border-[#E6E4DD] bg-white p-6">
               <div className="mb-4 flex items-center justify-between">
                 <div className="flex items-center gap-3">
-                  <h3 className="text-base font-semibold text-gray-900">
+                  <h3 className="text-base font-semibold text-[#22262A]">
                     Plan Content
                   </h3>
                   {hasMultipleVersions && (
-                    <span className="text-xs text-gray-400">
+                    <span className="font-mono text-xs text-[#9BA0A6]">
                       v{versionCount}
                     </span>
                   )}
@@ -392,8 +392,8 @@ export function PlanDetailView({ planReview }: PlanDetailViewProps) {
                       className={cn(
                         'rounded-md px-2 py-1 text-xs font-medium transition-colors',
                         showDiff
-                          ? 'bg-blue-100 text-blue-800'
-                          : 'text-gray-500 hover:bg-gray-100',
+                          ? 'bg-[#0E7490]/10 text-[#0E7490]'
+                          : 'text-[#6B7280] hover:bg-[#F1EFE9]',
                       )}
                     >
                       {showDiff ? 'Hide Diff' : 'Show Changes'}
@@ -401,7 +401,7 @@ export function PlanDetailView({ planReview }: PlanDetailViewProps) {
                   )}
                 </div>
                 {planAnnotations.length > 0 && (
-                  <span className="rounded-full bg-yellow-100 px-2.5 py-0.5 text-xs font-medium text-yellow-800">
+                  <span className="rounded-full bg-[#C98A1B]/12 px-2.5 py-0.5 text-xs font-medium text-[#92610E]">
                     {planAnnotations.length} annotation
                     {planAnnotations.length !== 1 ? 's' : ''}
                   </span>
@@ -423,7 +423,7 @@ export function PlanDetailView({ planReview }: PlanDetailViewProps) {
 
           {/* Right: Annotation Sidebar. */}
           <div className="hidden w-72 flex-shrink-0 xl:block">
-            <div className="sticky top-4 max-h-[calc(100vh-6rem)] rounded-lg border border-gray-200 bg-white">
+            <div className="sticky top-4 max-h-[calc(100vh-6rem)] rounded-lg border border-[#E6E4DD] bg-white">
               <AnnotationSidebar
                 annotations={planAnnotations}
                 onScrollToBlock={handleScrollToBlock}
@@ -433,8 +433,8 @@ export function PlanDetailView({ planReview }: PlanDetailViewProps) {
         </div>
       ) : (
         // Read-only single-column layout.
-        <div className="rounded-lg border border-gray-200 bg-white p-6">
-          <h3 className="mb-4 text-base font-semibold text-gray-900">
+        <div className="rounded-lg border border-[#E6E4DD] bg-white p-6">
+          <h3 className="mb-4 text-base font-semibold text-[#22262A]">
             Plan Content
           </h3>
           <BlockViewer
@@ -447,14 +447,14 @@ export function PlanDetailView({ planReview }: PlanDetailViewProps) {
 
       {/* Action buttons (only shown when pending). */}
       {isPending ? (
-        <div className="rounded-lg border border-gray-200 bg-white p-6">
-          <h3 className="mb-3 text-base font-semibold text-gray-900">
+        <div className="rounded-lg border border-[#E6E4DD] bg-white p-6">
+          <h3 className="mb-3 text-base font-semibold text-[#22262A]">
             Review Actions
           </h3>
 
           {/* Annotation summary. */}
           {planAnnotations.length > 0 && (
-            <div className="mb-3 rounded-lg border border-yellow-200 bg-yellow-50 px-3 py-2 text-xs text-yellow-800">
+            <div className="mb-3 rounded-lg border border-[#C98A1B]/25 bg-[#C98A1B]/8 px-3 py-2 text-xs text-[#92610E]">
               {planAnnotations.length} annotation
               {planAnnotations.length !== 1 ? 's' : ''} will be
               included as structured feedback when requesting changes
@@ -469,8 +469,8 @@ export function PlanDetailView({ planReview }: PlanDetailViewProps) {
             placeholder="Add additional notes (optional)..."
             rows={3}
             className={cn(
-              'w-full rounded-lg border border-gray-300 px-3 py-2 text-sm',
-              'placeholder-gray-400 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500',
+              'w-full rounded-lg border border-[#E6E4DD] px-3 py-2 text-sm',
+              'placeholder-[#9BA0A6] focus:border-[#22262A] focus:outline-none focus:ring-1 focus:ring-[#22262A]/30',
               'resize-none',
             )}
           />
@@ -483,9 +483,9 @@ export function PlanDetailView({ planReview }: PlanDetailViewProps) {
               disabled={updateStatus.isPending}
               className={cn(
                 'rounded-lg px-4 py-2 text-sm font-medium text-white',
-                'bg-green-600 hover:bg-green-700',
+                'bg-[#178A5B] hover:bg-[#136F49]',
                 'disabled:opacity-50 disabled:cursor-not-allowed',
-                'focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2',
+                'focus:outline-none focus:ring-2 focus:ring-[#178A5B]/30 focus:ring-offset-2',
               )}
             >
               {updateStatus.isPending ? 'Updating...' : 'Approve'}
@@ -496,10 +496,10 @@ export function PlanDetailView({ planReview }: PlanDetailViewProps) {
               onClick={() => handleAction('changes_requested')}
               disabled={updateStatus.isPending}
               className={cn(
-                'rounded-lg border border-yellow-300 px-4 py-2 text-sm font-medium',
-                'text-yellow-700 hover:bg-yellow-50',
+                'rounded-lg border border-[#C98A1B]/40 px-4 py-2 text-sm font-medium',
+                'text-[#92610E] hover:bg-[#C98A1B]/8',
                 'disabled:opacity-50 disabled:cursor-not-allowed',
-                'focus:outline-none focus:ring-2 focus:ring-yellow-500 focus:ring-offset-2',
+                'focus:outline-none focus:ring-2 focus:ring-[#C98A1B]/30 focus:ring-offset-2',
               )}
             >
               Request Changes
@@ -512,10 +512,10 @@ export function PlanDetailView({ planReview }: PlanDetailViewProps) {
               onClick={() => handleAction('rejected')}
               disabled={updateStatus.isPending}
               className={cn(
-                'rounded-lg border border-red-300 px-4 py-2 text-sm font-medium',
-                'text-red-700 hover:bg-red-50',
+                'rounded-lg border border-[#B3372B]/40 px-4 py-2 text-sm font-medium',
+                'text-[#B3372B] hover:bg-[#B3372B]/8',
                 'disabled:opacity-50 disabled:cursor-not-allowed',
-                'focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2',
+                'focus:outline-none focus:ring-2 focus:ring-[#B3372B]/30 focus:ring-offset-2',
               )}
             >
               Reject

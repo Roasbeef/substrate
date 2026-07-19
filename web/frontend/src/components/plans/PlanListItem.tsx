@@ -44,40 +44,40 @@ export function PlanListItem({ planReview, className }: PlanListItemProps) {
     <Link
       to={routes.plan(planReview.plan_review_id)}
       className={cn(
-        'flex items-center gap-4 rounded-lg border border-gray-200 bg-white px-4 py-3',
-        'transition-all hover:border-gray-300 hover:shadow-sm',
+        'flex items-center gap-4 rounded-lg border border-[#E6E4DD] bg-white px-4 py-3',
+        'transition-all hover:border-[#D8D6CE] hover:shadow-sm',
         className,
       )}
     >
       {/* Plan title and metadata. */}
       <div className="min-w-0 flex-1">
         <div className="flex items-center gap-2">
-          <span className="truncate text-sm font-medium text-gray-900">
+          <span className="truncate text-sm font-medium text-[#22262A]">
             {title}
           </span>
           <PlanStateBadge state={planReview.state} />
         </div>
-        <div className="mt-1 flex items-center gap-2 text-xs text-gray-500">
+        <div className="mt-1 flex items-center gap-2 text-xs text-[#6B7280]">
           <span>by {planReview.reviewer_name || 'Unknown'}</span>
-          <span className="text-gray-300">|</span>
-          <span>ID: {planReview.plan_review_id.slice(0, 8)}</span>
+          <span className="text-[#B0ADA4]">|</span>
+          <span className="font-mono text-[#9BA0A6]">ID: {planReview.plan_review_id.slice(0, 8)}</span>
           {planReview.session_id ? (
             <>
-              <span className="text-gray-300">|</span>
-              <span>Session: {planReview.session_id.slice(0, 8)}</span>
+              <span className="text-[#B0ADA4]">|</span>
+              <span className="font-mono text-[#9BA0A6]">Session: {planReview.session_id.slice(0, 8)}</span>
             </>
           ) : null}
         </div>
       </div>
 
       {/* Timestamp. */}
-      <div className="shrink-0 text-xs text-gray-400">
+      <div className="shrink-0 font-mono text-xs text-[#9BA0A6]">
         {formatRelativeTime(planReview.created_at)}
       </div>
 
       {/* Chevron arrow. */}
       <svg
-        className="h-4 w-4 shrink-0 text-gray-400"
+        className="h-4 w-4 shrink-0 text-[#9BA0A6]"
         fill="none"
         viewBox="0 0 24 24"
         stroke="currentColor"

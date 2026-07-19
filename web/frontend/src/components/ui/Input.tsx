@@ -60,16 +60,16 @@ const baseInputStyles = cn(
   'block w-full rounded-md border shadow-sm',
   'transition-colors duration-150 ease-in-out',
   'focus:outline-none focus:ring-2 focus:ring-offset-0',
-  'disabled:cursor-not-allowed disabled:bg-gray-50 disabled:text-gray-500',
-  'placeholder:text-gray-400',
+  'disabled:cursor-not-allowed disabled:bg-[#F4F3EE] disabled:text-[#9BA0A6]',
+  'placeholder:text-[#9BA0A6]',
 );
 
 // Get border and focus styles based on error state.
 function getBorderStyles(hasError: boolean): string {
   if (hasError) {
-    return 'border-red-300 focus:border-red-500 focus:ring-red-500';
+    return 'border-[#B3372B]/40 focus:border-[#B3372B] focus:ring-[#B3372B]/30';
   }
-  return 'border-gray-300 focus:border-blue-500 focus:ring-blue-500';
+  return 'border-[#E6E4DD] focus:border-[#22262A] focus:ring-[#22262A]/30';
 }
 
 // Input wrapper for icons.
@@ -93,7 +93,7 @@ function InputWrapper({
       {leftIcon ? (
         <div
           className={cn(
-            'pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3 text-gray-400',
+            'pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3 text-[#9BA0A6]',
             iconSizeStyles[size],
           )}
         >
@@ -104,7 +104,7 @@ function InputWrapper({
       {rightIcon ? (
         <div
           className={cn(
-            'pointer-events-none absolute inset-y-0 right-0 flex items-center pr-3 text-gray-400',
+            'pointer-events-none absolute inset-y-0 right-0 flex items-center pr-3 text-[#9BA0A6]',
             iconSizeStyles[size],
           )}
         >
@@ -126,9 +126,9 @@ function Label({
   required?: boolean | undefined;
 }) {
   return (
-    <label htmlFor={htmlFor} className="mb-1 block text-sm font-medium text-gray-700">
+    <label htmlFor={htmlFor} className="mb-1 block text-sm font-medium text-[#22262A]">
       {children}
-      {required ? <span className="ml-1 text-red-500">*</span> : null}
+      {required ? <span className="ml-1 text-[#B3372B]">*</span> : null}
     </label>
   );
 }
@@ -144,7 +144,7 @@ function HelperText({
   id?: string | undefined;
 }) {
   return (
-    <p id={id} className={cn('mt-1 text-sm', isError ? 'text-red-600' : 'text-gray-500')}>
+    <p id={id} className={cn('mt-1 text-sm', isError ? 'text-[#B3372B]' : 'text-[#6B7280]')}>
       {children}
     </p>
   );

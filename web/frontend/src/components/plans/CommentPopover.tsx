@@ -42,11 +42,11 @@ function modePlaceholder(mode: CommentMode): string {
 function modeColorClass(mode: CommentMode): string {
   switch (mode) {
     case 'comment':
-      return 'text-blue-700 bg-blue-50 border-blue-200';
+      return 'text-[#33608D] bg-[#33608D]/8 border-[#33608D]/20';
     case 'replace':
-      return 'text-amber-700 bg-amber-50 border-amber-200';
+      return 'text-[#92610E] bg-[#C98A1B]/8 border-[#C98A1B]/25';
     case 'insert':
-      return 'text-green-700 bg-green-50 border-green-200';
+      return 'text-[#178A5B] bg-[#178A5B]/8 border-[#178A5B]/20';
   }
 }
 
@@ -126,7 +126,7 @@ export function CommentPopover({
   return createPortal(
     <div
       ref={popoverRef}
-      className="fixed z-[110] w-80 rounded-lg border border-gray-200 bg-white shadow-xl"
+      className="fixed z-[110] w-80 rounded-lg border border-[#E6E4DD] bg-white shadow-xl"
       style={{
         top: `${top}px`,
         left: `${left}px`,
@@ -143,7 +143,7 @@ export function CommentPopover({
       <div className="p-3">
         {/* Context snippet. */}
         {contextText && mode === 'comment' && (
-          <div className="mb-2 rounded border border-gray-100 bg-gray-50 px-2 py-1.5 text-xs text-gray-500">
+          <div className="mb-2 rounded border border-[#F1EFE9] bg-[#F4F3EE] px-2 py-1.5 text-xs text-[#6B7280]">
             Re: &ldquo;{displayContext}&rdquo;
           </div>
         )}
@@ -156,12 +156,12 @@ export function CommentPopover({
           onKeyDown={handleKeyDown}
           placeholder={modePlaceholder(mode)}
           rows={3}
-          className="w-full resize-none rounded-lg border border-gray-300 px-3 py-2 text-sm placeholder-gray-400 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+          className="w-full resize-none rounded-lg border border-[#E6E4DD] px-3 py-2 text-sm placeholder-[#9BA0A6] focus:border-[#22262A] focus:outline-none focus:ring-1 focus:ring-[#22262A]/30"
         />
 
         {/* Action buttons. */}
         <div className="mt-2 flex items-center justify-between">
-          <span className="text-[10px] text-gray-400">
+          <span className="text-[10px] text-[#9BA0A6]">
             {navigator.platform.includes('Mac') ? '⌘' : 'Ctrl'}+Enter
             to submit
           </span>
@@ -169,7 +169,7 @@ export function CommentPopover({
             <button
               type="button"
               onClick={onClose}
-              className="rounded-md px-3 py-1.5 text-xs font-medium text-gray-600 hover:bg-gray-100"
+              className="rounded-md px-3 py-1.5 text-xs font-medium text-[#6B7280] hover:bg-[#F1EFE9]"
             >
               Cancel
             </button>
@@ -177,7 +177,7 @@ export function CommentPopover({
               type="button"
               onClick={handleSubmit}
               disabled={text.trim() === ''}
-              className="rounded-md bg-blue-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
+              className="rounded-md bg-[#22262A] px-3 py-1.5 text-xs font-medium text-white hover:bg-[#3A4046] disabled:cursor-not-allowed disabled:opacity-50"
             >
               Submit
             </button>

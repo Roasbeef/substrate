@@ -88,8 +88,8 @@ export default function SettingsPage() {
   return (
     <div className="mx-auto max-w-4xl p-6">
       <div className="mb-8">
-        <h1 className="text-2xl font-bold text-gray-900">Settings</h1>
-        <p className="mt-1 text-sm text-gray-600">
+        <h1 className="text-2xl font-bold text-[#22262A]">Settings</h1>
+        <p className="mt-1 text-sm text-[#6B7280]">
           Manage your preferences and agent configuration.
         </p>
       </div>
@@ -108,8 +108,8 @@ export default function SettingsPage() {
                     className={`
                       flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors
                       ${isActive
-                        ? 'bg-blue-50 text-blue-700'
-                        : 'text-gray-700 hover:bg-gray-100'
+                        ? 'bg-[#22262A] text-white'
+                        : 'text-[#6B7280] hover:bg-[#F1EFE9] hover:text-[#22262A]'
                       }
                     `}
                   >
@@ -124,7 +124,7 @@ export default function SettingsPage() {
 
         {/* Settings content. */}
         <div className="flex-1">
-          <div className="rounded-lg border border-gray-200 bg-white p-6">
+          <div className="rounded-lg border border-[#E6E4DD] bg-white p-6">
             {activeTab === 'notifications' && <NotificationsSection />}
             {activeTab === 'agent' && <AgentProfileSection />}
             {activeTab === 'appearance' && <AppearanceSection />}
@@ -140,8 +140,8 @@ export default function SettingsPage() {
 function NotificationsSection() {
   return (
     <div>
-      <h2 className="mb-4 text-lg font-semibold text-gray-900">Notifications</h2>
-      <p className="mb-6 text-sm text-gray-600">
+      <h2 className="mb-4 text-lg font-semibold text-[#22262A]">Notifications</h2>
+      <p className="mb-6 text-sm text-[#6B7280]">
         Configure how you receive notifications about new messages and agent activity.
       </p>
       <NotificationSettings />
@@ -165,22 +165,22 @@ function AgentProfileSection() {
 
   return (
     <div>
-      <h2 className="mb-4 text-lg font-semibold text-gray-900">Agent Profile</h2>
-      <p className="mb-6 text-sm text-gray-600">
+      <h2 className="mb-4 text-lg font-semibold text-[#22262A]">Agent Profile</h2>
+      <p className="mb-6 text-sm text-[#6B7280]">
         Customize how your agent appears to others in the system.
       </p>
 
       <div className="space-y-6">
         {/* Current agent info. */}
         {currentAgent && (
-          <div className="rounded-lg bg-gray-50 p-4">
+          <div className="rounded-lg bg-[#F4F3EE] p-4">
             <div className="flex items-center gap-3">
-              <div className="flex h-12 w-12 items-center justify-center rounded-full bg-blue-100 text-blue-600">
+              <div className="flex h-12 w-12 items-center justify-center rounded-full bg-[#F1EFE9] text-[#33608D]">
                 <UserIcon className="h-6 w-6" />
               </div>
               <div>
-                <p className="font-medium text-gray-900">{currentAgent.name}</p>
-                <p className="text-sm text-gray-500">Agent ID: {currentAgent.id}</p>
+                <p className="font-medium text-[#22262A]">{currentAgent.name}</p>
+                <p className="text-sm text-[#6B7280]">Agent ID: {currentAgent.id}</p>
               </div>
               <Badge variant="success" className="ml-auto">
                 Active
@@ -197,7 +197,7 @@ function AgentProfileSection() {
             onChange={(e) => setDisplayName(e.target.value)}
             placeholder="Enter agent display name"
           />
-          <p className="mt-1 text-xs text-gray-500">
+          <p className="mt-1 text-xs text-[#6B7280]">
             This name will be shown to other agents in messages.
           </p>
         </div>
@@ -231,15 +231,15 @@ function AppearanceSection() {
 
   return (
     <div>
-      <h2 className="mb-4 text-lg font-semibold text-gray-900">Appearance</h2>
-      <p className="mb-6 text-sm text-gray-600">
+      <h2 className="mb-4 text-lg font-semibold text-[#22262A]">Appearance</h2>
+      <p className="mb-6 text-sm text-[#6B7280]">
         Customize the look and feel of the interface.
       </p>
 
       <div className="space-y-6">
         {/* Theme selection. */}
         <div>
-          <label className="block text-sm font-medium text-gray-700">Theme</label>
+          <label className="block text-sm font-medium text-[#22262A]">Theme</label>
           <div className="mt-2 flex gap-3">
             {(['light', 'dark', 'system'] as const).map((t) => (
               <button
@@ -248,8 +248,8 @@ function AppearanceSection() {
                 className={`
                   rounded-lg border px-4 py-2 text-sm font-medium transition-colors
                   ${theme === t
-                    ? 'border-blue-600 bg-blue-50 text-blue-700'
-                    : 'border-gray-300 text-gray-700 hover:bg-gray-50'
+                    ? 'border-[#22262A] bg-[#22262A] text-white'
+                    : 'border-[#E6E4DD] text-[#6B7280] hover:bg-[#F4F3EE]'
                   }
                 `}
               >
@@ -257,14 +257,14 @@ function AppearanceSection() {
               </button>
             ))}
           </div>
-          <p className="mt-1 text-xs text-gray-500">
+          <p className="mt-1 text-xs text-[#6B7280]">
             System theme will follow your OS preferences.
           </p>
         </div>
 
         {/* Density selection. */}
         <div>
-          <label className="block text-sm font-medium text-gray-700">Display Density</label>
+          <label className="block text-sm font-medium text-[#22262A]">Display Density</label>
           <div className="mt-2 flex gap-3">
             {(['comfortable', 'compact'] as const).map((d) => (
               <button
@@ -273,8 +273,8 @@ function AppearanceSection() {
                 className={`
                   rounded-lg border px-4 py-2 text-sm font-medium transition-colors
                   ${density === d
-                    ? 'border-blue-600 bg-blue-50 text-blue-700'
-                    : 'border-gray-300 text-gray-700 hover:bg-gray-50'
+                    ? 'border-[#22262A] bg-[#22262A] text-white'
+                    : 'border-[#E6E4DD] text-[#6B7280] hover:bg-[#F4F3EE]'
                   }
                 `}
               >
@@ -295,30 +295,30 @@ function ApiTokensSection() {
 
   return (
     <div>
-      <h2 className="mb-4 text-lg font-semibold text-gray-900">API & Tokens</h2>
-      <p className="mb-6 text-sm text-gray-600">
+      <h2 className="mb-4 text-lg font-semibold text-[#22262A]">API & Tokens</h2>
+      <p className="mb-6 text-sm text-[#6B7280]">
         Manage API access tokens for external integrations.
       </p>
 
       <div className="space-y-6">
         {/* API endpoint info. */}
-        <div className="rounded-lg bg-gray-50 p-4">
-          <h3 className="text-sm font-medium text-gray-900">API Endpoint</h3>
-          <code className="mt-1 block text-sm text-gray-600">
+        <div className="rounded-lg bg-[#F4F3EE] p-4">
+          <h3 className="text-sm font-medium text-[#22262A]">API Endpoint</h3>
+          <code className="mt-1 block text-sm text-[#6B7280]">
             {window.location.origin}/api/v1
           </code>
         </div>
 
         {/* API token. */}
         <div>
-          <label className="block text-sm font-medium text-gray-700">API Token</label>
+          <label className="block text-sm font-medium text-[#22262A]">API Token</label>
           <div className="mt-2 flex gap-2">
             <div className="relative flex-1">
               <input
                 type={showToken ? 'text' : 'password'}
                 value={exampleToken}
                 readOnly
-                className="block w-full rounded-lg border border-gray-300 bg-gray-50 px-3 py-2 text-sm font-mono text-gray-900"
+                className="block w-full rounded-lg border border-[#E6E4DD] bg-[#F4F3EE] px-3 py-2 text-sm font-mono text-[#22262A]"
               />
             </div>
             <Button
@@ -336,15 +336,15 @@ function ApiTokensSection() {
               Copy
             </Button>
           </div>
-          <p className="mt-1 text-xs text-gray-500">
+          <p className="mt-1 text-xs text-[#6B7280]">
             Keep this token secret. Never share it publicly.
           </p>
         </div>
 
         {/* Regenerate token. */}
-        <div className="border-t border-gray-200 pt-4">
-          <h3 className="text-sm font-medium text-gray-900">Regenerate Token</h3>
-          <p className="mt-1 text-sm text-gray-600">
+        <div className="border-t border-[#E6E4DD] pt-4">
+          <h3 className="text-sm font-medium text-[#22262A]">Regenerate Token</h3>
+          <p className="mt-1 text-sm text-[#6B7280]">
             Generate a new API token. This will invalidate your current token.
           </p>
           <Button variant="danger" size="sm" className="mt-3">

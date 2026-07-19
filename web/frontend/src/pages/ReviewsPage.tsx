@@ -58,8 +58,8 @@ export default function ReviewsPage() {
     if (detailError) {
       return (
         <div className="p-6">
-          <div className="rounded-lg border border-red-200 bg-red-50 p-6 text-center">
-            <p className="text-sm text-red-700">
+          <div className="rounded-lg border border-[#B3372B]/30 bg-[#B3372B]/10 p-6 text-center">
+            <p className="text-sm text-[#B3372B]">
               Failed to load review: {detailError.message}
             </p>
           </div>
@@ -83,14 +83,14 @@ export default function ReviewsPage() {
     <div className="p-6">
       {/* Page header. */}
       <div className="mb-6">
-        <h1 className="text-2xl font-bold text-gray-900">Code Reviews</h1>
-        <p className="mt-1 text-sm text-gray-500">
+        <h1 className="text-2xl font-bold text-[#22262A]">Code Reviews</h1>
+        <p className="mt-1 text-sm text-[#6B7280]">
           Track and manage automated code review requests.
         </p>
       </div>
 
       {/* State filter tabs. */}
-      <div className="mb-4 flex gap-1 rounded-lg bg-gray-100 p-1">
+      <div className="mb-4 flex gap-1 rounded-lg bg-[#F1EFE9] p-1">
         {stateFilters.map((filter) => (
           <button
             key={filter.value}
@@ -99,8 +99,8 @@ export default function ReviewsPage() {
             className={cn(
               'rounded-md px-3 py-1.5 text-sm font-medium transition-colors',
               stateFilter === filter.value
-                ? 'bg-white text-gray-900 shadow-sm'
-                : 'text-gray-600 hover:text-gray-900',
+                ? 'bg-white text-[#22262A] shadow-sm'
+                : 'text-[#6B7280] hover:text-[#22262A]',
             )}
           >
             {filter.label}
@@ -114,8 +114,8 @@ export default function ReviewsPage() {
           <Spinner size="lg" variant="primary" label="Loading reviews..." />
         </div>
       ) : listError ? (
-        <div className="rounded-lg border border-red-200 bg-red-50 p-6 text-center">
-          <p className="text-sm text-red-700">
+        <div className="rounded-lg border border-[#B3372B]/30 bg-[#B3372B]/10 p-6 text-center">
+          <p className="text-sm text-[#B3372B]">
             Failed to load reviews: {listError.message}
           </p>
         </div>
@@ -126,9 +126,9 @@ export default function ReviewsPage() {
           ))}
         </div>
       ) : (
-        <div className="rounded-lg border border-gray-200 bg-white p-12 text-center">
+        <div className="rounded-lg border border-[#E6E4DD] bg-white p-12 text-center">
           <svg
-            className="mx-auto h-12 w-12 text-gray-400"
+            className="mx-auto h-12 w-12 text-[#9BA0A6]"
             fill="none"
             viewBox="0 0 24 24"
             stroke="currentColor"
@@ -140,14 +140,14 @@ export default function ReviewsPage() {
               d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"
             />
           </svg>
-          <h3 className="mt-4 text-sm font-medium text-gray-900">No reviews</h3>
-          <p className="mt-1 text-sm text-gray-500">
+          <h3 className="mt-4 text-sm font-medium text-[#22262A]">No reviews</h3>
+          <p className="mt-1 text-sm text-[#6B7280]">
             {stateFilter
               ? `No reviews with state "${stateFilter.replace('_', ' ')}".`
               : 'No reviews have been created yet.'}
           </p>
-          <p className="mt-3 text-xs text-gray-400">
-            Use <code className="rounded bg-gray-100 px-1">substrate review request</code> to request a code review.
+          <p className="mt-3 text-xs text-[#9BA0A6]">
+            Use <code className="rounded bg-[#F1EFE9] px-1">substrate review request</code> to request a code review.
           </p>
         </div>
       )}

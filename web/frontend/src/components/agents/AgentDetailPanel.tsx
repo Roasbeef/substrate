@@ -123,11 +123,11 @@ export function AgentDetailPanel({
         )}
       >
         {/* Sticky header with back button and agent info. */}
-        <div className="shrink-0 border-b border-gray-200 bg-white px-8 py-5">
+        <div className="shrink-0 border-b border-[#E6E4DD] bg-white px-8 py-5">
           <div className="flex items-center justify-between">
             <button
               onClick={onBack}
-              className="inline-flex items-center gap-1.5 text-sm text-gray-500 hover:text-gray-700 transition-colors"
+              className="inline-flex items-center gap-1.5 text-sm text-[#6B7280] hover:text-[#22262A] transition-colors"
             >
               <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -137,7 +137,7 @@ export function AgentDetailPanel({
             <div className="flex items-center gap-3">
               <button
                 onClick={() => setComposeOpen(true)}
-                className="inline-flex items-center gap-1.5 rounded-md border border-gray-300 bg-white px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
+                className="inline-flex items-center gap-1.5 rounded-md border border-[#E6E4DD] bg-white px-3 py-1.5 text-sm font-medium text-[#22262A] hover:bg-[#F4F3EE] focus:outline-none focus:ring-2 focus:ring-[#22262A]/30 focus:ring-offset-2"
               >
                 <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
@@ -156,19 +156,19 @@ export function AgentDetailPanel({
             <div className="flex justify-center mb-3">
               <Avatar name={agent.name} size="lg" />
             </div>
-            <h2 className="text-2xl font-bold text-gray-900">{agent.name}</h2>
+            <h2 className="text-2xl font-bold text-[#22262A]">{agent.name}</h2>
             {getAgentContext(agent) ? (
-              <p className="mt-1 text-sm text-gray-500">{getAgentContext(agent)}</p>
+              <p className="mt-1 text-sm text-[#6B7280]">{getAgentContext(agent)}</p>
             ) : null}
             {agent.git_branch ? (
-              <p className="mt-1 flex items-center justify-center gap-1 text-xs text-gray-400">
+              <p className="mt-1 flex items-center justify-center gap-1 text-xs text-[#9BA0A6]">
                 <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 3v12M18 9a3 3 0 01-3 3H6m12-6a3 3 0 10-6 0 3 3 0 006 0zM6 21a3 3 0 100-6 3 3 0 000 6z" />
                 </svg>
                 <code>{agent.git_branch}</code>
               </p>
             ) : null}
-            <div className="mt-2 flex items-center justify-center gap-3 text-sm text-gray-500">
+            <div className="mt-2 flex items-center justify-center gap-3 text-sm text-[#6B7280]">
               {agent.session_id !== undefined && agent.session_id !== 0 ? (
                 <span>Session #{agent.session_id}</span>
               ) : null}
@@ -178,17 +178,17 @@ export function AgentDetailPanel({
 
           {/* Current activity summary. */}
           {summaryLoading ? (
-            <div className="mx-8 mb-6 rounded-lg border border-gray-100 bg-gray-50 p-5">
+            <div className="mx-8 mb-6 rounded-lg border border-[#F1EFE9] bg-[#F4F3EE] p-5">
               <div className="space-y-2">
-                <div className="h-4 w-full animate-pulse rounded bg-gray-200" />
-                <div className="h-4 w-3/4 animate-pulse rounded bg-gray-200" />
+                <div className="h-4 w-full animate-pulse rounded bg-[#E6E4DD]" />
+                <div className="h-4 w-3/4 animate-pulse rounded bg-[#E6E4DD]" />
               </div>
             </div>
           ) : summary ? (
-            <div className="mx-8 mb-6 rounded-lg border border-blue-100 bg-blue-50/50 p-5">
+            <div className="mx-8 mb-6 rounded-lg border border-[#33608D]/15 bg-[#33608D]/5 p-5">
               <div className="flex items-start gap-3">
-                <div className="mt-0.5 shrink-0 rounded-full bg-blue-100 p-1.5">
-                  <svg className="h-4 w-4 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <div className="mt-0.5 shrink-0 rounded-full bg-[#33608D]/10 p-1.5">
+                  <svg className="h-4 w-4 text-[#33608D]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                   </svg>
                 </div>

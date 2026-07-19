@@ -73,7 +73,7 @@ function HighlightedText({ text, query }: { text: string; query: string }) {
       {parts.map((part, i) => {
         const isMatch = part.toLowerCase() === query.toLowerCase();
         return isMatch ? (
-          <mark key={i} className="bg-yellow-200 text-gray-900">
+          <mark key={i} className="bg-[#C98A1B]/20 text-[#22262A]">
             {part}
           </mark>
         ) : (
@@ -93,10 +93,10 @@ function SearchResultItem({
   query: string;
 }) {
   const typeColors = {
-    message: 'text-blue-600 bg-blue-100',
-    thread: 'text-purple-600 bg-purple-100',
-    agent: 'text-green-600 bg-green-100',
-    topic: 'text-orange-600 bg-orange-100',
+    message: 'text-[#33608D] bg-[#33608D]/10',
+    thread: 'text-[#5B5BD6] bg-[#5B5BD6]/10',
+    agent: 'text-[#178A5B] bg-[#178A5B]/10',
+    topic: 'text-[#92610E] bg-[#C98A1B]/12',
   };
 
   const typeLabels = {
@@ -110,9 +110,9 @@ function SearchResultItem({
     <Link
       to={result.route}
       className={cn(
-        'block rounded-lg border border-gray-200 bg-white p-4',
-        'hover:border-blue-300 hover:bg-blue-50/50',
-        'focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2',
+        'block rounded-lg border border-[#E6E4DD] bg-white p-4',
+        'hover:border-[#D8D6CE] hover:bg-[#F4F3EE]',
+        'focus:outline-none focus:ring-2 focus:ring-[#22262A]/30 focus:ring-offset-2',
         'transition-colors',
       )}
     >
@@ -128,7 +128,7 @@ function SearchResultItem({
 
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2">
-            <h3 className="truncate text-sm font-medium text-gray-900">
+            <h3 className="truncate text-sm font-medium text-[#22262A]">
               <HighlightedText text={result.title} query={query} />
             </h3>
             <span
@@ -141,11 +141,11 @@ function SearchResultItem({
             </span>
           </div>
 
-          <p className="mt-1 line-clamp-2 text-sm text-gray-500">
+          <p className="mt-1 line-clamp-2 text-sm text-[#6B7280]">
             <HighlightedText text={result.snippet} query={query} />
           </p>
 
-          <p className="mt-2 text-xs text-gray-400">
+          <p className="mt-2 text-xs text-[#9BA0A6]">
             {new Date(result.created_at).toLocaleDateString(undefined, {
               year: 'numeric',
               month: 'short',
@@ -163,7 +163,7 @@ function EmptyState({ query, hasFilter }: { query: string; hasFilter: boolean })
   return (
     <div className="flex flex-col items-center justify-center py-16 text-center">
       <svg
-        className="h-16 w-16 text-gray-300"
+        className="h-16 w-16 text-[#B0ADA4]"
         fill="none"
         viewBox="0 0 24 24"
         stroke="currentColor"
@@ -175,8 +175,8 @@ function EmptyState({ query, hasFilter }: { query: string; hasFilter: boolean })
           d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
         />
       </svg>
-      <h3 className="mt-4 text-lg font-medium text-gray-900">No results found</h3>
-      <p className="mt-2 max-w-sm text-sm text-gray-500">
+      <h3 className="mt-4 text-lg font-medium text-[#22262A]">No results found</h3>
+      <p className="mt-2 max-w-sm text-sm text-[#6B7280]">
         {query ? (
           <>
             No results found for "{query}".
@@ -248,9 +248,9 @@ export default function SearchResultsPage() {
     <div className="mx-auto max-w-4xl space-y-6 p-6">
       {/* Header. */}
       <div>
-        <h1 className="text-2xl font-bold text-gray-900">Search Results</h1>
+        <h1 className="text-2xl font-bold text-[#22262A]">Search Results</h1>
         {initialQuery && (
-          <p className="mt-1 text-sm text-gray-500">
+          <p className="mt-1 text-sm text-[#6B7280]">
             {filteredResults.length} result{filteredResults.length !== 1 ? 's' : ''} for "{initialQuery}"
             {filter !== 'all' && ` in ${filter}s`}
           </p>

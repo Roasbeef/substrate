@@ -34,17 +34,17 @@ function typeLabel(type: PlanAnnotationType): string {
 function typeBadgeClass(type: PlanAnnotationType): string {
   switch (type) {
     case PlanAnnotationType.COMMENT:
-      return 'bg-yellow-100 text-yellow-800';
+      return 'bg-[#33608D]/10 text-[#33608D]';
     case PlanAnnotationType.DELETION:
-      return 'bg-red-100 text-red-800';
+      return 'bg-[#B3372B]/10 text-[#B3372B]';
     case PlanAnnotationType.REPLACEMENT:
-      return 'bg-blue-100 text-blue-800';
+      return 'bg-[#C98A1B]/12 text-[#92610E]';
     case PlanAnnotationType.INSERTION:
-      return 'bg-green-100 text-green-800';
+      return 'bg-[#178A5B]/10 text-[#178A5B]';
     case PlanAnnotationType.GLOBAL_COMMENT:
-      return 'bg-purple-100 text-purple-800';
+      return 'bg-[#5B5BD6]/10 text-[#4a4ab8]';
     default:
-      return 'bg-gray-100 text-gray-800';
+      return 'bg-[#6B7280]/8 text-[#6B7280]';
   }
 }
 
@@ -113,11 +113,11 @@ export function AnnotationSidebar({
   return (
     <div className="flex h-full flex-col">
       {/* Header. */}
-      <div className="flex items-center justify-between border-b border-gray-200 px-4 py-3">
-        <h3 className="text-sm font-semibold text-gray-900">
+      <div className="flex items-center justify-between border-b border-[#E6E4DD] px-4 py-3">
+        <h3 className="text-sm font-semibold text-[#22262A]">
           Annotations
           {annotations.length > 0 && (
-            <span className="ml-1.5 rounded-full bg-gray-100 px-2 py-0.5 text-xs font-normal text-gray-600">
+            <span className="ml-1.5 rounded-full bg-[#F1EFE9] px-2 py-0.5 text-xs font-normal text-[#6B7280]">
               {annotations.length}
             </span>
           )}
@@ -125,7 +125,7 @@ export function AnnotationSidebar({
         <button
           type="button"
           onClick={() => setShowGlobalInput(!showGlobalInput)}
-          className="flex items-center gap-1 rounded-md px-2 py-1 text-xs font-medium text-gray-600 hover:bg-gray-100"
+          className="flex items-center gap-1 rounded-md px-2 py-1 text-xs font-medium text-[#6B7280] hover:bg-[#F1EFE9]"
           title="Add global comment"
         >
           <svg
@@ -147,13 +147,13 @@ export function AnnotationSidebar({
 
       {/* Global comment input. */}
       {showGlobalInput && (
-        <div className="border-b border-gray-200 p-3">
+        <div className="border-b border-[#E6E4DD] p-3">
           <textarea
             value={globalCommentText}
             onChange={(e) => setGlobalCommentText(e.target.value)}
             placeholder="Add a general comment..."
             rows={2}
-            className="w-full resize-none rounded-lg border border-gray-300 px-3 py-2 text-sm placeholder-gray-400 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+            className="w-full resize-none rounded-lg border border-[#E6E4DD] px-3 py-2 text-sm placeholder-[#9BA0A6] focus:border-[#22262A] focus:outline-none focus:ring-1 focus:ring-[#22262A]/30"
             onKeyDown={(e) => {
               if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') {
                 e.preventDefault();
@@ -168,7 +168,7 @@ export function AnnotationSidebar({
                 setShowGlobalInput(false);
                 setGlobalCommentText('');
               }}
-              className="rounded px-2 py-1 text-xs text-gray-500 hover:bg-gray-100"
+              className="rounded px-2 py-1 text-xs text-[#6B7280] hover:bg-[#F1EFE9]"
             >
               Cancel
             </button>
@@ -176,7 +176,7 @@ export function AnnotationSidebar({
               type="button"
               onClick={handleAddGlobalComment}
               disabled={!globalCommentText.trim()}
-              className="rounded bg-blue-600 px-2 py-1 text-xs text-white hover:bg-blue-700 disabled:opacity-50"
+              className="rounded bg-[#22262A] px-2 py-1 text-xs text-white hover:bg-[#3A4046] disabled:opacity-50"
             >
               Add
             </button>
@@ -189,7 +189,7 @@ export function AnnotationSidebar({
         {annotations.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-12 text-center">
             <svg
-              className="mb-3 h-10 w-10 text-gray-300"
+              className="mb-3 h-10 w-10 text-[#D8D6CE]"
               fill="none"
               viewBox="0 0 24 24"
               stroke="currentColor"

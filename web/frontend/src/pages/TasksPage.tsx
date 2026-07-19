@@ -46,43 +46,43 @@ const STATUS: Record<
 > = {
   pending: {
     label: 'Pending',
-    bg: 'bg-amber-100',
-    bgSubtle: 'bg-amber-50',
-    text: 'text-amber-700',
-    border: 'border-amber-200',
-    dot: 'bg-amber-400',
-    accent: 'text-amber-600',
-    columnBg: 'bg-amber-50/60',
+    bg: 'bg-[#C98A1B]/12',
+    bgSubtle: 'bg-white',
+    text: 'text-[#92610E]',
+    border: 'border-[#E6E4DD]',
+    dot: 'bg-[#C98A1B]',
+    accent: 'text-[#92610E]',
+    columnBg: 'bg-[#F7F6F3]/60',
   },
   in_progress: {
     label: 'In Progress',
-    bg: 'bg-blue-100',
-    bgSubtle: 'bg-blue-50',
-    text: 'text-blue-700',
-    border: 'border-blue-200',
-    dot: 'bg-blue-500',
-    accent: 'text-blue-600',
-    columnBg: 'bg-blue-50/60',
+    bg: 'bg-[#33608D]/10',
+    bgSubtle: 'bg-white',
+    text: 'text-[#33608D]',
+    border: 'border-[#E6E4DD]',
+    dot: 'bg-[#33608D]',
+    accent: 'text-[#33608D]',
+    columnBg: 'bg-[#F7F6F3]/60',
   },
   completed: {
     label: 'Completed',
-    bg: 'bg-emerald-100',
-    bgSubtle: 'bg-emerald-50',
-    text: 'text-emerald-700',
-    border: 'border-emerald-200',
-    dot: 'bg-emerald-500',
-    accent: 'text-emerald-600',
-    columnBg: 'bg-emerald-50/60',
+    bg: 'bg-[#178A5B]/10',
+    bgSubtle: 'bg-white',
+    text: 'text-[#178A5B]',
+    border: 'border-[#E6E4DD]',
+    dot: 'bg-[#178A5B]',
+    accent: 'text-[#178A5B]',
+    columnBg: 'bg-[#F7F6F3]/60',
   },
   deleted: {
     label: 'Deleted',
-    bg: 'bg-gray-100',
-    bgSubtle: 'bg-gray-50',
-    text: 'text-gray-500',
-    border: 'border-gray-200',
-    dot: 'bg-gray-400',
-    accent: 'text-gray-500',
-    columnBg: 'bg-gray-50/60',
+    bg: 'bg-[#6B7280]/8',
+    bgSubtle: 'bg-white',
+    text: 'text-[#9BA0A6]',
+    border: 'border-[#E6E4DD]',
+    dot: 'bg-[#B0ADA4]',
+    accent: 'text-[#9BA0A6]',
+    columnBg: 'bg-[#F7F6F3]/60',
   },
 };
 
@@ -122,14 +122,14 @@ function PulsingDot({ status, blocked }: { status: string; blocked?: boolean }) 
   if (status === 'in_progress') {
     return (
       <span className="relative flex h-2.5 w-2.5">
-        <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-blue-400 opacity-60" />
-        <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-blue-500" />
+        <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-[#33608D] opacity-60" />
+        <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-[#33608D]" />
       </span>
     );
   }
   if (status === 'completed') {
     return (
-      <svg className="h-3.5 w-3.5 text-emerald-500" fill="currentColor" viewBox="0 0 20 20">
+      <svg className="h-3.5 w-3.5 text-[#178A5B]" fill="currentColor" viewBox="0 0 20 20">
         <path
           fillRule="evenodd"
           d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z"
@@ -142,7 +142,7 @@ function PulsingDot({ status, blocked }: { status: string; blocked?: boolean }) 
     <span
       className={cn(
         'h-2.5 w-2.5 rounded-full border-2',
-        blocked ? 'border-orange-400 bg-orange-100' : 'border-gray-300 bg-white',
+        blocked ? 'border-[#C98A1B] bg-[#C98A1B]/15' : 'border-[#D8D6CE] bg-white',
       )}
     />
   );
@@ -189,16 +189,18 @@ function Stat({
   color: 'blue' | 'yellow' | 'green' | 'orange' | 'gray';
 }) {
   const palette: Record<string, string> = {
-    blue: 'bg-blue-50 text-blue-700 border-blue-200',
-    yellow: 'bg-yellow-50 text-yellow-700 border-yellow-200',
-    green: 'bg-green-50 text-green-700 border-green-200',
-    orange: 'bg-orange-50 text-orange-700 border-orange-200',
-    gray: 'bg-gray-50 text-gray-600 border-gray-200',
+    blue: 'text-[#33608D]',
+    yellow: 'text-[#92610E]',
+    green: 'text-[#178A5B]',
+    orange: 'text-[#92610E]',
+    gray: 'text-[#6B7280]',
   };
   return (
-    <div className={cn('rounded-lg border px-3 py-2.5', palette[color])}>
-      <div className="text-2xl font-bold tabular-nums leading-none">{value}</div>
-      <div className="mt-1 text-[11px] font-medium uppercase tracking-wider opacity-70">
+    <div className="rounded-lg border border-[#E6E4DD] bg-white px-3 py-2.5">
+      <div className={cn('text-2xl font-bold tabular-nums leading-none', palette[color])}>
+        {value}
+      </div>
+      <div className="mt-1 text-[11px] font-medium uppercase tracking-wider text-[#9BA0A6]">
         {label}
       </div>
     </div>
@@ -211,7 +213,7 @@ function Stat({
 
 function ViewToggle({ mode, onChange }: { mode: ViewMode; onChange: (m: ViewMode) => void }) {
   return (
-    <div className="inline-flex rounded-lg bg-gray-100 p-0.5">
+    <div className="inline-flex rounded-lg bg-[#F1EFE9] p-0.5">
       {(['list', 'board'] as const).map((m) => (
         <button
           key={m}
@@ -221,8 +223,8 @@ function ViewToggle({ mode, onChange }: { mode: ViewMode; onChange: (m: ViewMode
             'flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-medium',
             'transition-all duration-150',
             mode === m
-              ? 'bg-white text-gray-900 shadow-sm'
-              : 'text-gray-500 hover:text-gray-700',
+              ? 'bg-white text-[#22262A] shadow-sm'
+              : 'text-[#6B7280] hover:text-[#22262A]',
           )}
         >
           {m === 'list' ? (
@@ -269,8 +271,8 @@ function AgentFilterSelect({
       value={value ?? ''}
       onChange={(e) => onChange(e.target.value ? Number(e.target.value) : undefined)}
       className={cn(
-        'rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-sm',
-        'text-gray-700 focus:border-blue-400 focus:outline-none focus:ring-1 focus:ring-blue-400',
+        'rounded-lg border border-[#E6E4DD] bg-white px-3 py-1.5 text-sm',
+        'text-[#22262A] focus:border-[#33608D] focus:outline-none focus:ring-1 focus:ring-[#33608D]',
         'max-w-xs truncate',
       )}
     >
@@ -317,8 +319,8 @@ function TaskRow({
         'w-full text-left flex items-start gap-3.5 rounded-lg border p-4',
         'transition-all duration-150 cursor-pointer group animate-fade-up',
         selected
-          ? 'border-blue-400 bg-blue-50/50 ring-1 ring-blue-200 shadow-sm'
-          : 'border-gray-200 bg-white hover:border-gray-300 hover:shadow-sm',
+          ? 'border-[#22262A] bg-[#F4F3EE] ring-1 ring-[#22262A]/15 shadow-sm'
+          : 'border-[#E6E4DD] bg-white hover:border-[#D8D6CE] hover:shadow-sm',
       )}
     >
       <div className="flex-shrink-0 pt-1">
@@ -328,16 +330,16 @@ function TaskRow({
       <div className="min-w-0 flex-1">
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0">
-            <h3 className="text-sm font-semibold text-gray-900 leading-snug truncate">
+            <h3 className="text-sm font-semibold text-[#22262A] leading-snug truncate">
               {task.subject}
             </h3>
             {task.active_form && task.status === 'in_progress' && (
-              <p className="mt-0.5 text-xs text-blue-600 italic truncate">
+              <p className="mt-0.5 text-xs text-[#33608D] italic truncate">
                 {task.active_form}
               </p>
             )}
             {task.description && (
-              <p className="mt-1 text-[13px] text-gray-500 line-clamp-2 leading-relaxed">
+              <p className="mt-1 text-[13px] text-[#6B7280] line-clamp-2 leading-relaxed">
                 {task.description}
               </p>
             )}
@@ -346,17 +348,17 @@ function TaskRow({
         </div>
 
         {/* Metadata chips. */}
-        <div className="mt-2 flex flex-wrap items-center gap-2 text-xs text-gray-400">
+        <div className="mt-2 flex flex-wrap items-center gap-2 text-xs text-[#9BA0A6]">
           {task.owner && (
-            <span className="inline-flex items-center gap-1 rounded-full bg-gray-100 px-2 py-0.5 text-gray-600 font-medium">
-              <svg className="h-3 w-3 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+            <span className="inline-flex items-center gap-1 rounded-full bg-[#F1EFE9] px-2 py-0.5 text-[#6B7280] font-medium">
+              <svg className="h-3 w-3 text-[#9BA0A6]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                 <path strokeLinecap="round" strokeLinejoin="round" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
               </svg>
               {task.owner}
             </span>
           )}
           {blocked && (
-            <span className="inline-flex items-center gap-1 text-orange-600 font-medium">
+            <span className="inline-flex items-center gap-1 text-[#92610E] font-medium">
               <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                 <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
               </svg>
@@ -364,7 +366,7 @@ function TaskRow({
             </span>
           )}
           {blocking && (
-            <span className="inline-flex items-center gap-1 text-purple-600 font-medium">
+            <span className="inline-flex items-center gap-1 text-[#5B5BD6] font-medium">
               <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                 <path strokeLinecap="round" strokeLinejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z" />
               </svg>
@@ -372,7 +374,7 @@ function TaskRow({
             </span>
           )}
           {task.claude_task_id && (
-            <span className="font-mono text-gray-400">
+            <span className="font-mono text-[#9BA0A6]">
               #{task.claude_task_id}
             </span>
           )}
@@ -415,24 +417,24 @@ function KanbanCard({
         'w-full text-left rounded-lg border p-3 animate-fade-up',
         'transition-all duration-150 cursor-pointer',
         selected
-          ? 'border-blue-400 bg-blue-50/60 ring-1 ring-blue-200 shadow-sm'
+          ? 'border-[#22262A] bg-[#F4F3EE] ring-1 ring-[#22262A]/15 shadow-sm'
           : depHighlight === 'upstream'
-            ? 'border-orange-300 bg-orange-50/40 ring-2 ring-orange-200 shadow-sm'
+            ? 'border-[#C98A1B]/40 bg-[#C98A1B]/8 ring-2 ring-[#C98A1B]/20 shadow-sm'
             : depHighlight === 'downstream'
-              ? 'border-purple-300 bg-purple-50/40 ring-2 ring-purple-200 shadow-sm'
-              : 'border-gray-200 bg-white hover:border-gray-300 hover:shadow-md',
+              ? 'border-[#5B5BD6]/40 bg-[#5B5BD6]/8 ring-2 ring-[#5B5BD6]/20 shadow-sm'
+              : 'border-[#E6E4DD] bg-white hover:border-[#D8D6CE] hover:shadow-md',
       )}
     >
-      <h4 className="text-[13px] font-semibold text-gray-900 leading-snug">
+      <h4 className="text-[13px] font-semibold text-[#22262A] leading-snug">
         {task.subject}
       </h4>
 
       {task.active_form && task.status === 'in_progress' && (
-        <p className="mt-1 text-xs text-blue-600 italic truncate">{task.active_form}</p>
+        <p className="mt-1 text-xs text-[#33608D] italic truncate">{task.active_form}</p>
       )}
 
       {task.description && (
-        <p className="mt-1 text-xs text-gray-500 line-clamp-2 leading-relaxed">
+        <p className="mt-1 text-xs text-[#6B7280] line-clamp-2 leading-relaxed">
           {task.description}
         </p>
       )}
@@ -440,15 +442,15 @@ function KanbanCard({
       <div className="mt-2.5 flex items-center justify-between gap-2">
         <div className="flex items-center gap-1.5 min-w-0">
           {task.owner && (
-            <span className="inline-flex items-center gap-1 rounded-full bg-gray-100 px-1.5 py-0.5 text-[10px] font-medium text-gray-600 truncate max-w-[120px]">
-              <svg className="h-2.5 w-2.5 flex-shrink-0 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+            <span className="inline-flex items-center gap-1 rounded-full bg-[#F1EFE9] px-1.5 py-0.5 text-[10px] font-medium text-[#6B7280] truncate max-w-[120px]">
+              <svg className="h-2.5 w-2.5 flex-shrink-0 text-[#9BA0A6]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                 <path strokeLinecap="round" strokeLinejoin="round" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
               </svg>
               <span className="truncate">{task.owner}</span>
             </span>
           )}
           {blocked && (
-            <span className="inline-flex items-center gap-1 rounded-full bg-orange-50 px-1.5 py-0.5 text-[10px] font-semibold text-orange-600">
+            <span className="inline-flex items-center gap-1 rounded-full bg-[#C98A1B]/12 px-1.5 py-0.5 text-[10px] font-semibold text-[#92610E]">
               <svg className="h-2.5 w-2.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                 <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01" />
               </svg>
@@ -456,7 +458,7 @@ function KanbanCard({
             </span>
           )}
         </div>
-        <div className="flex items-center gap-1.5 text-[10px] text-gray-400 flex-shrink-0">
+        <div className="flex items-center gap-1.5 text-[10px] text-[#9BA0A6] flex-shrink-0">
           {task.claude_task_id && (
             <span className="font-mono">#{task.claude_task_id}</span>
           )}
@@ -508,14 +510,14 @@ function KanbanColumn({
       <div
         className={cn(
           'flex-1 space-y-2 rounded-b-lg border border-t-0 p-2',
-          'border-gray-200 overflow-y-auto scrollbar-thin',
+          'border-[#E6E4DD] overflow-y-auto scrollbar-thin',
           'min-h-[180px] max-h-[calc(100vh-340px)]',
           s.columnBg,
         )}
       >
         {tasks.length === 0 ? (
           <div className="flex h-20 items-center justify-center">
-            <p className="text-xs text-gray-400 italic">No tasks</p>
+            <p className="text-xs text-[#9BA0A6] italic">No tasks</p>
           </div>
         ) : (
           tasks.map((task, i) => (
@@ -587,7 +589,7 @@ function DetailPanel({
         className={cn(
           'fixed inset-y-0 right-0 z-50 w-full sm:w-[460px]',
           'flex flex-col bg-white shadow-2xl animate-slide-in',
-          'border-l border-gray-200',
+          'border-l border-[#E6E4DD]',
         )}
       >
         {/* Header. */}
@@ -595,13 +597,13 @@ function DetailPanel({
           <div className="flex items-center gap-3 min-w-0">
             <Badge status={task.status} />
             {task.claude_task_id && (
-              <span className="text-xs text-gray-400 font-mono">#{task.claude_task_id}</span>
+              <span className="text-xs text-[#9BA0A6] font-mono">#{task.claude_task_id}</span>
             )}
           </div>
           <button
             type="button"
             onClick={onClose}
-            className="rounded-lg p-1.5 text-gray-400 hover:text-gray-600 hover:bg-gray-100/80 transition-colors"
+            className="rounded-lg p-1.5 text-[#9BA0A6] hover:text-[#6B7280] hover:bg-[#F1EFE9] transition-colors"
           >
             <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
@@ -614,14 +616,14 @@ function DetailPanel({
           <div className="px-5 py-5 space-y-5">
             {/* Title. */}
             <div>
-              <h2 className="text-lg font-bold text-gray-900 leading-snug tracking-tight">
+              <h2 className="text-lg font-bold text-[#22262A] leading-snug tracking-tight">
                 {task.subject}
               </h2>
               {task.active_form && task.status === 'in_progress' && (
-                <div className="mt-2 flex items-center gap-2 text-sm text-blue-600">
+                <div className="mt-2 flex items-center gap-2 text-sm text-[#33608D]">
                   <span className="relative flex h-2 w-2">
-                    <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-blue-400 opacity-60" />
-                    <span className="relative inline-flex h-2 w-2 rounded-full bg-blue-500" />
+                    <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-[#33608D] opacity-60" />
+                    <span className="relative inline-flex h-2 w-2 rounded-full bg-[#33608D]" />
                   </span>
                   <span className="italic">{task.active_form}</span>
                 </div>
@@ -631,7 +633,7 @@ function DetailPanel({
             {/* Description. */}
             {task.description && (
               <Section title="Description">
-                <p className="text-sm text-gray-700 leading-relaxed whitespace-pre-wrap">
+                <p className="text-sm text-[#22262A] leading-relaxed whitespace-pre-wrap">
                   {task.description}
                 </p>
               </Section>
@@ -640,8 +642,8 @@ function DetailPanel({
             {/* Owner. */}
             {task.owner && (
               <Section title="Owner">
-                <span className="inline-flex items-center gap-1.5 rounded-full bg-gray-100 px-3 py-1 text-sm font-medium text-gray-700">
-                  <svg className="h-3.5 w-3.5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <span className="inline-flex items-center gap-1.5 rounded-full bg-[#F1EFE9] px-3 py-1 text-sm font-medium text-[#6B7280]">
+                  <svg className="h-3.5 w-3.5 text-[#9BA0A6]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                     <path strokeLinecap="round" strokeLinejoin="round" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
                   </svg>
                   {task.owner}
@@ -681,12 +683,12 @@ function DetailPanel({
             {/* Metadata. */}
             {metadata && Object.keys(metadata).length > 0 && (
               <Section title="Metadata">
-                <div className="rounded-lg border border-gray-200 bg-gray-50 p-3">
+                <div className="rounded-lg border border-[#E6E4DD] bg-[#F7F6F3] p-3">
                   <dl className="space-y-1.5">
                     {Object.entries(metadata).map(([key, value]) => (
                       <div key={key} className="flex gap-2 text-xs">
-                        <dt className="font-medium text-gray-500 min-w-[80px]">{key}</dt>
-                        <dd className="text-gray-700 font-mono break-all">{String(value)}</dd>
+                        <dt className="font-medium text-[#6B7280] min-w-[80px]">{key}</dt>
+                        <dd className="text-[#22262A] font-mono break-all">{String(value)}</dd>
                       </div>
                     ))}
                   </dl>
@@ -696,9 +698,9 @@ function DetailPanel({
 
             {/* Timeline. */}
             <Section title="Timeline">
-              <div className="rounded-lg border border-gray-200 overflow-hidden">
+              <div className="rounded-lg border border-[#E6E4DD] overflow-hidden">
                 <table className="w-full text-xs">
-                  <tbody className="divide-y divide-gray-100">
+                  <tbody className="divide-y divide-[#F1EFE9]">
                     {[
                       ['Created', task.created_at],
                       ['Updated', task.updated_at],
@@ -708,10 +710,10 @@ function DetailPanel({
                       .filter(([, v]) => v != null)
                       .map(([label, date]) => (
                         <tr key={label as string}>
-                          <td className="px-3 py-2 font-medium text-gray-500 bg-gray-50/80 w-24">
+                          <td className="px-3 py-2 font-medium text-[#6B7280] bg-[#F7F6F3] w-24">
                             {label as string}
                           </td>
-                          <td className="px-3 py-2 text-gray-700 font-mono">
+                          <td className="px-3 py-2 text-[#22262A] font-mono">
                             {fullTimestamp(date as Date | null)}
                           </td>
                         </tr>
@@ -743,7 +745,7 @@ function DetailPanel({
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
     <div>
-      <h3 className="text-[11px] font-semibold uppercase tracking-widest text-gray-400 mb-2">
+      <h3 className="text-[11px] font-semibold uppercase tracking-widest text-[#6B7280] mb-2">
         {title}
       </h3>
       {children}
@@ -768,14 +770,14 @@ function DepCard({
       className={cn(
         'flex items-start gap-2 rounded-lg border p-2.5',
         isBlocked
-          ? 'bg-orange-50 border-orange-200'
-          : 'bg-purple-50 border-purple-200',
+          ? 'bg-[#C98A1B]/8 border-[#C98A1B]/25'
+          : 'bg-[#5B5BD6]/8 border-[#5B5BD6]/25',
       )}
     >
       <svg
         className={cn(
           'h-4 w-4 flex-shrink-0 mt-0.5',
-          isBlocked ? 'text-orange-500' : 'text-purple-500',
+          isBlocked ? 'text-[#92610E]' : 'text-[#5B5BD6]',
         )}
         fill="none"
         viewBox="0 0 24 24"
@@ -793,7 +795,7 @@ function DepCard({
         )}
       </svg>
       <div>
-        <p className={cn('text-xs font-medium', isBlocked ? 'text-orange-700' : 'text-purple-700')}>
+        <p className={cn('text-xs font-medium', isBlocked ? 'text-[#92610E]' : 'text-[#5B5BD6]')}>
           {label}
         </p>
         <div className="mt-1 flex flex-wrap gap-1">
@@ -809,8 +811,8 @@ function DepCard({
                 'inline-flex rounded px-1.5 py-0.5 text-[11px] font-mono',
                 'transition-colors',
                 isBlocked
-                  ? 'bg-orange-100 text-orange-700 hover:bg-orange-200'
-                  : 'bg-purple-100 text-purple-700 hover:bg-purple-200',
+                  ? 'bg-[#C98A1B]/15 text-[#92610E] hover:bg-[#C98A1B]/25'
+                  : 'bg-[#5B5BD6]/12 text-[#5B5BD6] hover:bg-[#5B5BD6]/20',
                 onNavigate && 'cursor-pointer',
               )}
             >
@@ -829,7 +831,7 @@ function DepCard({
 
 function DepArrow() {
   return (
-    <div className="flex-shrink-0 flex items-center text-gray-300 self-center">
+    <div className="flex-shrink-0 flex items-center text-[#D8D6CE] self-center">
       <svg className="h-4 w-8" viewBox="0 0 32 16" fill="none">
         <path d="M0 8h24" stroke="currentColor" strokeWidth="1.5" />
         <path
@@ -855,9 +857,9 @@ function DepGraphNode({
 }) {
   const s = getStatus(task.status);
   const colors = {
-    upstream: 'border-orange-200 bg-orange-50 hover:bg-orange-100',
-    current: 'border-blue-400 bg-blue-50 ring-2 ring-blue-200',
-    downstream: 'border-purple-200 bg-purple-50 hover:bg-purple-100',
+    upstream: 'border-[#C98A1B]/30 bg-[#C98A1B]/8 hover:bg-[#C98A1B]/12',
+    current: 'border-[#22262A] bg-[#F4F3EE] ring-2 ring-[#22262A]/15',
+    downstream: 'border-[#5B5BD6]/30 bg-[#5B5BD6]/8 hover:bg-[#5B5BD6]/12',
   };
 
   return (
@@ -874,10 +876,10 @@ function DepGraphNode({
     >
       <div className="flex items-center gap-1.5">
         <span className={cn('h-1.5 w-1.5 rounded-full flex-shrink-0', s.dot)} />
-        <span className="text-[10px] font-mono text-gray-400">#{task.claude_task_id}</span>
+        <span className="text-[10px] font-mono text-[#9BA0A6]">#{task.claude_task_id}</span>
         <span className={cn('text-[9px] font-semibold uppercase', s.text)}>{s.label}</span>
       </div>
-      <p className="mt-1 text-xs font-medium text-gray-800 truncate">
+      <p className="mt-1 text-xs font-medium text-[#22262A] truncate">
         {task.subject || '(untitled)'}
       </p>
     </button>
@@ -923,7 +925,7 @@ function DependencyGraph({
       {(upstream.length > 0 || unresolvedUpstream.length > 0) && (
         <>
           <div className="flex flex-col gap-1.5 flex-shrink-0">
-            <span className="text-[9px] font-semibold uppercase tracking-wider text-orange-400 text-center mb-0.5">
+            <span className="text-[9px] font-semibold uppercase tracking-wider text-[#92610E] text-center mb-0.5">
               Blocked by
             </span>
             {upstream.map((t) => (
@@ -937,10 +939,10 @@ function DependencyGraph({
             {unresolvedUpstream.map((id) => (
               <div
                 key={id}
-                className="rounded-lg border border-dashed border-orange-200 bg-orange-50/50 px-3 py-2 min-w-[140px]"
+                className="rounded-lg border border-dashed border-[#C98A1B]/30 bg-[#C98A1B]/5 px-3 py-2 min-w-[140px]"
               >
-                <span className="text-[10px] font-mono text-orange-400">#{id}</span>
-                <p className="mt-0.5 text-[10px] text-orange-300 italic">not in scope</p>
+                <span className="text-[10px] font-mono text-[#92610E]">#{id}</span>
+                <p className="mt-0.5 text-[10px] text-[#B0ADA4] italic">not in scope</p>
               </div>
             ))}
           </div>
@@ -950,7 +952,7 @@ function DependencyGraph({
 
       {/* Current node. */}
       <div className="flex flex-col gap-1.5 flex-shrink-0">
-        <span className="text-[9px] font-semibold uppercase tracking-wider text-blue-400 text-center mb-0.5">
+        <span className="text-[9px] font-semibold uppercase tracking-wider text-[#6B7280] text-center mb-0.5">
           Current
         </span>
         <DepGraphNode task={task} variant="current" />
@@ -961,7 +963,7 @@ function DependencyGraph({
         <>
           <DepArrow />
           <div className="flex flex-col gap-1.5 flex-shrink-0">
-            <span className="text-[9px] font-semibold uppercase tracking-wider text-purple-400 text-center mb-0.5">
+            <span className="text-[9px] font-semibold uppercase tracking-wider text-[#5B5BD6] text-center mb-0.5">
               Blocks
             </span>
             {downstream.map((t) => (
@@ -975,10 +977,10 @@ function DependencyGraph({
             {unresolvedDownstream.map((id) => (
               <div
                 key={id}
-                className="rounded-lg border border-dashed border-purple-200 bg-purple-50/50 px-3 py-2 min-w-[140px]"
+                className="rounded-lg border border-dashed border-[#5B5BD6]/30 bg-[#5B5BD6]/5 px-3 py-2 min-w-[140px]"
               >
-                <span className="text-[10px] font-mono text-purple-400">#{id}</span>
-                <p className="mt-0.5 text-[10px] text-purple-300 italic">not in scope</p>
+                <span className="text-[10px] font-mono text-[#5B5BD6]">#{id}</span>
+                <p className="mt-0.5 text-[10px] text-[#B0ADA4] italic">not in scope</p>
               </div>
             ))}
           </div>
@@ -991,8 +993,8 @@ function DependencyGraph({
 function IdRow({ label, value, mono }: { label: string; value: string; mono?: boolean }) {
   return (
     <div className="flex gap-2">
-      <span className="font-medium text-gray-500 w-16">{label}</span>
-      <span className={cn('text-gray-700', mono && 'font-mono')}>{value}</span>
+      <span className="font-medium text-[#6B7280] w-16">{label}</span>
+      <span className={cn('text-[#22262A]', mono && 'font-mono')}>{value}</span>
     </div>
   );
 }
@@ -1019,18 +1021,18 @@ function AgentSummaryTable({
 
   return (
     <div className="mb-6 animate-fade-up">
-      <h2 className="mb-2 text-xs font-semibold uppercase tracking-widest text-gray-400">
+      <h2 className="mb-2 text-xs font-semibold uppercase tracking-widest text-[#6B7280]">
         Per-Agent Summary
       </h2>
-      <div className="overflow-hidden rounded-lg border border-gray-200 bg-white">
-        <table className="min-w-full divide-y divide-gray-200">
-          <thead className="bg-gray-50">
+      <div className="overflow-hidden rounded-lg border border-[#E6E4DD] bg-white">
+        <table className="min-w-full divide-y divide-[#E6E4DD]">
+          <thead className="bg-[#F7F6F3]">
             <tr>
               {['Agent', 'In Progress', 'Pending', 'Blocked', 'Done Today'].map((h) => (
                 <th
                   key={h}
                   className={cn(
-                    'px-4 py-2 text-[11px] font-semibold uppercase tracking-wider text-gray-500',
+                    'px-4 py-2 text-[11px] font-semibold uppercase tracking-wider text-[#6B7280]',
                     h === 'Agent' ? 'text-left' : 'text-center',
                   )}
                 >
@@ -1039,26 +1041,26 @@ function AgentSummaryTable({
               ))}
             </tr>
           </thead>
-          <tbody className="divide-y divide-gray-100">
+          <tbody className="divide-y divide-[#F1EFE9]">
             {agentStats.map((stat) => (
               <tr
                 key={stat.agent_id}
-                className="cursor-pointer hover:bg-gray-50 transition-colors"
+                className="cursor-pointer hover:bg-[#F4F3EE] transition-colors"
                 onClick={() => onSelectAgent(stat.agent_id)}
               >
-                <td className="whitespace-nowrap px-4 py-2 text-sm font-medium text-gray-900">
+                <td className="whitespace-nowrap px-4 py-2 text-sm font-medium text-[#22262A]">
                   {stat.agent_name || `Agent ${stat.agent_id}`}
                 </td>
-                <td className="whitespace-nowrap px-4 py-2 text-center text-sm tabular-nums text-blue-600 font-medium">
+                <td className="whitespace-nowrap px-4 py-2 text-center text-sm tabular-nums text-[#33608D] font-medium">
                   {stat.in_progress_count || '—'}
                 </td>
-                <td className="whitespace-nowrap px-4 py-2 text-center text-sm tabular-nums text-amber-600 font-medium">
+                <td className="whitespace-nowrap px-4 py-2 text-center text-sm tabular-nums text-[#92610E] font-medium">
                   {stat.pending_count || '—'}
                 </td>
-                <td className="whitespace-nowrap px-4 py-2 text-center text-sm tabular-nums text-orange-600 font-medium">
+                <td className="whitespace-nowrap px-4 py-2 text-center text-sm tabular-nums text-[#92610E] font-medium">
                   {stat.blocked_count || '—'}
                 </td>
-                <td className="whitespace-nowrap px-4 py-2 text-center text-sm tabular-nums text-emerald-600 font-medium">
+                <td className="whitespace-nowrap px-4 py-2 text-center text-sm tabular-nums text-[#178A5B] font-medium">
                   {stat.completed_today || '—'}
                 </td>
               </tr>
@@ -1161,8 +1163,8 @@ export default function TasksPage() {
       {/* Header. */}
       <div className="mb-6 flex items-start justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900 tracking-tight">Tasks</h1>
-          <p className="mt-1 text-sm text-gray-500">
+          <h1 className="text-2xl font-bold text-[#22262A] tracking-tight">Tasks</h1>
+          <p className="mt-1 text-sm text-[#6B7280]">
             Track Claude Code agent tasks and progress.
           </p>
         </div>
@@ -1184,7 +1186,7 @@ export default function TasksPage() {
       {/* Filters. */}
       <div className="mb-4 flex flex-wrap items-center gap-3">
         {viewMode === 'list' && (
-          <div className="flex gap-0.5 rounded-lg bg-gray-100 p-0.5">
+          <div className="flex gap-0.5 rounded-lg bg-[#F1EFE9] p-0.5">
             {statusFilters.map((f) => (
               <button
                 key={f.value}
@@ -1193,8 +1195,8 @@ export default function TasksPage() {
                 className={cn(
                   'rounded-md px-3 py-1.5 text-sm font-medium transition-all duration-150',
                   statusFilter === f.value
-                    ? 'bg-white text-gray-900 shadow-sm'
-                    : 'text-gray-500 hover:text-gray-700',
+                    ? 'bg-white text-[#22262A] shadow-sm'
+                    : 'text-[#6B7280] hover:text-[#22262A]',
                 )}
               >
                 {f.label}
@@ -1221,8 +1223,8 @@ export default function TasksPage() {
           <Spinner size="lg" variant="primary" label="Loading tasks..." />
         </div>
       ) : error ? (
-        <div className="rounded-lg border border-red-200 bg-red-50 p-8 text-center">
-          <p className="text-sm text-red-700">Failed to load tasks: {error.message}</p>
+        <div className="rounded-lg border border-[#B3372B]/25 bg-[#B3372B]/8 p-8 text-center">
+          <p className="text-sm text-[#B3372B]">Failed to load tasks: {error.message}</p>
         </div>
       ) : viewMode === 'board' ? (
         <div className="flex gap-4 overflow-x-auto pb-4">
@@ -1261,9 +1263,9 @@ export default function TasksPage() {
           ))}
         </div>
       ) : (
-        <div className="rounded-lg border border-gray-200 bg-white p-12 text-center animate-fade-up">
+        <div className="rounded-lg border border-[#E6E4DD] bg-white p-12 text-center animate-fade-up">
           <svg
-            className="mx-auto h-12 w-12 text-gray-300"
+            className="mx-auto h-12 w-12 text-[#B0ADA4]"
             fill="none"
             viewBox="0 0 24 24"
             stroke="currentColor"
@@ -1275,15 +1277,15 @@ export default function TasksPage() {
               d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"
             />
           </svg>
-          <h3 className="mt-4 text-sm font-semibold text-gray-900">No tasks</h3>
-          <p className="mt-1 text-sm text-gray-500">
+          <h3 className="mt-4 text-sm font-semibold text-[#22262A]">No tasks</h3>
+          <p className="mt-1 text-sm text-[#6B7280]">
             {statusFilter
               ? `No tasks with status "${statusFilter.replace('_', ' ')}".`
               : agentFilter
                 ? 'No tasks for this agent.'
                 : 'No tasks have been tracked yet.'}
           </p>
-          <p className="mt-3 text-xs text-gray-400">
+          <p className="mt-3 text-xs text-[#9BA0A6]">
             Tasks are automatically tracked when agents use TodoWrite.
           </p>
         </div>

@@ -56,8 +56,8 @@ export default function PlansPage() {
     if (detailError) {
       return (
         <div className="p-6">
-          <div className="rounded-lg border border-red-200 bg-red-50 p-6 text-center">
-            <p className="text-sm text-red-700">
+          <div className="rounded-lg border border-[#B3372B]/25 bg-[#B3372B]/10 p-6 text-center">
+            <p className="text-sm text-[#B3372B]">
               Failed to load plan review: {detailError.message}
             </p>
           </div>
@@ -81,14 +81,14 @@ export default function PlansPage() {
     <div className="p-6">
       {/* Page header. */}
       <div className="mb-6">
-        <h1 className="text-2xl font-bold text-gray-900">Plan Reviews</h1>
-        <p className="mt-1 text-sm text-gray-500">
+        <h1 className="text-2xl font-bold text-[#22262A]">Plan Reviews</h1>
+        <p className="mt-1 text-sm text-[#6B7280]">
           Review and approve agent implementation plans before execution.
         </p>
       </div>
 
       {/* State filter tabs. */}
-      <div className="mb-4 flex gap-1 rounded-lg bg-gray-100 p-1">
+      <div className="mb-4 flex gap-1 rounded-lg bg-[#F1EFE9] p-1">
         {stateFilters.map((filter) => (
           <button
             key={filter.value}
@@ -97,8 +97,8 @@ export default function PlansPage() {
             className={cn(
               'rounded-md px-3 py-1.5 text-sm font-medium transition-colors',
               stateFilter === filter.value
-                ? 'bg-white text-gray-900 shadow-sm'
-                : 'text-gray-600 hover:text-gray-900',
+                ? 'bg-[#22262A] text-white shadow-sm'
+                : 'text-[#6B7280] hover:text-[#22262A]',
             )}
           >
             {filter.label}
@@ -112,8 +112,8 @@ export default function PlansPage() {
           <Spinner size="lg" variant="primary" label="Loading plan reviews..." />
         </div>
       ) : listError ? (
-        <div className="rounded-lg border border-red-200 bg-red-50 p-6 text-center">
-          <p className="text-sm text-red-700">
+        <div className="rounded-lg border border-[#B3372B]/25 bg-[#B3372B]/10 p-6 text-center">
+          <p className="text-sm text-[#B3372B]">
             Failed to load plan reviews: {listError.message}
           </p>
         </div>
@@ -124,9 +124,9 @@ export default function PlansPage() {
           ))}
         </div>
       ) : (
-        <div className="rounded-lg border border-gray-200 bg-white p-12 text-center">
+        <div className="rounded-lg border border-[#E6E4DD] bg-white p-12 text-center">
           <svg
-            className="mx-auto h-12 w-12 text-gray-400"
+            className="mx-auto h-12 w-12 text-[#9BA0A6]"
             fill="none"
             viewBox="0 0 24 24"
             stroke="currentColor"
@@ -138,13 +138,13 @@ export default function PlansPage() {
               d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
             />
           </svg>
-          <h3 className="mt-4 text-sm font-medium text-gray-900">No plan reviews</h3>
-          <p className="mt-1 text-sm text-gray-500">
+          <h3 className="mt-4 text-sm font-medium text-[#22262A]">No plan reviews</h3>
+          <p className="mt-1 text-sm text-[#6B7280]">
             {stateFilter
               ? `No plan reviews with state "${stateFilter.replace('_', ' ')}".`
               : 'No plan reviews have been submitted yet.'}
           </p>
-          <p className="mt-3 text-xs text-gray-400">
+          <p className="mt-3 text-xs text-[#9BA0A6]">
             Plans are submitted automatically when agents call ExitPlanMode.
           </p>
         </div>

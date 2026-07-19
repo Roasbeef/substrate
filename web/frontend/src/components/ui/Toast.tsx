@@ -16,7 +16,7 @@ export type ToastVariant = 'success' | 'error' | 'warning' | 'info';
 function SuccessIcon() {
   return (
     <svg
-      className="h-5 w-5 text-green-400"
+      className="h-5 w-5 text-[#178A5B]"
       xmlns="http://www.w3.org/2000/svg"
       viewBox="0 0 20 20"
       fill="currentColor"
@@ -34,7 +34,7 @@ function SuccessIcon() {
 function ErrorIcon() {
   return (
     <svg
-      className="h-5 w-5 text-red-400"
+      className="h-5 w-5 text-[#B3372B]"
       xmlns="http://www.w3.org/2000/svg"
       viewBox="0 0 20 20"
       fill="currentColor"
@@ -52,7 +52,7 @@ function ErrorIcon() {
 function WarningIcon() {
   return (
     <svg
-      className="h-5 w-5 text-yellow-400"
+      className="h-5 w-5 text-[#92610E]"
       xmlns="http://www.w3.org/2000/svg"
       viewBox="0 0 20 20"
       fill="currentColor"
@@ -70,7 +70,7 @@ function WarningIcon() {
 function InfoIcon() {
   return (
     <svg
-      className="h-5 w-5 text-blue-400"
+      className="h-5 w-5 text-[#33608D]"
       xmlns="http://www.w3.org/2000/svg"
       viewBox="0 0 20 20"
       fill="currentColor"
@@ -109,10 +109,10 @@ const variantIcons: Record<ToastVariant, () => React.JSX.Element> = {
 
 // Variant styles mapping.
 const variantStyles: Record<ToastVariant, string> = {
-  success: 'bg-white border-green-200',
-  error: 'bg-white border-red-200',
-  warning: 'bg-white border-yellow-200',
-  info: 'bg-white border-blue-200',
+  success: 'bg-white border-[#178A5B]/30',
+  error: 'bg-white border-[#B3372B]/30',
+  warning: 'bg-white border-[#C98A1B]/30',
+  info: 'bg-white border-[#33608D]/30',
 };
 
 // Single toast item component.
@@ -153,11 +153,11 @@ function ToastItem({ toast, onClose }: ToastItemProps) {
           </div>
           <div className="ml-3 w-0 flex-1 pt-0.5">
             {toast.title ? (
-              <p className="text-sm font-medium text-gray-900">{toast.title}</p>
+              <p className="text-sm font-medium text-[#22262A]">{toast.title}</p>
             ) : null}
             <p
               className={cn(
-                'text-sm text-gray-500',
+                'text-sm text-[#6B7280]',
                 toast.title ? 'mt-1' : '',
               )}
             >
@@ -168,7 +168,7 @@ function ToastItem({ toast, onClose }: ToastItemProps) {
                 <button
                   type="button"
                   onClick={toast.action.onClick}
-                  className="rounded-md bg-white text-sm font-medium text-blue-600 hover:text-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
+                  className="rounded-md bg-white text-sm font-medium text-[#33608D] hover:text-[#22262A] focus:outline-none focus:ring-2 focus:ring-[#22262A]/30 focus:ring-offset-2"
                 >
                   {toast.action.label}
                 </button>
@@ -178,7 +178,7 @@ function ToastItem({ toast, onClose }: ToastItemProps) {
           <div className="ml-4 flex flex-shrink-0">
             <button
               type="button"
-              className="inline-flex rounded-md bg-white text-gray-400 hover:text-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
+              className="inline-flex rounded-md bg-white text-[#9BA0A6] hover:text-[#6B7280] focus:outline-none focus:ring-2 focus:ring-[#22262A]/30 focus:ring-offset-2"
               onClick={() => onClose(toast.id)}
               aria-label="Close notification"
             >
