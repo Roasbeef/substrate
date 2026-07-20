@@ -173,10 +173,30 @@ export function FocusMode({ lane, summary }: FocusModeProps) {
                 </p>
               )}
               {doc.isError && (
-                <p className="text-[12px] text-[var(--c-rust)]">
-                  Could not read this file from the agent's working
-                  directory.
-                </p>
+                <div className="space-y-2">
+                  <p className="text-[12px] text-[var(--c-rust)]">
+                    Could not read this file from the agent's working
+                    directory.
+                  </p>
+                  <dl className="space-y-1 rounded-md border border-[var(--c-hair)] bg-[var(--c-hover)] p-2 font-mono text-[10.5px] text-[var(--c-mut)]">
+                    <div>path: {openDoc.path}</div>
+                    <div>
+                      workdir:{' '}
+                      {agent.working_dir || '(not recorded)'}
+                    </div>
+                    <div>
+                      project: {agent.project_key || '(none)'}
+                    </div>
+                  </dl>
+                  <p className="text-[11.5px] leading-snug text-[var(--c-dim)]">
+                    Substrate resolves files against the agent's
+                    recorded working directory (worktrees included).
+                    If it shows "(not recorded)", the agent has never
+                    reported one — it backfills from the agent's
+                    session identity when available, and future CLI
+                    heartbeats can report it directly.
+                  </p>
+                </div>
               )}
               {doc.data &&
                 (docHtml ? (

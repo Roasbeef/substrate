@@ -1,6 +1,7 @@
 package web
 
 import (
+	"context"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -58,13 +59,12 @@ func (s *Server) handleAgentDoc(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	base := agent.WorkingDir
-	if base == "" && strings.HasPrefix(agent.ProjectKey, "/") {
-		base = agent.ProjectKey
-	}
+	base := s.resolveAgentBase(r.Context(), agent.ID,
+		agent.WorkingDir, agent.ProjectKey,
+	)
 	if base == "" {
 		http.Error(
-			w, "agent has no working directory",
+			w, "agent has no recorded working directory",
 			http.StatusNotFound,
 		)
 		return
@@ -118,4 +118,31 @@ func resolveDocPath(base, rel string) (string, bool) {
 	}
 
 	return full, true
+}
+
+// resolveAgentBase picks the best-known on-disk root for an agent:
+// its recorded working directory, an absolute project key (worktree
+// checkouts often register this way), or the project key of its most
+// recent session identity.
+func (s *Server) resolveAgentBase(ctx context.Context, agentID int64,
+	workingDir, projectKey string,
+) string {
+	if workingDir != "" {
+		return workingDir
+	}
+	if strings.HasPrefix(projectKey, "/") {
+		return projectKey
+	}
+
+	idents, err := s.store.ListSessionIdentitiesByAgent(ctx, agentID)
+	if err != nil {
+		return ""
+	}
+	for _, ident := range idents {
+		if strings.HasPrefix(ident.ProjectKey, "/") {
+			return ident.ProjectKey
+		}
+	}
+
+	return ""
 }
