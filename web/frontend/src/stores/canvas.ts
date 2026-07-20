@@ -42,6 +42,14 @@ export interface StatusFilters {
   offline: boolean;
 }
 
+// An unsent composer draft, keyed by agent name. Persisted so text
+// typed into a card's composer survives card remounts (panning, focus
+// mode, feed refreshes) and full page reloads.
+export interface ComposerDraft {
+  text: string;
+  urgent: boolean;
+}
+
 // Default card footprint used for auto-placement collision checks.
 export const CARD_WIDTH = 380;
 export const CARD_GAP = 28;
@@ -58,12 +66,16 @@ interface CanvasState {
   zOrder: Record<number, number>;
 
   granularity: Record<number, Granularity>;
+  // Unsent composer drafts keyed by agent name.
+  drafts: Record<string, ComposerDraft>;
   // Focus mode: agent snapped near-fullscreen, with an optional open
   // document shown in its right rail. Session-only state.
   focusedCard: number | null;
   focusedMessage: number | null;
   openDoc: { agentId: number; path: string } | null;
 
+  setDraft: (agentName: string, draft: ComposerDraft) => void;
+  clearDraft: (agentName: string) => void;
   setPosition: (agentId: number, pos: CardPosition) => void;
   setSize: (agentId: number, size: CardSize) => void;
   setGranularity: (agentId: number, g: Granularity) => void;
@@ -122,6 +134,7 @@ export const useCanvasStore = create<CanvasState>()(
       positions: {},
       sizes: {},
       granularity: {},
+      drafts: {},
       focusedCard: null,
       focusedMessage: null,
       openDoc: null,
@@ -129,6 +142,21 @@ export const useCanvasStore = create<CanvasState>()(
       filters: { active: true, idle: false, offline: false },
       zTop: 1,
       zOrder: {},
+
+      setDraft: (agentName, draft) =>
+        set((s) => ({
+          drafts: { ...s.drafts, [agentName]: draft },
+        })),
+
+      clearDraft: (agentName) =>
+        set((s) => {
+          if (!(agentName in s.drafts)) {
+            return s;
+          }
+          const next = { ...s.drafts };
+          delete next[agentName];
+          return { drafts: next };
+        }),
 
       setPosition: (agentId, pos) =>
         set((s) => ({
@@ -193,6 +221,7 @@ export const useCanvasStore = create<CanvasState>()(
         positions: s.positions,
         sizes: s.sizes,
         granularity: s.granularity,
+        drafts: s.drafts,
         viewport: s.viewport,
         filters: s.filters,
       }),

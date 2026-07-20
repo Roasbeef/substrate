@@ -2,13 +2,14 @@
 // It sends steering messages straight to the agent, optionally as a
 // reply to a thread picked via an event's Reply button.
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { clsx } from 'clsx';
 import { useSendMessage } from '@/hooks/useMessages.js';
 import { useReplyToThread } from '@/hooks/useThreads.js';
 import { commandKeys } from '@/hooks/useCommandFeed.js';
 import { useAuthStore } from '@/stores/auth.js';
+import { useCanvasStore } from '@/stores/canvas.js';
 import { useUIStore } from '@/stores/ui.js';
 
 // Reply target context set by an event card.
@@ -43,9 +44,30 @@ export function SteerComposer({
   onRemoveAttachment,
   onClearAttachments,
 }: SteerComposerProps) {
-  const [text, setText] = useState('');
-  const [urgent, setUrgent] = useState(false);
+  // The draft lives in the canvas store (persisted to localStorage),
+  // so text survives card remounts (panning, focus mode, feed
+  // refreshes) and full page reloads — and the canvas card and focus
+  // mode composers stay in sync for the same agent.
+  const text = useCanvasStore(
+    (s) => s.drafts[agentName]?.text ?? '',
+  );
+  const urgent = useCanvasStore(
+    (s) => s.drafts[agentName]?.urgent ?? false,
+  );
   const inputRef = useRef<HTMLTextAreaElement>(null);
+
+  // updateDraft writes the draft through to the store, dropping the
+  // entry entirely once it is back to the empty state.
+  const updateDraft = (nextText: string, nextUrgent: boolean) => {
+    const { setDraft, clearDraft } = useCanvasStore.getState();
+    if (nextText === '' && !nextUrgent) {
+      clearDraft(agentName);
+    } else {
+      setDraft(agentName, { text: nextText, urgent: nextUrgent });
+    }
+  };
+  const setText = (v: string) => updateDraft(v, urgent);
+  const setUrgent = (v: boolean) => updateDraft(text, v);
 
   const sendMessage = useSendMessage();
   const replyToThread = useReplyToThread();
@@ -99,8 +121,7 @@ export function SteerComposer({
         });
       }
 
-      setText('');
-      setUrgent(false);
+      updateDraft('', false);
       onClearReply();
       onClearAttachments?.();
       void queryClient.invalidateQueries({
@@ -183,7 +204,7 @@ export function SteerComposer({
         />
         <button
           type="button"
-          onClick={() => setUrgent((v) => !v)}
+          onClick={() => setUrgent(!urgent)}
           title="Mark urgent"
           className={clsx(
             'rounded-md px-1.5 py-1 font-mono text-[11px] font-bold',
