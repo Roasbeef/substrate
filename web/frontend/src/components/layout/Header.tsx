@@ -1,6 +1,6 @@
 // Header component - top navigation bar with search, agent switcher, and settings.
 
-import { type ReactNode } from 'react';
+import { type ReactNode, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { clsx } from 'clsx';
 import { twMerge } from 'tailwind-merge';
@@ -162,6 +162,44 @@ function IconButton({
 }
 
 
+// ThemeToggle flips between light and dark, persisting the choice.
+function ThemeToggle() {
+  const [dark, setDark] = useState(
+    () => document.documentElement.classList.contains('dark'),
+  );
+
+  const toggle = () => {
+    const next = !dark;
+    setDark(next);
+    document.documentElement.classList.toggle('dark', next);
+    localStorage.setItem('substrate-theme', next ? 'dark' : 'light');
+  };
+
+  return (
+    <button
+      type="button"
+      onClick={toggle}
+      title={dark ? 'Switch to light mode' : 'Switch to dark mode'}
+      aria-label="Toggle dark mode"
+      className="rounded-md p-2 hover:bg-[var(--c-fill)] hover:text-[var(--c-ink)] focus:outline-none"
+    >
+      {dark ? (
+        <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24"
+          stroke="currentColor" strokeWidth={2}>
+          <path strokeLinecap="round" strokeLinejoin="round"
+            d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" />
+        </svg>
+      ) : (
+        <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24"
+          stroke="currentColor" strokeWidth={2}>
+          <path strokeLinecap="round" strokeLinejoin="round"
+            d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" />
+        </svg>
+      )}
+    </button>
+  );
+}
+
 // Quiet paper search bar - centered.
 function HeaderSearchBar() {
   const toggleSearch = useUIStore((state) => state.toggleSearch);
@@ -171,17 +209,17 @@ function HeaderSearchBar() {
       type="button"
       onClick={toggleSearch}
       className={cn(
-        'flex items-center gap-2 rounded-lg border border-[#E6E4DD] bg-white px-4 py-1.5',
-        'text-sm text-[#9BA0A6] transition-colors hover:border-[#C9C7BF]',
+        'flex items-center gap-2 rounded-lg border border-[var(--c-hair)] bg-[var(--c-card)] px-4 py-1.5',
+        'text-sm text-[var(--c-faint)] transition-colors hover:border-[var(--c-ghost)]',
         'focus:outline-none focus:ring-2 focus:ring-[#22262A]/20',
         'w-full max-w-xl',
       )}
     >
-      <SearchIcon className="h-4 w-4 text-[#B0ADA4]" />
+      <SearchIcon className="h-4 w-4 text-[var(--c-dim)]" />
       <span className="flex-1 text-left">
         Search agents, threads, plans…
       </span>
-      <kbd className="hidden rounded border border-[#E6E4DD] px-1.5 py-0.5 font-mono text-[10px] font-medium text-[#9BA0A6] md:inline-block">
+      <kbd className="hidden rounded border border-[var(--c-hair)] px-1.5 py-0.5 font-mono text-[10px] font-medium text-[var(--c-faint)] md:inline-block">
         ⌘K
       </kbd>
     </button>
@@ -193,7 +231,7 @@ function HeaderSearchBar() {
 function Wordmark() {
   return (
     <span className="flex items-center gap-2.5">
-      <span className="font-mono text-[13px] font-bold tracking-[0.18em] text-[#22262A]">
+      <span className="font-mono text-[13px] font-bold tracking-[0.18em] text-[var(--c-ink)]">
         SUBSTRATE
       </span>
       <svg className="h-3 w-11" viewBox="0 0 64 16" aria-hidden="true">
@@ -226,7 +264,7 @@ export function Header({ className, leftContent, rightContent }: HeaderProps) {
   return (
     <header
       className={cn(
-        'flex h-12 items-center border-b border-[#E6E4DD] bg-[#F7F6F3] px-4',
+        'flex h-12 items-center border-b border-[var(--c-hair)] bg-[var(--c-paper)] px-4',
         className,
       )}
     >
@@ -235,7 +273,7 @@ export function Header({ className, leftContent, rightContent }: HeaderProps) {
         <button
           type="button"
           onClick={toggleSidebar}
-          className="rounded-md p-2 text-[#6B7280] hover:bg-[#F1EFE9] hover:text-[#22262A] focus:outline-none md:hidden"
+          className="rounded-md p-2 text-[var(--c-mut)] hover:bg-[var(--c-fill)] hover:text-[var(--c-ink)] focus:outline-none md:hidden"
           aria-label="Toggle sidebar"
         >
           <MenuIcon />
@@ -255,13 +293,13 @@ export function Header({ className, leftContent, rightContent }: HeaderProps) {
       </div>
 
       {/* Right section - actions and custom content. */}
-      <div className="flex items-center gap-1 flex-shrink-0 text-[#6B7280]">
+      <div className="flex items-center gap-1 flex-shrink-0 text-[var(--c-mut)]">
         {/* Mobile search button. */}
         <div className="md:hidden">
           <button
             type="button"
             onClick={toggleSearch}
-            className="rounded-md p-2 hover:bg-[#F1EFE9] hover:text-[#22262A] focus:outline-none"
+            className="rounded-md p-2 hover:bg-[var(--c-fill)] hover:text-[var(--c-ink)] focus:outline-none"
             aria-label="Search"
           >
             <SearchIcon />
@@ -275,8 +313,8 @@ export function Header({ className, leftContent, rightContent }: HeaderProps) {
           className={cn(
             'rounded-md p-2 transition-colors focus:outline-none',
             isGlobalSelected
-              ? 'bg-[#22262A] text-white'
-              : 'hover:bg-[#F1EFE9] hover:text-[#22262A]',
+              ? 'bg-[var(--c-ink)] text-white'
+              : 'hover:bg-[var(--c-fill)] hover:text-[var(--c-ink)]',
           )}
           aria-label="View all agents"
           title="Global - View all agents"
@@ -293,22 +331,25 @@ export function Header({ className, leftContent, rightContent }: HeaderProps) {
           />
         ) : null}
 
+        {/* Theme toggle. */}
+        <ThemeToggle />
+
         {/* Notifications button. */}
         <button
           type="button"
-          className="relative rounded-md p-2 hover:bg-[#F1EFE9] hover:text-[#22262A] focus:outline-none"
+          className="relative rounded-md p-2 hover:bg-[var(--c-fill)] hover:text-[var(--c-ink)] focus:outline-none"
           aria-label="View notifications"
         >
           <BellIcon />
           {totalUnreadCount > 0 ? (
-            <span className="absolute right-1.5 top-1.5 block h-2 w-2 rounded-full bg-[#B3372B] ring-2 ring-[#F7F6F3]" />
+            <span className="absolute right-1.5 top-1.5 block h-2 w-2 rounded-full bg-[var(--c-rust)] ring-2 ring-[var(--c-paper)]" />
           ) : null}
         </button>
 
         {/* Settings link. */}
         <Link
           to={routes.settings}
-          className="rounded-md p-2 hover:bg-[#F1EFE9] hover:text-[#22262A] focus:outline-none"
+          className="rounded-md p-2 hover:bg-[var(--c-fill)] hover:text-[var(--c-ink)] focus:outline-none"
           aria-label="Settings"
         >
           <SettingsIcon />
@@ -356,7 +397,7 @@ export function CompactHeader({
   return (
     <header
       className={cn(
-        'flex h-14 items-center justify-between border-b border-gray-200 bg-white px-4',
+        'flex h-14 items-center justify-between border-b border-gray-200 bg-[var(--c-card)] px-4',
         className,
       )}
     >

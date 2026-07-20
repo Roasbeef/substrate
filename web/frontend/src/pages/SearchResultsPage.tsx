@@ -73,7 +73,7 @@ function HighlightedText({ text, query }: { text: string; query: string }) {
       {parts.map((part, i) => {
         const isMatch = part.toLowerCase() === query.toLowerCase();
         return isMatch ? (
-          <mark key={i} className="bg-[#C98A1B]/20 text-[#22262A]">
+          <mark key={i} className="bg-[#C98A1B]/20 text-[var(--c-ink)]">
             {part}
           </mark>
         ) : (
@@ -93,10 +93,10 @@ function SearchResultItem({
   query: string;
 }) {
   const typeColors = {
-    message: 'text-[#33608D] bg-[#33608D]/10',
-    thread: 'text-[#5B5BD6] bg-[#5B5BD6]/10',
-    agent: 'text-[#178A5B] bg-[#178A5B]/10',
-    topic: 'text-[#92610E] bg-[#C98A1B]/12',
+    message: 'text-[var(--c-steel)] bg-[#33608D]/10',
+    thread: 'text-[var(--c-violet)] bg-[#5B5BD6]/10',
+    agent: 'text-[var(--c-green)] bg-[#178A5B]/10',
+    topic: 'text-[var(--c-amber)] bg-[#C98A1B]/12',
   };
 
   const typeLabels = {
@@ -110,8 +110,8 @@ function SearchResultItem({
     <Link
       to={result.route}
       className={cn(
-        'block rounded-lg border border-[#E6E4DD] bg-white p-4',
-        'hover:border-[#D8D6CE] hover:bg-[#F4F3EE]',
+        'block rounded-lg border border-[var(--c-hair)] bg-[var(--c-card)] p-4',
+        'hover:border-[var(--c-ghost2)] hover:bg-[var(--c-hover)]',
         'focus:outline-none focus:ring-2 focus:ring-[#22262A]/30 focus:ring-offset-2',
         'transition-colors',
       )}
@@ -128,7 +128,7 @@ function SearchResultItem({
 
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2">
-            <h3 className="truncate text-sm font-medium text-[#22262A]">
+            <h3 className="truncate text-sm font-medium text-[var(--c-ink)]">
               <HighlightedText text={result.title} query={query} />
             </h3>
             <span
@@ -141,11 +141,11 @@ function SearchResultItem({
             </span>
           </div>
 
-          <p className="mt-1 line-clamp-2 text-sm text-[#6B7280]">
+          <p className="mt-1 line-clamp-2 text-sm text-[var(--c-mut)]">
             <HighlightedText text={result.snippet} query={query} />
           </p>
 
-          <p className="mt-2 text-xs text-[#9BA0A6]">
+          <p className="mt-2 text-xs text-[var(--c-faint)]">
             {new Date(result.created_at).toLocaleDateString(undefined, {
               year: 'numeric',
               month: 'short',
@@ -163,7 +163,7 @@ function EmptyState({ query, hasFilter }: { query: string; hasFilter: boolean })
   return (
     <div className="flex flex-col items-center justify-center py-16 text-center">
       <svg
-        className="h-16 w-16 text-[#B0ADA4]"
+        className="h-16 w-16 text-[var(--c-dim)]"
         fill="none"
         viewBox="0 0 24 24"
         stroke="currentColor"
@@ -175,8 +175,8 @@ function EmptyState({ query, hasFilter }: { query: string; hasFilter: boolean })
           d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
         />
       </svg>
-      <h3 className="mt-4 text-lg font-medium text-[#22262A]">No results found</h3>
-      <p className="mt-2 max-w-sm text-sm text-[#6B7280]">
+      <h3 className="mt-4 text-lg font-medium text-[var(--c-ink)]">No results found</h3>
+      <p className="mt-2 max-w-sm text-sm text-[var(--c-mut)]">
         {query ? (
           <>
             No results found for "{query}".
@@ -248,9 +248,9 @@ export default function SearchResultsPage() {
     <div className="mx-auto max-w-4xl space-y-6 p-6">
       {/* Header. */}
       <div>
-        <h1 className="text-2xl font-bold text-[#22262A]">Search Results</h1>
+        <h1 className="text-2xl font-bold text-[var(--c-ink)]">Search Results</h1>
         {initialQuery && (
-          <p className="mt-1 text-sm text-[#6B7280]">
+          <p className="mt-1 text-sm text-[var(--c-mut)]">
             {filteredResults.length} result{filteredResults.length !== 1 ? 's' : ''} for "{initialQuery}"
             {filter !== 'all' && ` in ${filter}s`}
           </p>
@@ -271,7 +271,7 @@ export default function SearchResultsPage() {
             <button
               type="button"
               onClick={() => setInputValue('')}
-              className="absolute right-3 top-1/2 -translate-y-1/2 text-[#9BA0A6] hover:text-[#6B7280]"
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-[var(--c-faint)] hover:text-[var(--c-mut)]"
             >
               <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -285,7 +285,7 @@ export default function SearchResultsPage() {
       </form>
 
       {/* Filter tabs. */}
-      <div className="flex gap-2 border-b border-[#E6E4DD] pb-3">
+      <div className="flex gap-2 border-b border-[var(--c-hair)] pb-3">
         {filterOptions.map((option) => {
           const count =
             option.value === 'all'
@@ -299,8 +299,8 @@ export default function SearchResultsPage() {
               className={cn(
                 'rounded-full px-4 py-1.5 text-sm font-medium transition-colors',
                 filter === option.value
-                  ? 'bg-[#22262A] text-white'
-                  : 'bg-[#F1EFE9] text-[#6B7280] hover:bg-[#E6E4DD]',
+                  ? 'bg-[var(--c-ink)] text-white'
+                  : 'bg-[var(--c-fill)] text-[var(--c-mut)] hover:bg-[var(--c-hair)]',
               )}
             >
               {option.label}
@@ -308,7 +308,7 @@ export default function SearchResultsPage() {
                 <span
                   className={cn(
                     'ml-1.5 inline-flex h-5 min-w-[20px] items-center justify-center rounded-full text-xs',
-                    filter === option.value ? 'bg-white/20 text-white' : 'bg-[#E6E4DD] text-[#6B7280]',
+                    filter === option.value ? 'bg-white/20 text-white' : 'bg-[var(--c-hair)] text-[var(--c-mut)]',
                   )}
                 >
                   {count}
@@ -329,7 +329,7 @@ export default function SearchResultsPage() {
 
         {isError && (
           <div className="rounded-lg bg-[#B3372B]/10 p-4 text-center">
-            <p className="text-sm text-[#B3372B]">
+            <p className="text-sm text-[var(--c-rust)]">
               {error instanceof Error ? error.message : 'Failed to search. Please try again.'}
             </p>
             <Button variant="outline" size="sm" className="mt-2" onClick={handleClear}>

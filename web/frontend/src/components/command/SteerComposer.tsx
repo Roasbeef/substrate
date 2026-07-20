@@ -93,16 +93,16 @@ export function SteerComposer({
   };
 
   return (
-    <div className="border-t border-[#EDEBE4] px-3 py-2">
+    <div className="border-t border-[var(--c-hair2)] px-3 py-2">
       {replyTarget && (
-        <div className="mb-1 flex items-center gap-2 text-[11px] text-[#6B7280]">
+        <div className="mb-1 flex items-center gap-2 text-[11px] text-[var(--c-mut)]">
           <span className="truncate">
             Reply to: {replyTarget.subject}
           </span>
           <button
             type="button"
             onClick={onClearReply}
-            className="ml-auto shrink-0 text-[#9BA0A6] hover:text-[#4A4F55]"
+            className="ml-auto shrink-0 text-[var(--c-faint)] hover:text-[var(--c-text2)]"
             aria-label="Cancel reply"
           >
             ✕
@@ -127,7 +127,7 @@ export function SteerComposer({
               ? 'Type your reply…'
               : `Steer ${agentName}…`
           }
-          className="max-h-24 min-h-[30px] flex-1 resize-none border-b border-transparent bg-transparent py-1 text-[13px] text-[#22262A] placeholder:text-[#B0ADA4] focus:border-[#22262A] focus:outline-none"
+          className="max-h-24 min-h-[30px] flex-1 resize-none border-b border-transparent bg-transparent py-1 text-[13px] text-[var(--c-ink)] placeholder:text-[var(--c-dim)] focus:border-[var(--c-ink)] focus:outline-none"
         />
         <button
           type="button"
@@ -136,8 +136,8 @@ export function SteerComposer({
           className={clsx(
             'rounded-md px-1.5 py-1 font-mono text-[11px] font-bold',
             urgent
-              ? 'bg-[#B3372B]/10 text-[#B3372B]'
-              : 'text-[#C0BDB4] hover:text-[#6B7280]',
+              ? 'bg-[#B3372B]/10 text-[var(--c-rust)]'
+              : 'text-[var(--c-ghost)] hover:text-[var(--c-mut)]',
           )}
         >
           !
@@ -146,7 +146,7 @@ export function SteerComposer({
           type="button"
           onClick={() => void submit()}
           disabled={!text.trim() || isSending}
-          className="rounded-md bg-[#22262A] px-2.5 py-1 text-[12px] font-medium text-white hover:bg-[#3A4046] disabled:opacity-30"
+          className="rounded-md bg-[var(--c-ink)] px-2.5 py-1 text-[12px] font-medium text-white hover:bg-[var(--c-inkhover)] disabled:opacity-30"
         >
           {isSending ? '…' : 'Send'}
         </button>

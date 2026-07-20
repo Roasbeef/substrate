@@ -120,7 +120,7 @@ export function MessageListSkeleton({ count = 10 }: MessageListSkeletonProps) {
 // AgentCardSkeleton displays a skeleton for an agent card.
 export function AgentCardSkeleton() {
   return (
-    <div className="rounded-lg border border-gray-200 bg-white p-4">
+    <div className="rounded-lg border border-gray-200 bg-[var(--c-card)] p-4">
       <div className="flex items-start gap-3">
         {/* Avatar placeholder. */}
         <Skeleton variant="circular" width={48} height={48} />
@@ -190,7 +190,7 @@ export function SessionListSkeleton({ count = 5 }: SessionListSkeletonProps) {
 // StatsCardSkeleton displays a skeleton for a stats card.
 export function StatsCardSkeleton() {
   return (
-    <div className="rounded-lg border border-gray-200 bg-white p-4">
+    <div className="rounded-lg border border-gray-200 bg-[var(--c-card)] p-4">
       <div className="flex items-center gap-3">
         <Skeleton variant="circular" width={40} height={40} />
         <div className="space-y-2">

@@ -118,37 +118,37 @@ const activityTypeConfigs: Record<ActivityType, ActivityTypeConfig> = {
   message_sent: {
     icon: <MailIcon className="h-4 w-4" />,
     bgColor: 'bg-[#33608D]/10',
-    iconColor: 'text-[#33608D]',
+    iconColor: 'text-[var(--c-steel)]',
     label: 'Message sent',
   },
   message_read: {
     icon: <CheckIcon className="h-4 w-4" />,
     bgColor: 'bg-[#178A5B]/10',
-    iconColor: 'text-[#178A5B]',
+    iconColor: 'text-[var(--c-green)]',
     label: 'Message read',
   },
   session_started: {
     icon: <PlayIcon className="h-4 w-4" />,
     bgColor: 'bg-[#5B5BD6]/10',
-    iconColor: 'text-[#5B5BD6]',
+    iconColor: 'text-[var(--c-violet)]',
     label: 'Session started',
   },
   session_completed: {
     icon: <StopIcon className="h-4 w-4" />,
     bgColor: 'bg-[#6B7280]/10',
-    iconColor: 'text-[#6B7280]',
+    iconColor: 'text-[var(--c-mut)]',
     label: 'Session completed',
   },
   agent_registered: {
     icon: <UserPlusIcon className="h-4 w-4" />,
     bgColor: 'bg-[#C98A1B]/12',
-    iconColor: 'text-[#92610E]',
+    iconColor: 'text-[var(--c-amber)]',
     label: 'Agent registered',
   },
   heartbeat: {
     icon: <HeartbeatIcon className="h-4 w-4" />,
     bgColor: 'bg-[#B3372B]/10',
-    iconColor: 'text-[#B3372B]',
+    iconColor: 'text-[var(--c-rust)]',
     label: 'Heartbeat',
   },
 };
@@ -217,11 +217,11 @@ export function ActivityItem({
 
       {/* Content. */}
       <div className="min-w-0 flex-1">
-        <p className="text-sm text-[#22262A]">
+        <p className="text-sm text-[var(--c-ink)]">
           <span className="font-medium">{activity.agent_name}</span>{' '}
-          <span className="text-[#6B7280]">{activity.description}</span>
+          <span className="text-[var(--c-mut)]">{activity.description}</span>
         </p>
-        <p className="mt-0.5 text-xs text-[#9BA0A6]">
+        <p className="mt-0.5 text-xs text-[var(--c-faint)]">
           {showFullTimestamp
             ? new Date(activity.created_at).toLocaleString()
             : formatRelativeTime(activity.created_at)}
@@ -235,10 +235,10 @@ export function ActivityItem({
 export function ActivityItemSkeleton() {
   return (
     <div className="flex items-start gap-3 py-3">
-      <div className="h-8 w-8 flex-shrink-0 animate-pulse rounded-full bg-[#E6E4DD]" />
+      <div className="h-8 w-8 flex-shrink-0 animate-pulse rounded-full bg-[var(--c-hair)]" />
       <div className="min-w-0 flex-1 space-y-2">
-        <div className="h-4 w-3/4 animate-pulse rounded bg-[#E6E4DD]" />
-        <div className="h-3 w-1/4 animate-pulse rounded bg-[#E6E4DD]" />
+        <div className="h-4 w-3/4 animate-pulse rounded bg-[var(--c-hair)]" />
+        <div className="h-3 w-1/4 animate-pulse rounded bg-[var(--c-hair)]" />
       </div>
     </div>
   );

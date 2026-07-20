@@ -48,7 +48,7 @@ function ErrorDisplay({
     <div className="flex flex-col items-center justify-center py-12 text-center">
       <div className="mb-4 rounded-full bg-[#B3372B]/10 p-3">
         <svg
-          className="h-6 w-6 text-[#B3372B]"
+          className="h-6 w-6 text-[var(--c-rust)]"
           fill="none"
           viewBox="0 0 24 24"
           stroke="currentColor"
@@ -61,14 +61,14 @@ function ErrorDisplay({
           />
         </svg>
       </div>
-      <h3 className="mb-1 text-lg font-medium text-[#22262A]">
+      <h3 className="mb-1 text-lg font-medium text-[var(--c-ink)]">
         Failed to load agents
       </h3>
-      <p className="mb-4 text-sm text-[#6B7280]">{message}</p>
+      <p className="mb-4 text-sm text-[var(--c-mut)]">{message}</p>
       {onRetry ? (
         <button
           onClick={onRetry}
-          className="rounded-md bg-[#22262A] px-4 py-2 text-sm font-medium text-white hover:bg-[#3A4046] focus:outline-none focus:ring-2 focus:ring-[#22262A]/30 focus:ring-offset-2"
+          className="rounded-md bg-[var(--c-ink)] px-4 py-2 text-sm font-medium text-white hover:bg-[var(--c-inkhover)] focus:outline-none focus:ring-2 focus:ring-[#22262A]/30 focus:ring-offset-2"
         >
           Try Again
         </button>
@@ -83,9 +83,9 @@ function EmptyState({ filter }: { filter: FilterTab }) {
 
   return (
     <div className="flex flex-col items-center justify-center py-12 text-center">
-      <div className="mb-4 rounded-full bg-[#F1EFE9] p-3">
+      <div className="mb-4 rounded-full bg-[var(--c-fill)] p-3">
         <svg
-          className="h-6 w-6 text-[#9BA0A6]"
+          className="h-6 w-6 text-[var(--c-faint)]"
           fill="none"
           viewBox="0 0 24 24"
           stroke="currentColor"
@@ -98,10 +98,10 @@ function EmptyState({ filter }: { filter: FilterTab }) {
           />
         </svg>
       </div>
-      <h3 className="mb-1 text-lg font-medium text-[#22262A]">
+      <h3 className="mb-1 text-lg font-medium text-[var(--c-ink)]">
         No{filterLabel} agents
       </h3>
-      <p className="text-sm text-[#6B7280]">
+      <p className="text-sm text-[var(--c-mut)]">
         {filter === 'all'
           ? 'No agents have been registered yet.'
           : `No agents are currently ${filter}.`}
@@ -196,7 +196,7 @@ export default function AgentsDashboard({
       <div className="flex items-center justify-between">
         <div>
           <div className="flex items-center gap-3">
-            <h1 className="text-2xl font-bold text-[#22262A]">Agents</h1>
+            <h1 className="text-2xl font-bold text-[var(--c-ink)]">Agents</h1>
             <div
               className="flex items-center gap-1.5 text-xs"
               title={
@@ -208,23 +208,23 @@ export default function AgentsDashboard({
               <span
                 className={`inline-block h-2 w-2 rounded-full ${
                   wsConnected
-                    ? 'bg-[#178A5B]'
+                    ? 'bg-[var(--c-green)]'
                     : 'bg-[#C98A1B] animate-pulse'
                 }`}
               />
-              <span className="text-[#6B7280]">
+              <span className="text-[var(--c-mut)]">
                 {wsConnected ? 'Live' : 'Connecting'}
               </span>
             </div>
           </div>
-          <p className="mt-1 text-sm text-[#6B7280]">
+          <p className="mt-1 text-sm text-[var(--c-mut)]">
             Manage and monitor your registered agents.
           </p>
         </div>
         {onRegisterClick ? (
           <button
             onClick={onRegisterClick}
-            className="inline-flex items-center gap-2 rounded-md bg-[#22262A] px-4 py-2 text-sm font-medium text-white hover:bg-[#3A4046] focus:outline-none focus:ring-2 focus:ring-[#22262A]/30 focus:ring-offset-2"
+            className="inline-flex items-center gap-2 rounded-md bg-[var(--c-ink)] px-4 py-2 text-sm font-medium text-white hover:bg-[var(--c-inkhover)] focus:outline-none focus:ring-2 focus:ring-[#22262A]/30 focus:ring-offset-2"
           >
             <svg
               className="h-4 w-4"
@@ -252,7 +252,7 @@ export default function AgentsDashboard({
       />
 
       {/* Filter tabs. */}
-      <div className="border-b border-[#E6E4DD]">
+      <div className="border-b border-[var(--c-hair)]">
         <nav
           className="-mb-px flex space-x-8"
           aria-label="Filter agents"
@@ -264,8 +264,8 @@ export default function AgentsDashboard({
               className={cn(
                 'whitespace-nowrap border-b-2 px-1 py-4 text-sm font-medium transition-colors',
                 filter === tab.id
-                  ? 'border-[#22262A] text-[#22262A]'
-                  : 'border-transparent text-[#6B7280] hover:border-[#D8D6CE] hover:text-[#22262A]',
+                  ? 'border-[var(--c-ink)] text-[var(--c-ink)]'
+                  : 'border-transparent text-[var(--c-mut)] hover:border-[var(--c-ghost2)] hover:text-[var(--c-ink)]',
               )}
               aria-current={
                 filter === tab.id ? 'page' : undefined
@@ -278,8 +278,8 @@ export default function AgentsDashboard({
                   className={cn(
                     'ml-2 rounded-full px-2 py-0.5 text-xs',
                     filter === tab.id
-                      ? 'bg-[#22262A] text-white'
-                      : 'bg-[#F1EFE9] text-[#6B7280]',
+                      ? 'bg-[var(--c-ink)] text-white'
+                      : 'bg-[var(--c-fill)] text-[var(--c-mut)]',
                   )}
                 >
                   {data.counts[tab.id]}

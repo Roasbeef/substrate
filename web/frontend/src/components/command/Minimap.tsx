@@ -75,7 +75,7 @@ export function Minimap({
 
   return (
     <div
-      className="pointer-events-auto overflow-hidden rounded-lg border border-[#E6E4DD] bg-white/95 shadow-[0_1px_2px_rgba(28,32,36,0.05),0_6px_18px_rgba(28,32,36,0.07)] backdrop-blur-sm"
+      className="pointer-events-auto overflow-hidden rounded-lg border border-[var(--c-hair)] bg-[var(--c-card95)] shadow-[0_1px_2px_rgba(28,32,36,0.05),0_6px_18px_rgba(28,32,36,0.07)] backdrop-blur-sm"
       onPointerDown={(e) => e.stopPropagation()}
       onWheel={(e) => e.stopPropagation()}
     >

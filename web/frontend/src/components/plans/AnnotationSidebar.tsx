@@ -34,17 +34,17 @@ function typeLabel(type: PlanAnnotationType): string {
 function typeBadgeClass(type: PlanAnnotationType): string {
   switch (type) {
     case PlanAnnotationType.COMMENT:
-      return 'bg-[#33608D]/10 text-[#33608D]';
+      return 'bg-[#33608D]/10 text-[var(--c-steel)]';
     case PlanAnnotationType.DELETION:
-      return 'bg-[#B3372B]/10 text-[#B3372B]';
+      return 'bg-[#B3372B]/10 text-[var(--c-rust)]';
     case PlanAnnotationType.REPLACEMENT:
-      return 'bg-[#C98A1B]/12 text-[#92610E]';
+      return 'bg-[#C98A1B]/12 text-[var(--c-amber)]';
     case PlanAnnotationType.INSERTION:
-      return 'bg-[#178A5B]/10 text-[#178A5B]';
+      return 'bg-[#178A5B]/10 text-[var(--c-green)]';
     case PlanAnnotationType.GLOBAL_COMMENT:
-      return 'bg-[#5B5BD6]/10 text-[#4a4ab8]';
+      return 'bg-[#5B5BD6]/10 text-[var(--c-violet2)]';
     default:
-      return 'bg-[#6B7280]/8 text-[#6B7280]';
+      return 'bg-[#6B7280]/8 text-[var(--c-mut)]';
   }
 }
 
@@ -113,11 +113,11 @@ export function AnnotationSidebar({
   return (
     <div className="flex h-full flex-col">
       {/* Header. */}
-      <div className="flex items-center justify-between border-b border-[#E6E4DD] px-4 py-3">
-        <h3 className="text-sm font-semibold text-[#22262A]">
+      <div className="flex items-center justify-between border-b border-[var(--c-hair)] px-4 py-3">
+        <h3 className="text-sm font-semibold text-[var(--c-ink)]">
           Annotations
           {annotations.length > 0 && (
-            <span className="ml-1.5 rounded-full bg-[#F1EFE9] px-2 py-0.5 text-xs font-normal text-[#6B7280]">
+            <span className="ml-1.5 rounded-full bg-[var(--c-fill)] px-2 py-0.5 text-xs font-normal text-[var(--c-mut)]">
               {annotations.length}
             </span>
           )}
@@ -125,7 +125,7 @@ export function AnnotationSidebar({
         <button
           type="button"
           onClick={() => setShowGlobalInput(!showGlobalInput)}
-          className="flex items-center gap-1 rounded-md px-2 py-1 text-xs font-medium text-[#6B7280] hover:bg-[#F1EFE9]"
+          className="flex items-center gap-1 rounded-md px-2 py-1 text-xs font-medium text-[var(--c-mut)] hover:bg-[var(--c-fill)]"
           title="Add global comment"
         >
           <svg
@@ -147,13 +147,13 @@ export function AnnotationSidebar({
 
       {/* Global comment input. */}
       {showGlobalInput && (
-        <div className="border-b border-[#E6E4DD] p-3">
+        <div className="border-b border-[var(--c-hair)] p-3">
           <textarea
             value={globalCommentText}
             onChange={(e) => setGlobalCommentText(e.target.value)}
             placeholder="Add a general comment..."
             rows={2}
-            className="w-full resize-none rounded-lg border border-[#E6E4DD] px-3 py-2 text-sm placeholder-[#9BA0A6] focus:border-[#22262A] focus:outline-none focus:ring-1 focus:ring-[#22262A]/30"
+            className="w-full resize-none rounded-lg border border-[var(--c-hair)] px-3 py-2 text-sm placeholder-[var(--c-faint)] focus:border-[var(--c-ink)] focus:outline-none focus:ring-1 focus:ring-[#22262A]/30"
             onKeyDown={(e) => {
               if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') {
                 e.preventDefault();
@@ -168,7 +168,7 @@ export function AnnotationSidebar({
                 setShowGlobalInput(false);
                 setGlobalCommentText('');
               }}
-              className="rounded px-2 py-1 text-xs text-[#6B7280] hover:bg-[#F1EFE9]"
+              className="rounded px-2 py-1 text-xs text-[var(--c-mut)] hover:bg-[var(--c-fill)]"
             >
               Cancel
             </button>
@@ -176,7 +176,7 @@ export function AnnotationSidebar({
               type="button"
               onClick={handleAddGlobalComment}
               disabled={!globalCommentText.trim()}
-              className="rounded bg-[#22262A] px-2 py-1 text-xs text-white hover:bg-[#3A4046] disabled:opacity-50"
+              className="rounded bg-[var(--c-ink)] px-2 py-1 text-xs text-white hover:bg-[var(--c-inkhover)] disabled:opacity-50"
             >
               Add
             </button>
@@ -189,7 +189,7 @@ export function AnnotationSidebar({
         {annotations.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-12 text-center">
             <svg
-              className="mb-3 h-10 w-10 text-[#D8D6CE]"
+              className="mb-3 h-10 w-10 text-[var(--c-ghost2)]"
               fill="none"
               viewBox="0 0 24 24"
               stroke="currentColor"
@@ -201,19 +201,19 @@ export function AnnotationSidebar({
                 d="M7.5 8.25h9m-9 3H12m-9.75 1.51c0 1.6 1.123 2.994 2.707 3.227 1.129.166 2.27.293 3.423.379.35.026.67.21.865.501L12 21l2.755-4.133a1.14 1.14 0 01.865-.501 48.172 48.172 0 003.423-.379c1.584-.233 2.707-1.626 2.707-3.228V6.741c0-1.602-1.123-2.995-2.707-3.228A48.394 48.394 0 0012 3c-2.392 0-4.744.175-7.043.513C3.373 3.746 2.25 5.14 2.25 6.741v6.018z"
               />
             </svg>
-            <p className="text-sm text-[#6B7280]">No annotations yet</p>
-            <p className="mt-1 text-xs text-[#9BA0A6]">
+            <p className="text-sm text-[var(--c-mut)]">No annotations yet</p>
+            <p className="mt-1 text-xs text-[var(--c-faint)]">
               Select text in the plan to annotate
             </p>
           </div>
         ) : (
-          <div className="divide-y divide-[#F1EFE9]">
+          <div className="divide-y divide-[var(--c-fill)]">
             {annotations.map((ann, index) => (
               <div
                 key={ann.id}
-                className={`cursor-pointer px-4 py-3 transition-colors hover:bg-[#F4F3EE] ${
+                className={`cursor-pointer px-4 py-3 transition-colors hover:bg-[var(--c-hover)] ${
                   selectedPlanAnnotationId === ann.id
-                    ? 'bg-[#5B5BD6]/8 border-l-2 border-[#5B5BD6]'
+                    ? 'bg-[#5B5BD6]/8 border-l-2 border-[var(--c-violet)]'
                     : ''
                 }`}
                 onClick={() => handleSelect(ann)}
@@ -221,7 +221,7 @@ export function AnnotationSidebar({
                 {/* Type badge and index. */}
                 <div className="flex items-center justify-between mb-1.5">
                   <div className="flex items-center gap-2">
-                    <span className="text-[10px] font-medium text-[#9BA0A6]">
+                    <span className="text-[10px] font-medium text-[var(--c-faint)]">
                       #{index + 1}
                     </span>
                     <span
@@ -241,7 +241,7 @@ export function AnnotationSidebar({
                           e.stopPropagation();
                           handleEdit(ann);
                         }}
-                        className="rounded p-1 text-[#9BA0A6] hover:bg-[#F1EFE9] hover:text-[#22262A]"
+                        className="rounded p-1 text-[var(--c-faint)] hover:bg-[var(--c-fill)] hover:text-[var(--c-ink)]"
                         title="Edit"
                       >
                         <svg
@@ -265,7 +265,7 @@ export function AnnotationSidebar({
                         e.stopPropagation();
                         deletePlanAnnotation(ann.id);
                       }}
-                      className="rounded p-1 text-[#9BA0A6] hover:bg-[#B3372B]/10 hover:text-[#B3372B]"
+                      className="rounded p-1 text-[var(--c-faint)] hover:bg-[#B3372B]/10 hover:text-[var(--c-rust)]"
                       title="Delete"
                     >
                       <svg
@@ -287,7 +287,7 @@ export function AnnotationSidebar({
 
                 {/* Original text snippet. */}
                 {ann.originalText && (
-                  <p className="text-xs text-[#6B7280] truncate mb-1">
+                  <p className="text-xs text-[var(--c-mut)] truncate mb-1">
                     &ldquo;{ann.originalText}&rdquo;
                   </p>
                 )}
@@ -299,7 +299,7 @@ export function AnnotationSidebar({
                       value={editText}
                       onChange={(e) => setEditText(e.target.value)}
                       rows={2}
-                      className="w-full resize-none rounded border border-[#E6E4DD] px-2 py-1 text-xs focus:border-[#22262A] focus:outline-none focus:ring-1 focus:ring-[#22262A]/30"
+                      className="w-full resize-none rounded border border-[var(--c-hair)] px-2 py-1 text-xs focus:border-[var(--c-ink)] focus:outline-none focus:ring-1 focus:ring-[#22262A]/30"
                       autoFocus
                       onKeyDown={(e) => {
                         if (
@@ -318,21 +318,21 @@ export function AnnotationSidebar({
                       <button
                         type="button"
                         onClick={handleCancelEdit}
-                        className="rounded px-2 py-0.5 text-[10px] text-[#6B7280] hover:bg-[#F1EFE9]"
+                        className="rounded px-2 py-0.5 text-[10px] text-[var(--c-mut)] hover:bg-[var(--c-fill)]"
                       >
                         Cancel
                       </button>
                       <button
                         type="button"
                         onClick={() => handleSaveEdit(ann)}
-                        className="rounded bg-[#22262A] px-2 py-0.5 text-[10px] text-white hover:bg-[#3A4046]"
+                        className="rounded bg-[var(--c-ink)] px-2 py-0.5 text-[10px] text-white hover:bg-[var(--c-inkhover)]"
                       >
                         Save
                       </button>
                     </div>
                   </div>
                 ) : ann.text ? (
-                  <p className="text-xs text-[#22262A] whitespace-pre-wrap">
+                  <p className="text-xs text-[var(--c-ink)] whitespace-pre-wrap">
                     {ann.text}
                   </p>
                 ) : null}

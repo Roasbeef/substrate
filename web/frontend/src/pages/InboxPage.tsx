@@ -512,7 +512,7 @@ export default function InboxPage() {
       </div>
 
       {/* Category tabs. */}
-      <div className="border-b border-gray-200 bg-white px-6">
+      <div className="border-b border-gray-200 bg-[var(--c-card)] px-6">
         <CategoryTabs
           selected={state.category}
           onSelect={handleCategoryChange}
@@ -531,7 +531,7 @@ export default function InboxPage() {
             id="sender-filter"
             value={state.senderFilter ?? ''}
             onChange={(e) => handleSenderFilterChange(e.target.value || null)}
-            className="rounded-md border border-gray-300 bg-white px-3 py-1.5 text-sm text-gray-900 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+            className="rounded-md border border-gray-300 bg-[var(--c-card)] px-3 py-1.5 text-sm text-gray-900 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
           >
             <option value="">All senders</option>
             {uniqueSenders.map((sender) => (

@@ -101,7 +101,7 @@ export function EventCard({ event, onReply }: EventCardProps) {
       <button
         type="button"
         onClick={() => setExpanded((v) => !v)}
-        className="flex w-full items-baseline gap-2 px-3 py-[7px] text-left hover:bg-[#F4F3EE]"
+        className="flex w-full items-baseline gap-2 px-3 py-[7px] text-left hover:bg-[var(--c-hover)]"
       >
         <span
           className={clsx(
@@ -115,8 +115,8 @@ export function EventCard({ event, onReply }: EventCardProps) {
           className={clsx(
             'min-w-0 flex-1 truncate text-[13px] leading-5',
             event.state === 'unread' && event.needs_action
-              ? 'font-semibold text-[#22262A]'
-              : 'text-[#4A4F55]',
+              ? 'font-semibold text-[var(--c-ink)]'
+              : 'text-[var(--c-text2)]',
           )}
         >
           {event.subject}
@@ -126,14 +126,14 @@ export function EventCard({ event, onReply }: EventCardProps) {
             className={clsx(
               'shrink-0 rounded-[3px] px-1 py-px font-mono text-[9.5px] uppercase tracking-[0.08em]',
               planPending
-                ? 'bg-[#C98A1B]/12 text-[#92610E]'
-                : 'bg-[#178A5B]/10 text-[#178A5B]',
+                ? 'bg-[#C98A1B]/12 text-[var(--c-amber)]'
+                : 'bg-[#178A5B]/10 text-[var(--c-green)]',
             )}
           >
             {event.plan_state.replace('_', ' ')}
           </span>
         )}
-        <span className="shrink-0 font-mono text-[10px] text-[#9BA0A6]">
+        <span className="shrink-0 font-mono text-[10px] text-[var(--c-faint)]">
           {timeAgo(event.created_at)}
         </span>
       </button>
@@ -149,14 +149,14 @@ export function EventCard({ event, onReply }: EventCardProps) {
                 value={planComment}
                 onChange={(e) => setPlanComment(e.target.value)}
                 placeholder="Note to agent (optional)"
-                className="w-full border-b border-[#E6E4DD] bg-transparent pb-1 text-[13px] text-[#22262A] placeholder:text-[#B0ADA4] focus:border-[#22262A] focus:outline-none"
+                className="w-full border-b border-[var(--c-hair)] bg-transparent pb-1 text-[13px] text-[var(--c-ink)] placeholder:text-[var(--c-dim)] focus:border-[var(--c-ink)] focus:outline-none"
               />
               <div className="flex gap-1.5 pt-0.5">
                 <button
                   type="button"
                   onClick={() => decidePlan('approved')}
                   disabled={updatePlan.isPending}
-                  className="rounded-md bg-[#178A5B] px-2.5 py-1 text-[12px] font-medium text-white hover:bg-[#116D48] disabled:opacity-50"
+                  className="rounded-md bg-[var(--c-green)] px-2.5 py-1 text-[12px] font-medium text-white hover:bg-[var(--c-greenhover)] disabled:opacity-50"
                 >
                   Approve
                 </button>
@@ -164,7 +164,7 @@ export function EventCard({ event, onReply }: EventCardProps) {
                   type="button"
                   onClick={() => decidePlan('changes_requested')}
                   disabled={updatePlan.isPending}
-                  className="rounded-md border border-[#D8D6CE] px-2.5 py-1 text-[12px] font-medium text-[#4A4F55] hover:bg-[#F4F3EE] disabled:opacity-50"
+                  className="rounded-md border border-[var(--c-ghost2)] px-2.5 py-1 text-[12px] font-medium text-[var(--c-text2)] hover:bg-[var(--c-hover)] disabled:opacity-50"
                 >
                   Request changes
                 </button>
@@ -172,7 +172,7 @@ export function EventCard({ event, onReply }: EventCardProps) {
                   type="button"
                   onClick={() => decidePlan('rejected')}
                   disabled={updatePlan.isPending}
-                  className="rounded-md px-2 py-1 text-[12px] font-medium text-[#B3372B] hover:bg-[#B3372B]/8 disabled:opacity-50"
+                  className="rounded-md px-2 py-1 text-[12px] font-medium text-[var(--c-rust)] hover:bg-[#B3372B]/8 disabled:opacity-50"
                 >
                   Reject
                 </button>
@@ -182,13 +182,13 @@ export function EventCard({ event, onReply }: EventCardProps) {
 
           {text && (
             <div
-              className="scrollbar-thin prose prose-command max-h-80 max-w-none overflow-y-auto text-[13px] leading-relaxed text-[#33383D]"
+              className="scrollbar-thin prose prose-command max-h-80 max-w-none overflow-y-auto text-[13px] leading-relaxed text-[var(--c-ink2)]"
               dangerouslySetInnerHTML={{ __html: renderedBody }}
             />
           )}
 
           {patch && (
-            <div className="mt-2 overflow-hidden rounded-md border border-[#E6E4DD]">
+            <div className="mt-2 overflow-hidden rounded-md border border-[var(--c-hair)]">
               <Suspense
                 fallback={
                   <div className="flex justify-center p-4">
@@ -205,14 +205,14 @@ export function EventCard({ event, onReply }: EventCardProps) {
             <button
               type="button"
               onClick={() => onReply(event)}
-              className="text-[12px] font-medium text-[#33608D] hover:underline"
+              className="text-[12px] font-medium text-[var(--c-steel)] hover:underline"
             >
               Reply
             </button>
             {event.thread_id && (
               <a
                 href={`/thread/${event.thread_id}`}
-                className="text-[12px] text-[#9BA0A6] hover:text-[#4A4F55]"
+                className="text-[12px] text-[var(--c-faint)] hover:text-[var(--c-text2)]"
               >
                 Open thread
               </a>

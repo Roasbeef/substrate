@@ -79,8 +79,8 @@ function StatCard({ label, value, icon, iconBg, iconColor, onClick }: StatCardPr
     <Wrapper
       onClick={onClick}
       className={cn(
-        'flex items-center gap-4 rounded-lg border border-[#E6E4DD] bg-white p-4',
-        onClick ? 'cursor-pointer text-left hover:border-[#D8D6CE] hover:shadow-sm transition-all' : '',
+        'flex items-center gap-4 rounded-lg border border-[var(--c-hair)] bg-[var(--c-card)] p-4',
+        onClick ? 'cursor-pointer text-left hover:border-[var(--c-ghost2)] hover:shadow-sm transition-all' : '',
         onClick ? 'focus:outline-none focus:ring-2 focus:ring-[#22262A]/30 focus:ring-offset-2' : '',
       )}
     >
@@ -94,8 +94,8 @@ function StatCard({ label, value, icon, iconBg, iconColor, onClick }: StatCardPr
         {icon}
       </div>
       <div>
-        <p className="text-sm font-medium text-[#6B7280]">{label}</p>
-        <p className="text-2xl font-semibold text-[#22262A]">{value}</p>
+        <p className="text-sm font-medium text-[var(--c-mut)]">{label}</p>
+        <p className="text-2xl font-semibold text-[var(--c-ink)]">{value}</p>
       </div>
     </Wrapper>
   );
@@ -125,7 +125,7 @@ export function DashboardStats({
         {[1, 2, 3, 4].map((i) => (
           <div
             key={i}
-            className="h-20 animate-pulse rounded-lg border border-[#E6E4DD] bg-[#F1EFE9]"
+            className="h-20 animate-pulse rounded-lg border border-[var(--c-hair)] bg-[var(--c-fill)]"
           />
         ))}
       </div>
@@ -144,31 +144,31 @@ export function DashboardStats({
         label="Total Agents"
         value={total}
         icon={<UsersIcon />}
-        iconBg="bg-[#F1EFE9]"
-        iconColor="text-[#6B7280]"
+        iconBg="bg-[var(--c-fill)]"
+        iconColor="text-[var(--c-mut)]"
       />
       <StatCard
         label="Active"
         value={counts?.active ?? 0}
         icon={<BoltIcon />}
-        iconBg="bg-[#F1EFE9]"
-        iconColor="text-[#178A5B]"
+        iconBg="bg-[var(--c-fill)]"
+        iconColor="text-[var(--c-green)]"
         {...(onStatClick && { onClick: () => onStatClick('active') })}
       />
       <StatCard
         label="Busy"
         value={counts?.busy ?? 0}
         icon={<ServerIcon />}
-        iconBg="bg-[#F1EFE9]"
-        iconColor="text-[#92610E]"
+        iconBg="bg-[var(--c-fill)]"
+        iconColor="text-[var(--c-amber)]"
         {...(onStatClick && { onClick: () => onStatClick('busy') })}
       />
       <StatCard
         label="Idle"
         value={counts?.idle ?? 0}
         icon={<ClockIcon />}
-        iconBg="bg-[#F1EFE9]"
-        iconColor="text-[#6B7280]"
+        iconBg="bg-[var(--c-fill)]"
+        iconColor="text-[var(--c-mut)]"
         {...(onStatClick && { onClick: () => onStatClick('idle') })}
       />
     </div>

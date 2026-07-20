@@ -261,7 +261,7 @@ const BlockRenderer = memo(function BlockRenderer({
   const annotatedClass = hasAnnotations
     ? 'relative ring-1 ring-[#C98A1B]/30 rounded-sm'
     : '';
-  const selectedClass = isSelected ? 'ring-2 ring-[#5B5BD6]' : '';
+  const selectedClass = isSelected ? 'ring-2 ring-[var(--c-violet)]' : '';
 
   const handleClick = () => {
     if (hasAnnotations) {
@@ -276,8 +276,8 @@ const BlockRenderer = memo(function BlockRenderer({
       );
       const styles: Record<number, string> = {
         1: 'text-2xl font-bold mb-4 mt-6 first:mt-0 tracking-tight',
-        2: 'text-xl font-semibold mb-3 mt-8 text-[#22262A]',
-        3: 'text-base font-semibold mb-2 mt-6 text-[#22262A]',
+        2: 'text-xl font-semibold mb-3 mt-8 text-[var(--c-ink)]',
+        3: 'text-base font-semibold mb-2 mt-6 text-[var(--c-ink)]',
       };
       const className =
         styles[block.level || 1] ||
@@ -298,7 +298,7 @@ const BlockRenderer = memo(function BlockRenderer({
     case 'paragraph':
       return (
         <p
-          className={`mb-4 leading-relaxed text-[#22262A] text-[15px] ${annotatedClass} ${selectedClass}`}
+          className={`mb-4 leading-relaxed text-[var(--c-ink)] text-[15px] ${annotatedClass} ${selectedClass}`}
           data-block-id={block.id}
           onClick={handleClick}
         >
@@ -324,12 +324,12 @@ const BlockRenderer = memo(function BlockRenderer({
           style={{ marginLeft: `${indent}rem` }}
           onClick={handleClick}
         >
-          <span className="select-none shrink-0 flex items-center text-[#9BA0A6]">
+          <span className="select-none shrink-0 flex items-center text-[var(--c-faint)]">
             {isCheckbox ? (
               block.checked ? (
-                <span className="text-[#178A5B]">&#x2713;</span>
+                <span className="text-[var(--c-green)]">&#x2713;</span>
               ) : (
-                <span className="text-[#9BA0A6]">&#x25CB;</span>
+                <span className="text-[var(--c-faint)]">&#x25CB;</span>
               )
             ) : (
               <span>{bullet}</span>
@@ -338,8 +338,8 @@ const BlockRenderer = memo(function BlockRenderer({
           <span
             className={`text-sm leading-relaxed ${
               isCheckbox && block.checked
-                ? 'text-[#9BA0A6] line-through'
-                : 'text-[#22262A]'
+                ? 'text-[var(--c-faint)] line-through'
+                : 'text-[var(--c-ink)]'
             }`}
           >
             <InlineContent content={block.content} />
@@ -352,7 +352,7 @@ const BlockRenderer = memo(function BlockRenderer({
     case 'blockquote':
       return (
         <blockquote
-          className={`border-l-2 border-[#D8D6CE] pl-4 my-4 text-[#6B7280] italic ${annotatedClass} ${selectedClass}`}
+          className={`border-l-2 border-[var(--c-ghost2)] pl-4 my-4 text-[var(--c-mut)] italic ${annotatedClass} ${selectedClass}`}
           data-block-id={block.id}
           onClick={handleClick}
         >
@@ -369,12 +369,12 @@ const BlockRenderer = memo(function BlockRenderer({
           onClick={handleClick}
         >
           {block.language && (
-            <div className="absolute top-0 right-0 rounded-bl-lg rounded-tr-lg bg-[#F1EFE9] px-2 py-0.5 text-[10px] font-mono text-[#6B7280]">
+            <div className="absolute top-0 right-0 rounded-bl-lg rounded-tr-lg bg-[var(--c-fill)] px-2 py-0.5 text-[10px] font-mono text-[var(--c-mut)]">
               {block.language}
             </div>
           )}
-          <pre className="rounded-lg text-[13px] overflow-x-auto bg-[#F7F6F3] border border-[#E6E4DD] p-4">
-            <code className="font-mono text-[#22262A] whitespace-pre">
+          <pre className="rounded-lg text-[13px] overflow-x-auto bg-[var(--c-paper)] border border-[var(--c-hair)] p-4">
+            <code className="font-mono text-[var(--c-ink)] whitespace-pre">
               {block.content}
             </code>
           </pre>
@@ -397,7 +397,7 @@ const BlockRenderer = memo(function BlockRenderer({
     case 'hr':
       return (
         <hr
-          className="border-[#E6E4DD] my-8"
+          className="border-[var(--c-hair)] my-8"
           data-block-id={block.id}
         />
       );
@@ -405,7 +405,7 @@ const BlockRenderer = memo(function BlockRenderer({
     default:
       return (
         <p
-          className={`mb-4 leading-relaxed text-[#22262A] ${annotatedClass} ${selectedClass}`}
+          className={`mb-4 leading-relaxed text-[var(--c-ink)] ${annotatedClass} ${selectedClass}`}
           data-block-id={block.id}
           onClick={handleClick}
         >
@@ -457,7 +457,7 @@ function InlineContent({ content }: { content: string }) {
       parts.push(
         <code
           key={key++}
-          className="px-1.5 py-0.5 rounded bg-[#F1EFE9] text-sm font-mono text-[#22262A]"
+          className="px-1.5 py-0.5 rounded bg-[var(--c-fill)] text-sm font-mono text-[var(--c-ink)]"
         >
           {match[1]}
         </code>,
@@ -484,7 +484,7 @@ function InlineContent({ content }: { content: string }) {
             href={linkUrl}
             target="_blank"
             rel="noopener noreferrer"
-            className="text-[#33608D] underline underline-offset-2 hover:text-[#22262A]"
+            className="text-[var(--c-steel)] underline underline-offset-2 hover:text-[var(--c-ink)]"
           >
             {match[1]}
           </a>,
@@ -492,7 +492,7 @@ function InlineContent({ content }: { content: string }) {
       } else {
         // Unsafe protocol (e.g., javascript:) — render as plain text.
         parts.push(
-          <span key={key++} className="text-[#33608D]">
+          <span key={key++} className="text-[var(--c-steel)]">
             {match[1]}
           </span>,
         );
@@ -542,11 +542,11 @@ function TableContent({ content }: { content: string }) {
   return (
     <table className="min-w-full border-collapse text-sm">
       <thead>
-        <tr className="border-b border-[#E6E4DD]">
+        <tr className="border-b border-[var(--c-hair)]">
           {headers.map((header, i) => (
             <th
               key={i}
-              className="px-3 py-2 text-left font-semibold text-[#22262A] bg-[#F7F6F3]"
+              className="px-3 py-2 text-left font-semibold text-[var(--c-ink)] bg-[var(--c-paper)]"
             >
               <InlineContent content={header} />
             </th>
@@ -557,10 +557,10 @@ function TableContent({ content }: { content: string }) {
         {rows.map((row, rowIdx) => (
           <tr
             key={rowIdx}
-            className="border-b border-[#F1EFE9] hover:bg-[#F4F3EE]"
+            className="border-b border-[var(--c-fill)] hover:bg-[var(--c-hover)]"
           >
             {row.map((cell, cellIdx) => (
-              <td key={cellIdx} className="px-3 py-2 text-[#6B7280]">
+              <td key={cellIdx} className="px-3 py-2 text-[var(--c-mut)]">
                 <InlineContent content={cell} />
               </td>
             ))}
@@ -590,14 +590,14 @@ function AnnotationMarkers({
           key={ann.id}
           className={`inline-block h-2 w-2 rounded-full ${
             ann.type === PlanAnnotationType.COMMENT
-              ? 'bg-[#33608D]'
+              ? 'bg-[var(--c-steel)]'
               : ann.type === PlanAnnotationType.DELETION
-                ? 'bg-[#B3372B]'
+                ? 'bg-[var(--c-rust)]'
                 : ann.type === PlanAnnotationType.REPLACEMENT
                   ? 'bg-[#C98A1B]'
                   : ann.type === PlanAnnotationType.INSERTION
-                    ? 'bg-[#178A5B]'
-                    : 'bg-[#9BA0A6]'
+                    ? 'bg-[var(--c-green)]'
+                    : 'bg-[var(--c-faint)]'
           }`}
           title={ann.text || ann.type}
         />

@@ -225,7 +225,7 @@ function SearchResultItem({ result, isSelected, onSelect }: SearchResultItemProp
       type="button"
       className={cn(
         'flex w-full items-start gap-3 px-4 py-3 text-left',
-        isSelected ? 'bg-[#F1EFE9]' : 'hover:bg-[#F4F3EE]',
+        isSelected ? 'bg-[var(--c-fill)]' : 'hover:bg-[var(--c-hover)]',
       )}
       onClick={onSelect}
       role="option"
@@ -234,22 +234,22 @@ function SearchResultItem({ result, isSelected, onSelect }: SearchResultItemProp
       <div
         className={cn(
           'mt-0.5 flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg',
-          result.type === 'message' ? 'bg-[#33608D]/10 text-[#33608D]' : '',
-          result.type === 'thread' ? 'bg-[#5B5BD6]/10 text-[#5B5BD6]' : '',
-          result.type === 'agent' ? 'bg-[#178A5B]/10 text-[#178A5B]' : '',
-          result.type === 'topic' ? 'bg-[#C98A1B]/12 text-[#92610E]' : '',
+          result.type === 'message' ? 'bg-[#33608D]/10 text-[var(--c-steel)]' : '',
+          result.type === 'thread' ? 'bg-[#5B5BD6]/10 text-[var(--c-violet)]' : '',
+          result.type === 'agent' ? 'bg-[#178A5B]/10 text-[var(--c-green)]' : '',
+          result.type === 'topic' ? 'bg-[#C98A1B]/12 text-[var(--c-amber)]' : '',
         )}
       >
         {renderIcon()}
       </div>
       <div className="min-w-0 flex-1">
         <div className="flex items-center gap-2">
-          <span className="truncate font-medium text-[#22262A]">{result.title}</span>
-          <span className="flex-shrink-0 text-xs text-[#9BA0A6]">
+          <span className="truncate font-medium text-[var(--c-ink)]">{result.title}</span>
+          <span className="flex-shrink-0 text-xs text-[var(--c-faint)]">
             {getResultTypeLabel(result.type)}
           </span>
         </div>
-        <p className="mt-0.5 truncate text-sm text-[#6B7280]">{result.snippet}</p>
+        <p className="mt-0.5 truncate text-sm text-[var(--c-mut)]">{result.snippet}</p>
       </div>
     </button>
   );
@@ -375,13 +375,13 @@ export function SearchBar({
           >
             <DialogPanel
               className={cn(
-                'mx-auto max-w-2xl overflow-hidden rounded-xl bg-white shadow-2xl ring-1 ring-black/5',
+                'mx-auto max-w-2xl overflow-hidden rounded-xl bg-[var(--c-card)] shadow-2xl ring-1 ring-black/5',
                 className,
               )}
             >
               {/* Search input. */}
-              <div className="relative flex items-center border-b border-[#E6E4DD]">
-                <SearchIcon className="pointer-events-none absolute left-4 text-[#9BA0A6]" />
+              <div className="relative flex items-center border-b border-[var(--c-hair)]">
+                <SearchIcon className="pointer-events-none absolute left-4 text-[var(--c-faint)]" />
                 <input
                   ref={inputRef}
                   type="text"
@@ -391,7 +391,7 @@ export function SearchBar({
                   placeholder={placeholder}
                   className={cn(
                     'w-full border-0 bg-transparent py-4 pl-12 pr-12',
-                    'text-[#22262A] placeholder:text-[#9BA0A6]',
+                    'text-[var(--c-ink)] placeholder:text-[var(--c-faint)]',
                     'focus:outline-none focus:ring-0',
                   )}
                   aria-label="Search"
@@ -401,12 +401,12 @@ export function SearchBar({
                   aria-expanded={enrichedResults.length > 0}
                 />
                 {isSearching ? (
-                  <SpinnerIcon className="absolute right-4 text-[#9BA0A6]" />
+                  <SpinnerIcon className="absolute right-4 text-[var(--c-faint)]" />
                 ) : searchQuery ? (
                   <button
                     type="button"
                     onClick={handleClear}
-                    className="absolute right-4 rounded p-1 text-[#9BA0A6] hover:text-[#22262A]"
+                    className="absolute right-4 rounded p-1 text-[var(--c-faint)] hover:text-[var(--c-ink)]"
                     aria-label="Clear search"
                   >
                     <CloseIcon className="h-4 w-4" />
@@ -423,35 +423,35 @@ export function SearchBar({
                 {/* Empty state - no query. */}
                 {!searchQuery.trim() ? (
                   <div className="px-4 py-8 text-center">
-                    <SearchIcon className="mx-auto h-12 w-12 text-[#B0ADA4]" />
-                    <p className="mt-2 text-sm text-[#6B7280]">
+                    <SearchIcon className="mx-auto h-12 w-12 text-[var(--c-dim)]" />
+                    <p className="mt-2 text-sm text-[var(--c-mut)]">
                       Type to search messages, threads, agents, and topics
                     </p>
-                    <p className="mt-1 text-xs text-[#9BA0A6]">
-                      Press <kbd className="rounded bg-[#F1EFE9] px-1">↑</kbd>{' '}
-                      <kbd className="rounded bg-[#F1EFE9] px-1">↓</kbd> to
-                      navigate, <kbd className="rounded bg-[#F1EFE9] px-1">Enter</kbd> to
-                      select, <kbd className="rounded bg-[#F1EFE9] px-1">Esc</kbd> to
+                    <p className="mt-1 text-xs text-[var(--c-faint)]">
+                      Press <kbd className="rounded bg-[var(--c-fill)] px-1">↑</kbd>{' '}
+                      <kbd className="rounded bg-[var(--c-fill)] px-1">↓</kbd> to
+                      navigate, <kbd className="rounded bg-[var(--c-fill)] px-1">Enter</kbd> to
+                      select, <kbd className="rounded bg-[var(--c-fill)] px-1">Esc</kbd> to
                       close
                     </p>
                   </div>
                 ) : searchQuery.trim().length < 2 ? (
                   // Query too short.
-                  <div className="px-4 py-8 text-center text-sm text-[#6B7280]">
+                  <div className="px-4 py-8 text-center text-sm text-[var(--c-mut)]">
                     Type at least 2 characters to search
                   </div>
                 ) : isSearching && enrichedResults.length === 0 ? (
                   // Loading state.
-                  <div className="px-4 py-8 text-center text-sm text-[#6B7280]">
+                  <div className="px-4 py-8 text-center text-sm text-[var(--c-mut)]">
                     Searching...
                   </div>
                 ) : enrichedResults.length === 0 && debouncedQuery.trim().length >= 2 ? (
                   // No results.
                   <div className="px-4 py-8 text-center">
-                    <p className="text-sm text-[#6B7280]">
+                    <p className="text-sm text-[var(--c-mut)]">
                       No results found for &ldquo;{debouncedQuery}&rdquo;
                     </p>
-                    <p className="mt-1 text-xs text-[#9BA0A6]">
+                    <p className="mt-1 text-xs text-[var(--c-faint)]">
                       Try adjusting your search terms
                     </p>
                   </div>
@@ -472,12 +472,12 @@ export function SearchBar({
 
               {/* Footer with keyboard hints. */}
               {enrichedResults.length > 0 ? (
-                <div className="flex items-center justify-between border-t border-[#E6E4DD] bg-[#F7F6F3] px-4 py-2 text-xs text-[#6B7280]">
+                <div className="flex items-center justify-between border-t border-[var(--c-hair)] bg-[var(--c-paper)] px-4 py-2 text-xs text-[var(--c-mut)]">
                   <span>{enrichedResults.length} results</span>
                   <span>
-                    <kbd className="rounded bg-[#E6E4DD] px-1">↑↓</kbd> Navigate{' '}
-                    <kbd className="ml-2 rounded bg-[#E6E4DD] px-1">Enter</kbd> Select{' '}
-                    <kbd className="ml-2 rounded bg-[#E6E4DD] px-1">Esc</kbd> Close
+                    <kbd className="rounded bg-[var(--c-hair)] px-1">↑↓</kbd> Navigate{' '}
+                    <kbd className="ml-2 rounded bg-[var(--c-hair)] px-1">Enter</kbd> Select{' '}
+                    <kbd className="ml-2 rounded bg-[var(--c-hair)] px-1">Esc</kbd> Close
                   </span>
                 </div>
               ) : null}
@@ -515,7 +515,7 @@ export function InlineSearchInput({
 }: InlineSearchInputProps) {
   return (
     <div className={cn('relative', className)}>
-      <SearchIcon className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-[#9BA0A6]" />
+      <SearchIcon className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-[var(--c-faint)]" />
       <input
         type="text"
         value={value}
@@ -523,19 +523,19 @@ export function InlineSearchInput({
         placeholder={placeholder}
         disabled={disabled}
         className={cn(
-          'w-full rounded-lg border border-[#E6E4DD] bg-white py-2 pl-10 pr-10',
-          'text-sm text-[#22262A] placeholder:text-[#9BA0A6]',
-          'focus:border-[#22262A] focus:outline-none focus:ring-1 focus:ring-[#22262A]/30',
+          'w-full rounded-lg border border-[var(--c-hair)] bg-[var(--c-card)] py-2 pl-10 pr-10',
+          'text-sm text-[var(--c-ink)] placeholder:text-[var(--c-faint)]',
+          'focus:border-[var(--c-ink)] focus:outline-none focus:ring-1 focus:ring-[#22262A]/30',
           disabled ? 'cursor-not-allowed opacity-50' : '',
         )}
       />
       {isLoading ? (
-        <SpinnerIcon className="absolute right-3 top-1/2 -translate-y-1/2 text-[#9BA0A6]" />
+        <SpinnerIcon className="absolute right-3 top-1/2 -translate-y-1/2 text-[var(--c-faint)]" />
       ) : value ? (
         <button
           type="button"
           onClick={() => onChange('')}
-          className="absolute right-3 top-1/2 -translate-y-1/2 rounded text-[#9BA0A6] hover:text-[#22262A]"
+          className="absolute right-3 top-1/2 -translate-y-1/2 rounded text-[var(--c-faint)] hover:text-[var(--c-ink)]"
           aria-label="Clear"
         >
           <CloseIcon className="h-4 w-4" />
@@ -559,16 +559,16 @@ export function SearchTrigger({ className }: SearchTriggerProps) {
       type="button"
       onClick={toggleSearch}
       className={cn(
-        'flex items-center gap-2 rounded-lg border border-[#E6E4DD] bg-[#F7F6F3] px-3 py-2',
-        'text-sm text-[#6B7280] hover:border-[#D8D6CE] hover:bg-[#F1EFE9]',
+        'flex items-center gap-2 rounded-lg border border-[var(--c-hair)] bg-[var(--c-paper)] px-3 py-2',
+        'text-sm text-[var(--c-mut)] hover:border-[var(--c-ghost2)] hover:bg-[var(--c-fill)]',
         'focus:outline-none focus:ring-2 focus:ring-[#22262A]/30 focus:ring-offset-2',
         'min-w-[200px] md:min-w-[300px]',
         className,
       )}
     >
-      <SearchIcon className="text-[#9BA0A6]" />
+      <SearchIcon className="text-[var(--c-faint)]" />
       <span className="flex-1 text-left">Search...</span>
-      <kbd className="hidden rounded bg-[#E6E4DD] px-1.5 py-0.5 text-xs font-medium text-[#6B7280] md:inline-block">
+      <kbd className="hidden rounded bg-[var(--c-hair)] px-1.5 py-0.5 text-xs font-medium text-[var(--c-mut)] md:inline-block">
         ⌘K
       </kbd>
     </button>

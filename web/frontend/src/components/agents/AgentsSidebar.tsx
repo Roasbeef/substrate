@@ -35,10 +35,10 @@ export interface AgentsSidebarProps {
 // Status dot component.
 function StatusDot({ status }: { status: AgentStatusType }) {
   const colors: Record<AgentStatusType, string> = {
-    active: 'bg-[#178A5B]',
-    busy: 'bg-[#178A5B]',
+    active: 'bg-[var(--c-green)]',
+    busy: 'bg-[var(--c-green)]',
     idle: 'bg-[#C98A1B]',
-    offline: 'bg-[#B0ADA4]',
+    offline: 'bg-[var(--c-dim)]',
   };
 
   return (
@@ -55,8 +55,8 @@ function AgentsSidebarSkeleton({ count = 5 }: { count?: number }) {
     <div className="space-y-1">
       {Array.from({ length: count }, (_, i) => (
         <div key={i} className="flex items-center gap-3 rounded-md px-3 py-2">
-          <div className="h-8 w-8 animate-pulse rounded-full bg-[#E6E4DD]" />
-          <div className="h-4 flex-1 animate-pulse rounded bg-[#E6E4DD]" />
+          <div className="h-8 w-8 animate-pulse rounded-full bg-[var(--c-hair)]" />
+          <div className="h-4 flex-1 animate-pulse rounded bg-[var(--c-hair)]" />
         </div>
       ))}
     </div>
@@ -71,7 +71,7 @@ function EmptyState({ filterStatus }: { filterStatus?: AgentStatusType }) {
 
   return (
     <div className="px-3 py-4 text-center">
-      <p className="text-sm text-[#6B7280]">{message}</p>
+      <p className="text-sm text-[var(--c-mut)]">{message}</p>
     </div>
   );
 }
@@ -101,16 +101,16 @@ export function AgentsSidebar({
     <div className={cn('', className)}>
       {/* Section header. */}
       <div className="mb-2 flex items-center justify-between px-3">
-        <h3 className="text-xs font-semibold uppercase tracking-wider text-[#6B7280]">
+        <h3 className="text-xs font-semibold uppercase tracking-wider text-[var(--c-mut)]">
           {title}
           {!isLoading && totalCount > 0 ? (
-            <span className="ml-1 text-[#9BA0A6]">({totalCount})</span>
+            <span className="ml-1 text-[var(--c-faint)]">({totalCount})</span>
           ) : null}
         </h3>
         {onViewAllClick ? (
           <button
             onClick={onViewAllClick}
-            className="text-xs font-medium text-[#33608D] hover:text-[#22262A]"
+            className="text-xs font-medium text-[var(--c-steel)] hover:text-[var(--c-ink)]"
           >
             View All
           </button>
@@ -131,7 +131,7 @@ export function AgentsSidebar({
               {...(onAgentClick && { onClick: () => onAgentClick(agent.id) })}
               className={cn(
                 selectedAgentId === agent.id
-                  ? 'bg-[#F1EFE9] text-[#22262A]'
+                  ? 'bg-[var(--c-fill)] text-[var(--c-ink)]'
                   : '',
               )}
             />
@@ -141,7 +141,7 @@ export function AgentsSidebar({
           {hasMore ? (
             <button
               onClick={onViewAllClick}
-              className="w-full rounded-md px-3 py-2 text-left text-sm text-[#6B7280] hover:bg-[#F1EFE9]"
+              className="w-full rounded-md px-3 py-2 text-left text-sm text-[var(--c-mut)] hover:bg-[var(--c-fill)]"
             >
               +{totalCount - maxVisible} more...
             </button>
@@ -179,7 +179,7 @@ export function AgentStatusList({
         {Array.from({ length: maxVisible }, (_, i) => (
           <div
             key={i}
-            className="h-3 w-3 animate-pulse rounded-full bg-[#E6E4DD]"
+            className="h-3 w-3 animate-pulse rounded-full bg-[var(--c-hair)]"
           />
         ))}
       </div>
@@ -206,7 +206,7 @@ export function AgentStatusList({
         </button>
       ))}
       {hasMore ? (
-        <span className="text-xs text-[#9BA0A6]">
+        <span className="text-xs text-[var(--c-faint)]">
           +{agents.length - maxVisible}
         </span>
       ) : null}

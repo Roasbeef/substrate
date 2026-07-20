@@ -10,12 +10,12 @@ function cn(...inputs: (string | undefined | null | false)[]) {
 
 // Color mapping for review states.
 const stateStyles: Record<ReviewState, string> = {
-  pending_review: 'bg-[#C98A1B]/12 text-[#92610E]',
-  under_review: 'bg-[#33608D]/10 text-[#33608D]',
-  changes_requested: 'bg-[#C98A1B]/12 text-[#92610E]',
-  approved: 'bg-[#178A5B]/10 text-[#178A5B]',
-  rejected: 'bg-[#B3372B]/10 text-[#B3372B]',
-  cancelled: 'bg-[#6B7280]/10 text-[#6B7280]',
+  pending_review: 'bg-[#C98A1B]/12 text-[var(--c-amber)]',
+  under_review: 'bg-[#33608D]/10 text-[var(--c-steel)]',
+  changes_requested: 'bg-[#C98A1B]/12 text-[var(--c-amber)]',
+  approved: 'bg-[#178A5B]/10 text-[var(--c-green)]',
+  rejected: 'bg-[#B3372B]/10 text-[var(--c-rust)]',
+  cancelled: 'bg-[#6B7280]/10 text-[var(--c-mut)]',
 };
 
 // Human-readable labels for review states.
@@ -38,7 +38,7 @@ export function ReviewStateBadge({ state, className }: ReviewStateBadgeProps) {
     <span
       className={cn(
         'inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium',
-        stateStyles[state] ?? 'bg-[#6B7280]/10 text-[#6B7280]',
+        stateStyles[state] ?? 'bg-[#6B7280]/10 text-[var(--c-mut)]',
         className,
       )}
     >

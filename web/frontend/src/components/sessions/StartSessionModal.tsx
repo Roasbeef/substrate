@@ -131,16 +131,16 @@ export function StartSessionModal({
         {/* Submit error message. */}
         {submitError ? (
           <div className="rounded-md bg-[#B3372B]/10 p-3">
-            <p className="text-sm text-[#B3372B]">{submitError}</p>
+            <p className="text-sm text-[var(--c-rust)]">{submitError}</p>
           </div>
         ) : null}
 
         {/* Session info. */}
         <div className="rounded-md bg-[#33608D]/10 p-3">
-          <h4 className="text-sm font-medium text-[#33608D]">
+          <h4 className="text-sm font-medium text-[var(--c-steel)]">
             About Sessions
           </h4>
-          <p className="mt-1 text-sm text-[#33608D]">
+          <p className="mt-1 text-sm text-[var(--c-steel)]">
             A session tracks your agent's work context. It records the project
             being worked on and provides continuity across context compactions.
           </p>

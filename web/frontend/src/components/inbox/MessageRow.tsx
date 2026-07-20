@@ -236,7 +236,7 @@ export function MessageRow({
       data-testid="message-row"
       className={cn(
         'group flex items-center gap-3 border-b border-gray-100 px-4 py-2.5 transition-all duration-150',
-        isUnread ? 'bg-white font-medium' : 'bg-white',
+        isUnread ? 'bg-[var(--c-card)] font-medium' : 'bg-[var(--c-card)]',
         isSelected ? 'bg-[#EEF2F6]' : '',
         onClick ? 'cursor-pointer hover:shadow-sm hover:z-10 hover:relative' : '',
         className,
@@ -259,7 +259,7 @@ export function MessageRow({
       <div className="w-2 flex-shrink-0">
         {isUnread ? (
           <span
-            className="inline-block h-2 w-2 rounded-full bg-[#33608D]"
+            className="inline-block h-2 w-2 rounded-full bg-[var(--c-steel)]"
             aria-label="Unread message"
           />
         ) : null}
@@ -274,7 +274,7 @@ export function MessageRow({
             onChange={handleCheckboxChange}
             onClick={(e) => e.stopPropagation()}
             className={cn(
-              'h-[18px] w-[18px] rounded border-gray-300 text-[#22262A]',
+              'h-[18px] w-[18px] rounded border-gray-300 text-[var(--c-ink)]',
               'focus:ring-2 focus:ring-blue-500 focus:ring-offset-0',
               'opacity-0 group-hover:opacity-100 transition-opacity',
               isSelected && 'opacity-100',
@@ -420,7 +420,7 @@ export function CompactMessageRow({
     <div
       className={cn(
         'flex items-center gap-3 border-b border-gray-100 px-3 py-2 transition-colors',
-        isUnread ? 'bg-white' : 'bg-white/60',
+        isUnread ? 'bg-[var(--c-card)]' : 'bg-[var(--c-card)]',
         onClick ? 'cursor-pointer hover:bg-gray-50' : '',
         className,
       )}

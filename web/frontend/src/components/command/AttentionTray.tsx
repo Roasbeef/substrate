@@ -17,7 +17,7 @@ export function AttentionTray({ items, onSelect }: AttentionTrayProps) {
 
   return (
     <div
-      className="pointer-events-auto w-[300px] overflow-hidden rounded-xl border border-[#E6E4DD] bg-white/95 shadow-[0_1px_2px_rgba(28,32,36,0.05),0_10px_28px_rgba(28,32,36,0.08)] backdrop-blur-sm"
+      className="pointer-events-auto w-[300px] overflow-hidden rounded-xl border border-[var(--c-hair)] bg-[var(--c-card95)] shadow-[0_1px_2px_rgba(28,32,36,0.05),0_10px_28px_rgba(28,32,36,0.08)] backdrop-blur-sm"
       onPointerDown={(e) => e.stopPropagation()}
       onWheel={(e) => e.stopPropagation()}
     >
@@ -26,22 +26,22 @@ export function AttentionTray({ items, onSelect }: AttentionTrayProps) {
         onClick={() => setCollapsed((v) => !v)}
         className="flex w-full items-center gap-2 px-3 py-2 text-left"
       >
-        <span className="font-mono text-[10px] font-semibold uppercase tracking-[0.12em] text-[#6B7280]">
+        <span className="font-mono text-[10px] font-semibold uppercase tracking-[0.12em] text-[var(--c-mut)]">
           Needs you
         </span>
         <span
           className={clsx(
             'flex h-[18px] min-w-[18px] items-center justify-center rounded-full px-1 font-mono text-[10.5px] font-bold',
             items.length > 0
-              ? 'bg-[#C98A1B]/15 text-[#92610E]'
-              : 'bg-[#F1EFE9] text-[#9BA0A6]',
+              ? 'bg-[#C98A1B]/15 text-[var(--c-amber)]'
+              : 'bg-[var(--c-fill)] text-[var(--c-faint)]',
           )}
         >
           {items.length}
         </span>
         <svg
           className={clsx(
-            'ml-auto h-3 w-3 text-[#B0ADA4] transition-transform',
+            'ml-auto h-3 w-3 text-[var(--c-dim)] transition-transform',
             collapsed && '-rotate-90',
           )}
           fill="none" viewBox="0 0 24 24" stroke="currentColor"
@@ -53,9 +53,9 @@ export function AttentionTray({ items, onSelect }: AttentionTrayProps) {
       </button>
 
       {!collapsed && (
-        <div className="scrollbar-thin max-h-[50vh] overflow-y-auto border-t border-[#EDEBE4]">
+        <div className="scrollbar-thin max-h-[50vh] overflow-y-auto border-t border-[var(--c-hair2)]">
           {items.length === 0 && (
-            <p className="px-3 py-3 text-[12px] text-[#9BA0A6]">
+            <p className="px-3 py-3 text-[12px] text-[var(--c-faint)]">
               All clear — nobody is waiting on you.
             </p>
           )}
@@ -68,7 +68,7 @@ export function AttentionTray({ items, onSelect }: AttentionTrayProps) {
                 type="button"
                 onClick={() => onSelect(item)}
                 className={clsx(
-                  'block w-full border-l-2 px-3 py-2 text-left hover:bg-[#F4F3EE]',
+                  'block w-full border-l-2 px-3 py-2 text-left hover:bg-[var(--c-hover)]',
                   kind.stripe,
                 )}
               >
@@ -81,18 +81,18 @@ export function AttentionTray({ items, onSelect }: AttentionTrayProps) {
                   >
                     {kind.label}
                   </span>
-                  <span className="font-mono text-[10.5px] text-[#8A8F96]">
+                  <span className="font-mono text-[10.5px] text-[var(--c-faint2)]">
                     {item.agent_name}
                   </span>
-                  <span className="ml-auto font-mono text-[10px] text-[#B0ADA4]">
+                  <span className="ml-auto font-mono text-[10px] text-[var(--c-dim)]">
                     {timeAgo(item.created_at)}
                   </span>
                 </span>
-                <span className="mt-0.5 line-clamp-2 block text-[12.5px] font-medium leading-snug text-[#33383D]">
+                <span className="mt-0.5 line-clamp-2 block text-[12.5px] font-medium leading-snug text-[var(--c-ink2)]">
                   {item.title}
                 </span>
                 {item.detail && (
-                  <span className="line-clamp-1 block text-[11.5px] text-[#8A8F96]">
+                  <span className="line-clamp-1 block text-[11.5px] text-[var(--c-faint2)]">
                     {item.detail}
                   </span>
                 )}

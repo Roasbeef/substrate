@@ -113,16 +113,16 @@ export function DeleteConfirmationModal({
             leaveFrom="opacity-100 scale-100"
             leaveTo="opacity-0 scale-95"
           >
-            <DialogPanel className="w-full max-w-md rounded-xl bg-white p-6 shadow-xl">
+            <DialogPanel className="w-full max-w-md rounded-xl bg-[var(--c-card)] p-6 shadow-xl">
               <div className="flex items-start gap-4">
                 <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full bg-[#B3372B]/10">
-                  <WarningIcon className="text-[#B3372B]" />
+                  <WarningIcon className="text-[var(--c-rust)]" />
                 </div>
                 <div className="flex-1">
-                  <DialogTitle className="text-lg font-semibold text-[#22262A]">
+                  <DialogTitle className="text-lg font-semibold text-[var(--c-ink)]">
                     {title}
                   </DialogTitle>
-                  <p className="mt-2 text-sm text-[#6B7280]">{description}</p>
+                  <p className="mt-2 text-sm text-[var(--c-mut)]">{description}</p>
                 </div>
               </div>
 
@@ -220,12 +220,12 @@ export function SnoozePickerModal({
             leaveFrom="opacity-100 scale-100"
             leaveTo="opacity-0 scale-95"
           >
-            <DialogPanel className="w-full max-w-sm rounded-xl bg-white shadow-xl">
-              <div className="flex items-center gap-3 border-b border-[#E6E4DD] px-6 py-4">
+            <DialogPanel className="w-full max-w-sm rounded-xl bg-[var(--c-card)] shadow-xl">
+              <div className="flex items-center gap-3 border-b border-[var(--c-hair)] px-6 py-4">
                 <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full bg-[#33608D]/10">
-                  <ClockIcon className="text-[#33608D]" />
+                  <ClockIcon className="text-[var(--c-steel)]" />
                 </div>
-                <DialogTitle className="text-lg font-semibold text-[#22262A]">
+                <DialogTitle className="text-lg font-semibold text-[var(--c-ink)]">
                   Snooze until
                 </DialogTitle>
               </div>
@@ -241,15 +241,15 @@ export function SnoozePickerModal({
                       disabled={isSnoozing}
                       className={cn(
                         'flex w-full items-center justify-between rounded-lg px-4 py-3',
-                        'text-left hover:bg-[#F4F3EE] focus:bg-[#F4F3EE]',
+                        'text-left hover:bg-[var(--c-hover)] focus:bg-[var(--c-hover)]',
                         'focus:outline-none focus:ring-2 focus:ring-[#22262A]/30 focus:ring-inset',
                         isSnoozing ? 'cursor-not-allowed opacity-50' : '',
                       )}
                     >
-                      <span className="font-medium text-[#22262A]">
+                      <span className="font-medium text-[var(--c-ink)]">
                         {duration.label}
                       </span>
-                      <span className="text-sm text-[#6B7280]">
+                      <span className="text-sm text-[var(--c-mut)]">
                         {formatPresetDate(duration)}
                       </span>
                     </button>
@@ -258,9 +258,9 @@ export function SnoozePickerModal({
 
                 {/* Divider. */}
                 <div className="my-4 flex items-center gap-2">
-                  <div className="h-px flex-1 bg-[#E6E4DD]" />
-                  <span className="text-xs text-[#9BA0A6]">or pick a date</span>
-                  <div className="h-px flex-1 bg-[#E6E4DD]" />
+                  <div className="h-px flex-1 bg-[var(--c-hair)]" />
+                  <span className="text-xs text-[var(--c-faint)]">or pick a date</span>
+                  <div className="h-px flex-1 bg-[var(--c-hair)]" />
                 </div>
 
                 {/* Custom date/time picker. */}
@@ -271,8 +271,8 @@ export function SnoozePickerModal({
                     onChange={(e) => setCustomDate(e.target.value)}
                     min={new Date().toISOString().split('T')[0]}
                     className={cn(
-                      'flex-1 rounded-lg border border-[#E6E4DD] px-3 py-2',
-                      'text-sm focus:border-[#22262A] focus:outline-none focus:ring-1 focus:ring-[#22262A]/30',
+                      'flex-1 rounded-lg border border-[var(--c-hair)] px-3 py-2',
+                      'text-sm focus:border-[var(--c-ink)] focus:outline-none focus:ring-1 focus:ring-[#22262A]/30',
                     )}
                     disabled={isSnoozing}
                   />
@@ -281,8 +281,8 @@ export function SnoozePickerModal({
                     value={customTime}
                     onChange={(e) => setCustomTime(e.target.value)}
                     className={cn(
-                      'w-24 rounded-lg border border-[#E6E4DD] px-3 py-2',
-                      'text-sm focus:border-[#22262A] focus:outline-none focus:ring-1 focus:ring-[#22262A]/30',
+                      'w-24 rounded-lg border border-[var(--c-hair)] px-3 py-2',
+                      'text-sm focus:border-[var(--c-ink)] focus:outline-none focus:ring-1 focus:ring-[#22262A]/30',
                     )}
                     disabled={isSnoozing}
                   />
@@ -290,7 +290,7 @@ export function SnoozePickerModal({
               </div>
 
               {/* Actions. */}
-              <div className="flex justify-end gap-3 border-t border-[#E6E4DD] px-6 py-4">
+              <div className="flex justify-end gap-3 border-t border-[var(--c-hair)] px-6 py-4">
                 <Button variant="outline" onClick={onClose} disabled={isSnoozing}>
                   Cancel
                 </Button>
@@ -349,7 +349,7 @@ export function BulkActionsToolbar({
         className,
       )}
     >
-      <span className="text-sm font-medium text-[#33608D]">
+      <span className="text-sm font-medium text-[var(--c-steel)]">
         {selectedCount} selected
       </span>
 
@@ -393,7 +393,7 @@ export function BulkActionsToolbar({
             size="sm"
             onClick={onDelete}
             disabled={isLoading}
-            className="text-[#B3372B] hover:bg-[#B3372B]/10 hover:text-[#B3372B]"
+            className="text-[var(--c-rust)] hover:bg-[#B3372B]/10 hover:text-[var(--c-rust)]"
           >
             Delete
           </Button>

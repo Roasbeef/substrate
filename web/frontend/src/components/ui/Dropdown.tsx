@@ -103,7 +103,7 @@ export function Dropdown({
       >
         <MenuItems
           className={cn(
-            'absolute z-10 mt-2 origin-top-right rounded-md bg-white shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-none',
+            'absolute z-10 mt-2 origin-top-right rounded-md bg-[var(--c-card)] shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-none',
             align === 'left' ? 'left-0' : 'right-0',
             widthStyles[width],
             menuClassName,
@@ -205,7 +205,7 @@ export function DropdownButton({
       >
         <MenuItems
           className={cn(
-            'absolute z-10 mt-2 min-w-[8rem] origin-top-right rounded-md bg-white shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-none',
+            'absolute z-10 mt-2 min-w-[8rem] origin-top-right rounded-md bg-[var(--c-card)] shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-none',
             align === 'left' ? 'left-0' : 'right-0',
           )}
         >

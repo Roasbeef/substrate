@@ -10,10 +10,10 @@ function cn(...inputs: (string | undefined | null | false)[]) {
 
 // Color mapping for plan review states.
 const stateStyles: Record<PlanReviewState, string> = {
-  pending: 'bg-[#C98A1B]/12 text-[#92610E]',
-  approved: 'bg-[#178A5B]/10 text-[#178A5B]',
-  rejected: 'bg-[#B3372B]/10 text-[#B3372B]',
-  changes_requested: 'bg-[#C98A1B]/12 text-[#92610E]',
+  pending: 'bg-[#C98A1B]/12 text-[var(--c-amber)]',
+  approved: 'bg-[#178A5B]/10 text-[var(--c-green)]',
+  rejected: 'bg-[#B3372B]/10 text-[var(--c-rust)]',
+  changes_requested: 'bg-[#C98A1B]/12 text-[var(--c-amber)]',
 };
 
 // Human-readable labels for plan review states.
@@ -34,7 +34,7 @@ export function PlanStateBadge({ state, className }: PlanStateBadgeProps) {
     <span
       className={cn(
         'inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium',
-        stateStyles[state] ?? 'bg-[#6B7280]/8 text-[#6B7280]',
+        stateStyles[state] ?? 'bg-[#6B7280]/8 text-[var(--c-mut)]',
         className,
       )}
     >

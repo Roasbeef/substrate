@@ -187,7 +187,7 @@ export function ComposeModal({
   const expandButton = (
     <button
       type="button"
-      className="rounded-md p-1 text-[#9BA0A6] hover:bg-[#F1EFE9] hover:text-[#6B7280] focus:outline-none focus:ring-2 focus:ring-[#22262A]/30 focus:ring-offset-2"
+      className="rounded-md p-1 text-[var(--c-faint)] hover:bg-[var(--c-fill)] hover:text-[var(--c-mut)] focus:outline-none focus:ring-2 focus:ring-[#22262A]/30 focus:ring-offset-2"
       onClick={() => setIsExpanded((prev) => !prev)}
       aria-label={isExpanded ? 'Exit fullscreen' : 'Fullscreen'}
       title={isExpanded ? 'Exit fullscreen' : 'Fullscreen'}
@@ -296,7 +296,7 @@ export function ComposeModal({
         </div>
 
         {/* Actions. */}
-        <div className="flex justify-end gap-3 border-t border-[#E6E4DD] pt-4">
+        <div className="flex justify-end gap-3 border-t border-[var(--c-hair)] pt-4">
           <Button
             type="button"
             variant="secondary"

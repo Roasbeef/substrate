@@ -14,7 +14,7 @@ export function PlanToc({ items, onScrollToBlock }: PlanTocProps) {
 
   return (
     <nav className="flex flex-col">
-      <h4 className="mb-3 px-3 font-mono text-[9.5px] font-semibold uppercase tracking-[0.12em] text-[#6B7280]">
+      <h4 className="mb-3 px-3 font-mono text-[9.5px] font-semibold uppercase tracking-[0.12em] text-[var(--c-mut)]">
         Contents
       </h4>
       <div className="space-y-0.5">
@@ -50,13 +50,13 @@ function TocEntry({
       <button
         type="button"
         onClick={handleClick}
-        className="group flex w-full items-center justify-between rounded-md px-3 py-1.5 text-left text-xs text-[#6B7280] hover:bg-[#F1EFE9] hover:text-[#22262A]"
+        className="group flex w-full items-center justify-between rounded-md px-3 py-1.5 text-left text-xs text-[var(--c-mut)] hover:bg-[var(--c-fill)] hover:text-[var(--c-ink)]"
         style={{ paddingLeft }}
         title={item.content}
       >
         <span className="truncate">{item.content}</span>
         {item.annotationCount > 0 && (
-          <span className="ml-2 flex-shrink-0 rounded-full bg-[#C98A1B]/12 px-1.5 py-0.5 text-[10px] font-medium text-[#92610E]">
+          <span className="ml-2 flex-shrink-0 rounded-full bg-[#C98A1B]/12 px-1.5 py-0.5 text-[10px] font-medium text-[var(--c-amber)]">
             {item.annotationCount}
           </span>
         )}

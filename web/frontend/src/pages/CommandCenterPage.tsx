@@ -287,13 +287,13 @@ export default function CommandCenterPage() {
   if (isError) {
     return (
       <div className="canvas-dots flex h-full flex-col items-center justify-center gap-3">
-        <p className="text-sm text-[#6B7280]">
+        <p className="text-sm text-[var(--c-mut)]">
           Failed to load the command feed.
         </p>
         <button
           type="button"
           onClick={() => void refetch()}
-          className="rounded-md bg-[#22262A] px-3 py-1.5 text-sm text-white hover:bg-[#3A4046]"
+          className="rounded-md bg-[var(--c-ink)] px-3 py-1.5 text-sm text-white hover:bg-[var(--c-inkhover)]"
         >
           Retry
         </button>
@@ -349,7 +349,7 @@ export default function CommandCenterPage() {
       {/* Empty state. */}
       {visibleLanes.length === 0 && (
         <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
-          <p className="max-w-sm text-center text-sm text-[#9BA0A6]">
+          <p className="max-w-sm text-center text-sm text-[var(--c-faint)]">
             {lanes.length === 0
               ? 'No agents yet. Start a Claude Code session with substrate hooks installed and it will appear here.'
               : 'Nothing matches the current filters.'}
@@ -372,13 +372,13 @@ export default function CommandCenterPage() {
           onPointerDown={(e) => e.stopPropagation()}
           onWheel={(e) => e.stopPropagation()}
         >
-          <div className="flex items-center gap-1.5 rounded-xl border border-[#E6E4DD] bg-white/95 px-2 py-1.5 shadow-[0_1px_2px_rgba(28,32,36,0.05),0_6px_18px_rgba(28,32,36,0.07)] backdrop-blur-sm">
+          <div className="flex items-center gap-1.5 rounded-xl border border-[var(--c-hair)] bg-[var(--c-card95)] px-2 py-1.5 shadow-[0_1px_2px_rgba(28,32,36,0.05),0_6px_18px_rgba(28,32,36,0.07)] backdrop-blur-sm">
             <span
               className={clsx(
                 'mr-0.5 h-1.5 w-1.5 rounded-full',
                 connectionState === 'connected'
-                  ? 'animate-pulse-dot bg-[#178A5B]'
-                  : 'bg-[#C9C7BF]',
+                  ? 'animate-pulse-dot bg-[var(--c-green)]'
+                  : 'bg-[var(--c-ghost)]',
               )}
               title={
                 connectionState === 'connected'
@@ -406,15 +406,15 @@ export default function CommandCenterPage() {
             />
           </div>
 
-          <div className="flex items-center overflow-hidden rounded-xl border border-[#E6E4DD] bg-white/95 shadow-[0_1px_2px_rgba(28,32,36,0.05),0_6px_18px_rgba(28,32,36,0.07)] backdrop-blur-sm">
+          <div className="flex items-center overflow-hidden rounded-xl border border-[var(--c-hair)] bg-[var(--c-card95)] shadow-[0_1px_2px_rgba(28,32,36,0.05),0_6px_18px_rgba(28,32,36,0.07)] backdrop-blur-sm">
             <ToolButton label="−" title="Zoom out"
               onClick={() => zoomBy(1 / 1.25)} />
-            <span className="px-1 font-mono text-[10.5px] text-[#8A8F96]">
+            <span className="px-1 font-mono text-[10.5px] text-[var(--c-faint2)]">
               {Math.round(viewport.scale * 100)}%
             </span>
             <ToolButton label="+" title="Zoom in"
               onClick={() => zoomBy(1.25)} />
-            <div className="h-4 w-px bg-[#EDEBE4]" />
+            <div className="h-4 w-px bg-[var(--c-hair2)]" />
             <ToolButton label="Fit" title="Fit all cards"
               onClick={fitAll} />
           </div>
@@ -442,7 +442,7 @@ export default function CommandCenterPage() {
         </div>
 
         {/* Hint line, bottom-left. */}
-        <p className="absolute bottom-4 left-4 select-none font-mono text-[10px] text-[#B0ADA4]">
+        <p className="absolute bottom-4 left-4 select-none font-mono text-[10px] text-[var(--c-dim)]">
           drag cards · corner resizes · drag canvas to pan · ⌘+scroll to zoom
         </p>
       </div>
@@ -470,8 +470,8 @@ function FilterChip({
       className={clsx(
         'rounded-lg px-2 py-0.5 font-mono text-[10.5px] uppercase tracking-[0.08em]',
         on
-          ? 'bg-[#22262A] text-white'
-          : 'text-[#8A8F96] hover:bg-[#F4F3EE] hover:text-[#4A4F55]',
+          ? 'bg-[var(--c-ink)] text-white'
+          : 'text-[var(--c-faint2)] hover:bg-[var(--c-hover)] hover:text-[var(--c-text2)]',
       )}
     >
       {label} {count}
@@ -494,7 +494,7 @@ function ToolButton({
       type="button"
       title={title}
       onClick={onClick}
-      className="px-2 py-1 font-mono text-[11px] text-[#4A4F55] hover:bg-[#F4F3EE]"
+      className="px-2 py-1 font-mono text-[11px] text-[var(--c-text2)] hover:bg-[var(--c-hover)]"
     >
       {label}
     </button>

@@ -221,20 +221,20 @@ function NavLink({ item, isActive, collapsed = false }: NavLinkProps) {
       className={cn(
         'flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors',
         isActive
-          ? 'border border-[#E6E4DD] bg-white font-semibold text-[#22262A] shadow-[0_1px_2px_rgba(28,32,36,0.06)]'
-          : 'text-[#6B7280] hover:bg-[#F1EFE9] hover:text-[#22262A]',
+          ? 'border border-[var(--c-hair)] bg-[var(--c-card)] font-semibold text-[var(--c-ink)] shadow-[0_1px_2px_rgba(28,32,36,0.06)]'
+          : 'text-[var(--c-mut)] hover:bg-[var(--c-fill)] hover:text-[var(--c-ink)]',
         collapsed ? 'justify-center' : '',
       )}
       title={collapsed ? item.label : undefined}
     >
-      <span className={cn(isActive ? 'text-[#22262A]' : 'text-[#B0ADA4]')}>
+      <span className={cn(isActive ? 'text-[var(--c-ink)]' : 'text-[var(--c-dim)]')}>
         {item.icon}
       </span>
       {!collapsed ? (
         <>
           <span className="flex-1">{item.label}</span>
           {item.badge && item.badge > 0 ? (
-            <span className="font-mono text-[10.5px] text-[#9BA0A6]">
+            <span className="font-mono text-[10.5px] text-[var(--c-faint)]">
               {item.badge}
             </span>
           ) : null}
@@ -278,7 +278,7 @@ function SidebarSectionHeader({
         <span className="text-gray-400">{icon}</span>
         <span>{label}</span>
         {count !== undefined && count > 0 ? (
-          <span className="font-mono text-[10.5px] text-[#9BA0A6]">
+          <span className="font-mono text-[10.5px] text-[var(--c-faint)]">
             {count}
           </span>
         ) : null}
@@ -287,7 +287,7 @@ function SidebarSectionHeader({
         <button
           type="button"
           onClick={onAddClick}
-          className="rounded p-1 text-[#B0ADA4] hover:bg-[#F1EFE9] hover:text-[#4A4F55]"
+          className="rounded p-1 text-[var(--c-dim)] hover:bg-[var(--c-fill)] hover:text-[var(--c-text2)]"
           title={`Add ${label.slice(0, -1)}`}
         >
           <SmallPlusIcon />
@@ -313,18 +313,18 @@ function TopicItem({ name, messageCount, onClick, isActive = false }: TopicItemP
       className={cn(
         'flex w-full items-center gap-2 rounded-lg px-3 py-1.5 text-sm',
         isActive
-          ? 'bg-[#F1EFE9] text-[#22262A]'
-          : 'text-[#6B7280] hover:bg-[#F1EFE9]',
+          ? 'bg-[var(--c-fill)] text-[var(--c-ink)]'
+          : 'text-[var(--c-mut)] hover:bg-[var(--c-fill)]',
       )}
     >
-      <span className={isActive ? 'text-[#22262A]' : 'text-[#B0ADA4]'}>
+      <span className={isActive ? 'text-[var(--c-ink)]' : 'text-[var(--c-dim)]'}>
         <HashtagIcon />
       </span>
       <span className="flex-1 truncate text-left">{name}</span>
       {messageCount !== undefined && messageCount > 0 ? (
         <span className={cn(
           'text-xs',
-          isActive ? 'text-[#22262A]' : 'text-[#9BA0A6]',
+          isActive ? 'text-[var(--c-ink)]' : 'text-[var(--c-faint)]',
         )}>{messageCount}</span>
       ) : null}
     </button>
@@ -343,7 +343,7 @@ function AgentItem({ name, status, onClick }: AgentItemProps) {
     <button
       type="button"
       onClick={onClick}
-      className="flex w-full items-center gap-2.5 rounded-lg px-3 py-1.5 text-sm text-[#6B7280] hover:bg-[#F1EFE9] hover:text-[#22262A]"
+      className="flex w-full items-center gap-2.5 rounded-lg px-3 py-1.5 text-sm text-[var(--c-mut)] hover:bg-[var(--c-fill)] hover:text-[var(--c-ink)]"
       title={status}
     >
       <HeartbeatTrace status={status} className="w-9 shrink-0" />
@@ -419,7 +419,7 @@ export function Sidebar({
   return (
     <aside
       className={cn(
-        'flex h-full w-64 flex-col border-r border-[#E6E4DD] bg-[#F7F6F3]',
+        'flex h-full w-64 flex-col border-r border-[var(--c-hair)] bg-[var(--c-paper)]',
         className,
       )}
     >
@@ -432,8 +432,8 @@ export function Sidebar({
             onClick={() => openModal('compose')}
             className={cn(
               'flex w-full items-center justify-center gap-2 rounded-2xl px-6 py-3',
-              'bg-[#22262A] text-white font-medium',
-              'hover:bg-[#3A4046] transition-colors',
+              'bg-[var(--c-ink)] text-white font-medium',
+              'hover:bg-[var(--c-inkhover)] transition-colors',
               'focus:outline-none focus:ring-2 focus:ring-[#22262A]/30 focus:ring-offset-2',
             )}
           >
@@ -514,7 +514,7 @@ export function Sidebar({
         <div className="border-t border-gray-200 p-3">
           <Link
             to={routes.settings}
-            className="flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium text-[#6B7280] hover:bg-[#F1EFE9] hover:text-[#22262A]"
+            className="flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium text-[var(--c-mut)] hover:bg-[var(--c-fill)] hover:text-[var(--c-ink)]"
           >
             <span className="text-gray-400">
               <SettingsIcon />
@@ -535,7 +535,7 @@ export function CollapsedSidebar({ className }: { className?: string }) {
   return (
     <aside
       className={cn(
-        'flex h-full w-16 flex-col border-r border-[#E6E4DD] bg-[#F7F6F3]',
+        'flex h-full w-16 flex-col border-r border-[var(--c-hair)] bg-[var(--c-paper)]',
         className,
       )}
     >
@@ -547,7 +547,7 @@ export function CollapsedSidebar({ className }: { className?: string }) {
           onClick={() => openModal('compose')}
           className={cn(
             'flex h-10 w-10 items-center justify-center rounded-lg',
-            'bg-[#22262A] text-white hover:bg-[#3A4046]',
+            'bg-[var(--c-ink)] text-white hover:bg-[var(--c-inkhover)]',
             'focus:outline-none focus:ring-2 focus:ring-[#22262A]/30 focus:ring-offset-2',
           )}
           aria-label="Compose"
@@ -572,7 +572,7 @@ export function CollapsedSidebar({ className }: { className?: string }) {
           to={routes.settings}
           className={cn(
             'flex h-10 w-10 items-center justify-center rounded-lg',
-            'text-[#B0ADA4] hover:bg-[#F1EFE9] hover:text-[#4A4F55]',
+            'text-[var(--c-dim)] hover:bg-[var(--c-fill)] hover:text-[var(--c-text2)]',
           )}
           aria-label="Settings"
         >

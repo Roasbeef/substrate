@@ -44,40 +44,40 @@ export function PlanListItem({ planReview, className }: PlanListItemProps) {
     <Link
       to={routes.plan(planReview.plan_review_id)}
       className={cn(
-        'flex items-center gap-4 rounded-lg border border-[#E6E4DD] bg-white px-4 py-3',
-        'transition-all hover:border-[#D8D6CE] hover:shadow-sm',
+        'flex items-center gap-4 rounded-lg border border-[var(--c-hair)] bg-[var(--c-card)] px-4 py-3',
+        'transition-all hover:border-[var(--c-ghost2)] hover:shadow-sm',
         className,
       )}
     >
       {/* Plan title and metadata. */}
       <div className="min-w-0 flex-1">
         <div className="flex items-center gap-2">
-          <span className="truncate text-sm font-medium text-[#22262A]">
+          <span className="truncate text-sm font-medium text-[var(--c-ink)]">
             {title}
           </span>
           <PlanStateBadge state={planReview.state} />
         </div>
-        <div className="mt-1 flex items-center gap-2 text-xs text-[#6B7280]">
+        <div className="mt-1 flex items-center gap-2 text-xs text-[var(--c-mut)]">
           <span>by {planReview.reviewer_name || 'Unknown'}</span>
-          <span className="text-[#B0ADA4]">|</span>
-          <span className="font-mono text-[#9BA0A6]">ID: {planReview.plan_review_id.slice(0, 8)}</span>
+          <span className="text-[var(--c-dim)]">|</span>
+          <span className="font-mono text-[var(--c-faint)]">ID: {planReview.plan_review_id.slice(0, 8)}</span>
           {planReview.session_id ? (
             <>
-              <span className="text-[#B0ADA4]">|</span>
-              <span className="font-mono text-[#9BA0A6]">Session: {planReview.session_id.slice(0, 8)}</span>
+              <span className="text-[var(--c-dim)]">|</span>
+              <span className="font-mono text-[var(--c-faint)]">Session: {planReview.session_id.slice(0, 8)}</span>
             </>
           ) : null}
         </div>
       </div>
 
       {/* Timestamp. */}
-      <div className="shrink-0 font-mono text-xs text-[#9BA0A6]">
+      <div className="shrink-0 font-mono text-xs text-[var(--c-faint)]">
         {formatRelativeTime(planReview.created_at)}
       </div>
 
       {/* Chevron arrow. */}
       <svg
-        className="h-4 w-4 shrink-0 text-[#9BA0A6]"
+        className="h-4 w-4 shrink-0 text-[var(--c-faint)]"
         fill="none"
         viewBox="0 0 24 24"
         stroke="currentColor"

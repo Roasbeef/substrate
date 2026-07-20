@@ -102,28 +102,28 @@ export interface StatCardProps {
 // Variant styles for cards.
 const variantStyles = {
   default: {
-    bg: 'bg-white',
+    bg: 'bg-[var(--c-card)]',
     icon: 'bg-gray-100 text-gray-600',
     text: 'text-gray-900',
   },
   blue: {
-    bg: 'bg-white border border-[#E6E4DD]',
-    icon: 'bg-[#F1EFE9] text-[#33608D]',
-    text: 'text-[#22262A]',
+    bg: 'bg-[var(--c-card)] border border-[var(--c-hair)]',
+    icon: 'bg-[var(--c-fill)] text-[var(--c-steel)]',
+    text: 'text-[var(--c-ink)]',
   },
   yellow: {
-    bg: 'bg-white border border-[#E6E4DD]',
-    icon: 'bg-[#F1EFE9] text-[#92610E]',
+    bg: 'bg-[var(--c-card)] border border-[var(--c-hair)]',
+    icon: 'bg-[var(--c-fill)] text-[var(--c-amber)]',
     text: 'text-yellow-900',
   },
   red: {
-    bg: 'bg-white border border-[#E6E4DD]',
-    icon: 'bg-[#F1EFE9] text-[#B3372B]',
+    bg: 'bg-[var(--c-card)] border border-[var(--c-hair)]',
+    icon: 'bg-[var(--c-fill)] text-[var(--c-rust)]',
     text: 'text-red-900',
   },
   green: {
-    bg: 'bg-white border border-[#E6E4DD]',
-    icon: 'bg-[#F1EFE9] text-[#178A5B]',
+    bg: 'bg-[var(--c-card)] border border-[var(--c-hair)]',
+    icon: 'bg-[var(--c-fill)] text-[var(--c-green)]',
     text: 'text-green-900',
   },
 };

@@ -122,7 +122,7 @@ export function DiffCommentPopover({
   return createPortal(
     <div
       ref={popoverRef}
-      className="fixed z-[110] w-96 rounded-lg border border-gray-200 bg-white shadow-xl"
+      className="fixed z-[110] w-96 rounded-lg border border-gray-200 bg-[var(--c-card)] shadow-xl"
       style={{
         top: `${top}px`,
         left: `${left}px`,

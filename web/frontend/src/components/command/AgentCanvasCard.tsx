@@ -42,16 +42,16 @@ function FlowRow({ flow }: { flow: FlowEvent }) {
     <button
       type="button"
       onClick={() => flow.detail && setOpen((v) => !v)}
-      className="flex w-full items-baseline gap-2 px-3 py-[3px] text-left hover:bg-[#F7F6F3]"
+      className="flex w-full items-baseline gap-2 px-3 py-[3px] text-left hover:bg-[var(--c-paper)]"
     >
-      <span className="w-3 shrink-0 text-center font-mono text-[10px] text-[#C0BDB4]">
+      <span className="w-3 shrink-0 text-center font-mono text-[10px] text-[var(--c-ghost)]">
         {flowGlyph[flow.kind]}
       </span>
       <span className="min-w-0 flex-1">
         <span
           className={clsx(
             'block truncate font-mono text-[10.5px] leading-4',
-            flow.kind === 'tool' ? 'text-[#6B7280]' : 'text-[#9BA0A6]',
+            flow.kind === 'tool' ? 'text-[var(--c-mut)]' : 'text-[var(--c-faint)]',
             flow.kind === 'thinking' && 'italic',
           )}
         >
@@ -60,12 +60,12 @@ function FlowRow({ flow }: { flow: FlowEvent }) {
             : flow.label}
         </span>
         {open && flow.detail && flow.kind !== 'tool' && (
-          <span className="block whitespace-pre-wrap font-mono text-[10.5px] leading-4 text-[#6B7280]">
+          <span className="block whitespace-pre-wrap font-mono text-[10.5px] leading-4 text-[var(--c-mut)]">
             {flow.detail}
           </span>
         )}
       </span>
-      <span className="shrink-0 font-mono text-[9.5px] text-[#C0BDB4]">
+      <span className="shrink-0 font-mono text-[9.5px] text-[var(--c-ghost)]">
         {timeAgo(flow.timestamp)}
       </span>
     </button>
@@ -78,15 +78,15 @@ function SummaryRow({ text, delta, ts }: {
 }) {
   return (
     <div className="flex items-baseline gap-2 px-3 py-1.5">
-      <span className="w-3 shrink-0 text-center font-mono text-[10px] font-bold text-[#178A5B]">
+      <span className="w-3 shrink-0 text-center font-mono text-[10px] font-bold text-[var(--c-green)]">
         Δ
       </span>
       <span className="min-w-0 flex-1">
-        <span className="block text-[12px] leading-snug text-[#4A4F55]">
+        <span className="block text-[12px] leading-snug text-[var(--c-text2)]">
           {delta || text}
         </span>
       </span>
-      <span className="shrink-0 font-mono text-[9.5px] text-[#B0ADA4]">
+      <span className="shrink-0 font-mono text-[9.5px] text-[var(--c-dim)]">
         {timeAgo(ts)}
       </span>
     </div>
@@ -288,10 +288,10 @@ export function AgentCanvasCard({
       onWheel={(e) => e.stopPropagation()}
       className={clsx(
         'absolute flex flex-col overflow-hidden rounded-xl',
-        'border bg-white',
+        'border bg-[var(--c-card)]',
         dragging || resizing
-          ? 'border-[#C9C7BF] shadow-[0_12px_32px_rgba(28,32,36,0.16)]'
-          : 'border-[#E6E4DD] shadow-[0_1px_2px_rgba(28,32,36,0.05),0_10px_28px_rgba(28,32,36,0.07)]',
+          ? 'border-[var(--c-ghost)] shadow-[0_12px_32px_rgba(28,32,36,0.16)]'
+          : 'border-[var(--c-hair)] shadow-[0_1px_2px_rgba(28,32,36,0.05),0_10px_28px_rgba(28,32,36,0.07)]',
         !resizing && 'transition-shadow duration-150',
       )}
       style={{
@@ -311,29 +311,29 @@ export function AgentCanvasCard({
         onPointerMove={onHeaderPointerMove}
         onPointerUp={onHeaderPointerUp}
         className={clsx(
-          'select-none border-b border-[#EDEBE4] px-3.5 pb-2 pt-2.5',
+          'select-none border-b border-[var(--c-hair2)] px-3.5 pb-2 pt-2.5',
           dragging ? 'cursor-grabbing' : 'cursor-grab',
         )}
         style={{ touchAction: 'none' }}
       >
         <div className="flex items-center gap-2.5">
-          <h2 className="text-[14.5px] font-semibold tracking-[-0.01em] text-[#22262A]">
+          <h2 className="text-[14.5px] font-semibold tracking-[-0.01em] text-[var(--c-ink)]">
             {agent.name}
           </h2>
           <HeartbeatTrace status={agent.status} />
-          <span className="ml-auto font-mono text-[10px] text-[#9BA0A6]">
+          <span className="ml-auto font-mono text-[10px] text-[var(--c-faint)]">
             {timeAgo(agent.last_active_at)}
           </span>
           {lane.unread_count > 0 && (
-            <span className="rounded-full bg-[#33608D]/10 px-1.5 py-px font-mono text-[10px] font-semibold text-[#33608D]">
+            <span className="rounded-full bg-[#33608D]/10 px-1.5 py-px font-mono text-[10px] font-semibold text-[var(--c-steel)]">
               {lane.unread_count}
             </span>
           )}
         </div>
-        <p className="mt-0.5 truncate font-mono text-[10.5px] text-[#8A8F96]">
+        <p className="mt-0.5 truncate font-mono text-[10.5px] text-[var(--c-faint2)]">
           {agent.project_key || 'unassigned'}
           {agent.git_branch && (
-            <span className="text-[#B0ADA4]"> · {agent.git_branch}</span>
+            <span className="text-[var(--c-dim)]"> · {agent.git_branch}</span>
           )}
         </p>
       </header>
@@ -341,31 +341,31 @@ export function AgentCanvasCard({
       {/* Waiting-on flag: the one loud row, and only when a human is
           actually needed. */}
       {lane.waiting_for && (
-        <div className="flex items-baseline gap-2 border-b border-[#EDEBE4] bg-[#C98A1B]/8 px-3.5 py-1.5">
-          <span className="font-mono text-[9.5px] font-semibold uppercase tracking-[0.1em] text-[#92610E]">
+        <div className="flex items-baseline gap-2 border-b border-[var(--c-hair2)] bg-[#C98A1B]/8 px-3.5 py-1.5">
+          <span className="font-mono text-[9.5px] font-semibold uppercase tracking-[0.1em] text-[var(--c-amber)]">
             waiting on you
           </span>
-          <span className="truncate text-[12.5px] text-[#6d5613]">
+          <span className="truncate text-[12.5px] text-[var(--c-amberink)]">
             {lane.waiting_for}
           </span>
         </div>
       )}
 
       {/* Digest. */}
-      <div className="border-b border-[#EDEBE4] px-3.5 py-2.5">
+      <div className="border-b border-[var(--c-hair2)] px-3.5 py-2.5">
         {summary?.summary ? (
           <>
-            <p className="text-[13px] leading-snug text-[#33383D]">
+            <p className="text-[13px] leading-snug text-[var(--c-ink2)]">
               {summary.summary}
             </p>
             {summary.delta && (
-              <p className="mt-1 text-[12px] leading-snug text-[#178A5B]">
+              <p className="mt-1 text-[12px] leading-snug text-[var(--c-green)]">
                 Δ {summary.delta}
               </p>
             )}
           </>
         ) : (
-          <p className="text-[13px] italic leading-snug text-[#9BA0A6]">
+          <p className="text-[13px] italic leading-snug text-[var(--c-faint)]">
             {agent.purpose || 'No live summary yet.'}
           </p>
         )}
@@ -373,11 +373,11 @@ export function AgentCanvasCard({
 
       {/* Timeline: merged mail / summary / flow tiers, with the
           granularity dial on the divider. */}
-      <div className="flex items-center gap-1 border-b border-[#EDEBE4] px-3.5 py-1">
-        <span className="font-mono text-[9px] font-semibold uppercase tracking-[0.12em] text-[#B0ADA4]">
+      <div className="flex items-center gap-1 border-b border-[var(--c-hair2)] px-3.5 py-1">
+        <span className="font-mono text-[9px] font-semibold uppercase tracking-[0.12em] text-[var(--c-dim)]">
           timeline
         </span>
-        <span className="ml-auto flex overflow-hidden rounded-md border border-[#E6E4DD]">
+        <span className="ml-auto flex overflow-hidden rounded-md border border-[var(--c-hair)]">
           {(['lo', 'med', 'hi'] as Granularity[]).map((g) => (
             <button
               key={g}
@@ -393,8 +393,8 @@ export function AgentCanvasCard({
               className={clsx(
                 'px-1.5 py-px font-mono text-[9px] font-semibold uppercase',
                 granularity === g
-                  ? 'bg-[#22262A] text-white'
-                  : 'text-[#9BA0A6] hover:bg-[#F1EFE9]',
+                  ? 'bg-[var(--c-ink)] text-white'
+                  : 'text-[var(--c-faint)] hover:bg-[var(--c-fill)]',
               )}
             >
               {g}
@@ -402,9 +402,9 @@ export function AgentCanvasCard({
           ))}
         </span>
       </div>
-      <div className="scrollbar-thin min-h-0 flex-1 divide-y divide-[#F1EFE9] overflow-y-auto">
+      <div className="scrollbar-thin min-h-0 flex-1 divide-y divide-[var(--c-fill)] overflow-y-auto">
         {visibleItems.length === 0 && (
-          <p className="px-3.5 py-4 text-center text-[12px] text-[#B0ADA4]">
+          <p className="px-3.5 py-4 text-center text-[12px] text-[var(--c-dim)]">
             No recent traffic.
           </p>
         )}
@@ -432,7 +432,7 @@ export function AgentCanvasCard({
           <button
             type="button"
             onClick={() => setShowAll(true)}
-            className="w-full py-1.5 text-center font-mono text-[10.5px] uppercase tracking-[0.08em] text-[#9BA0A6] hover:bg-[#F4F3EE] hover:text-[#4A4F55]"
+            className="w-full py-1.5 text-center font-mono text-[10.5px] uppercase tracking-[0.08em] text-[var(--c-faint)] hover:bg-[var(--c-hover)] hover:text-[var(--c-text2)]"
           >
             {hiddenCount} older
           </button>
@@ -452,7 +452,7 @@ export function AgentCanvasCard({
         onPointerDown={onResizePointerDown}
         onPointerMove={onResizePointerMove}
         onPointerUp={onResizePointerUp}
-        className="absolute bottom-0 right-0 flex h-5 w-5 cursor-nwse-resize items-end justify-end p-[3px] text-[#C9C7BF] hover:text-[#8A8F96]"
+        className="absolute bottom-0 right-0 flex h-5 w-5 cursor-nwse-resize items-end justify-end p-[3px] text-[var(--c-ghost)] hover:text-[var(--c-faint2)]"
         style={{ touchAction: 'none' }}
       >
         <svg className="h-2.5 w-2.5" viewBox="0 0 10 10"

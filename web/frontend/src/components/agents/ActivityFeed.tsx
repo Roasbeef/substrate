@@ -38,9 +38,9 @@ export interface ActivityFeedProps {
 function EmptyState() {
   return (
     <div className="flex flex-col items-center justify-center py-8 text-center">
-      <div className="mb-3 rounded-full bg-[#F1EFE9] p-3">
+      <div className="mb-3 rounded-full bg-[var(--c-fill)] p-3">
         <svg
-          className="h-6 w-6 text-[#9BA0A6]"
+          className="h-6 w-6 text-[var(--c-faint)]"
           fill="none"
           viewBox="0 0 24 24"
           stroke="currentColor"
@@ -53,7 +53,7 @@ function EmptyState() {
           />
         </svg>
       </div>
-      <p className="text-sm text-[#6B7280]">No recent activity</p>
+      <p className="text-sm text-[var(--c-mut)]">No recent activity</p>
     </div>
   );
 }
@@ -70,7 +70,7 @@ function ErrorState({
     <div className="flex flex-col items-center justify-center py-8 text-center">
       <div className="mb-3 rounded-full bg-[#B3372B]/10 p-3">
         <svg
-          className="h-6 w-6 text-[#B3372B]"
+          className="h-6 w-6 text-[var(--c-rust)]"
           fill="none"
           viewBox="0 0 24 24"
           stroke="currentColor"
@@ -83,12 +83,12 @@ function ErrorState({
           />
         </svg>
       </div>
-      <p className="mb-2 text-sm text-[#22262A]">Failed to load activities</p>
-      <p className="mb-3 text-xs text-[#6B7280]">{message}</p>
+      <p className="mb-2 text-sm text-[var(--c-ink)]">Failed to load activities</p>
+      <p className="mb-3 text-xs text-[var(--c-mut)]">{message}</p>
       {onRetry ? (
         <button
           onClick={onRetry}
-          className="text-sm font-medium text-[#33608D] hover:text-[#22262A]"
+          className="text-sm font-medium text-[var(--c-steel)] hover:text-[var(--c-ink)]"
         >
           Try again
         </button>
@@ -100,7 +100,7 @@ function ErrorState({
 // Loading skeleton for initial load.
 function LoadingSkeleton({ count = 5 }: { count?: number }) {
   return (
-    <div className="divide-y divide-[#F1EFE9]">
+    <div className="divide-y divide-[var(--c-fill)]">
       {Array.from({ length: count }, (_, i) => (
         <ActivityItemSkeleton key={i} />
       ))}
@@ -123,7 +123,7 @@ export function ActivityFeed({
   // Show error state.
   if (error) {
     return (
-      <div className={cn('rounded-lg border border-[#E6E4DD] bg-white', className)}>
+      <div className={cn('rounded-lg border border-[var(--c-hair)] bg-[var(--c-card)]', className)}>
         <ErrorState message={error.message} {...(onRetry && { onRetry })} />
       </div>
     );
@@ -132,7 +132,7 @@ export function ActivityFeed({
   // Show loading skeleton.
   if (isLoading) {
     return (
-      <div className={cn('rounded-lg border border-[#E6E4DD] bg-white p-4', className)}>
+      <div className={cn('rounded-lg border border-[var(--c-hair)] bg-[var(--c-card)] p-4', className)}>
         <LoadingSkeleton />
       </div>
     );
@@ -141,7 +141,7 @@ export function ActivityFeed({
   // Show empty state.
   if (!activities || activities.length === 0) {
     return (
-      <div className={cn('rounded-lg border border-[#E6E4DD] bg-white', className)}>
+      <div className={cn('rounded-lg border border-[var(--c-hair)] bg-[var(--c-card)]', className)}>
         <EmptyState />
       </div>
     );
@@ -149,12 +149,12 @@ export function ActivityFeed({
 
   return (
     <div
-      className={cn('rounded-lg border border-[#E6E4DD] bg-white', className)}
+      className={cn('rounded-lg border border-[var(--c-hair)] bg-[var(--c-card)]', className)}
       style={maxHeight ? { maxHeight } : undefined}
     >
       <div
         className={cn(
-          'divide-y divide-[#F1EFE9] px-4',
+          'divide-y divide-[var(--c-fill)] px-4',
           maxHeight ? 'overflow-y-auto' : '',
         )}
         style={maxHeight ? { maxHeight } : undefined}
@@ -173,7 +173,7 @@ export function ActivityFeed({
             <button
               onClick={onLoadMore}
               disabled={isFetchingMore}
-              className="text-sm font-medium text-[#33608D] hover:text-[#22262A] disabled:text-[#B0ADA4]"
+              className="text-sm font-medium text-[var(--c-steel)] hover:text-[var(--c-ink)] disabled:text-[var(--c-dim)]"
             >
               {isFetchingMore ? 'Loading...' : 'Load more'}
             </button>
@@ -214,8 +214,8 @@ export function CompactActivityFeed({
       <div className={cn('space-y-2', className)}>
         {Array.from({ length: limit }, (_, i) => (
           <div key={i} className="flex items-center gap-2">
-            <div className="h-6 w-6 animate-pulse rounded-full bg-[#E6E4DD]" />
-            <div className="h-4 flex-1 animate-pulse rounded bg-[#E6E4DD]" />
+            <div className="h-6 w-6 animate-pulse rounded-full bg-[var(--c-hair)]" />
+            <div className="h-4 flex-1 animate-pulse rounded bg-[var(--c-hair)]" />
           </div>
         ))}
       </div>
@@ -224,7 +224,7 @@ export function CompactActivityFeed({
 
   if (!activities || activities.length === 0) {
     return (
-      <p className={cn('text-sm text-[#6B7280]', className)}>No recent activity</p>
+      <p className={cn('text-sm text-[var(--c-mut)]', className)}>No recent activity</p>
     );
   }
 

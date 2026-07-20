@@ -65,7 +65,7 @@ export function DiffAnnotationCard({
   };
 
   return (
-    <div className="mx-2 my-1 rounded-lg border border-gray-200 bg-white shadow-sm">
+    <div className="mx-2 my-1 rounded-lg border border-gray-200 bg-[var(--c-card)] shadow-sm">
       {/* Header with type badge and actions. */}
       <div className="flex items-center justify-between px-3 py-1.5">
         <div className="flex items-center gap-2">

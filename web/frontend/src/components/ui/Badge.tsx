@@ -32,22 +32,22 @@ export interface BadgeProps {
 
 // Variant styles mapping.
 const variantStyles: Record<BadgeVariant, string> = {
-  default: 'bg-[#6B7280]/10 text-[#6B7280]',
-  success: 'bg-[#178A5B]/10 text-[#178A5B]',
-  warning: 'bg-[#C98A1B]/12 text-[#92610E]',
-  error: 'bg-[#B3372B]/10 text-[#B3372B]',
-  info: 'bg-[#33608D]/10 text-[#33608D]',
-  outline: 'border border-[#E6E4DD] text-[#6B7280] bg-transparent',
+  default: 'bg-[#6B7280]/10 text-[var(--c-mut)]',
+  success: 'bg-[#178A5B]/10 text-[var(--c-green)]',
+  warning: 'bg-[#C98A1B]/12 text-[var(--c-amber)]',
+  error: 'bg-[#B3372B]/10 text-[var(--c-rust)]',
+  info: 'bg-[#33608D]/10 text-[var(--c-steel)]',
+  outline: 'border border-[var(--c-hair)] text-[var(--c-mut)] bg-transparent',
 };
 
 // Dot color mapping for variants.
 const dotColors: Record<BadgeVariant, string> = {
-  default: 'bg-[#9BA0A6]',
-  success: 'bg-[#178A5B]',
+  default: 'bg-[var(--c-faint)]',
+  success: 'bg-[var(--c-green)]',
   warning: 'bg-[#C98A1B]',
-  error: 'bg-[#B3372B]',
-  info: 'bg-[#33608D]',
-  outline: 'bg-[#9BA0A6]',
+  error: 'bg-[var(--c-rust)]',
+  info: 'bg-[var(--c-steel)]',
+  outline: 'bg-[var(--c-faint)]',
 };
 
 // Size styles mapping.
@@ -92,10 +92,10 @@ export function Badge({
 export type AgentStatus = 'active' | 'busy' | 'idle' | 'offline';
 
 const agentStatusConfig: Record<AgentStatus, { variant: BadgeVariant; label: string; dotColor: string }> = {
-  active: { variant: 'success', label: 'Active', dotColor: 'bg-[#178A5B] animate-pulse' },
+  active: { variant: 'success', label: 'Active', dotColor: 'bg-[var(--c-green)] animate-pulse' },
   busy: { variant: 'warning', label: 'Busy', dotColor: 'bg-[#C98A1B]' },
-  idle: { variant: 'default', label: 'Idle', dotColor: 'bg-[#9BA0A6]' },
-  offline: { variant: 'outline', label: 'Offline', dotColor: 'bg-[#B0ADA4]' },
+  idle: { variant: 'default', label: 'Idle', dotColor: 'bg-[var(--c-faint)]' },
+  offline: { variant: 'outline', label: 'Offline', dotColor: 'bg-[var(--c-dim)]' },
 };
 
 export interface StatusBadgeProps {

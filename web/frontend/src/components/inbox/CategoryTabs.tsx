@@ -64,7 +64,7 @@ function TabButton({ tab, isSelected, onClick, disabled, variant }: TabButtonPro
           baseStyles,
           'rounded-full px-4 py-2',
           isSelected
-            ? 'bg-[#22262A] text-white'
+            ? 'bg-[var(--c-ink)] text-white'
             : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900',
           disabled ? 'cursor-not-allowed opacity-50' : '',
         )}
@@ -76,7 +76,7 @@ function TabButton({ tab, isSelected, onClick, disabled, variant }: TabButtonPro
           <span
             className={cn(
               'ml-1 rounded-full px-2 py-0.5 text-xs',
-              isSelected ? 'bg-white/20 text-white' : 'bg-[#F1EFE9] text-[#6B7280]',
+              isSelected ? 'bg-white/20 text-white' : 'bg-[var(--c-fill)] text-[var(--c-mut)]',
             )}
           >
             {tab.count}
@@ -96,7 +96,7 @@ function TabButton({ tab, isSelected, onClick, disabled, variant }: TabButtonPro
         baseStyles,
         'border-b-2 pb-3 pt-2 px-1',
         isSelected
-          ? 'border-[#22262A] text-[#22262A]'
+          ? 'border-[var(--c-ink)] text-[var(--c-ink)]'
           : 'border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700',
         disabled ? 'cursor-not-allowed opacity-50' : '',
       )}
@@ -108,7 +108,7 @@ function TabButton({ tab, isSelected, onClick, disabled, variant }: TabButtonPro
         <span
           className={cn(
             'ml-2 rounded-full px-2 py-0.5 text-xs',
-            isSelected ? 'bg-[#F1EFE9] text-[#22262A]' : 'bg-[#F1EFE9] text-[#6B7280]',
+            isSelected ? 'bg-[var(--c-fill)] text-[var(--c-ink)]' : 'bg-[var(--c-fill)] text-[var(--c-mut)]',
           )}
         >
           {tab.count}
@@ -186,7 +186,7 @@ export function FilterTabs({
           className={cn(
             'rounded-md px-3 py-1.5 text-sm font-medium transition-colors',
             selected === tab.id
-              ? 'bg-white text-gray-900 shadow-sm'
+              ? 'bg-[var(--c-card)] text-gray-900 shadow-sm'
               : 'text-gray-600 hover:text-gray-900',
             disabled ? 'cursor-not-allowed opacity-50' : '',
           )}

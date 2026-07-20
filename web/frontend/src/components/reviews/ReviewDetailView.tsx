@@ -20,9 +20,9 @@ function cn(...inputs: (string | undefined | null | false)[]) {
 
 // Decision badge styles.
 const decisionStyles: Record<string, string> = {
-  approved: 'bg-[#178A5B]/10 text-[#178A5B]',
-  rejected: 'bg-[#B3372B]/10 text-[#B3372B]',
-  changes_requested: 'bg-[#C98A1B]/12 text-[#92610E]',
+  approved: 'bg-[#178A5B]/10 text-[var(--c-green)]',
+  rejected: 'bg-[#B3372B]/10 text-[var(--c-rust)]',
+  changes_requested: 'bg-[#C98A1B]/12 text-[var(--c-amber)]',
 };
 
 // Format milliseconds into human-readable duration.
@@ -102,7 +102,7 @@ export function ReviewDetailView({ review }: ReviewDetailViewProps) {
       <button
         type="button"
         onClick={() => navigate(routes.reviews)}
-        className="flex items-center gap-1 text-sm text-[#6B7280] hover:text-[#22262A]"
+        className="flex items-center gap-1 text-sm text-[var(--c-mut)] hover:text-[var(--c-ink)]"
       >
         <svg
           className="h-4 w-4"
@@ -121,18 +121,18 @@ export function ReviewDetailView({ review }: ReviewDetailViewProps) {
       </button>
 
       {/* Review header card. */}
-      <div className="rounded-lg border border-[#E6E4DD] bg-white p-6">
+      <div className="rounded-lg border border-[var(--c-hair)] bg-[var(--c-card)] p-6">
         <div className="flex items-start justify-between">
           <div>
             <div className="flex items-center gap-3">
-              <h2 className="text-lg font-semibold text-[#22262A]">
+              <h2 className="text-lg font-semibold text-[var(--c-ink)]">
                 {review.branch}
               </h2>
               <ReviewStateBadge state={review.state} />
             </div>
             {review.base_branch ? (
-              <p className="mt-1 text-sm text-[#6B7280]">
-                into <code className="text-[#22262A]">{review.base_branch}</code>
+              <p className="mt-1 text-sm text-[var(--c-mut)]">
+                into <code className="text-[var(--c-ink)]">{review.base_branch}</code>
               </p>
             ) : null}
           </div>
@@ -145,7 +145,7 @@ export function ReviewDetailView({ review }: ReviewDetailViewProps) {
               disabled={cancelMutation.isPending}
               className={cn(
                 'rounded-lg border border-[#B3372B]/30 px-3 py-1.5 text-sm font-medium',
-                'text-[#B3372B] hover:bg-[#B3372B]/10',
+                'text-[var(--c-rust)] hover:bg-[#B3372B]/10',
                 'disabled:opacity-50 disabled:cursor-not-allowed',
               )}
             >
@@ -157,38 +157,38 @@ export function ReviewDetailView({ review }: ReviewDetailViewProps) {
         {/* Metadata grid. */}
         <div className="mt-4 grid grid-cols-2 gap-4 sm:grid-cols-4">
           <div>
-            <dt className="text-xs font-medium text-[#6B7280]">Type</dt>
-            <dd className="mt-1 text-sm font-medium text-[#22262A]">
+            <dt className="text-xs font-medium text-[var(--c-mut)]">Type</dt>
+            <dd className="mt-1 text-sm font-medium text-[var(--c-ink)]">
               {review.review_type}
             </dd>
           </div>
           <div>
-            <dt className="text-xs font-medium text-[#6B7280]">Iterations</dt>
-            <dd className="mt-1 text-sm font-medium text-[#22262A]">
+            <dt className="text-xs font-medium text-[var(--c-mut)]">Iterations</dt>
+            <dd className="mt-1 text-sm font-medium text-[var(--c-ink)]">
               {review.iterations}
             </dd>
           </div>
           <div>
-            <dt className="text-xs font-medium text-[#6B7280]">Open Issues</dt>
-            <dd className="mt-1 text-sm font-medium text-[#22262A]">
+            <dt className="text-xs font-medium text-[var(--c-mut)]">Open Issues</dt>
+            <dd className="mt-1 text-sm font-medium text-[var(--c-ink)]">
               {openCount}
             </dd>
           </div>
           <div>
-            <dt className="text-xs font-medium text-[#6B7280]">Fixed Issues</dt>
-            <dd className="mt-1 text-sm font-medium text-[#22262A]">
+            <dt className="text-xs font-medium text-[var(--c-mut)]">Fixed Issues</dt>
+            <dd className="mt-1 text-sm font-medium text-[var(--c-ink)]">
               {fixedCount}
             </dd>
           </div>
         </div>
 
         {/* Review ID. */}
-        <div className="mt-4 border-t border-[#F1EFE9] pt-3">
-          <span className="text-xs text-[#9BA0A6]">
+        <div className="mt-4 border-t border-[var(--c-fill)] pt-3">
+          <span className="text-xs text-[var(--c-faint)]">
             Review ID: {review.review_id}
           </span>
           {review.thread_id ? (
-            <span className="ml-4 text-xs text-[#9BA0A6]">
+            <span className="ml-4 text-xs text-[var(--c-faint)]">
               Thread: {review.thread_id}
             </span>
           ) : null}
@@ -196,7 +196,7 @@ export function ReviewDetailView({ review }: ReviewDetailViewProps) {
 
         {/* Error display. */}
         {review.error ? (
-          <div className="mt-3 rounded bg-[#B3372B]/10 p-3 text-sm text-[#B3372B]">
+          <div className="mt-3 rounded bg-[#B3372B]/10 p-3 text-sm text-[var(--c-rust)]">
             {review.error}
           </div>
         ) : null}
@@ -205,7 +205,7 @@ export function ReviewDetailView({ review }: ReviewDetailViewProps) {
       {/* Iterations section. */}
       {review.iteration_details && review.iteration_details.length > 0 ? (
         <div>
-          <h3 className="mb-3 text-base font-semibold text-[#22262A]">
+          <h3 className="mb-3 text-base font-semibold text-[var(--c-ink)]">
             Iterations ({review.iteration_details.length})
           </h3>
           <div className="space-y-3">
@@ -224,7 +224,7 @@ export function ReviewDetailView({ review }: ReviewDetailViewProps) {
       {/* Diff section. */}
       <div>
         <div className="mb-3 flex items-center justify-between">
-          <h3 className="text-base font-semibold text-[#22262A]">
+          <h3 className="text-base font-semibold text-[var(--c-ink)]">
             Changes
           </h3>
           <button
@@ -233,8 +233,8 @@ export function ReviewDetailView({ review }: ReviewDetailViewProps) {
             className={cn(
               'rounded-lg border px-3 py-1.5 text-sm font-medium transition-colors',
               showDiff
-                ? 'border-[#33608D]/30 bg-[#33608D]/10 text-[#33608D]'
-                : 'border-[#E6E4DD] text-[#6B7280] hover:bg-[#F4F3EE]',
+                ? 'border-[#33608D]/30 bg-[#33608D]/10 text-[var(--c-steel)]'
+                : 'border-[var(--c-hair)] text-[var(--c-mut)] hover:bg-[var(--c-hover)]',
             )}
           >
             {showDiff ? 'Hide diff' : 'Show diff'}
@@ -247,21 +247,21 @@ export function ReviewDetailView({ review }: ReviewDetailViewProps) {
               <Spinner size="md" variant="primary" label="Loading diff..." />
             </div>
           ) : diffData?.error ? (
-            <div className="rounded-lg border border-[#B3372B]/30 bg-[#B3372B]/10 p-4 text-sm text-[#B3372B]">
+            <div className="rounded-lg border border-[#B3372B]/30 bg-[#B3372B]/10 p-4 text-sm text-[var(--c-rust)]">
               {diffData.error}
             </div>
           ) : diffData?.patch ? (
             <div>
               {diffData.command ? (
-                <p className="mb-2 text-xs text-[#9BA0A6]">
+                <p className="mb-2 text-xs text-[var(--c-faint)]">
                   <code>{diffData.command}</code>
                 </p>
               ) : null}
               <DiffViewer patch={diffData.patch} />
             </div>
           ) : (
-            <div className="rounded-lg border border-[#E6E4DD] bg-white p-8 text-center">
-              <p className="text-sm text-[#6B7280]">No diff available.</p>
+            <div className="rounded-lg border border-[var(--c-hair)] bg-[var(--c-card)] p-8 text-center">
+              <p className="text-sm text-[var(--c-mut)]">No diff available.</p>
             </div>
           )
         ) : null}
@@ -269,7 +269,7 @@ export function ReviewDetailView({ review }: ReviewDetailViewProps) {
 
       {/* Issues section. */}
       <div>
-        <h3 className="mb-3 text-base font-semibold text-[#22262A]">
+        <h3 className="mb-3 text-base font-semibold text-[var(--c-ink)]">
           Issues ({issues?.length ?? 0})
         </h3>
 
@@ -289,8 +289,8 @@ export function ReviewDetailView({ review }: ReviewDetailViewProps) {
             ))}
           </div>
         ) : (
-          <div className="rounded-lg border border-[#E6E4DD] bg-white p-8 text-center">
-            <p className="text-sm text-[#6B7280]">
+          <div className="rounded-lg border border-[var(--c-hair)] bg-[var(--c-card)] p-8 text-center">
+            <p className="text-sm text-[var(--c-mut)]">
               {review.state === 'under_review'
                 ? 'Review is in progress. Issues will appear here when the reviewer completes analysis.'
                 : 'No issues found for this review.'}
@@ -348,7 +348,7 @@ function IterationCard({
     .replace(/_/g, ' ')
     .replace(/\b\w/g, (c) => c.toUpperCase());
 
-  const badgeStyle = decisionStyles[iteration.decision] ?? 'bg-[#6B7280]/10 text-[#6B7280]';
+  const badgeStyle = decisionStyles[iteration.decision] ?? 'bg-[#6B7280]/10 text-[var(--c-mut)]';
 
   // Find the reviewer's mail message for this iteration.
   const reviewMessage = useMemo(
@@ -363,11 +363,11 @@ function IterationCard({
   );
 
   return (
-    <div className="rounded-lg border border-[#E6E4DD] bg-white p-4">
+    <div className="rounded-lg border border-[var(--c-hair)] bg-[var(--c-card)] p-4">
       {/* Iteration header. */}
       <div className="flex items-start justify-between">
         <div className="flex items-center gap-3">
-          <span className="text-sm font-semibold text-[#22262A]">
+          <span className="text-sm font-semibold text-[var(--c-ink)]">
             Iteration {iteration.iteration_num}
           </span>
           <span
@@ -380,7 +380,7 @@ function IterationCard({
           </span>
         </div>
         {iteration.reviewer_id ? (
-          <span className="text-xs text-[#6B7280]">
+          <span className="text-xs text-[var(--c-mut)]">
             by {iteration.reviewer_id}
           </span>
         ) : null}
@@ -389,26 +389,26 @@ function IterationCard({
       {/* Metrics row. */}
       <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-4">
         <div>
-          <dt className="text-xs text-[#6B7280]">Files</dt>
-          <dd className="text-sm font-medium text-[#22262A]">
+          <dt className="text-xs text-[var(--c-mut)]">Files</dt>
+          <dd className="text-sm font-medium text-[var(--c-ink)]">
             {iteration.files_reviewed}
           </dd>
         </div>
         <div>
-          <dt className="text-xs text-[#6B7280]">Lines</dt>
-          <dd className="text-sm font-medium text-[#22262A]">
+          <dt className="text-xs text-[var(--c-mut)]">Lines</dt>
+          <dd className="text-sm font-medium text-[var(--c-ink)]">
             {iteration.lines_analyzed.toLocaleString()}
           </dd>
         </div>
         <div>
-          <dt className="text-xs text-[#6B7280]">Duration</dt>
-          <dd className="text-sm font-medium text-[#22262A]">
+          <dt className="text-xs text-[var(--c-mut)]">Duration</dt>
+          <dd className="text-sm font-medium text-[var(--c-ink)]">
             {formatDuration(iteration.duration_ms)}
           </dd>
         </div>
         <div>
-          <dt className="text-xs text-[#6B7280]">Cost</dt>
-          <dd className="text-sm font-medium text-[#22262A]">
+          <dt className="text-xs text-[var(--c-mut)]">Cost</dt>
+          <dd className="text-sm font-medium text-[var(--c-ink)]">
             {formatCost(iteration.cost_usd)}
           </dd>
         </div>
@@ -421,7 +421,7 @@ function IterationCard({
           <button
             type="button"
             onClick={() => setExpanded(!expanded)}
-            className="text-xs font-medium text-[#6B7280] hover:text-[#22262A]"
+            className="text-xs font-medium text-[var(--c-mut)] hover:text-[var(--c-ink)]"
           >
             {expanded ? 'Hide summary' : 'Show summary'}
           </button>
@@ -429,7 +429,7 @@ function IterationCard({
 
         {/* Full review toggle. */}
         {threadLoading ? (
-          <span className="text-xs text-[#9BA0A6]">Loading review...</span>
+          <span className="text-xs text-[var(--c-faint)]">Loading review...</span>
         ) : reviewMessage ? (
           <button
             type="button"
@@ -437,8 +437,8 @@ function IterationCard({
             className={cn(
               'text-xs font-medium transition-colors',
               showReview
-                ? 'text-[#33608D] hover:text-[#22262A]'
-                : 'text-[#33608D] hover:text-[#22262A]',
+                ? 'text-[var(--c-steel)] hover:text-[var(--c-ink)]'
+                : 'text-[var(--c-steel)] hover:text-[var(--c-ink)]',
             )}
           >
             {showReview ? 'Hide full review' : 'View full review'}
@@ -448,8 +448,8 @@ function IterationCard({
 
       {/* Summary content. */}
       {expanded && iteration.summary ? (
-        <div className="mt-2 rounded bg-[#F4F3EE] p-3">
-          <p className="text-sm text-[#22262A] whitespace-pre-wrap">
+        <div className="mt-2 rounded bg-[var(--c-hover)] p-3">
+          <p className="text-sm text-[var(--c-ink)] whitespace-pre-wrap">
             {iteration.summary}
           </p>
         </div>
@@ -458,7 +458,7 @@ function IterationCard({
       {/* Full review mail content. */}
       {showReview && reviewMessage ? (
         <div className="mt-2 rounded-lg border border-[#33608D]/20 bg-[#33608D]/5 p-4">
-          <div className="mb-2 flex items-center gap-2 text-xs text-[#6B7280]">
+          <div className="mb-2 flex items-center gap-2 text-xs text-[var(--c-mut)]">
             <svg
               className="h-3.5 w-3.5"
               fill="none"
@@ -473,13 +473,13 @@ function IterationCard({
               />
             </svg>
             <span>
-              From <span className="font-medium text-[#22262A]">{reviewMessage.sender_name}</span>
+              From <span className="font-medium text-[var(--c-ink)]">{reviewMessage.sender_name}</span>
               {' — '}
               {reviewMessage.subject}
             </span>
           </div>
           <div
-            className="prose prose-sm max-w-none text-[#22262A]"
+            className="prose prose-sm max-w-none text-[var(--c-ink)]"
             dangerouslySetInnerHTML={{ __html: renderedReviewBody }}
           />
         </div>
@@ -487,14 +487,14 @@ function IterationCard({
 
       {/* Timestamps. */}
       {iteration.started_at > 0 || iteration.completed_at > 0 ? (
-        <div className="mt-3 flex gap-4 border-t border-[#F1EFE9] pt-2">
+        <div className="mt-3 flex gap-4 border-t border-[var(--c-fill)] pt-2">
           {iteration.started_at > 0 ? (
-            <span className="text-xs text-[#9BA0A6]">
+            <span className="text-xs text-[var(--c-faint)]">
               Started: {formatTimestamp(iteration.started_at)}
             </span>
           ) : null}
           {iteration.completed_at > 0 ? (
-            <span className="text-xs text-[#9BA0A6]">
+            <span className="text-xs text-[var(--c-faint)]">
               Completed: {formatTimestamp(iteration.completed_at)}
             </span>
           ) : null}
