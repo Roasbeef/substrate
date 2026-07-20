@@ -61,12 +61,14 @@ interface CanvasState {
   // Focus mode: agent snapped near-fullscreen, with an optional open
   // document shown in its right rail. Session-only state.
   focusedCard: number | null;
+  focusedMessage: number | null;
   openDoc: { agentId: number; path: string } | null;
 
   setPosition: (agentId: number, pos: CardPosition) => void;
   setSize: (agentId: number, size: CardSize) => void;
   setGranularity: (agentId: number, g: Granularity) => void;
   setFocusedCard: (agentId: number | null) => void;
+  setFocusedMessage: (messageId: number | null) => void;
   setOpenDoc: (doc: { agentId: number; path: string } | null) => void;
   ensurePositions: (agentIds: number[]) => void;
   setViewport: (v: Viewport) => void;
@@ -121,6 +123,7 @@ export const useCanvasStore = create<CanvasState>()(
       sizes: {},
       granularity: {},
       focusedCard: null,
+      focusedMessage: null,
       openDoc: null,
       viewport: { x: 0, y: 0, scale: 1 },
       filters: { active: true, idle: false, offline: false },
@@ -158,8 +161,11 @@ export const useCanvasStore = create<CanvasState>()(
 
       setFocusedCard: (focusedCard) =>
         set(focusedCard === null
-          ? { focusedCard, openDoc: null }
+          ? { focusedCard, openDoc: null, focusedMessage: null }
           : { focusedCard }),
+
+      setFocusedMessage: (focusedMessage) =>
+        set({ focusedMessage }),
 
       setOpenDoc: (openDoc) => set({ openDoc }),
 

@@ -64,12 +64,20 @@ export interface EventCardProps {
   onReply: (event: CommandEvent) => void;
   // Called when a referenced document chip is clicked.
   onOpenDoc?: ((path: string) => void) | undefined;
+  // Called when the message-focus affordance is clicked.
+  onFocusMessage?: ((event: CommandEvent) => void) | undefined;
+  // Start expanded regardless of classification (message focus view).
+  defaultExpanded?: boolean | undefined;
 }
 
-export function EventCard({ event, onReply, onOpenDoc }: EventCardProps) {
+export function EventCard({
+  event, onReply, onOpenDoc, onFocusMessage, defaultExpanded,
+}: EventCardProps) {
   // Actionable events start expanded so the canvas shows work items
   // without a click; informational ones start collapsed.
-  const [expanded, setExpanded] = useState(event.needs_action);
+  const [expanded, setExpanded] = useState(
+    defaultExpanded ?? event.needs_action,
+  );
   const [planComment, setPlanComment] = useState('');
 
   const kind = eventKinds[event.kind] ?? eventKinds.message;
@@ -165,6 +173,24 @@ export function EventCard({ event, onReply, onOpenDoc }: EventCardProps) {
         <span className="shrink-0 font-mono text-[10px] text-[var(--c-faint)]">
           {timeAgo(event.created_at)}
         </span>
+        {onFocusMessage && (
+          <span
+            role="button"
+            tabIndex={0}
+            title="Focus this message"
+            onClick={(e) => {
+              e.stopPropagation();
+              onFocusMessage(event);
+            }}
+            className="shrink-0 rounded p-0.5 text-[var(--c-ghost)] hover:bg-[var(--c-fill)] hover:text-[var(--c-ink)]"
+          >
+            <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24"
+              stroke="currentColor" strokeWidth={1.8}>
+              <path strokeLinecap="round" strokeLinejoin="round"
+                d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4" />
+            </svg>
+          </span>
+        )}
       </button>
 
       {expanded && (

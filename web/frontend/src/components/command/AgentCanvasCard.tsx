@@ -4,20 +4,17 @@
 // canvas space; everything inside behaves like a normal document.
 
 import { useMemo, useRef, useState } from 'react';
-import { useQueryClient } from '@tanstack/react-query';
 import { clsx } from 'clsx';
 import type { CommandEvent, CommandLane, FlowEvent } from '@/api/command.js';
 import type { AgentSummary } from '@/types/api.js';
 import { useCanvasStore } from '@/stores/canvas.js';
 import type { CardPosition, CardSize, Granularity } from '@/stores/canvas.js';
-import { commandKeys, useAgentFlow } from '@/hooks/useCommandFeed.js';
-import { useSendMessage } from '@/hooks/useMessages.js';
-import { useAuthStore } from '@/stores/auth.js';
+import { useAgentFlow } from '@/hooks/useCommandFeed.js';
 import { useUIStore } from '@/stores/ui.js';
 import { useSummaryHistory } from '@/hooks/useSummaries.js';
 import { EventCard } from './EventCard.js';
 import { SteerComposer } from './SteerComposer.js';
-import type { ReplyTarget } from './SteerComposer.js';
+import type { PendingAttachment, ReplyTarget } from './SteerComposer.js';
 import { HeartbeatTrace } from './HeartbeatTrace.js';
 import { agentTint, timeAgo } from './kinds.js';
 
@@ -127,9 +124,10 @@ export function AgentCanvasCard({
   const [dragging, setDragging] = useState(false);
   const [resizing, setResizing] = useState(false);
   const [dropActive, setDropActive] = useState(false);
+  const [pendingAttachments, setPendingAttachments] = useState<
+    PendingAttachment[]
+  >([]);
 
-  const sendMessage = useSendMessage();
-  const queryClient = useQueryClient();
   const addToast = useUIStore((st) => st.addToast);
 
   const setPosition = useCanvasStore((s) => s.setPosition);
@@ -138,6 +136,7 @@ export function AgentCanvasCard({
   const granularity =
     useCanvasStore((s) => s.granularity[agent.id]) ?? 'med';
   const setFocusedCard = useCanvasStore((s) => s.setFocusedCard);
+  const setFocusedMessage = useCanvasStore((s) => s.setFocusedMessage);
   const setOpenDoc = useCanvasStore((s) => s.setOpenDoc);
   const setGranularity = useCanvasStore((s) => s.setGranularity);
 
@@ -287,8 +286,8 @@ export function AgentCanvasCard({
     }
   };
 
-  // Dropped images upload to the shared attachments dir, then land
-  // in this agent's inbox as a markdown-image message.
+  // Dropped images upload immediately but stage in the composer so
+  // the operator can add a message before anything is sent.
   const handleDrop = async (e: React.DragEvent) => {
     e.preventDefault();
     e.stopPropagation();
@@ -302,7 +301,7 @@ export function AgentCanvasCard({
     }
 
     try {
-      const refs: string[] = [];
+      const staged: PendingAttachment[] = [];
       for (const img of images) {
         const form = new FormData();
         form.append('file', img);
@@ -313,25 +312,15 @@ export function AgentCanvasCard({
         if (!res.ok) {
           throw new Error(`upload failed (${res.status})`);
         }
-        const data = (await res.json()) as { markdown: string };
-        refs.push(data.markdown);
+        const data = (await res.json()) as {
+          url: string;
+          markdown: string;
+        };
+        staged.push({
+          name: img.name, url: data.url, markdown: data.markdown,
+        });
       }
-
-      const { currentAgent, availableAgents } =
-        useAuthStore.getState();
-      const userAgent = availableAgents.find(
-        (a) => a.name === 'User',
-      );
-      await sendMessage.mutateAsync({
-        sender_id: currentAgent?.id ?? userAgent?.id ?? 0,
-        recipient_names: [agent.name],
-        subject: `Image: ${images.map((f) => f.name).join(', ')}`,
-        body: refs.join('\n'),
-        priority: 'PRIORITY_NORMAL',
-      });
-      void queryClient.invalidateQueries({
-        queryKey: commandKeys.feed(),
-      });
+      setPendingAttachments((prev) => [...prev, ...staged]);
     } catch (err) {
       addToast({
         variant: 'error',
@@ -548,6 +537,10 @@ export function AgentCanvasCard({
                 setFocusedCard(agent.id);
                 setOpenDoc({ agentId: agent.id, path });
               }}
+              onFocusMessage={(ev) => {
+                setFocusedCard(agent.id);
+                setFocusedMessage(ev.message_id);
+              }}
             />
           ) : item.tier === 'summary' ? (
             <SummaryRow
@@ -576,6 +569,13 @@ export function AgentCanvasCard({
         agentName={agent.name}
         replyTarget={replyTarget}
         onClearReply={() => setReplyTarget(null)}
+        attachments={pendingAttachments}
+        onRemoveAttachment={(i) =>
+          setPendingAttachments((prev) =>
+            prev.filter((_, idx) => idx !== i),
+          )
+        }
+        onClearAttachments={() => setPendingAttachments([])}
       />
 
       {/* Corner resize handle: drag to grow or shrink the card. */}

@@ -17,17 +17,31 @@ export interface ReplyTarget {
   subject: string;
 }
 
+// A staged image attachment waiting to be sent with the next message.
+export interface PendingAttachment {
+  name: string;
+  url: string;
+  markdown: string;
+}
+
 export interface SteerComposerProps {
   agentName: string;
   // Active reply target; null means a fresh steering message.
   replyTarget: ReplyTarget | null;
   onClearReply: () => void;
+  // Images staged by drag-drop, sent along with the next message.
+  attachments?: PendingAttachment[] | undefined;
+  onRemoveAttachment?: ((index: number) => void) | undefined;
+  onClearAttachments?: (() => void) | undefined;
 }
 
 export function SteerComposer({
   agentName,
   replyTarget,
   onClearReply,
+  attachments = [],
+  onRemoveAttachment,
+  onClearAttachments,
 }: SteerComposerProps) {
   const [text, setText] = useState('');
   const [urgent, setUrgent] = useState(false);
@@ -50,9 +64,15 @@ export function SteerComposer({
   // Send the steering message, either as a thread reply or a new
   // direct message to the agent.
   const submit = async () => {
-    const body = text.trim();
-    if (!body || isSending) {
+    let body = text.trim();
+    if ((!body && attachments.length === 0) || isSending) {
       return;
+    }
+
+    // Staged images ride along as markdown references.
+    if (attachments.length > 0) {
+      const refs = attachments.map((a) => a.markdown).join('\n');
+      body = body ? `${body}\n\n${refs}` : refs;
     }
 
     try {
@@ -67,10 +87,13 @@ export function SteerComposer({
         const userAgent = availableAgents.find(
           (a) => a.name === 'User',
         );
+        const subject = text.trim()
+          ? `Steer: ${text.trim().slice(0, 60)}`
+          : `Image: ${attachments.map((a) => a.name).join(', ')}`;
         await sendMessage.mutateAsync({
           sender_id: currentAgent?.id ?? userAgent?.id ?? 0,
           recipient_names: [agentName],
-          subject: `Steer: ${body.slice(0, 60)}`,
+          subject,
           body,
           priority: urgent ? 'PRIORITY_URGENT' : 'PRIORITY_NORMAL',
         });
@@ -79,6 +102,7 @@ export function SteerComposer({
       setText('');
       setUrgent(false);
       onClearReply();
+      onClearAttachments?.();
       void queryClient.invalidateQueries({
         queryKey: commandKeys.feed(),
       });
@@ -107,6 +131,34 @@ export function SteerComposer({
           >
             ✕
           </button>
+        </div>
+      )}
+
+      {attachments.length > 0 && (
+        <div className="mb-1.5 flex flex-wrap gap-1.5">
+          {attachments.map((a, i) => (
+            <span
+              key={`${a.url}-${i}`}
+              className="flex items-center gap-1.5 rounded-md border border-[var(--c-hair)] bg-[var(--c-hover)] py-0.5 pl-0.5 pr-1.5"
+            >
+              <img
+                src={a.url}
+                alt={a.name}
+                className="h-6 w-6 rounded object-cover"
+              />
+              <span className="max-w-[120px] truncate font-mono text-[10.5px] text-[var(--c-text2)]">
+                {a.name}
+              </span>
+              <button
+                type="button"
+                onClick={() => onRemoveAttachment?.(i)}
+                className="text-[var(--c-faint)] hover:text-[var(--c-rust)]"
+                aria-label={`Remove ${a.name}`}
+              >
+                ✕
+              </button>
+            </span>
+          ))}
         </div>
       )}
 
@@ -145,7 +197,9 @@ export function SteerComposer({
         <button
           type="button"
           onClick={() => void submit()}
-          disabled={!text.trim() || isSending}
+          disabled={
+            (!text.trim() && attachments.length === 0) || isSending
+          }
           className="rounded-md bg-[var(--c-ink)] px-2.5 py-1 text-[12px] font-medium text-white hover:bg-[var(--c-inkhover)] disabled:opacity-30"
         >
           {isSending ? '…' : 'Send'}

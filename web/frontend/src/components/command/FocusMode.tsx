@@ -26,6 +26,8 @@ export interface FocusModeProps {
 export function FocusMode({ lane, summary }: FocusModeProps) {
   const { agent } = lane;
   const setFocusedCard = useCanvasStore((s) => s.setFocusedCard);
+  const focusedMessage = useCanvasStore((s) => s.focusedMessage);
+  const setFocusedMessage = useCanvasStore((s) => s.setFocusedMessage);
   const openDoc = useCanvasStore((s) => s.openDoc);
   const setOpenDoc = useCanvasStore((s) => s.setOpenDoc);
   const [replyTarget, setReplyTarget] = useState<ReplyTarget | null>(
@@ -38,15 +40,18 @@ export function FocusMode({ lane, summary }: FocusModeProps) {
       if (e.key !== 'Escape') {
         return;
       }
-      if (useCanvasStore.getState().openDoc) {
+      const st = useCanvasStore.getState();
+      if (st.openDoc) {
         setOpenDoc(null);
+      } else if (st.focusedMessage !== null) {
+        setFocusedMessage(null);
       } else {
         setFocusedCard(null);
       }
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [setFocusedCard, setOpenDoc]);
+  }, [setFocusedCard, setFocusedMessage, setOpenDoc]);
 
   const doc = useQuery({
     queryKey: ['command', 'doc', openDoc?.agentId, openDoc?.path],
@@ -119,17 +124,32 @@ export function FocusMode({ lane, summary }: FocusModeProps) {
           </button>
         </header>
 
+        {focusedMessage !== null && (
+          <button
+            type="button"
+            onClick={() => setFocusedMessage(null)}
+            className="border-b border-[var(--c-hair2)] bg-[var(--c-hover)] px-4 py-1.5 text-left font-mono text-[10.5px] uppercase tracking-[0.1em] text-[var(--c-mut)] hover:text-[var(--c-ink)]"
+          >
+            ← single message · show full timeline
+          </button>
+        )}
         <div className="scrollbar-thin min-h-0 flex-1 divide-y divide-[var(--c-fill)] overflow-y-auto">
           {lane.events.length === 0 && (
             <p className="px-4 py-6 text-center text-[12.5px] text-[var(--c-dim)]">
               No traffic yet.
             </p>
           )}
-          {lane.events.map((event) => (
+          {(focusedMessage === null
+            ? lane.events
+            : lane.events.filter(
+                (ev) => ev.message_id === focusedMessage,
+              )
+          ).map((event) => (
             <EventCard
-              key={`${event.direction}-${event.message_id}`}
+              key={`f-${event.direction}-${event.message_id}-${String(focusedMessage !== null)}`}
               event={event}
               onReply={handleReply}
+              defaultExpanded={focusedMessage !== null}
               onOpenDoc={(path) =>
                 setOpenDoc({ agentId: agent.id, path })
               }
