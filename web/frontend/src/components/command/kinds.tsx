@@ -127,6 +127,19 @@ export const eventKinds: Record<CommandEventKind, KindConfig> = {
     chip: 'bg-[#A13D63]/10 text-[#A13D63]',
     icon: <ReviewIcon />,
   },
+  steer: {
+    label: 'You',
+    text: 'text-[var(--c-steel)]',
+    stripe: 'border-l-transparent',
+    chip: 'bg-[#33608D]/10 text-[var(--c-steel)]',
+    icon: (
+      <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24"
+        stroke="currentColor" strokeWidth={1.8}>
+        <path strokeLinecap="round" strokeLinejoin="round"
+          d="M5 12h14m0 0l-6-6m6 6l-6 6" />
+      </svg>
+    ),
+  },
   message: {
     label: 'Message',
     text: 'text-[var(--c-steel)]',
@@ -135,6 +148,22 @@ export const eventKinds: Record<CommandEventKind, KindConfig> = {
     icon: <MessageIcon />,
   },
 };
+
+// Identity tints for agent tiles: a fixed 8-color wheel keyed by a
+// stable hash of the agent name, so identity survives reloads.
+const identityTints = [
+  '#B3372B', '#C98A1B', '#178A5B', '#0E7490',
+  '#33608D', '#5B5BD6', '#A13D63', '#6B7280',
+];
+
+// agentTint returns a stable accent color for an agent name.
+export function agentTint(name: string): string {
+  let h = 0;
+  for (let i = 0; i < name.length; i++) {
+    h = (h * 31 + name.charCodeAt(i)) >>> 0;
+  }
+  return identityTints[h % identityTints.length] as string;
+}
 
 // Kind configs for the attention tray.
 export const attentionKinds: Record<AttentionKind, KindConfig> = {

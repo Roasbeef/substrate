@@ -15,7 +15,7 @@ import { EventCard } from './EventCard.js';
 import { SteerComposer } from './SteerComposer.js';
 import type { ReplyTarget } from './SteerComposer.js';
 import { HeartbeatTrace } from './HeartbeatTrace.js';
-import { timeAgo } from './kinds.js';
+import { agentTint, timeAgo } from './kinds.js';
 
 // Number of timeline items shown before the "older" fold.
 const VISIBLE_EVENTS = 8;
@@ -127,6 +127,8 @@ export function AgentCanvasCard({
   const bringToFront = useCanvasStore((s) => s.bringToFront);
   const granularity =
     useCanvasStore((s) => s.granularity[agent.id]) ?? 'med';
+  const setFocusedCard = useCanvasStore((s) => s.setFocusedCard);
+  const setOpenDoc = useCanvasStore((s) => s.setOpenDoc);
   const setGranularity = useCanvasStore((s) => s.setGranularity);
 
   // Medium tier: Haiku summary history; high tier: transcript flow.
@@ -317,6 +319,12 @@ export function AgentCanvasCard({
         style={{ touchAction: 'none' }}
       >
         <div className="flex items-center gap-2.5">
+          <span
+            className="flex h-5 w-5 shrink-0 items-center justify-center rounded-[5px] font-mono text-[11px] font-bold text-white"
+            style={{ backgroundColor: agentTint(agent.name) }}
+          >
+            {agent.name.slice(0, 1)}
+          </span>
           <h2 className="text-[14.5px] font-semibold tracking-[-0.01em] text-[var(--c-ink)]">
             {agent.name}
           </h2>
@@ -324,6 +332,19 @@ export function AgentCanvasCard({
           <span className="ml-auto font-mono text-[10px] text-[var(--c-faint)]">
             {timeAgo(agent.last_active_at)}
           </span>
+          <button
+            type="button"
+            onPointerDown={(e) => e.stopPropagation()}
+            onClick={() => setFocusedCard(agent.id)}
+            title="Focus (near-fullscreen)"
+            className="rounded p-0.5 text-[var(--c-dim)] hover:bg-[var(--c-hover)] hover:text-[var(--c-ink)]"
+          >
+            <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24"
+              stroke="currentColor" strokeWidth={1.8}>
+              <path strokeLinecap="round" strokeLinejoin="round"
+                d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4" />
+            </svg>
+          </button>
           {lane.unread_count > 0 && (
             <span className="rounded-full bg-[#33608D]/10 px-1.5 py-px font-mono text-[10px] font-semibold text-[var(--c-steel)]">
               {lane.unread_count}
@@ -331,7 +352,8 @@ export function AgentCanvasCard({
           )}
         </div>
         <p className="mt-0.5 truncate font-mono text-[10.5px] text-[var(--c-faint2)]">
-          {agent.project_key || 'unassigned'}
+          {agent.project_key || agent.working_dir ||
+            agent.purpose || 'unassigned'}
           {agent.git_branch && (
             <span className="text-[var(--c-dim)]"> · {agent.git_branch}</span>
           )}
@@ -365,9 +387,20 @@ export function AgentCanvasCard({
             )}
           </>
         ) : (
-          <p className="text-[13px] italic leading-snug text-[var(--c-faint)]">
-            {agent.purpose || 'No live summary yet.'}
-          </p>
+          (() => {
+            const latest = lane.events.find(
+              (ev) => ev.direction !== 'out' && ev.body,
+            );
+            return latest ? (
+              <p className="line-clamp-2 text-[13px] leading-snug text-[var(--c-text2)]">
+                {latest.body.slice(0, 220)}
+              </p>
+            ) : (
+              <p className="text-[13px] italic leading-snug text-[var(--c-faint)]">
+                {agent.purpose || 'No live summary yet.'}
+              </p>
+            );
+          })()
         )}
       </div>
 
@@ -412,9 +445,13 @@ export function AgentCanvasCard({
         {visibleItems.map((item, i) =>
           item.tier === 'mail' ? (
             <EventCard
-              key={`m-${item.event.message_id}`}
+              key={`m-${item.event.direction}-${item.event.message_id}`}
               event={item.event}
               onReply={handleReply}
+              onOpenDoc={(path) => {
+                setFocusedCard(agent.id);
+                setOpenDoc({ agentId: agent.id, path });
+              }}
             />
           ) : item.tier === 'summary' ? (
             <SummaryRow

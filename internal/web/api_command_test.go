@@ -215,3 +215,19 @@ func TestSortAttentionOrder(t *testing.T) {
 	require.Equal(t, attentionKindUrgent, items[2].Kind)
 	require.Equal(t, attentionKindBlocked, items[3].Kind)
 }
+
+// TestResolveDocPath verifies document path confinement.
+func TestResolveDocPath(t *testing.T) {
+	full, ok := resolveDocPath("/work/repo", "docs/design.md")
+	require.True(t, ok)
+	require.Equal(t, "/work/repo/docs/design.md", full)
+
+	_, ok = resolveDocPath("/work/repo", "/etc/passwd")
+	require.False(t, ok)
+
+	_, ok = resolveDocPath("/work/repo", "../secrets.txt")
+	require.False(t, ok)
+
+	_, ok = resolveDocPath("/work/repo", "docs/../../other")
+	require.False(t, ok)
+}

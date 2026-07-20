@@ -9,7 +9,8 @@ export type CommandEventKind =
   | 'question'
   | 'status'
   | 'review'
-  | 'message';
+  | 'message'
+  | 'steer';
 
 // Attention queue item kinds.
 export type AttentionKind = 'plan' | 'question' | 'urgent' | 'blocked';
@@ -29,6 +30,7 @@ export interface CommandEvent {
   plan_review_id?: string;
   plan_state?: string;
   has_diff: boolean;
+  direction: 'in' | 'out';
 }
 
 // Agent header info for a lane.
@@ -38,6 +40,7 @@ export interface CommandLaneAgent {
   project_key: string;
   git_branch: string;
   purpose: string;
+  working_dir: string;
   status: string;
   last_active_at: string;
   seconds_since_heartbeat: number;
@@ -103,5 +106,24 @@ export function getAgentFlow(
 ): Promise<AgentFlowResponse> {
   return get<AgentFlowResponse>(
     `/command/flow/${agentId}?limit=${limit}`,
+  );
+}
+
+// A document referenced by an agent, served from its working dir.
+export interface AgentDocResponse {
+  path: string;
+  size: number;
+  modified: string;
+  content: string;
+  truncated: boolean;
+}
+
+// Fetch a referenced document for the viewer panel.
+export function getAgentDoc(
+  agentId: number,
+  path: string,
+): Promise<AgentDocResponse> {
+  return get<AgentDocResponse>(
+    `/command/doc/${agentId}?path=${encodeURIComponent(path)}`,
   );
 }

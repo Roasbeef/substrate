@@ -19,6 +19,26 @@ const DiffViewer = lazy(() =>
   })),
 );
 
+// docPathRe finds repo-relative file references like docs/design.md
+// so they can become implicit attachments.
+const DOC_PATH_RE =
+  /(?:^|[\s(`'"])((?:[\w.-]+\/)+[\w.-]+\.(?:md|go|ts|tsx|js|py|rs|txt|json|ya?ml|sql|sh|proto))/g;
+
+// extractDocPaths pulls up to four unique file references from a body.
+function extractDocPaths(body: string): string[] {
+  const out: string[] = [];
+  for (const m of body.matchAll(DOC_PATH_RE)) {
+    const path = m[1] as string;
+    if (!out.includes(path)) {
+      out.push(path);
+    }
+    if (out.length >= 4) {
+      break;
+    }
+  }
+  return out;
+}
+
 // Marker used by `substrate send-diff` to embed patches in bodies.
 const DIFF_MARKER = '<!-- substrate:diff -->';
 
@@ -42,9 +62,11 @@ export interface EventCardProps {
   // Called when the user hits "Reply" so the card composer can focus
   // with the thread context attached.
   onReply: (event: CommandEvent) => void;
+  // Called when a referenced document chip is clicked.
+  onOpenDoc?: ((path: string) => void) | undefined;
 }
 
-export function EventCard({ event, onReply }: EventCardProps) {
+export function EventCard({ event, onReply, onOpenDoc }: EventCardProps) {
   // Actionable events start expanded so the canvas shows work items
   // without a click; informational ones start collapsed.
   const [expanded, setExpanded] = useState(event.needs_action);
@@ -65,6 +87,11 @@ export function EventCard({ event, onReply }: EventCardProps) {
   );
 
   const planPending = event.plan_state === 'pending';
+  const docPaths = useMemo(
+    () => (onOpenDoc ? extractDocPaths(event.body) : []),
+    [event.body, onOpenDoc],
+  );
+  const outbound = event.direction === 'out';
 
   // Submit a plan decision with the optional inline comment.
   const decidePlan = (
@@ -116,7 +143,9 @@ export function EventCard({ event, onReply }: EventCardProps) {
             'min-w-0 flex-1 truncate text-[13px] leading-5',
             event.state === 'unread' && event.needs_action
               ? 'font-semibold text-[var(--c-ink)]'
-              : 'text-[var(--c-text2)]',
+              : outbound
+                ? 'text-[var(--c-faint2)] italic'
+                : 'text-[var(--c-text2)]',
           )}
         >
           {event.subject}
@@ -185,6 +214,26 @@ export function EventCard({ event, onReply }: EventCardProps) {
               className="scrollbar-thin prose prose-command max-h-80 max-w-none overflow-y-auto text-[13px] leading-relaxed text-[var(--c-ink2)]"
               dangerouslySetInnerHTML={{ __html: renderedBody }}
             />
+          )}
+
+          {docPaths.length > 0 && (
+            <div className="mt-1.5 flex flex-wrap gap-1.5">
+              {docPaths.map((path) => (
+                <button
+                  key={path}
+                  type="button"
+                  onClick={() => onOpenDoc?.(path)}
+                  className="flex items-center gap-1 rounded border border-[var(--c-hair)] bg-[var(--c-hover)] px-1.5 py-0.5 font-mono text-[10.5px] text-[var(--c-steel)] hover:border-[var(--c-steel)]"
+                >
+                  <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24"
+                    stroke="currentColor" strokeWidth={1.8}>
+                    <path strokeLinecap="round" strokeLinejoin="round"
+                      d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                  </svg>
+                  {path}
+                </button>
+              ))}
+            </div>
           )}
 
           {patch && (

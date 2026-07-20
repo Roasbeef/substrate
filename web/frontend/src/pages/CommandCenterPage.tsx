@@ -17,6 +17,7 @@ import {
 } from '@/hooks/useWebSocket.js';
 import { useCanvasStore, CARD_WIDTH } from '@/stores/canvas.js';
 import { AgentCanvasCard } from '@/components/command/AgentCanvasCard.js';
+import { FocusMode } from '@/components/command/FocusMode.js';
 import { AttentionTray } from '@/components/command/AttentionTray.js';
 import { Minimap } from '@/components/command/Minimap.js';
 import { Spinner } from '@/components/ui/Spinner.js';
@@ -53,6 +54,7 @@ export default function CommandCenterPage() {
   const toggleFilter = useCanvasStore((s) => s.toggleFilter);
   const zOrder = useCanvasStore((s) => s.zOrder);
   const sizes = useCanvasStore((s) => s.sizes);
+  const focusedCard = useCanvasStore((s) => s.focusedCard);
   const bringToFront = useCanvasStore((s) => s.bringToFront);
 
   const containerRef = useRef<HTMLDivElement>(null);
@@ -356,6 +358,20 @@ export default function CommandCenterPage() {
           </p>
         </div>
       )}
+
+      {/* Focus mode overlay. */}
+      {focusedCard !== null &&
+        (() => {
+          const lane = lanes.find(
+            (l) => l.agent.id === focusedCard,
+          );
+          return lane ? (
+            <FocusMode
+              lane={lane}
+              summary={summariesByAgent.get(lane.agent.id)}
+            />
+          ) : null;
+        })()}
 
       {/* Overlays. */}
       <div className="pointer-events-none absolute inset-0">

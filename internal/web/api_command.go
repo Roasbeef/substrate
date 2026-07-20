@@ -1,6 +1,7 @@
 package web
 
 import (
+	"context"
 	"net/http"
 	"sort"
 	"strings"
@@ -25,6 +26,7 @@ const (
 	eventKindStatus   = "status"
 	eventKindReview   = "review"
 	eventKindMessage  = "message"
+	eventKindSteer    = "steer"
 )
 
 // Attention item kinds surfaced in the "needs you" queue.
@@ -51,6 +53,9 @@ type CommandEvent struct {
 	PlanReviewID string `json:"plan_review_id,omitempty"`
 	PlanState    string `json:"plan_state,omitempty"`
 	HasDiff      bool   `json:"has_diff"`
+	// Direction is "in" for agent→operator traffic and "out" for
+	// operator→agent steers, so the timeline shows both sides.
+	Direction string `json:"direction"`
 }
 
 // CommandLaneAgent is the agent header info for a lane.
@@ -60,6 +65,7 @@ type CommandLaneAgent struct {
 	ProjectKey  string `json:"project_key"`
 	GitBranch   string `json:"git_branch"`
 	Purpose     string `json:"purpose"`
+	WorkingDir  string `json:"working_dir"`
 	Status      string `json:"status"`
 	LastActive  string `json:"last_active_at"`
 	SecondsIdle int    `json:"seconds_since_heartbeat"`
@@ -287,6 +293,20 @@ func (s *Server) handleCommandFeed(w http.ResponseWriter, r *http.Request) {
 		)
 	}
 
+	// Merge the operator's outbound steers into recipient lanes so
+	// each card reads as a two-way conversation.
+	mergeOutboundEvents(ctx, s, userAgent.ID, eventsByAgent)
+
+	// Both sources are merged, so restore newest-first order per
+	// lane; buildLane depends on it for waiting-for and recency.
+	for id := range eventsByAgent {
+		evs := eventsByAgent[id]
+		sort.SliceStable(evs, func(i, j int) bool {
+			return evs[i].CreatedAt > evs[j].CreatedAt
+		})
+		eventsByAgent[id] = evs
+	}
+
 	lanes := make([]CommandLane, 0, len(agents))
 	attention := make([]AttentionItem, 0, 8)
 
@@ -301,6 +321,7 @@ func (s *Server) handleCommandFeed(w http.ResponseWriter, r *http.Request) {
 			aws.ActiveSessionID, aws.LastActive,
 			eventsByAgent[aws.Agent.ID],
 		)
+		lane.Agent.WorkingDir = aws.Agent.WorkingDir.String
 		lanes = append(lanes, lane)
 
 		attention = append(
@@ -316,6 +337,46 @@ func (s *Server) handleCommandFeed(w http.ResponseWriter, r *http.Request) {
 		Lanes:       lanes,
 		Attention:   attention,
 	})
+}
+
+// mergeOutboundEvents appends the operator's recent sent messages to
+// their recipient agents' event lists as "steer" events.
+func mergeOutboundEvents(ctx context.Context, s *Server,
+	userID int64, eventsByAgent map[int64][]CommandEvent,
+) {
+	sent, err := s.store.GetSentMessages(ctx, userID, 100)
+	if err != nil || len(sent) == 0 {
+		return
+	}
+
+	ids := make([]int64, 0, len(sent))
+	for _, m := range sent {
+		ids = append(ids, m.ID)
+	}
+	recipients, err := s.store.GetMessageRecipientsBulk(ctx, ids)
+	if err != nil {
+		return
+	}
+
+	for _, msg := range sent {
+		for _, rcpt := range recipients[msg.ID] {
+			eventsByAgent[rcpt.AgentID] = append(
+				eventsByAgent[rcpt.AgentID],
+				CommandEvent{
+					MessageID: msg.ID,
+					ThreadID:  msg.ThreadID,
+					Kind:      eventKindSteer,
+					Subject:   msg.Subject,
+					Body:      msg.Body,
+					Priority:  msg.Priority,
+					State:     "sent",
+					CreatedAt: msg.CreatedAt.UTC().
+						Format(time.RFC3339),
+					Direction: "out",
+				},
+			)
+		}
+	}
 }
 
 // storePlanRef is a minimal plan review reference used during event
@@ -360,6 +421,7 @@ func buildEvent(subject, body, priority, state, threadID string,
 		PlanReviewID: planID,
 		PlanState:    planState,
 		HasDiff:      strings.Contains(body, diffMarker),
+		Direction:    "in",
 	}
 }
 

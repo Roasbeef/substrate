@@ -58,10 +58,16 @@ interface CanvasState {
   zOrder: Record<number, number>;
 
   granularity: Record<number, Granularity>;
+  // Focus mode: agent snapped near-fullscreen, with an optional open
+  // document shown in its right rail. Session-only state.
+  focusedCard: number | null;
+  openDoc: { agentId: number; path: string } | null;
 
   setPosition: (agentId: number, pos: CardPosition) => void;
   setSize: (agentId: number, size: CardSize) => void;
   setGranularity: (agentId: number, g: Granularity) => void;
+  setFocusedCard: (agentId: number | null) => void;
+  setOpenDoc: (doc: { agentId: number; path: string } | null) => void;
   ensurePositions: (agentIds: number[]) => void;
   setViewport: (v: Viewport) => void;
   toggleFilter: (key: keyof StatusFilters) => void;
@@ -114,6 +120,8 @@ export const useCanvasStore = create<CanvasState>()(
       positions: {},
       sizes: {},
       granularity: {},
+      focusedCard: null,
+      openDoc: null,
       viewport: { x: 0, y: 0, scale: 1 },
       filters: { active: true, idle: false, offline: false },
       zTop: 1,
@@ -147,6 +155,13 @@ export const useCanvasStore = create<CanvasState>()(
         }
         set({ positions: autoPlace(positions, agentIds) });
       },
+
+      setFocusedCard: (focusedCard) =>
+        set(focusedCard === null
+          ? { focusedCard, openDoc: null }
+          : { focusedCard }),
+
+      setOpenDoc: (openDoc) => set({ openDoc }),
 
       setGranularity: (agentId, g) =>
         set((s) => ({
