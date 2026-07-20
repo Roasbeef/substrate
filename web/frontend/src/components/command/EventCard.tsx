@@ -8,6 +8,7 @@ import { clsx } from 'clsx';
 import type { CommandEvent } from '@/api/command.js';
 import { renderMarkdownToHtml } from '@/lib/markdown.js';
 import { useUpdatePlanReviewStatus } from '@/hooks/usePlanReviews.js';
+import { useMarkMessageRead } from '@/hooks/useMessages.js';
 import { commandKeys } from '@/hooks/useCommandFeed.js';
 import { Spinner } from '@/components/ui/Spinner.js';
 import { eventKinds, timeAgo } from './kinds.js';
@@ -100,6 +101,26 @@ export function EventCard({
     [event.body, onOpenDoc],
   );
   const outbound = event.direction === 'out';
+  const unread = !outbound && event.state === 'unread';
+
+  const markRead = useMarkMessageRead();
+
+  // markSeen transitions an unread event to read once the operator
+  // actually looks at it (expanding the row or focusing the message),
+  // mirroring how opening a message in the inbox marks it read. The
+  // feed refetch then clears the dot and unread counts everywhere.
+  const markSeen = () => {
+    if (!unread) {
+      return;
+    }
+    markRead.mutate(event.message_id, {
+      onSuccess: () => {
+        void queryClient.invalidateQueries({
+          queryKey: commandKeys.feed(),
+        });
+      },
+    });
+  };
 
   // Submit a plan decision with the optional inline comment.
   const decidePlan = (
@@ -135,9 +156,22 @@ export function EventCard({
       {/* Collapsed row: kind icon, subject, time. */}
       <button
         type="button"
-        onClick={() => setExpanded((v) => !v)}
-        className="flex w-full items-baseline gap-2 px-3 py-[7px] text-left hover:bg-[var(--c-hover)]"
+        onClick={() => {
+          if (!expanded) {
+            markSeen();
+          }
+          setExpanded((v) => !v);
+        }}
+        className="relative flex w-full items-baseline gap-2 px-3 py-[7px] text-left hover:bg-[var(--c-hover)]"
       >
+        {/* Unread indicator dot, tucked into the left gutter so row
+            alignment matches read rows. */}
+        {unread && (
+          <span
+            aria-label="Unread message"
+            className="absolute left-[3.5px] top-1/2 h-1.5 w-1.5 -translate-y-1/2 rounded-full bg-[var(--c-steel)]"
+          />
+        )}
         <span
           className={clsx(
             'relative top-[1.5px] shrink-0',
@@ -149,7 +183,7 @@ export function EventCard({
         <span
           className={clsx(
             'min-w-0 flex-1 truncate text-[13px] leading-5',
-            event.state === 'unread' && event.needs_action
+            unread
               ? 'font-semibold text-[var(--c-ink)]'
               : outbound
                 ? 'text-[var(--c-faint2)] italic'
@@ -180,6 +214,7 @@ export function EventCard({
             title="Focus this message"
             onClick={(e) => {
               e.stopPropagation();
+              markSeen();
               onFocusMessage(event);
             }}
             className="shrink-0 rounded p-0.5 text-[var(--c-ghost)] hover:bg-[var(--c-fill)] hover:text-[var(--c-ink)]"
