@@ -351,6 +351,14 @@
     font-size: 0.875rem;
   }
 
+  /* Attachment images in message bodies stay bounded. */
+  .prose img {
+    max-width: 100%;
+    max-height: 320px;
+    border-radius: 6px;
+    border: 1px solid var(--c-hair);
+  }
+
   /* Compact markdown sizing for command canvas cards. */
   .prose-command h1 {
     font-size: 1.05em;

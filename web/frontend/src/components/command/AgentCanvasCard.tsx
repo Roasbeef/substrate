@@ -4,12 +4,16 @@
 // canvas space; everything inside behaves like a normal document.
 
 import { useMemo, useRef, useState } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import { clsx } from 'clsx';
 import type { CommandEvent, CommandLane, FlowEvent } from '@/api/command.js';
 import type { AgentSummary } from '@/types/api.js';
 import { useCanvasStore } from '@/stores/canvas.js';
 import type { CardPosition, CardSize, Granularity } from '@/stores/canvas.js';
-import { useAgentFlow } from '@/hooks/useCommandFeed.js';
+import { commandKeys, useAgentFlow } from '@/hooks/useCommandFeed.js';
+import { useSendMessage } from '@/hooks/useMessages.js';
+import { useAuthStore } from '@/stores/auth.js';
+import { useUIStore } from '@/stores/ui.js';
 import { useSummaryHistory } from '@/hooks/useSummaries.js';
 import { EventCard } from './EventCard.js';
 import { SteerComposer } from './SteerComposer.js';
@@ -122,6 +126,11 @@ export function AgentCanvasCard({
   const [digestOpen, setDigestOpen] = useState(false);
   const [dragging, setDragging] = useState(false);
   const [resizing, setResizing] = useState(false);
+  const [dropActive, setDropActive] = useState(false);
+
+  const sendMessage = useSendMessage();
+  const queryClient = useQueryClient();
+  const addToast = useUIStore((st) => st.addToast);
 
   const setPosition = useCanvasStore((s) => s.setPosition);
   const setSize = useCanvasStore((s) => s.setSize);
@@ -278,6 +287,61 @@ export function AgentCanvasCard({
     }
   };
 
+  // Dropped images upload to the shared attachments dir, then land
+  // in this agent's inbox as a markdown-image message.
+  const handleDrop = async (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setDropActive(false);
+
+    const images = Array.from(e.dataTransfer.files).filter((f) =>
+      f.type.startsWith('image/'),
+    );
+    if (images.length === 0) {
+      return;
+    }
+
+    try {
+      const refs: string[] = [];
+      for (const img of images) {
+        const form = new FormData();
+        form.append('file', img);
+        const res = await fetch('/api/v1/command/upload', {
+          method: 'POST',
+          body: form,
+        });
+        if (!res.ok) {
+          throw new Error(`upload failed (${res.status})`);
+        }
+        const data = (await res.json()) as { markdown: string };
+        refs.push(data.markdown);
+      }
+
+      const { currentAgent, availableAgents } =
+        useAuthStore.getState();
+      const userAgent = availableAgents.find(
+        (a) => a.name === 'User',
+      );
+      await sendMessage.mutateAsync({
+        sender_id: currentAgent?.id ?? userAgent?.id ?? 0,
+        recipient_names: [agent.name],
+        subject: `Image: ${images.map((f) => f.name).join(', ')}`,
+        body: refs.join('\n'),
+        priority: 'PRIORITY_NORMAL',
+      });
+      void queryClient.invalidateQueries({
+        queryKey: commandKeys.feed(),
+      });
+    } catch (err) {
+      addToast({
+        variant: 'error',
+        title: 'Attachment failed',
+        message:
+          err instanceof Error ? err.message : 'Upload error',
+      });
+    }
+  };
+
   return (
     <article
       id={`card-${agent.id}`}
@@ -289,12 +353,21 @@ export function AgentCanvasCard({
         bringToFront(agent.id);
       }}
       onWheel={(e) => e.stopPropagation()}
+      onDragOver={(e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        setDropActive(true);
+      }}
+      onDragLeave={() => setDropActive(false)}
+      onDrop={(e) => void handleDrop(e)}
       className={clsx(
         'absolute flex flex-col overflow-hidden rounded-xl',
         'border bg-[var(--c-card)]',
-        dragging || resizing
-          ? 'border-[var(--c-ghost)] shadow-[0_12px_32px_rgba(28,32,36,0.16)]'
-          : 'border-[var(--c-hair)] shadow-[0_1px_2px_rgba(28,32,36,0.05),0_10px_28px_rgba(28,32,36,0.07)]',
+        dropActive
+          ? 'border-[var(--c-steel)] ring-2 ring-[var(--c-steel)]/30 shadow-[0_12px_32px_rgba(28,32,36,0.16)]'
+          : dragging || resizing
+            ? 'border-[var(--c-ghost)] shadow-[0_12px_32px_rgba(28,32,36,0.16)]'
+            : 'border-[var(--c-hair)] shadow-[0_1px_2px_rgba(28,32,36,0.05),0_10px_28px_rgba(28,32,36,0.07)]',
         !resizing && 'transition-shadow duration-150',
       )}
       style={{

@@ -127,6 +127,7 @@ func NewServer(cfg *Config, st store.Storage,
 	s.registerCommandRoutes()
 	s.registerCommandFlowRoutes()
 	s.registerCommandDocRoutes()
+	s.registerAttachmentRoutes()
 
 	// Register WebSocket route.
 	s.mux.HandleFunc("/ws", s.handleWebSocket)
