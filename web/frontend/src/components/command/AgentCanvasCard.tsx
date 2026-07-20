@@ -119,6 +119,7 @@ export function AgentCanvasCard({
     null,
   );
   const [showAll, setShowAll] = useState(false);
+  const [digestOpen, setDigestOpen] = useState(false);
   const [dragging, setDragging] = useState(false);
   const [resizing, setResizing] = useState(false);
 
@@ -352,12 +353,16 @@ export function AgentCanvasCard({
           )}
         </div>
         <p className="mt-0.5 truncate font-mono text-[10.5px] text-[var(--c-faint2)]">
-          {agent.project_key || agent.working_dir ||
-            agent.purpose || 'unassigned'}
+          {agent.project_key || agent.working_dir || 'unassigned'}
           {agent.git_branch && (
             <span className="text-[var(--c-dim)]"> · {agent.git_branch}</span>
           )}
         </p>
+        {agent.purpose && (
+          <p className="truncate text-[11px] leading-4 text-[var(--c-mut)]">
+            {agent.purpose}
+          </p>
+        )}
       </header>
 
       {/* Waiting-on flag: the one loud row, and only when a human is
@@ -373,35 +378,53 @@ export function AgentCanvasCard({
         </div>
       )}
 
-      {/* Digest. */}
-      <div className="border-b border-[var(--c-hair2)] px-3.5 py-2.5">
-        {summary?.summary ? (
-          <>
-            <p className="text-[13px] leading-snug text-[var(--c-ink2)]">
-              {summary.summary}
-            </p>
-            {summary.delta && (
-              <p className="mt-1 text-[12px] leading-snug text-[var(--c-green)]">
-                Δ {summary.delta}
-              </p>
-            )}
-          </>
-        ) : (
-          (() => {
-            const latest = lane.events.find(
-              (ev) => ev.direction !== 'out' && ev.body,
-            );
-            return latest ? (
-              <p className="line-clamp-2 text-[13px] leading-snug text-[var(--c-text2)]">
-                {latest.body.slice(0, 220)}
-              </p>
-            ) : (
-              <p className="text-[13px] italic leading-snug text-[var(--c-faint)]">
+      {/* Digest: clamped by default, click to unfold the full text. */}
+      <div className="border-b border-[var(--c-hair2)]">
+        {(() => {
+          const latest = lane.events.find(
+            (ev) => ev.direction !== 'out' && ev.body,
+          );
+          const main = summary?.summary ?? latest?.body ?? '';
+
+          if (!main) {
+            return (
+              <p className="px-3.5 py-2.5 text-[13px] italic leading-snug text-[var(--c-faint)]">
                 {agent.purpose || 'No live summary yet.'}
               </p>
             );
-          })()
-        )}
+          }
+
+          return (
+            <button
+              type="button"
+              onClick={() => setDigestOpen((v) => !v)}
+              title={digestOpen ? 'Collapse' : 'Expand'}
+              className="block w-full px-3.5 py-2.5 text-left hover:bg-[var(--c-hover)]"
+            >
+              <span
+                className={clsx(
+                  'block whitespace-pre-line text-[13px] leading-snug',
+                  summary?.summary
+                    ? 'text-[var(--c-ink2)]'
+                    : 'text-[var(--c-text2)]',
+                  !digestOpen && 'line-clamp-2',
+                )}
+              >
+                {digestOpen ? main : main.slice(0, 400)}
+              </span>
+              {summary?.delta && (
+                <span
+                  className={clsx(
+                    'mt-1 block text-[12px] leading-snug text-[var(--c-green)]',
+                    !digestOpen && 'line-clamp-1',
+                  )}
+                >
+                  Δ {summary.delta}
+                </span>
+              )}
+            </button>
+          );
+        })()}
       </div>
 
       {/* Timeline: merged mail / summary / flow tiers, with the
