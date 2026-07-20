@@ -237,7 +237,13 @@ export function EventCard({
 
           {text && (
             <div
-              className="scrollbar-thin prose prose-command max-h-80 max-w-none overflow-y-auto text-[13px] leading-relaxed text-[var(--c-ink2)]"
+              className={clsx(
+                'prose prose-command max-w-none text-[13px] leading-relaxed text-[var(--c-ink2)]',
+                // In message-focus the outer column scrolls; inside a
+                // card the body clamps so timelines stay skimmable.
+                !defaultExpanded &&
+                  'scrollbar-thin max-h-80 overflow-y-auto',
+              )}
               dangerouslySetInnerHTML={{ __html: renderedBody }}
             />
           )}
