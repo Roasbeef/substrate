@@ -4,7 +4,7 @@
 
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useCallback, useRef } from 'react';
-import { getCommandFeed } from '@/api/command.js';
+import { getAgentFlow, getCommandFeed } from '@/api/command.js';
 import type { CommandFeedResponse } from '@/api/command.js';
 import {
   useAgentUpdates,
@@ -17,6 +17,8 @@ import type { AgentUpdatePayload, NewMessagePayload } from './useWebSocket.js';
 export const commandKeys = {
   all: ['command'] as const,
   feed: () => [...commandKeys.all, 'feed'] as const,
+  flow: (agentId: number) =>
+    [...commandKeys.all, 'flow', agentId] as const,
 };
 
 // Fetch the aggregated command feed. A modest refetch interval acts as
@@ -27,6 +29,19 @@ export function useCommandFeed() {
     queryFn: getCommandFeed,
     refetchInterval: 30_000,
     staleTime: 5_000,
+  });
+}
+
+// Fetch the high-granularity transcript flow for one agent. Enabled
+// only when a card's granularity dial is set to HI so idle cards cost
+// nothing.
+export function useAgentFlow(agentId: number, enabled: boolean) {
+  return useQuery({
+    queryKey: commandKeys.flow(agentId),
+    queryFn: () => getAgentFlow(agentId),
+    enabled,
+    refetchInterval: 20_000,
+    staleTime: 10_000,
   });
 }
 

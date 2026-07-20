@@ -18,6 +18,10 @@ export interface CardSize {
   h: number;
 }
 
+// Timeline granularity per card: mail only (lo), mail + Haiku summary
+// history (med), or everything including raw transcript flow (hi).
+export type Granularity = 'lo' | 'med' | 'hi';
+
 // Resize clamps keep cards usable at both extremes.
 export const MIN_CARD_W = 320;
 export const MAX_CARD_W = 820;
@@ -53,8 +57,11 @@ interface CanvasState {
   zTop: number;
   zOrder: Record<number, number>;
 
+  granularity: Record<number, Granularity>;
+
   setPosition: (agentId: number, pos: CardPosition) => void;
   setSize: (agentId: number, size: CardSize) => void;
+  setGranularity: (agentId: number, g: Granularity) => void;
   ensurePositions: (agentIds: number[]) => void;
   setViewport: (v: Viewport) => void;
   toggleFilter: (key: keyof StatusFilters) => void;
@@ -106,6 +113,7 @@ export const useCanvasStore = create<CanvasState>()(
     (set, get) => ({
       positions: {},
       sizes: {},
+      granularity: {},
       viewport: { x: 0, y: 0, scale: 1 },
       filters: { active: true, idle: false, offline: false },
       zTop: 1,
@@ -140,6 +148,11 @@ export const useCanvasStore = create<CanvasState>()(
         set({ positions: autoPlace(positions, agentIds) });
       },
 
+      setGranularity: (agentId, g) =>
+        set((s) => ({
+          granularity: { ...s.granularity, [agentId]: g },
+        })),
+
       setViewport: (viewport) => set({ viewport }),
 
       toggleFilter: (key) =>
@@ -158,6 +171,7 @@ export const useCanvasStore = create<CanvasState>()(
       partialize: (s) => ({
         positions: s.positions,
         sizes: s.sizes,
+        granularity: s.granularity,
         viewport: s.viewport,
         filters: s.filters,
       }),

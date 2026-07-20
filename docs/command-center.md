@@ -35,7 +35,18 @@ Each card is one agent's dossier:
   "none") never surface.
 - **Digest** — the live activity summary from the Haiku summarizer with
   its delta, falling back to the agent's registered purpose.
-- **Event feed** — classified message traffic, newest first. Kinds:
+- **Timeline** — a merged, three-granularity view with a per-card
+  LO/MED/HI dial (persisted per agent):
+  - **LO — mail**: classified substrate messages only.
+  - **MED — + summaries** (default): interleaves the Haiku summarizer's
+    history entries (the Δ deltas) so the narrative between mails reads
+    in place.
+  - **HI — + raw flow**: adds the agent's actual Claude Code session
+    flow — tool invocations with their arguments, assistant text, and
+    thinking snippets — as quiet mono rows, parsed server-side from the
+    session transcript via `GET /api/v1/command/flow/{agent_id}`
+    (`internal/web/api_command_flow.go`).
+  Mail events render newest first. Kinds:
   `plan`, `diff`, `question`, `review`, `status`, `message`. Actionable
   events start expanded with a colored edge; informational ones collapse
   to a single line, and anything past six folds behind an `n older`

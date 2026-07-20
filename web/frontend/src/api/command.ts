@@ -79,3 +79,29 @@ export interface CommandFeedResponse {
 export function getCommandFeed(): Promise<CommandFeedResponse> {
   return get<CommandFeedResponse>('/command/feed');
 }
+
+// One high-granularity event parsed from an agent's Claude Code
+// session transcript.
+export interface FlowEvent {
+  timestamp: string;
+  kind: 'prompt' | 'text' | 'tool' | 'thinking';
+  label: string;
+  detail?: string;
+}
+
+// Response for the per-agent flow endpoint.
+export interface AgentFlowResponse {
+  agent_id: number;
+  session_id?: string;
+  events: FlowEvent[];
+}
+
+// Fetch recent transcript flow events for one agent.
+export function getAgentFlow(
+  agentId: number,
+  limit = 60,
+): Promise<AgentFlowResponse> {
+  return get<AgentFlowResponse>(
+    `/command/flow/${agentId}?limit=${limit}`,
+  );
+}

@@ -5,18 +5,93 @@
 
 import { useMemo, useRef, useState } from 'react';
 import { clsx } from 'clsx';
-import type { CommandEvent, CommandLane } from '@/api/command.js';
+import type { CommandEvent, CommandLane, FlowEvent } from '@/api/command.js';
 import type { AgentSummary } from '@/types/api.js';
 import { useCanvasStore } from '@/stores/canvas.js';
-import type { CardPosition, CardSize } from '@/stores/canvas.js';
+import type { CardPosition, CardSize, Granularity } from '@/stores/canvas.js';
+import { useAgentFlow } from '@/hooks/useCommandFeed.js';
+import { useSummaryHistory } from '@/hooks/useSummaries.js';
 import { EventCard } from './EventCard.js';
 import { SteerComposer } from './SteerComposer.js';
 import type { ReplyTarget } from './SteerComposer.js';
 import { HeartbeatTrace } from './HeartbeatTrace.js';
 import { timeAgo } from './kinds.js';
 
-// Number of events shown before the "show older" fold.
-const VISIBLE_EVENTS = 6;
+// Number of timeline items shown before the "older" fold.
+const VISIBLE_EVENTS = 8;
+
+// One entry in the merged three-tier timeline.
+type TimelineItem =
+  | { tier: 'mail'; ts: string; event: CommandEvent }
+  | { tier: 'summary'; ts: string; text: string; delta: string }
+  | { tier: 'flow'; ts: string; flow: FlowEvent };
+
+// Glyphs for flow event kinds, kept to quiet mono marks.
+const flowGlyph: Record<FlowEvent['kind'], string> = {
+  tool: '$',
+  thinking: '~',
+  text: '¶',
+  prompt: '›',
+};
+
+// FlowRow renders one high-granularity transcript event as a faint
+// mono line, expandable when a detail is present.
+function FlowRow({ flow }: { flow: FlowEvent }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <button
+      type="button"
+      onClick={() => flow.detail && setOpen((v) => !v)}
+      className="flex w-full items-baseline gap-2 px-3 py-[3px] text-left hover:bg-[#F7F6F3]"
+    >
+      <span className="w-3 shrink-0 text-center font-mono text-[10px] text-[#C0BDB4]">
+        {flowGlyph[flow.kind]}
+      </span>
+      <span className="min-w-0 flex-1">
+        <span
+          className={clsx(
+            'block truncate font-mono text-[10.5px] leading-4',
+            flow.kind === 'tool' ? 'text-[#6B7280]' : 'text-[#9BA0A6]',
+            flow.kind === 'thinking' && 'italic',
+          )}
+        >
+          {flow.kind === 'tool' && flow.detail
+            ? `${flow.label} ${flow.detail}`
+            : flow.label}
+        </span>
+        {open && flow.detail && flow.kind !== 'tool' && (
+          <span className="block whitespace-pre-wrap font-mono text-[10.5px] leading-4 text-[#6B7280]">
+            {flow.detail}
+          </span>
+        )}
+      </span>
+      <span className="shrink-0 font-mono text-[9.5px] text-[#C0BDB4]">
+        {timeAgo(flow.timestamp)}
+      </span>
+    </button>
+  );
+}
+
+// SummaryRow renders one Haiku digest history entry: the medium tier.
+function SummaryRow({ text, delta, ts }: {
+  text: string; delta: string; ts: string;
+}) {
+  return (
+    <div className="flex items-baseline gap-2 px-3 py-1.5">
+      <span className="w-3 shrink-0 text-center font-mono text-[10px] font-bold text-[#178A5B]">
+        Δ
+      </span>
+      <span className="min-w-0 flex-1">
+        <span className="block text-[12px] leading-snug text-[#4A4F55]">
+          {delta || text}
+        </span>
+      </span>
+      <span className="shrink-0 font-mono text-[9.5px] text-[#B0ADA4]">
+        {timeAgo(ts)}
+      </span>
+    </div>
+  );
+}
 
 export interface AgentCanvasCardProps {
   lane: CommandLane;
@@ -50,6 +125,17 @@ export function AgentCanvasCard({
   const setPosition = useCanvasStore((s) => s.setPosition);
   const setSize = useCanvasStore((s) => s.setSize);
   const bringToFront = useCanvasStore((s) => s.bringToFront);
+  const granularity =
+    useCanvasStore((s) => s.granularity[agent.id]) ?? 'med';
+  const setGranularity = useCanvasStore((s) => s.setGranularity);
+
+  // Medium tier: Haiku summary history; high tier: transcript flow.
+  const { data: history } = useSummaryHistory(
+    agent.id, 20, granularity !== 'lo',
+  );
+  const { data: flowData } = useAgentFlow(
+    agent.id, granularity === 'hi',
+  );
 
   // Drag bookkeeping lives in a ref; only the store position renders.
   const dragRef = useRef<{
@@ -70,12 +156,37 @@ export function AgentCanvasCard({
     origH: number;
   } | null>(null);
 
-  const visibleEvents = useMemo(
-    () =>
-      showAll ? lane.events : lane.events.slice(0, VISIBLE_EVENTS),
-    [lane.events, showAll],
+  // Merge the three tiers into one timeline, newest first. Mail is
+  // always present; summary history joins at MED; raw flow at HI.
+  const timeline = useMemo<TimelineItem[]>(() => {
+    const items: TimelineItem[] = lane.events.map((event) => ({
+      tier: 'mail', ts: event.created_at, event,
+    }));
+
+    if (granularity !== 'lo') {
+      for (const h of history ?? []) {
+        items.push({
+          tier: 'summary', ts: h.created_at,
+          text: h.summary, delta: h.delta,
+        });
+      }
+    }
+
+    if (granularity === 'hi') {
+      for (const f of flowData?.events ?? []) {
+        items.push({ tier: 'flow', ts: f.timestamp, flow: f });
+      }
+    }
+
+    items.sort((a, b) => (a.ts < b.ts ? 1 : -1));
+    return items;
+  }, [lane.events, history, flowData, granularity]);
+
+  const visibleItems = useMemo(
+    () => (showAll ? timeline : timeline.slice(0, VISIBLE_EVENTS)),
+    [timeline, showAll],
   );
-  const hiddenCount = lane.events.length - visibleEvents.length;
+  const hiddenCount = timeline.length - visibleItems.length;
 
   const handleReply = (event: CommandEvent) => {
     setReplyTarget({
@@ -260,21 +371,62 @@ export function AgentCanvasCard({
         )}
       </div>
 
-      {/* Event feed. */}
+      {/* Timeline: merged mail / summary / flow tiers, with the
+          granularity dial on the divider. */}
+      <div className="flex items-center gap-1 border-b border-[#EDEBE4] px-3.5 py-1">
+        <span className="font-mono text-[9px] font-semibold uppercase tracking-[0.12em] text-[#B0ADA4]">
+          timeline
+        </span>
+        <span className="ml-auto flex overflow-hidden rounded-md border border-[#E6E4DD]">
+          {(['lo', 'med', 'hi'] as Granularity[]).map((g) => (
+            <button
+              key={g}
+              type="button"
+              title={
+                g === 'lo'
+                  ? 'Mail only'
+                  : g === 'med'
+                    ? 'Mail + activity summaries'
+                    : 'Everything incl. raw agent flow'
+              }
+              onClick={() => setGranularity(agent.id, g)}
+              className={clsx(
+                'px-1.5 py-px font-mono text-[9px] font-semibold uppercase',
+                granularity === g
+                  ? 'bg-[#22262A] text-white'
+                  : 'text-[#9BA0A6] hover:bg-[#F1EFE9]',
+              )}
+            >
+              {g}
+            </button>
+          ))}
+        </span>
+      </div>
       <div className="scrollbar-thin min-h-0 flex-1 divide-y divide-[#F1EFE9] overflow-y-auto">
-        {visibleEvents.length === 0 && (
+        {visibleItems.length === 0 && (
           <p className="px-3.5 py-4 text-center text-[12px] text-[#B0ADA4]">
             No recent traffic.
           </p>
         )}
 
-        {visibleEvents.map((event) => (
-          <EventCard
-            key={event.message_id}
-            event={event}
-            onReply={handleReply}
-          />
-        ))}
+        {visibleItems.map((item, i) =>
+          item.tier === 'mail' ? (
+            <EventCard
+              key={`m-${item.event.message_id}`}
+              event={item.event}
+              onReply={handleReply}
+            />
+          ) : item.tier === 'summary' ? (
+            <SummaryRow
+              key={`s-${item.ts}-${i}`}
+              text={item.text}
+              delta={item.delta}
+              ts={item.ts}
+            />
+          ) : (
+            <FlowRow key={`f-${item.ts}-${i}`} flow={item.flow} />
+          ),
+        )}
 
         {hiddenCount > 0 && (
           <button
