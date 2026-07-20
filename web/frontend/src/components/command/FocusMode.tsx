@@ -15,6 +15,7 @@ import { useCanvasStore } from '@/stores/canvas.js';
 import { EventCard } from './EventCard.js';
 import { SteerComposer } from './SteerComposer.js';
 import type { ReplyTarget } from './SteerComposer.js';
+import { useImageDrop } from './useImageDrop.js';
 import { HeartbeatTrace } from './HeartbeatTrace.js';
 import { agentTint, timeAgo } from './kinds.js';
 
@@ -33,6 +34,16 @@ export function FocusMode({ lane, summary }: FocusModeProps) {
   const [replyTarget, setReplyTarget] = useState<ReplyTarget | null>(
     null,
   );
+
+  // Focus mode accepts image drops on the whole timeline column, same
+  // as the canvas cards.
+  const {
+    attachments,
+    dropActive,
+    dropHandlers,
+    removeAttachment,
+    clearAttachments,
+  } = useImageDrop();
 
   // Esc leaves focus mode (or closes the doc first if one is open).
   useEffect(() => {
@@ -86,8 +97,17 @@ export function FocusMode({ lane, summary }: FocusModeProps) {
       onPointerDown={(e) => e.stopPropagation()}
       onWheel={(e) => e.stopPropagation()}
     >
-      {/* Main column: identity header, timeline, composer. */}
-      <div className="flex min-w-0 flex-[3] flex-col overflow-hidden rounded-xl border border-[var(--c-hair)] bg-[var(--c-card)] shadow-[0_16px_48px_rgba(28,32,36,0.18)]">
+      {/* Main column: identity header, timeline, composer. Accepts
+          image drops anywhere on the column. */}
+      <div
+        {...dropHandlers}
+        className={clsx(
+          'flex min-w-0 flex-[3] flex-col overflow-hidden rounded-xl border bg-[var(--c-card)] shadow-[0_16px_48px_rgba(28,32,36,0.18)]',
+          dropActive
+            ? 'border-[var(--c-steel)] ring-2 ring-[var(--c-steel)]/30'
+            : 'border-[var(--c-hair)]',
+        )}
+      >
         <header className="flex items-center gap-3 border-b border-[var(--c-hair2)] px-4 py-3">
           <span
             className="flex h-9 w-9 items-center justify-center rounded-lg font-mono text-[15px] font-bold text-white"
@@ -161,6 +181,9 @@ export function FocusMode({ lane, summary }: FocusModeProps) {
           agentName={agent.name}
           replyTarget={replyTarget}
           onClearReply={() => setReplyTarget(null)}
+          attachments={attachments}
+          onRemoveAttachment={removeAttachment}
+          onClearAttachments={clearAttachments}
         />
       </div>
 

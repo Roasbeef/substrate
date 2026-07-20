@@ -10,11 +10,11 @@ import type { AgentSummary } from '@/types/api.js';
 import { useCanvasStore } from '@/stores/canvas.js';
 import type { CardPosition, CardSize, Granularity } from '@/stores/canvas.js';
 import { useAgentFlow } from '@/hooks/useCommandFeed.js';
-import { useUIStore } from '@/stores/ui.js';
 import { useSummaryHistory } from '@/hooks/useSummaries.js';
 import { EventCard } from './EventCard.js';
 import { SteerComposer } from './SteerComposer.js';
-import type { PendingAttachment, ReplyTarget } from './SteerComposer.js';
+import type { ReplyTarget } from './SteerComposer.js';
+import { useImageDrop } from './useImageDrop.js';
 import { HeartbeatTrace } from './HeartbeatTrace.js';
 import { agentTint, timeAgo } from './kinds.js';
 
@@ -123,12 +123,14 @@ export function AgentCanvasCard({
   const [digestOpen, setDigestOpen] = useState(false);
   const [dragging, setDragging] = useState(false);
   const [resizing, setResizing] = useState(false);
-  const [dropActive, setDropActive] = useState(false);
-  const [pendingAttachments, setPendingAttachments] = useState<
-    PendingAttachment[]
-  >([]);
 
-  const addToast = useUIStore((st) => st.addToast);
+  const {
+    attachments: pendingAttachments,
+    dropActive,
+    dropHandlers,
+    removeAttachment,
+    clearAttachments,
+  } = useImageDrop();
 
   const setPosition = useCanvasStore((s) => s.setPosition);
   const setSize = useCanvasStore((s) => s.setSize);
@@ -286,51 +288,6 @@ export function AgentCanvasCard({
     }
   };
 
-  // Dropped images upload immediately but stage in the composer so
-  // the operator can add a message before anything is sent.
-  const handleDrop = async (e: React.DragEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-    setDropActive(false);
-
-    const images = Array.from(e.dataTransfer.files).filter((f) =>
-      f.type.startsWith('image/'),
-    );
-    if (images.length === 0) {
-      return;
-    }
-
-    try {
-      const staged: PendingAttachment[] = [];
-      for (const img of images) {
-        const form = new FormData();
-        form.append('file', img);
-        const res = await fetch('/api/v1/command/upload', {
-          method: 'POST',
-          body: form,
-        });
-        if (!res.ok) {
-          throw new Error(`upload failed (${res.status})`);
-        }
-        const data = (await res.json()) as {
-          url: string;
-          markdown: string;
-        };
-        staged.push({
-          name: img.name, url: data.url, markdown: data.markdown,
-        });
-      }
-      setPendingAttachments((prev) => [...prev, ...staged]);
-    } catch (err) {
-      addToast({
-        variant: 'error',
-        title: 'Attachment failed',
-        message:
-          err instanceof Error ? err.message : 'Upload error',
-      });
-    }
-  };
-
   return (
     <article
       id={`card-${agent.id}`}
@@ -342,13 +299,7 @@ export function AgentCanvasCard({
         bringToFront(agent.id);
       }}
       onWheel={(e) => e.stopPropagation()}
-      onDragOver={(e) => {
-        e.preventDefault();
-        e.stopPropagation();
-        setDropActive(true);
-      }}
-      onDragLeave={() => setDropActive(false)}
-      onDrop={(e) => void handleDrop(e)}
+      {...dropHandlers}
       className={clsx(
         'absolute flex flex-col overflow-hidden rounded-xl',
         'border bg-[var(--c-card)]',
@@ -570,12 +521,8 @@ export function AgentCanvasCard({
         replyTarget={replyTarget}
         onClearReply={() => setReplyTarget(null)}
         attachments={pendingAttachments}
-        onRemoveAttachment={(i) =>
-          setPendingAttachments((prev) =>
-            prev.filter((_, idx) => idx !== i),
-          )
-        }
-        onClearAttachments={() => setPendingAttachments([])}
+        onRemoveAttachment={removeAttachment}
+        onClearAttachments={clearAttachments}
       />
 
       {/* Corner resize handle: drag to grow or shrink the card. */}
