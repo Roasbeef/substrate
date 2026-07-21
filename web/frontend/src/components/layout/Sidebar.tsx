@@ -1,12 +1,12 @@
 // Sidebar component - main navigation sidebar with nav links and actions.
 
-import { type ReactNode, useState } from 'react';
-import { Link, useLocation, useNavigate, useSearchParams } from 'react-router-dom';
+import { type ReactNode, useMemo, useState } from 'react';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { clsx } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 import { useUIStore, type SidebarSection } from '@/stores/ui.js';
+import { useCanvasStore } from '@/stores/canvas.js';
 import { useAgentsStatus } from '@/hooks/useAgents.js';
-import { useTopics } from '@/hooks/useTopics.js';
 import { routes } from '@/lib/routes.js';
 import { HeartbeatTrace } from '@/components/command/HeartbeatTrace.js';
 
@@ -46,19 +46,6 @@ function InboxIcon() {
         strokeLinejoin="round"
         strokeWidth={2}
         d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4"
-      />
-    </svg>
-  );
-}
-
-function SendIcon() {
-  return (
-    <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-      <path
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        strokeWidth={2}
-        d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"
       />
     </svg>
   );
@@ -164,19 +151,6 @@ function CollapseIcon({ expand = false }: { expand?: boolean }) {
   );
 }
 
-function HashtagIcon() {
-  return (
-    <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-      <path
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        strokeWidth={2}
-        d="M7 20l4-16m2 16l4-16M6 9h14M4 15h14"
-      />
-    </svg>
-  );
-}
-
 function UserCircleIcon() {
   return (
     <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -198,11 +172,11 @@ function SmallPlusIcon() {
   );
 }
 
-// Default navigation items.
+// Default navigation items. Sent lives inside Signals as a folder
+// now that timelines are two-way everywhere.
 const navItems: NavItem[] = [
   { id: 'command', label: 'Canvas', path: routes.command, icon: <CommandIcon /> },
   { id: 'inbox', label: 'Signals', path: routes.inbox, icon: <InboxIcon /> },
-  { id: 'sent', label: 'Sent', path: routes.sent, icon: <SendIcon /> },
   { id: 'agents', label: 'Fleet', path: routes.agents, icon: <UsersIcon /> },
   { id: 'reviews', label: 'Reviews', path: routes.reviews, icon: <CodeReviewIcon /> },
   { id: 'tasks', label: 'Tasks', path: routes.tasks, icon: <TasksIcon /> },
@@ -310,40 +284,6 @@ function SidebarSectionHeader({
   );
 }
 
-// Topic item in sidebar.
-interface TopicItemProps {
-  name: string;
-  messageCount?: number;
-  onClick?: () => void;
-  isActive?: boolean;
-}
-
-function TopicItem({ name, messageCount, onClick, isActive = false }: TopicItemProps) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className={cn(
-        'flex w-full items-center gap-2 rounded-lg px-3 py-1.5 text-sm',
-        isActive
-          ? 'bg-[var(--c-fill)] text-[var(--c-ink)]'
-          : 'text-[var(--c-mut)] hover:bg-[var(--c-fill)]',
-      )}
-    >
-      <span className={isActive ? 'text-[var(--c-ink)]' : 'text-[var(--c-dim)]'}>
-        <HashtagIcon />
-      </span>
-      <span className="flex-1 truncate text-left">{name}</span>
-      {messageCount !== undefined && messageCount > 0 ? (
-        <span className={cn(
-          'text-xs',
-          isActive ? 'text-[var(--c-ink)]' : 'text-[var(--c-faint)]',
-        )}>{messageCount}</span>
-      ) : null}
-    </button>
-  );
-}
-
 // Agent item in sidebar.
 interface AgentItemProps {
   name: string;
@@ -406,22 +346,31 @@ export function Sidebar({
   const toggleSidebar = useUIStore((state) => state.toggleSidebar);
   const activeSection = useActiveSection();
   const navigate = useNavigate();
-  const [searchParams] = useSearchParams();
+  const setFocusedCard = useCanvasStore((s) => s.setFocusedCard);
 
-  // State for collapsible sections.
-  const [topicsExpanded, setTopicsExpanded] = useState(true);
+  // State for the collapsible live-agents section.
   const [agentsExpanded, setAgentsExpanded] = useState(true);
 
-  // Get active topic from URL params.
-  const activeTopic = searchParams.get('topic');
-
-  // Fetch topics and agents.
-  const { data: topics } = useTopics();
   const { data: agentsData } = useAgentsStatus();
 
-  // Handle topic click - navigate to inbox with topic filter.
-  const handleTopicClick = (topicName: string) => {
-    navigate(`/inbox?topic=${encodeURIComponent(topicName)}`);
+  // liveAgents is the current working set: busy sessions first, then
+  // recently active ones.
+  const liveAgents = useMemo(() => {
+    const live = (agentsData?.agents ?? []).filter(
+      (a) => a.status === 'active' || a.status === 'busy',
+    );
+    return live.sort((a, b) => {
+      if (a.status !== b.status) {
+        return a.status === 'busy' ? -1 : 1;
+      }
+      return a.name.localeCompare(b.name);
+    });
+  }, [agentsData?.agents]);
+
+  // handleAgentClick jumps to the agent's dossier on the canvas.
+  const handleAgentClick = (agentId: number) => {
+    setFocusedCard(agentId);
+    navigate(routes.command);
   };
 
   const items = customNavItems ?? navItems;
@@ -467,56 +416,32 @@ export function Sidebar({
           />
         ))}
 
-        {/* Topics Section */}
-        <div className="mt-4 border-t border-gray-100 pt-2">
+        {/* Live agents: the working set right now. Clicking one jumps
+            to its card on the canvas in focus mode. */}
+        <div className="mt-4 border-t border-[var(--c-hair2)] pt-2">
           <SidebarSectionHeader
-            label="Topics"
-            icon={<HashtagIcon />}
-            isExpanded={topicsExpanded}
-            onToggle={() => setTopicsExpanded(!topicsExpanded)}
-            {...(topics?.length !== undefined && { count: topics.length })}
-          />
-          {topicsExpanded ? (
-            <div className="ml-2 space-y-0.5">
-              {topics && topics.length > 0 ? (
-                topics.slice(0, 5).map((topic) => (
-                  <TopicItem
-                    key={topic.id}
-                    name={topic.name}
-                    messageCount={topic.message_count}
-                    onClick={() => handleTopicClick(topic.name)}
-                    isActive={activeTopic === topic.name}
-                  />
-                ))
-              ) : (
-                <p className="px-3 py-2 text-xs text-gray-400">No topics yet</p>
-              )}
-            </div>
-          ) : null}
-        </div>
-
-        {/* Agents Section */}
-        <div className="mt-4 border-t border-gray-100 pt-2">
-          <SidebarSectionHeader
-            label="Agents"
+            label="Live"
             icon={<UserCircleIcon />}
             isExpanded={agentsExpanded}
             onToggle={() => setAgentsExpanded(!agentsExpanded)}
-            {...(agentsData?.agents.length !== undefined && { count: agentsData.agents.length })}
+            {...(liveAgents.length > 0 && { count: liveAgents.length })}
             onAddClick={() => openModal('newAgent')}
           />
           {agentsExpanded ? (
             <div className="ml-2 space-y-0.5">
-              {agentsData && agentsData.agents.length > 0 ? (
-                agentsData.agents.slice(0, 5).map((agent) => (
+              {liveAgents.length > 0 ? (
+                liveAgents.slice(0, 8).map((agent) => (
                   <AgentItem
                     key={agent.id}
                     name={agent.name}
                     status={agent.status}
+                    onClick={() => handleAgentClick(agent.id)}
                   />
                 ))
               ) : (
-                <p className="px-3 py-2 text-xs text-gray-400">No agents yet</p>
+                <p className="px-3 py-2 text-xs text-[var(--c-dim)]">
+                  No live agents
+                </p>
               )}
             </div>
           ) : null}
