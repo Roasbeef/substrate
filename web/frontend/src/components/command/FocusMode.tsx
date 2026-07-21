@@ -12,6 +12,9 @@ import { getAgentDoc } from '@/api/command.js';
 import type { AgentSummary } from '@/types/api.js';
 import { renderMarkdownToHtml } from '@/lib/markdown.js';
 import { useCanvasStore } from '@/stores/canvas.js';
+import {
+  FlowRow, GranularityDial, SummaryRow, useAgentTimeline,
+} from './timeline.js';
 import { EventCard } from './EventCard.js';
 import { SteerComposer } from './SteerComposer.js';
 import type { ReplyTarget } from './SteerComposer.js';
@@ -31,6 +34,12 @@ export function FocusMode({ lane, summary }: FocusModeProps) {
   const setFocusedMessage = useCanvasStore((s) => s.setFocusedMessage);
   const openDoc = useCanvasStore((s) => s.openDoc);
   const setOpenDoc = useCanvasStore((s) => s.setOpenDoc);
+  const granularity =
+    useCanvasStore((s) => s.granularity[agent.id]) ?? 'med';
+
+  // Focus mode honors the same granularity dial as the canvas card:
+  // the merged mail / summary / flow timeline carries over.
+  const timeline = useAgentTimeline(lane, granularity);
   const [replyTarget, setReplyTarget] = useState<ReplyTarget | null>(
     null,
   );
@@ -144,7 +153,7 @@ export function FocusMode({ lane, summary }: FocusModeProps) {
           </button>
         </header>
 
-        {focusedMessage !== null && (
+        {focusedMessage !== null ? (
           <button
             type="button"
             onClick={() => setFocusedMessage(null)}
@@ -152,29 +161,60 @@ export function FocusMode({ lane, summary }: FocusModeProps) {
           >
             ← single message · show full timeline
           </button>
+        ) : (
+          <div className="flex items-center gap-1 border-b border-[var(--c-hair2)] px-4 py-1.5">
+            <span className="font-mono text-[9px] font-semibold uppercase tracking-[0.12em] text-[var(--c-dim)]">
+              timeline
+            </span>
+            <span className="ml-auto">
+              <GranularityDial agentId={agent.id} />
+            </span>
+          </div>
         )}
         <div className="scrollbar-thin min-h-0 flex-1 divide-y divide-[var(--c-fill)] overflow-y-auto">
-          {lane.events.length === 0 && (
+          {timeline.length === 0 && (
             <p className="px-4 py-6 text-center text-[12.5px] text-[var(--c-dim)]">
               No traffic yet.
             </p>
           )}
-          {(focusedMessage === null
+          {focusedMessage !== null
             ? lane.events
-            : lane.events.filter(
-                (ev) => ev.message_id === focusedMessage,
-              )
-          ).map((event) => (
-            <EventCard
-              key={`f-${event.direction}-${event.message_id}-${String(focusedMessage !== null)}`}
-              event={event}
-              onReply={handleReply}
-              defaultExpanded={focusedMessage !== null}
-              onOpenDoc={(path) =>
-                setOpenDoc({ agentId: agent.id, path })
-              }
-            />
-          ))}
+                .filter((ev) => ev.message_id === focusedMessage)
+                .map((event) => (
+                  <EventCard
+                    key={`f-${event.direction}-${event.message_id}-solo`}
+                    event={event}
+                    onReply={handleReply}
+                    defaultExpanded
+                    onOpenDoc={(path) =>
+                      setOpenDoc({ agentId: agent.id, path })
+                    }
+                  />
+                ))
+            : timeline.map((item, i) =>
+                item.tier === 'mail' ? (
+                  <EventCard
+                    key={`f-${item.event.direction}-${item.event.message_id}`}
+                    event={item.event}
+                    onReply={handleReply}
+                    onFocusMessage={(ev) =>
+                      setFocusedMessage(ev.message_id)
+                    }
+                    onOpenDoc={(path) =>
+                      setOpenDoc({ agentId: agent.id, path })
+                    }
+                  />
+                ) : item.tier === 'summary' ? (
+                  <SummaryRow
+                    key={`fs-${item.ts}-${i}`}
+                    text={item.text}
+                    delta={item.delta}
+                    ts={item.ts}
+                  />
+                ) : (
+                  <FlowRow key={`ff-${item.ts}-${i}`} flow={item.flow} />
+                ),
+              )}
         </div>
 
         <SteerComposer
