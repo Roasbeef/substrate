@@ -68,6 +68,17 @@ interface CanvasState {
   granularity: Record<number, Granularity>;
   // Unsent composer drafts keyed by agent name.
   drafts: Record<string, ComposerDraft>;
+  // Free-text card filter matched against name, project, branch, and
+  // purpose. Session-only so a stale query never hides the fleet
+  // after a reload.
+  query: string;
+  // When true, agents with no mail traffic at all are hidden. They
+  // are usually hook-registration noise rather than working agents.
+  showQuiet: boolean;
+  // When true, cards are auto-arranged into labeled clusters by
+  // project instead of using the manually dragged positions. Manual
+  // positions are kept and restored when toggled back off.
+  groupByProject: boolean;
   // Focus mode: agent snapped near-fullscreen, with an optional open
   // document shown in its right rail. Session-only state.
   focusedCard: number | null;
@@ -76,6 +87,9 @@ interface CanvasState {
 
   setDraft: (agentName: string, draft: ComposerDraft) => void;
   clearDraft: (agentName: string) => void;
+  setQuery: (query: string) => void;
+  toggleQuiet: () => void;
+  toggleGroupByProject: () => void;
   setPosition: (agentId: number, pos: CardPosition) => void;
   setSize: (agentId: number, size: CardSize) => void;
   setGranularity: (agentId: number, g: Granularity) => void;
@@ -135,6 +149,9 @@ export const useCanvasStore = create<CanvasState>()(
       sizes: {},
       granularity: {},
       drafts: {},
+      query: '',
+      showQuiet: true,
+      groupByProject: false,
       focusedCard: null,
       focusedMessage: null,
       openDoc: null,
@@ -142,6 +159,14 @@ export const useCanvasStore = create<CanvasState>()(
       filters: { active: true, idle: false, offline: false },
       zTop: 1,
       zOrder: {},
+
+      setQuery: (query) => set({ query }),
+
+      toggleQuiet: () =>
+        set((s) => ({ showQuiet: !s.showQuiet })),
+
+      toggleGroupByProject: () =>
+        set((s) => ({ groupByProject: !s.groupByProject })),
 
       setDraft: (agentName, draft) =>
         set((s) => ({
@@ -224,6 +249,8 @@ export const useCanvasStore = create<CanvasState>()(
         drafts: s.drafts,
         viewport: s.viewport,
         filters: s.filters,
+        showQuiet: s.showQuiet,
+        groupByProject: s.groupByProject,
       }),
     },
   ),

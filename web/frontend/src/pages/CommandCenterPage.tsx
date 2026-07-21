@@ -16,6 +16,7 @@ import {
   useConnectionState, useWebSocketConnection,
 } from '@/hooks/useWebSocket.js';
 import { useCanvasStore, CARD_WIDTH } from '@/stores/canvas.js';
+import { layoutGroups } from '@/components/command/groupLayout.js';
 import { AgentCanvasCard } from '@/components/command/AgentCanvasCard.js';
 import { FocusMode } from '@/components/command/FocusMode.js';
 import { AttentionTray } from '@/components/command/AttentionTray.js';
@@ -52,6 +53,14 @@ export default function CommandCenterPage() {
   const ensurePositions = useCanvasStore((s) => s.ensurePositions);
   const filters = useCanvasStore((s) => s.filters);
   const toggleFilter = useCanvasStore((s) => s.toggleFilter);
+  const query = useCanvasStore((s) => s.query);
+  const setQuery = useCanvasStore((s) => s.setQuery);
+  const showQuiet = useCanvasStore((s) => s.showQuiet);
+  const toggleQuiet = useCanvasStore((s) => s.toggleQuiet);
+  const groupByProject = useCanvasStore((s) => s.groupByProject);
+  const toggleGroupByProject = useCanvasStore(
+    (s) => s.toggleGroupByProject,
+  );
   const zOrder = useCanvasStore((s) => s.zOrder);
   const sizes = useCanvasStore((s) => s.sizes);
   const focusedCard = useCanvasStore((s) => s.focusedCard);
@@ -101,27 +110,49 @@ export default function CommandCenterPage() {
     return map;
   }, [summaries]);
 
-  // Filter lanes by liveness, always keeping anyone who needs the
+  // Filter lanes: text query is strict (a search means the operator
+  // wants exactly those agents), quiet zero-traffic agents can be
+  // hidden, and liveness buckets always keep anyone who needs the
   // operator.
-  const visibleLanes = useMemo(
+  const visibleLanes = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    return lanes.filter((lane) => {
+      const a = lane.agent;
+      if (q) {
+        const hay =
+          `${a.name} ${a.project_key} ${a.working_dir} ` +
+          `${a.git_branch} ${a.purpose}`;
+        if (!hay.toLowerCase().includes(q)) {
+          return false;
+        }
+      }
+      if (!showQuiet && lane.events.length === 0) {
+        return false;
+      }
+      if (laneNeedsOperator(lane)) {
+        return true;
+      }
+      if (isLive(a.status)) {
+        return filters.active;
+      }
+      if (a.status === 'idle') {
+        return filters.idle;
+      }
+      return filters.offline;
+    });
+  }, [lanes, filters, query, showQuiet]);
+
+  // Grouped mode computes a per-project cluster layout on the fly;
+  // manual positions stay untouched in the store for toggling back.
+  const grouped = useMemo(
     () =>
-      lanes.filter((lane) => {
-        if (laneNeedsOperator(lane)) {
-          return true;
-        }
-        if (isLive(lane.agent.status)) {
-          return filters.active;
-        }
-        if (lane.agent.status === 'idle') {
-          return filters.idle;
-        }
-        return filters.offline;
-      }),
-    [lanes, filters],
+      groupByProject ? layoutGroups(visibleLanes, sizes) : null,
+    [groupByProject, visibleLanes, sizes],
   );
+  const effectivePositions = grouped?.positions ?? positions;
 
   const counts = useMemo(() => {
-    const c = { live: 0, idle: 0, offline: 0 };
+    const c = { live: 0, idle: 0, offline: 0, quiet: 0 };
     for (const lane of lanes) {
       if (isLive(lane.agent.status)) {
         c.live++;
@@ -129,6 +160,9 @@ export default function CommandCenterPage() {
         c.idle++;
       } else {
         c.offline++;
+      }
+      if (lane.events.length === 0) {
+        c.quiet++;
       }
     }
     return c;
@@ -224,7 +258,7 @@ export default function CommandCenterPage() {
     let maxX = -Infinity;
     let maxY = -Infinity;
     for (const lane of visibleLanes) {
-      const p = positions[lane.agent.id];
+      const p = effectivePositions[lane.agent.id];
       if (!p) {
         continue;
       }
@@ -251,12 +285,12 @@ export default function CommandCenterPage() {
         (screen.height - spanY * scale) / 2,
       scale,
     });
-  }, [visibleLanes, positions, sizes, screen, setViewport]);
+  }, [visibleLanes, effectivePositions, sizes, screen, setViewport]);
 
   // flyTo centers the viewport on an agent's card.
   const flyTo = useCallback(
     (agentId: number) => {
-      const p = positions[agentId];
+      const p = effectivePositions[agentId];
       if (!p) {
         return;
       }
@@ -268,8 +302,25 @@ export default function CommandCenterPage() {
       });
       bringToFront(agentId);
     },
-    [positions, screen, viewport.scale, setViewport, bringToFront],
+    [
+      effectivePositions, screen, viewport.scale, setViewport,
+      bringToFront,
+    ],
   );
+
+  // Re-frame the fleet whenever grouped mode toggles so the new
+  // arrangement is immediately in view.
+  const fitRef = useRef(fitAll);
+  useEffect(() => {
+    fitRef.current = fitAll;
+  }, [fitAll]);
+  const prevGrouped = useRef(groupByProject);
+  useEffect(() => {
+    if (prevGrouped.current !== groupByProject) {
+      prevGrouped.current = groupByProject;
+      fitRef.current();
+    }
+  }, [groupByProject]);
 
   const handleAttentionSelect = useCallback(
     (item: AttentionItem) => flyTo(item.agent_id),
@@ -329,8 +380,33 @@ export default function CommandCenterPage() {
           transformOrigin: '0 0',
         }}
       >
+        {/* Project cluster regions, behind the cards. */}
+        {grouped?.blocks.map((b) => (
+          <div
+            key={b.label}
+            className="pointer-events-none absolute rounded-2xl border border-[var(--c-hair)] bg-[var(--c-hover)]/40"
+            style={{
+              left: b.x, top: b.y, width: b.w, height: b.h,
+            }}
+          >
+            <div className="absolute left-4 top-3 flex items-baseline gap-2">
+              <span className="font-mono text-[11px] font-semibold uppercase tracking-[0.14em] text-[var(--c-mut)]">
+                {b.label}
+              </span>
+              <span className="font-mono text-[10px] text-[var(--c-faint)]">
+                {b.count}
+                {b.liveCount > 0 && (
+                  <span className="text-[var(--c-green)]">
+                    {' '}· {b.liveCount} live
+                  </span>
+                )}
+              </span>
+            </div>
+          </div>
+        ))}
+
         {visibleLanes.map((lane) => {
-          const p = positions[lane.agent.id];
+          const p = effectivePositions[lane.agent.id];
           if (!p) {
             return null;
           }
@@ -343,6 +419,7 @@ export default function CommandCenterPage() {
               size={sizes[lane.agent.id]}
               scale={viewport.scale}
               zIndex={zOrder[lane.agent.id] ?? 1}
+              locked={groupByProject}
             />
           );
         })}
@@ -388,6 +465,46 @@ export default function CommandCenterPage() {
           onPointerDown={(e) => e.stopPropagation()}
           onWheel={(e) => e.stopPropagation()}
         >
+          {/* Fleet filter: free text over name, repo, branch, and
+              purpose. */}
+          <div className="flex items-center gap-1.5 rounded-xl border border-[var(--c-hair)] bg-[var(--c-card95)] px-2.5 py-1.5 shadow-[0_1px_2px_rgba(28,32,36,0.05),0_6px_18px_rgba(28,32,36,0.07)] backdrop-blur-sm">
+            <svg
+              className="h-3.5 w-3.5 shrink-0 text-[var(--c-faint)]"
+              fill="none" viewBox="0 0 24 24" stroke="currentColor"
+              strokeWidth={2}
+            >
+              <path strokeLinecap="round" strokeLinejoin="round"
+                d="M21 21l-4.35-4.35M17 10.5a6.5 6.5 0 11-13 0 6.5 6.5 0 0113 0z" />
+            </svg>
+            <input
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Escape') {
+                  setQuery('');
+                  (e.target as HTMLInputElement).blur();
+                }
+              }}
+              placeholder="filter fleet…"
+              className="w-36 bg-transparent text-[12px] text-[var(--c-ink)] placeholder:text-[var(--c-dim)] focus:outline-none"
+            />
+            {query && (
+              <>
+                <span className="font-mono text-[10px] text-[var(--c-faint2)]">
+                  {visibleLanes.length}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setQuery('')}
+                  aria-label="Clear filter"
+                  className="rounded p-0.5 text-[var(--c-faint)] hover:bg-[var(--c-hover)] hover:text-[var(--c-ink)]"
+                >
+                  ✕
+                </button>
+              </>
+            )}
+          </div>
+
           <div className="flex items-center gap-1.5 rounded-xl border border-[var(--c-hair)] bg-[var(--c-card95)] px-2 py-1.5 shadow-[0_1px_2px_rgba(28,32,36,0.05),0_6px_18px_rgba(28,32,36,0.07)] backdrop-blur-sm">
             <span
               className={clsx(
@@ -420,6 +537,13 @@ export default function CommandCenterPage() {
               on={filters.offline}
               onClick={() => toggleFilter('offline')}
             />
+            <div className="h-4 w-px bg-[var(--c-hair2)]" />
+            <FilterChip
+              label="quiet"
+              count={counts.quiet}
+              on={showQuiet}
+              onClick={toggleQuiet}
+            />
           </div>
 
           <div className="flex items-center overflow-hidden rounded-xl border border-[var(--c-hair)] bg-[var(--c-card95)] shadow-[0_1px_2px_rgba(28,32,36,0.05),0_6px_18px_rgba(28,32,36,0.07)] backdrop-blur-sm">
@@ -431,6 +555,21 @@ export default function CommandCenterPage() {
             <ToolButton label="+" title="Zoom in"
               onClick={() => zoomBy(1.25)} />
             <div className="h-4 w-px bg-[var(--c-hair2)]" />
+            <button
+              type="button"
+              title="Auto-group cards by project"
+              aria-pressed={groupByProject}
+              onClick={toggleGroupByProject}
+              className={clsx(
+                'px-2 py-1 font-mono text-[11px]',
+                groupByProject
+                  ? 'bg-[var(--c-ink)] text-white'
+                  : 'text-[var(--c-text2)] hover:bg-[var(--c-hover)]',
+              )}
+            >
+              Group
+            </button>
+            <div className="h-4 w-px bg-[var(--c-hair2)]" />
             <ToolButton label="Fit" title="Fit all cards"
               onClick={fitAll} />
           </div>
@@ -441,7 +580,8 @@ export default function CommandCenterPage() {
           <Minimap
             cards={visibleLanes.map((lane) => ({
               id: lane.agent.id,
-              position: positions[lane.agent.id] ?? { x: 0, y: 0 },
+              position: effectivePositions[lane.agent.id] ??
+                { x: 0, y: 0 },
               needsAction: laneNeedsOperator(lane),
               live: isLive(lane.agent.status),
             }))}
@@ -459,7 +599,9 @@ export default function CommandCenterPage() {
 
         {/* Hint line, bottom-left. */}
         <p className="absolute bottom-4 left-4 select-none font-mono text-[10px] text-[var(--c-dim)]">
-          drag cards · corner resizes · drag canvas to pan · ⌘+scroll to zoom
+          {groupByProject
+            ? 'grouped by project · card drag off · drag canvas to pan · ⌘+scroll to zoom'
+            : 'drag cards · corner resizes · drag canvas to pan · ⌘+scroll to zoom'}
         </p>
       </div>
     </div>

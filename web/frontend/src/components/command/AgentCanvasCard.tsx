@@ -105,6 +105,9 @@ export interface AgentCanvasCardProps {
   // coordinates while dragging.
   scale: number;
   zIndex: number;
+  // When true the position is layout-managed (group-by-project mode)
+  // and header dragging is disabled; resizing still works.
+  locked?: boolean | undefined;
 }
 
 export function AgentCanvasCard({
@@ -114,6 +117,7 @@ export function AgentCanvasCard({
   size,
   scale,
   zIndex,
+  locked,
 }: AgentCanvasCardProps) {
   const { agent } = lane;
   const [replyTarget, setReplyTarget] = useState<ReplyTarget | null>(
@@ -213,6 +217,12 @@ export function AgentCanvasCard({
   const onHeaderPointerDown = (e: React.PointerEvent) => {
     // Only left-button / primary touch drags.
     if (e.button !== 0) {
+      return;
+    }
+    // Layout-managed cards only surface on press; the computed
+    // position would immediately override any drag.
+    if (locked) {
+      bringToFront(agent.id);
       return;
     }
     (e.target as Element).setPointerCapture?.(e.pointerId);
@@ -328,7 +338,11 @@ export function AgentCanvasCard({
         onPointerUp={onHeaderPointerUp}
         className={clsx(
           'select-none border-b border-[var(--c-hair2)] px-3.5 pb-2 pt-2.5',
-          dragging ? 'cursor-grabbing' : 'cursor-grab',
+          locked
+            ? 'cursor-default'
+            : dragging
+              ? 'cursor-grabbing'
+              : 'cursor-grab',
         )}
         style={{ touchAction: 'none' }}
       >
