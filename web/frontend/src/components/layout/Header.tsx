@@ -63,30 +63,6 @@ function SearchIcon({ className }: { className?: string }) {
   );
 }
 
-// Settings icon.
-function SettingsIcon({ className }: { className?: string }) {
-  return (
-    <svg
-      className={cn('h-5 w-5', className)}
-      fill="none"
-      viewBox="0 0 24 24"
-      stroke="currentColor"
-    >
-      <path
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        strokeWidth={2}
-        d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"
-      />
-      <path
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        strokeWidth={2}
-        d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"
-      />
-    </svg>
-  );
-}
 
 // Bell icon for notifications.
 function BellIcon({ className }: { className?: string }) {
@@ -258,6 +234,11 @@ export function Header({ className, leftContent, rightContent }: HeaderProps) {
   // Calculate total unread count.
   const totalUnreadCount = messagesData?.data?.length ?? 0;
 
+  // Live agent tally for the fleet pulse chip.
+  const liveCount = (agentsData?.agents ?? []).filter(
+    (a) => a.status === 'active' || a.status === 'busy',
+  ).length;
+
   // Check if Global (all agents) is currently selected.
   const isGlobalSelected = currentAgent === null;
 
@@ -306,6 +287,24 @@ export function Header({ className, leftContent, rightContent }: HeaderProps) {
           </button>
         </div>
 
+        {/* Fleet pulse: how many agents are working right now.
+            Click drops onto the canvas. */}
+        <Link
+          to={routes.command}
+          title="Live agents — open canvas"
+          className="mr-1 hidden items-center gap-1.5 rounded-lg border border-[var(--c-hair)] bg-[var(--c-card)] px-2 py-1 font-mono text-[10.5px] font-semibold uppercase tracking-[0.08em] text-[var(--c-mut)] hover:border-[var(--c-ghost)] hover:text-[var(--c-ink)] sm:flex"
+        >
+          <span
+            className={cn(
+              'h-1.5 w-1.5 rounded-full',
+              liveCount > 0
+                ? 'animate-pulse-dot bg-[var(--c-green)]'
+                : 'bg-[var(--c-ghost)]',
+            )}
+          />
+          {liveCount} live
+        </Link>
+
         {/* Global button - shows all messages from all agents. */}
         <button
           type="button"
@@ -345,15 +344,6 @@ export function Header({ className, leftContent, rightContent }: HeaderProps) {
             <span className="absolute right-1.5 top-1.5 block h-2 w-2 rounded-full bg-[var(--c-rust)] ring-2 ring-[var(--c-paper)]" />
           ) : null}
         </button>
-
-        {/* Settings link. */}
-        <Link
-          to={routes.settings}
-          className="rounded-md p-2 hover:bg-[var(--c-fill)] hover:text-[var(--c-ink)] focus:outline-none"
-          aria-label="Settings"
-        >
-          <SettingsIcon />
-        </Link>
 
         {rightContent}
       </div>

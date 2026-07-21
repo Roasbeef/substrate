@@ -7,6 +7,7 @@ import { twMerge } from 'tailwind-merge';
 import { useUIStore, type SidebarSection } from '@/stores/ui.js';
 import { useCanvasStore } from '@/stores/canvas.js';
 import { useAgentsStatus } from '@/hooks/useAgents.js';
+import { useMessages } from '@/hooks/useMessages.js';
 import { routes } from '@/lib/routes.js';
 import { HeartbeatTrace } from '@/components/command/HeartbeatTrace.js';
 
@@ -151,19 +152,6 @@ function CollapseIcon({ expand = false }: { expand?: boolean }) {
   );
 }
 
-function UserCircleIcon() {
-  return (
-    <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-      <path
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        strokeWidth={2}
-        d="M5.121 17.804A13.937 13.937 0 0112 16c2.5 0 4.847.655 6.879 1.804M15 10a3 3 0 11-6 0 3 3 0 016 0zm6 2a9 9 0 11-18 0 9 9 0 0118 0z"
-      />
-    </svg>
-  );
-}
-
 function SmallPlusIcon() {
   return (
     <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -206,7 +194,8 @@ function NavLink({ item, isActive, collapsed = false }: NavLinkProps) {
     <Link
       to={item.path}
       className={cn(
-        'flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors',
+        'flex items-center gap-2.5 rounded-lg px-2.5 py-[7px] text-[13px] font-medium transition-colors',
+        '[&_svg]:h-[18px] [&_svg]:w-[18px]',
         isActive
           ? 'border border-[var(--c-hair)] bg-[var(--c-card)] font-semibold text-[var(--c-ink)] shadow-[0_1px_2px_rgba(28,32,36,0.06)]'
           : 'text-[var(--c-mut)] hover:bg-[var(--c-fill)] hover:text-[var(--c-ink)]',
@@ -221,7 +210,7 @@ function NavLink({ item, isActive, collapsed = false }: NavLinkProps) {
         <>
           <span className="flex-1">{item.label}</span>
           {item.badge && item.badge > 0 ? (
-            <span className="font-mono text-[10.5px] text-[var(--c-faint)]">
+            <span className="rounded-full bg-[#33608D]/10 px-1.5 py-px font-mono text-[10px] font-semibold text-[var(--c-steel)]">
               {item.badge}
             </span>
           ) : null}
@@ -250,22 +239,22 @@ function SidebarSectionHeader({
   onAddClick,
 }: SidebarSectionHeaderProps) {
   return (
-    <div className="flex items-center justify-between px-3 py-2">
+    <div className="flex items-center justify-between px-2.5 py-1.5">
       <button
         type="button"
         onClick={onToggle}
-        className="flex flex-1 items-center gap-2 text-sm font-semibold text-gray-500 hover:text-gray-700"
+        className="flex flex-1 items-center gap-1.5 font-mono text-[10px] font-semibold uppercase tracking-[0.14em] text-[var(--c-mut)] hover:text-[var(--c-ink)]"
       >
         <ChevronDownIcon
           className={cn(
-            'transition-transform',
+            'h-3 w-3 text-[var(--c-dim)] transition-transform',
             !isExpanded && '-rotate-90',
           )}
         />
-        <span className="text-gray-400">{icon}</span>
+        {icon}
         <span>{label}</span>
         {count !== undefined && count > 0 ? (
-          <span className="font-mono text-[10.5px] text-[var(--c-faint)]">
+          <span className="font-mono text-[10px] normal-case tracking-normal text-[var(--c-faint)]">
             {count}
           </span>
         ) : null}
@@ -353,6 +342,11 @@ export function Sidebar({
 
   const { data: agentsData } = useAgentsStatus();
 
+  // Unread mail count badges the Signals row. Shares the header's
+  // query, so no extra request.
+  const { data: unreadData } = useMessages({ filter: 'unread' });
+  const unreadCount = unreadData?.data?.length ?? 0;
+
   // liveAgents is the current working set: busy sessions first, then
   // recently active ones.
   const liveAgents = useMemo(() => {
@@ -373,7 +367,11 @@ export function Sidebar({
     navigate(routes.command);
   };
 
-  const items = customNavItems ?? navItems;
+  const items = (customNavItems ?? navItems).map((it) =>
+    it.id === 'inbox' && unreadCount > 0
+      ? { ...it, badge: unreadCount }
+      : it,
+  );
 
   // Collapsed: render the thin icon strip instead of disappearing.
   if (sidebarCollapsed) {
@@ -390,15 +388,16 @@ export function Sidebar({
       <Logo />
 
       {showComposeButton ? (
-        <div className="px-3 py-3">
+        <div className="px-3 pb-2 pt-3">
           <button
             type="button"
             onClick={() => openModal('compose')}
             className={cn(
-              'flex w-full items-center justify-center gap-2 rounded-2xl px-6 py-3',
-              'bg-[var(--c-ink)] text-white font-medium',
+              'flex w-full items-center justify-center gap-2 rounded-xl px-4 py-2.5',
+              'bg-[var(--c-ink)] text-[13.5px] font-medium text-white',
               'hover:bg-[var(--c-inkhover)] transition-colors',
               'focus:outline-none focus:ring-2 focus:ring-[#22262A]/30 focus:ring-offset-2',
+              '[&_svg]:h-4 [&_svg]:w-4',
             )}
           >
             <PlusIcon />
@@ -421,7 +420,16 @@ export function Sidebar({
         <div className="mt-4 border-t border-[var(--c-hair2)] pt-2">
           <SidebarSectionHeader
             label="Live"
-            icon={<UserCircleIcon />}
+            icon={
+              <span
+                className={cn(
+                  'h-1.5 w-1.5 rounded-full',
+                  liveAgents.length > 0
+                    ? 'animate-pulse-dot bg-[var(--c-green)]'
+                    : 'bg-[var(--c-ghost)]',
+                )}
+              />
+            }
             isExpanded={agentsExpanded}
             onToggle={() => setAgentsExpanded(!agentsExpanded)}
             {...(liveAgents.length > 0 && { count: liveAgents.length })}
