@@ -123,14 +123,6 @@ function SettingsIcon() {
   );
 }
 
-function PlusIcon() {
-  return (
-    <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-    </svg>
-  );
-}
-
 function ChevronDownIcon({ className }: { className?: string }) {
   return (
     <svg className={cn('h-4 w-4', className)} fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -298,8 +290,6 @@ function AgentItem({ name, status, onClick }: AgentItemProps) {
 export interface SidebarProps {
   /** Custom navigation items (overrides defaults). */
   navItems?: NavItem[];
-  /** Whether to show the compose button. */
-  showComposeButton?: boolean;
   /** Whether to show the settings link. */
   showSettings?: boolean;
   /** Additional class name. */
@@ -325,7 +315,6 @@ function useActiveSection(): SidebarSection {
 // Main Sidebar component.
 export function Sidebar({
   navItems: customNavItems,
-  showComposeButton = true,
   showSettings = true,
   className,
   footer,
@@ -387,26 +376,7 @@ export function Sidebar({
     >
       <Logo />
 
-      {showComposeButton ? (
-        <div className="px-3 pb-2 pt-3">
-          <button
-            type="button"
-            onClick={() => openModal('compose')}
-            className={cn(
-              'flex w-full items-center justify-center gap-2 rounded-xl px-4 py-2.5',
-              'bg-[var(--c-ink)] text-[13.5px] font-medium text-white',
-              'hover:bg-[var(--c-inkhover)] transition-colors',
-              'focus:outline-none focus:ring-2 focus:ring-[#22262A]/30 focus:ring-offset-2',
-              '[&_svg]:h-4 [&_svg]:w-4',
-            )}
-          >
-            <PlusIcon />
-            <span>Compose</span>
-          </button>
-        </div>
-      ) : null}
-
-      <nav className="flex-1 space-y-1 overflow-y-auto px-3 py-2">
+      <nav className="flex-1 space-y-1 overflow-y-auto px-3 py-3">
         {items.map((item) => (
           <NavLink
             key={item.id}
@@ -494,7 +464,6 @@ export function CollapsedSidebar({
   className?: string | undefined;
 }) {
   const activeSection = useActiveSection();
-  const openModal = useUIStore((state) => state.openModal);
   const toggleSidebar = useUIStore((state) => state.toggleSidebar);
 
   return (
@@ -504,23 +473,7 @@ export function CollapsedSidebar({
         className,
       )}
     >
-      <div className="py-3">
-        <button
-          type="button"
-          onClick={() => openModal('compose')}
-          className={cn(
-            'flex h-9 w-9 items-center justify-center rounded-xl',
-            'bg-[var(--c-ink)] text-white hover:bg-[var(--c-inkhover)]',
-            'focus:outline-none focus:ring-2 focus:ring-[#22262A]/30',
-          )}
-          aria-label="Compose"
-          title="Compose"
-        >
-          <PlusIcon />
-        </button>
-      </div>
-
-      <nav className="flex flex-1 flex-col items-center gap-1 py-1">
+      <nav className="flex flex-1 flex-col items-center gap-1 py-3">
         {navItems.map((item) => (
           <Link
             key={item.id}

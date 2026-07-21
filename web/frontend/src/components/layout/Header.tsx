@@ -25,6 +25,25 @@ export interface HeaderProps {
   rightContent?: ReactNode;
 }
 
+// Pen icon for the new-message action.
+function ComposeIcon({ className }: { className?: string }) {
+  return (
+    <svg
+      className={cn('h-5 w-5', className)}
+      fill="none"
+      viewBox="0 0 24 24"
+      stroke="currentColor"
+    >
+      <path
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        strokeWidth={2}
+        d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"
+      />
+    </svg>
+  );
+}
+
 // Menu icon for sidebar toggle.
 function MenuIcon({ className }: { className?: string }) {
   return (
@@ -225,6 +244,7 @@ function Wordmark() {
 export function Header({ className, leftContent, rightContent }: HeaderProps) {
   const toggleSidebar = useUIStore((state) => state.toggleSidebar);
   const toggleSearch = useUIStore((state) => state.toggleSearch);
+  const openModal = useUIStore((state) => state.openModal);
   const { currentAgent, setCurrentAgent } = useAuthStore();
 
   // Fetch agents and messages for agent switcher.
@@ -286,6 +306,19 @@ export function Header({ className, leftContent, rightContent }: HeaderProps) {
             <SearchIcon />
           </button>
         </div>
+
+        {/* New message. Steering happens on the cards; this is the
+            escape hatch for topics, broadcasts, and agents without a
+            card in view. */}
+        <button
+          type="button"
+          onClick={() => openModal('compose')}
+          className="rounded-md p-2 hover:bg-[var(--c-fill)] hover:text-[var(--c-ink)] focus:outline-none"
+          aria-label="New message"
+          title="New message"
+        >
+          <ComposeIcon />
+        </button>
 
         {/* Fleet pulse: how many agents are working right now.
             Click drops onto the canvas. */}
