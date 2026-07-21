@@ -273,7 +273,7 @@ export function Header({ className, leftContent, rightContent }: HeaderProps) {
         <button
           type="button"
           onClick={toggleSidebar}
-          className="rounded-md p-2 text-[var(--c-mut)] hover:bg-[var(--c-fill)] hover:text-[var(--c-ink)] focus:outline-none md:hidden"
+          className="rounded-md p-2 text-[var(--c-mut)] hover:bg-[var(--c-fill)] hover:text-[var(--c-ink)] focus:outline-none"
           aria-label="Toggle sidebar"
         >
           <MenuIcon />

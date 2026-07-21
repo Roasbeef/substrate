@@ -100,6 +100,30 @@ function generateToastId(): string {
   return `toast-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
 }
 
+// The collapsed/expanded sidebar preference survives reloads without
+// dragging the whole UI store into persistence.
+const SIDEBAR_KEY = 'substrate-sidebar-collapsed';
+
+// readSidebarCollapsed loads the stored preference, defaulting to
+// expanded.
+function readSidebarCollapsed(): boolean {
+  try {
+    return localStorage.getItem(SIDEBAR_KEY) === '1';
+  } catch {
+    return false;
+  }
+}
+
+// writeSidebarCollapsed stores the preference, ignoring storage
+// errors (private mode, quota).
+function writeSidebarCollapsed(collapsed: boolean): void {
+  try {
+    localStorage.setItem(SIDEBAR_KEY, collapsed ? '1' : '0');
+  } catch {
+    // Preference simply won't survive the reload.
+  }
+}
+
 export const useUIStore = create<UIState>()(
   devtools(
     (set) => ({
@@ -107,7 +131,7 @@ export const useUIStore = create<UIState>()(
       activeModal: null,
       modalData: null,
       toasts: [],
-      sidebarCollapsed: false,
+      sidebarCollapsed: readSidebarCollapsed(),
       activeSidebarSection: 'inbox',
       globalLoading: false,
       searchQuery: '',
@@ -152,7 +176,11 @@ export const useUIStore = create<UIState>()(
       // Sidebar actions.
       toggleSidebar: () =>
         set(
-          (state) => ({ sidebarCollapsed: !state.sidebarCollapsed }),
+          (state) => {
+            const next = !state.sidebarCollapsed;
+            writeSidebarCollapsed(next);
+            return { sidebarCollapsed: next };
+          },
           undefined,
           'toggleSidebar',
         ),

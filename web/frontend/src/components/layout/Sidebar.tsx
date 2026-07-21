@@ -151,6 +151,19 @@ function ChevronDownIcon({ className }: { className?: string }) {
   );
 }
 
+// CollapseIcon points into the sidebar edge: « to shrink, » to grow.
+function CollapseIcon({ expand = false }: { expand?: boolean }) {
+  return (
+    <svg
+      className={cn('h-4 w-4', expand && 'rotate-180')}
+      fill="none" viewBox="0 0 24 24" stroke="currentColor"
+    >
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+        d="M11 19l-7-7 7-7m8 14l-7-7 7-7" />
+    </svg>
+  );
+}
+
 function HashtagIcon() {
   return (
     <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -390,6 +403,7 @@ export function Sidebar({
 }: SidebarProps) {
   const openModal = useUIStore((state) => state.openModal);
   const sidebarCollapsed = useUIStore((state) => state.sidebarCollapsed);
+  const toggleSidebar = useUIStore((state) => state.toggleSidebar);
   const activeSection = useActiveSection();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
@@ -412,8 +426,9 @@ export function Sidebar({
 
   const items = customNavItems ?? navItems;
 
+  // Collapsed: render the thin icon strip instead of disappearing.
   if (sidebarCollapsed) {
-    return null;
+    return <CollapsedSidebar className={className} />;
   }
 
   return (
@@ -510,74 +525,105 @@ export function Sidebar({
 
       {footer}
 
-      {showSettings ? (
-        <div className="border-t border-gray-200 p-3">
+      <div className="flex items-center gap-1 border-t border-[var(--c-hair)] p-3">
+        {showSettings ? (
           <Link
             to={routes.settings}
-            className="flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium text-[var(--c-mut)] hover:bg-[var(--c-fill)] hover:text-[var(--c-ink)]"
+            className="flex flex-1 items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium text-[var(--c-mut)] hover:bg-[var(--c-fill)] hover:text-[var(--c-ink)]"
           >
-            <span className="text-gray-400">
+            <span className="text-[var(--c-dim)]">
               <SettingsIcon />
             </span>
             <span>Settings</span>
           </Link>
-        </div>
-      ) : null}
+        ) : (
+          <div className="flex-1" />
+        )}
+        <button
+          type="button"
+          onClick={toggleSidebar}
+          title="Collapse sidebar"
+          aria-label="Collapse sidebar"
+          className="rounded-lg p-2 text-[var(--c-dim)] hover:bg-[var(--c-fill)] hover:text-[var(--c-ink)]"
+        >
+          <CollapseIcon />
+        </button>
+      </div>
     </aside>
   );
 }
 
-// Collapsed sidebar variant.
-export function CollapsedSidebar({ className }: { className?: string }) {
+// CollapsedSidebar is the thin icon strip: compose, icon-only nav
+// with tooltips, then settings and the expand control at the foot.
+export function CollapsedSidebar({
+  className,
+}: {
+  className?: string | undefined;
+}) {
   const activeSection = useActiveSection();
   const openModal = useUIStore((state) => state.openModal);
+  const toggleSidebar = useUIStore((state) => state.toggleSidebar);
 
   return (
     <aside
       className={cn(
-        'flex h-full w-16 flex-col border-r border-[var(--c-hair)] bg-[var(--c-paper)]',
+        'flex h-full w-14 flex-col items-center border-r border-[var(--c-hair)] bg-[var(--c-paper)]',
         className,
       )}
     >
-      <Logo collapsed />
-
-      <div className="px-2 py-2">
+      <div className="py-3">
         <button
           type="button"
           onClick={() => openModal('compose')}
           className={cn(
-            'flex h-10 w-10 items-center justify-center rounded-lg',
+            'flex h-9 w-9 items-center justify-center rounded-xl',
             'bg-[var(--c-ink)] text-white hover:bg-[var(--c-inkhover)]',
-            'focus:outline-none focus:ring-2 focus:ring-[#22262A]/30 focus:ring-offset-2',
+            'focus:outline-none focus:ring-2 focus:ring-[#22262A]/30',
           )}
           aria-label="Compose"
+          title="Compose"
         >
           <PlusIcon />
         </button>
       </div>
 
-      <nav className="flex-1 space-y-1 px-2 py-2">
+      <nav className="flex flex-1 flex-col items-center gap-1 py-1">
         {navItems.map((item) => (
-          <NavLink
+          <Link
             key={item.id}
-            item={item}
-            isActive={activeSection === item.id}
-            collapsed
-          />
+            to={item.path}
+            title={item.label}
+            aria-label={item.label}
+            className={cn(
+              'flex h-9 w-9 items-center justify-center rounded-lg transition-colors',
+              activeSection === item.id
+                ? 'border border-[var(--c-hair)] bg-[var(--c-card)] text-[var(--c-ink)] shadow-[0_1px_2px_rgba(28,32,36,0.06)]'
+                : 'text-[var(--c-dim)] hover:bg-[var(--c-fill)] hover:text-[var(--c-ink)]',
+            )}
+          >
+            {item.icon}
+          </Link>
         ))}
       </nav>
 
-      <div className="border-t border-gray-200 p-2">
+      <div className="flex flex-col items-center gap-1 border-t border-[var(--c-hair)] py-2">
         <Link
           to={routes.settings}
-          className={cn(
-            'flex h-10 w-10 items-center justify-center rounded-lg',
-            'text-[var(--c-dim)] hover:bg-[var(--c-fill)] hover:text-[var(--c-text2)]',
-          )}
+          className="flex h-9 w-9 items-center justify-center rounded-lg text-[var(--c-dim)] hover:bg-[var(--c-fill)] hover:text-[var(--c-ink)]"
           aria-label="Settings"
+          title="Settings"
         >
           <SettingsIcon />
         </Link>
+        <button
+          type="button"
+          onClick={toggleSidebar}
+          title="Expand sidebar"
+          aria-label="Expand sidebar"
+          className="flex h-9 w-9 items-center justify-center rounded-lg text-[var(--c-dim)] hover:bg-[var(--c-fill)] hover:text-[var(--c-ink)]"
+        >
+          <CollapseIcon expand />
+        </button>
       </div>
     </aside>
   );
