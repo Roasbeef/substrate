@@ -245,7 +245,7 @@ export function DiffViewer({
       className={`sticky top-0 z-10 flex items-center justify-between border-b px-3 py-2 ${
         fullscreen
           ? 'border-gray-700 bg-gray-900'
-          : 'border-gray-200 bg-white'
+          : 'border-gray-200 bg-[var(--c-card)]'
       }`}
     >
       <div className="flex items-center gap-3">
@@ -273,7 +273,7 @@ export function DiffViewer({
               diffStyle === 'unified'
                 ? fullscreen
                   ? 'bg-gray-700 text-gray-100 shadow-sm'
-                  : 'bg-white text-gray-900 shadow-sm'
+                  : 'bg-[var(--c-card)] text-gray-900 shadow-sm'
                 : fullscreen
                   ? 'text-gray-400 hover:text-gray-200'
                   : 'text-gray-500 hover:text-gray-700'
@@ -288,7 +288,7 @@ export function DiffViewer({
               diffStyle === 'split'
                 ? fullscreen
                   ? 'bg-gray-700 text-gray-100 shadow-sm'
-                  : 'bg-white text-gray-900 shadow-sm'
+                  : 'bg-[var(--c-card)] text-gray-900 shadow-sm'
                 : fullscreen
                   ? 'text-gray-400 hover:text-gray-200'
                   : 'text-gray-500 hover:text-gray-700'

@@ -175,36 +175,36 @@ function AgentListItem({
           onClick={onClick}
           className={cn(
             'flex w-full items-center gap-3 px-3 py-2 text-left text-sm',
-            focus ? 'bg-gray-100' : '',
-            isSelected ? 'bg-blue-50' : '',
+            focus ? 'bg-[var(--c-hover)]' : '',
+            isSelected ? 'bg-[var(--c-fill)]' : '',
           )}
         >
           <div className="relative">
             <Avatar name={agent.name} size="sm" />
             {agent.unreadCount !== undefined && agent.unreadCount > 0 ? (
-              <span className="absolute -right-1 -top-1 flex h-4 w-4 items-center justify-center rounded-full bg-red-500 text-[10px] font-bold text-white">
+              <span className="absolute -right-1 -top-1 flex h-4 w-4 items-center justify-center rounded-full bg-[var(--c-rust)] text-[10px] font-bold text-white">
                 {agent.unreadCount > 9 ? '9+' : agent.unreadCount}
               </span>
             ) : null}
           </div>
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2">
-              <span className="font-medium text-gray-900 truncate">
+              <span className="font-medium text-[var(--c-ink)] truncate">
                 {agent.name}
               </span>
               {isSelected ? (
-                <CheckIcon className="h-4 w-4 text-blue-600 flex-shrink-0" />
+                <CheckIcon className="h-4 w-4 text-[var(--c-ink)] flex-shrink-0" />
               ) : null}
             </div>
             {getAgentContext(agent) ? (
-              <div className="text-xs text-gray-500 truncate">
+              <div className="text-xs text-[var(--c-mut)] truncate">
                 {getAgentContext(agent)}
               </div>
             ) : null}
             <div className="flex items-center gap-2">
               <StatusBadge status={agent.status} size="sm" />
               {agent.unreadCount !== undefined && agent.unreadCount > 0 ? (
-                <span className="text-xs text-gray-500">
+                <span className="text-xs text-[var(--c-mut)]">
                   {agent.unreadCount} unread
                 </span>
               ) : null}
@@ -335,8 +335,8 @@ export function AgentSwitcher({
       <MenuButton
         className={cn(
           'flex items-center gap-2 rounded-lg px-3 py-2 text-sm',
-          'bg-white border border-gray-200 shadow-sm',
-          'hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2',
+          'bg-[var(--c-card)] border border-[var(--c-hair)] shadow-sm',
+          'hover:bg-[var(--c-hover)] focus:outline-none focus:ring-2 focus:ring-[#22262A]/30 focus:ring-offset-2',
           disabled ? 'cursor-not-allowed opacity-50' : '',
         )}
         disabled={disabled}
@@ -351,40 +351,40 @@ export function AgentSwitcher({
             <div className="relative">
               <Avatar name={selectedAgent.name} size="xs" />
               {displayUnreadCount > 0 ? (
-                <span className="absolute -right-1 -top-1 flex h-4 w-4 items-center justify-center rounded-full bg-red-500 text-[10px] font-bold text-white">
+                <span className="absolute -right-1 -top-1 flex h-4 w-4 items-center justify-center rounded-full bg-[var(--c-rust)] text-[10px] font-bold text-white">
                   {displayUnreadCount > 9 ? '9+' : displayUnreadCount}
                 </span>
               ) : null}
             </div>
-            <span className="font-medium text-gray-900">{selectedAgent.name}</span>
+            <span className="font-medium text-[var(--c-ink)]">{selectedAgent.name}</span>
             <StatusBadge status={selectedAgent.status} size="sm" />
           </>
         ) : selectedAggregate ? (
           <>
-            <div className="relative flex h-6 w-6 items-center justify-center rounded-full bg-purple-100 text-purple-600">
+            <div className="relative flex h-6 w-6 items-center justify-center rounded-full bg-[#5B5BD6]/10 text-[var(--c-violet)]">
               <CodeReviewIcon className="h-4 w-4" />
               {displayUnreadCount > 0 ? (
-                <span className="absolute -right-1 -top-1 flex h-4 w-4 items-center justify-center rounded-full bg-red-500 text-[10px] font-bold text-white">
+                <span className="absolute -right-1 -top-1 flex h-4 w-4 items-center justify-center rounded-full bg-[var(--c-rust)] text-[10px] font-bold text-white">
                   {displayUnreadCount > 9 ? '9+' : displayUnreadCount}
                 </span>
               ) : null}
             </div>
-            <span className="font-medium text-gray-900">{selectedAggregate}</span>
+            <span className="font-medium text-[var(--c-ink)]">{selectedAggregate}</span>
           </>
         ) : (
           <>
-            <div className="relative flex h-6 w-6 items-center justify-center rounded-full bg-blue-100 text-blue-600">
+            <div className="relative flex h-6 w-6 items-center justify-center rounded-full bg-[#33608D]/10 text-[var(--c-steel)]">
               <GlobeIcon className="h-4 w-4" />
               {displayUnreadCount > 0 ? (
-                <span className="absolute -right-1 -top-1 flex h-4 w-4 items-center justify-center rounded-full bg-red-500 text-[10px] font-bold text-white">
+                <span className="absolute -right-1 -top-1 flex h-4 w-4 items-center justify-center rounded-full bg-[var(--c-rust)] text-[10px] font-bold text-white">
                   {displayUnreadCount > 9 ? '9+' : displayUnreadCount}
                 </span>
               ) : null}
             </div>
-            <span className="font-medium text-gray-900">Global</span>
+            <span className="font-medium text-[var(--c-ink)]">Global</span>
           </>
         )}
-        <ChevronDownIcon className="text-gray-400" />
+        <ChevronDownIcon className="text-[var(--c-faint)]" />
       </MenuButton>
 
       <Transition
@@ -399,15 +399,15 @@ export function AgentSwitcher({
         <MenuItems
           className={cn(
             'absolute right-0 z-50 mt-2 w-64 origin-top-right rounded-lg',
-            'bg-white shadow-lg ring-1 ring-black ring-opacity-5',
+            'bg-[var(--c-card)] shadow-lg ring-1 ring-black ring-opacity-5',
             'focus:outline-none',
           )}
         >
           {/* Search input. */}
           {showSearch && agents.length > 5 ? (
-            <div className="p-2 border-b border-gray-100">
+            <div className="p-2 border-b border-[var(--c-fill)]">
               <div className="relative">
-                <SearchIcon className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+                <SearchIcon className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--c-faint)]" />
                 <input
                   type="text"
                   placeholder="Search agents..."
@@ -415,9 +415,9 @@ export function AgentSwitcher({
                   onChange={(e) => setSearchQuery(e.target.value)}
                   onClick={(e) => e.stopPropagation()}
                   className={cn(
-                    'w-full rounded-md border border-gray-200 py-1.5 pl-9 pr-3 text-sm',
-                    'focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500',
-                    'placeholder:text-gray-400',
+                    'w-full rounded-md border border-[var(--c-hair)] py-1.5 pl-9 pr-3 text-sm',
+                    'focus:border-[var(--c-ink)] focus:outline-none focus:ring-1 focus:ring-[#22262A]/30',
+                    'placeholder:text-[var(--c-faint)]',
                   )}
                 />
               </div>
@@ -434,21 +434,21 @@ export function AgentSwitcher({
                   onClick={() => handleSelect(null)}
                   className={cn(
                     'flex w-full items-center gap-3 px-3 py-2 text-left text-sm',
-                    focus ? 'bg-gray-100' : '',
-                    isGlobalSelected ? 'bg-blue-50' : '',
+                    focus ? 'bg-[var(--c-hover)]' : '',
+                    isGlobalSelected ? 'bg-[var(--c-fill)]' : '',
                   )}
                 >
-                  <div className="flex h-8 w-8 items-center justify-center rounded-full bg-blue-100 text-blue-600">
+                  <div className="flex h-8 w-8 items-center justify-center rounded-full bg-[#33608D]/10 text-[var(--c-steel)]">
                     <GlobeIcon className="h-5 w-5" />
                   </div>
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2">
-                      <span className="font-medium text-gray-900">Global</span>
+                      <span className="font-medium text-[var(--c-ink)]">Global</span>
                       {isGlobalSelected ? (
-                        <CheckIcon className="h-4 w-4 text-blue-600 flex-shrink-0" />
+                        <CheckIcon className="h-4 w-4 text-[var(--c-ink)] flex-shrink-0" />
                       ) : null}
                     </div>
-                    <span className="text-xs text-gray-500">All agents</span>
+                    <span className="text-xs text-[var(--c-mut)]">All agents</span>
                   </div>
                 </button>
               )}
@@ -457,7 +457,7 @@ export function AgentSwitcher({
             {/* Aggregates section (e.g., CodeReviewer). */}
             {filteredAggregates.length > 0 ? (
               <>
-                <div className="my-1 border-t border-gray-100" />
+                <div className="my-1 border-t border-[var(--c-fill)]" />
                 {filteredAggregates.map((agg) => (
                   <MenuItem key={agg.name}>
                     {({ focus }) => (
@@ -466,30 +466,30 @@ export function AgentSwitcher({
                         onClick={() => handleSelectAggregate(agg)}
                         className={cn(
                           'flex w-full items-center gap-3 px-3 py-2 text-left text-sm',
-                          focus ? 'bg-gray-100' : '',
-                          selectedAggregate === agg.name ? 'bg-purple-50' : '',
+                          focus ? 'bg-[var(--c-hover)]' : '',
+                          selectedAggregate === agg.name ? 'bg-[#5B5BD6]/10' : '',
                         )}
                       >
-                        <div className="relative flex h-8 w-8 items-center justify-center rounded-full bg-purple-100 text-purple-600">
+                        <div className="relative flex h-8 w-8 items-center justify-center rounded-full bg-[#5B5BD6]/10 text-[var(--c-violet)]">
                           <CodeReviewIcon className="h-5 w-5" />
                           {agg.totalUnread > 0 ? (
-                            <span className="absolute -right-1 -top-1 flex h-4 w-4 items-center justify-center rounded-full bg-red-500 text-[10px] font-bold text-white">
+                            <span className="absolute -right-1 -top-1 flex h-4 w-4 items-center justify-center rounded-full bg-[var(--c-rust)] text-[10px] font-bold text-white">
                               {agg.totalUnread > 9 ? '9+' : agg.totalUnread}
                             </span>
                           ) : null}
                         </div>
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-2">
-                            <span className="font-medium text-gray-900">
+                            <span className="font-medium text-[var(--c-ink)]">
                               {agg.displayName}
                             </span>
                             {selectedAggregate === agg.name ? (
-                              <CheckIcon className="h-4 w-4 text-purple-600 flex-shrink-0" />
+                              <CheckIcon className="h-4 w-4 text-[var(--c-violet)] flex-shrink-0" />
                             ) : null}
                           </div>
                           <div className="flex items-center gap-2">
                             <StatusBadge status={agg.status} size="sm" />
-                            <span className="text-xs text-gray-500">
+                            <span className="text-xs text-[var(--c-mut)]">
                               {agg.count} reviewer{agg.count !== 1 ? 's' : ''}
                             </span>
                           </div>
@@ -503,11 +503,11 @@ export function AgentSwitcher({
 
             {/* Divider before individual agents. */}
             {sortedAgents.length > 0 ? (
-              <div className="my-1 border-t border-gray-100" />
+              <div className="my-1 border-t border-[var(--c-fill)]" />
             ) : null}
 
             {sortedAgents.length === 0 && filteredAggregates.length === 0 && searchQuery ? (
-              <div className="px-3 py-4 text-center text-sm text-gray-500">
+              <div className="px-3 py-4 text-center text-sm text-[var(--c-mut)]">
                 No agents found
               </div>
             ) : (

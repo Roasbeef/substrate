@@ -113,8 +113,8 @@ export function NewAgentModal({
       <form onSubmit={handleSubmit} className="space-y-4">
         {/* Submit error message. */}
         {submitError ? (
-          <div className="rounded-md bg-red-50 p-3">
-            <p className="text-sm text-red-700">{submitError}</p>
+          <div className="rounded-md bg-[#B3372B]/10 p-3">
+            <p className="text-sm text-[var(--c-rust)]">{submitError}</p>
           </div>
         ) : null}
 
@@ -131,11 +131,11 @@ export function NewAgentModal({
         />
 
         {/* Agent info. */}
-        <div className="rounded-md bg-blue-50 p-3">
-          <h4 className="text-sm font-medium text-blue-800">
+        <div className="rounded-md border border-[#33608D]/15 bg-[#33608D]/5 p-3">
+          <h4 className="text-sm font-medium text-[var(--c-steel)]">
             What happens when you register?
           </h4>
-          <ul className="mt-1 list-inside list-disc text-sm text-blue-700">
+          <ul className="mt-1 list-inside list-disc text-sm text-[var(--c-mut)]">
             <li>A new agent identity is created</li>
             <li>The agent can send and receive messages</li>
             <li>Activity will be tracked in the dashboard</li>

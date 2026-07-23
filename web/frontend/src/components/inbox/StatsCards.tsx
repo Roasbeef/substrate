@@ -102,28 +102,28 @@ export interface StatCardProps {
 // Variant styles for cards.
 const variantStyles = {
   default: {
-    bg: 'bg-white',
+    bg: 'bg-[var(--c-card)]',
     icon: 'bg-gray-100 text-gray-600',
     text: 'text-gray-900',
   },
   blue: {
-    bg: 'bg-blue-50',
-    icon: 'bg-blue-100 text-blue-600',
-    text: 'text-blue-900',
+    bg: 'bg-[var(--c-card)] border border-[var(--c-hair)]',
+    icon: 'bg-[var(--c-fill)] text-[var(--c-steel)]',
+    text: 'text-[var(--c-ink)]',
   },
   yellow: {
-    bg: 'bg-yellow-50',
-    icon: 'bg-yellow-100 text-yellow-600',
+    bg: 'bg-[var(--c-card)] border border-[var(--c-hair)]',
+    icon: 'bg-[var(--c-fill)] text-[var(--c-amber)]',
     text: 'text-yellow-900',
   },
   red: {
-    bg: 'bg-red-50',
-    icon: 'bg-red-100 text-red-600',
+    bg: 'bg-[var(--c-card)] border border-[var(--c-hair)]',
+    icon: 'bg-[var(--c-fill)] text-[var(--c-rust)]',
     text: 'text-red-900',
   },
   green: {
-    bg: 'bg-green-50',
-    icon: 'bg-green-100 text-green-600',
+    bg: 'bg-[var(--c-card)] border border-[var(--c-hair)]',
+    icon: 'bg-[var(--c-fill)] text-[var(--c-green)]',
     text: 'text-green-900',
   },
 };

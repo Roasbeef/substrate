@@ -288,7 +288,7 @@ export function RecipientInput({
 
       <div
         className={cn(
-          'flex flex-wrap items-center gap-2 rounded-md border bg-white px-3 py-2',
+          'flex flex-wrap items-center gap-2 rounded-md border bg-[var(--c-card)] px-3 py-2',
           'focus-within:border-blue-500 focus-within:ring-2 focus-within:ring-blue-100',
           error
             ? 'border-red-300 focus-within:border-red-500 focus-within:ring-red-100'
@@ -359,7 +359,7 @@ export function RecipientInput({
       {/* Suggestions dropdown. */}
       {isOpen && filteredSuggestions.length > 0 ? (
         <div
-          className="absolute left-0 right-0 z-10 mt-1 max-h-60 overflow-auto rounded-md border border-gray-200 bg-white py-1 shadow-lg"
+          className="absolute left-0 right-0 z-10 mt-1 max-h-60 overflow-auto rounded-md border border-gray-200 bg-[var(--c-card)] py-1 shadow-lg"
           role="listbox"
         >
           {filteredSuggestions.map((suggestion, index) => (

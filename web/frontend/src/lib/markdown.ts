@@ -33,6 +33,19 @@ function hasSetAttribute(node: unknown): node is {
 function ensureExternalLinkHook(): void {
   if (hookRegistered) return;
   DOMPurify.addHook('afterSanitizeAttributes', (node) => {
+    if (
+      typeof node === 'object' && node !== null &&
+      'tagName' in node &&
+      (node as { tagName: string }).tagName === 'IMG'
+    ) {
+      const el = node as unknown as Element;
+      const src = el.getAttribute('src') ?? '';
+      if (!src.startsWith(ATTACHMENT_SRC_PREFIX)) {
+        el.remove();
+        return;
+      }
+      el.setAttribute('loading', 'lazy');
+    }
     if (hasSetAttribute(node) && node.tagName === 'A') {
       node.setAttribute('target', '_blank');
       node.setAttribute('rel', 'noopener noreferrer');
@@ -47,10 +60,15 @@ function ensureExternalLinkHook(): void {
 const ALLOWED_TAGS = [
   'p', 'br', 'strong', 'em', 'code', 'pre', 'ul', 'ol', 'li',
   'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'a', 'blockquote', 'hr',
-  'table', 'thead', 'tbody', 'tr', 'th', 'td',
+  'table', 'thead', 'tbody', 'tr', 'th', 'td', 'img',
 ];
 
-const ALLOWED_ATTR = ['href', 'target', 'rel'];
+const ALLOWED_ATTR = ['href', 'target', 'rel', 'src', 'alt'];
+
+// Attachment images are the only images allowed through: same-origin
+// paths under the attachments endpoint. Anything else (remote URLs,
+// data URIs) is dropped to prevent tracking pixels and exfil vectors.
+const ATTACHMENT_SRC_PREFIX = '/api/v1/attachments/';
 
 // renderMarkdownToHtml parses GFM markdown to HTML, sanitizes it, and
 // rewrites anchors to open in a new tab.

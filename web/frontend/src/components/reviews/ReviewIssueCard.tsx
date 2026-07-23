@@ -20,10 +20,10 @@ const statusIcons: Record<IssueStatus, string> = {
 
 // Status colors.
 const statusStyles: Record<IssueStatus, string> = {
-  open: 'text-red-600',
-  fixed: 'text-green-600',
-  wont_fix: 'text-gray-500',
-  duplicate: 'text-gray-500',
+  open: 'text-[var(--c-rust)]',
+  fixed: 'text-[var(--c-green)]',
+  wont_fix: 'text-[var(--c-mut)]',
+  duplicate: 'text-[var(--c-mut)]',
 };
 
 // Status labels.
@@ -54,7 +54,7 @@ export function ReviewIssueCard({
   return (
     <div
       className={cn(
-        'rounded-lg border border-gray-200 bg-white p-4',
+        'rounded-lg border border-[var(--c-hair)] bg-[var(--c-card)] p-4',
         'transition-shadow hover:shadow-sm',
         issue.status === 'fixed' && 'opacity-60',
       )}
@@ -64,11 +64,11 @@ export function ReviewIssueCard({
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2">
             <SeverityBadge severity={issue.severity} />
-            <span className="rounded bg-gray-100 px-1.5 py-0.5 text-xs text-gray-600">
+            <span className="rounded bg-[var(--c-fill)] px-1.5 py-0.5 text-xs text-[var(--c-mut)]">
               {issue.issue_type}
             </span>
           </div>
-          <h4 className="mt-1.5 text-sm font-medium text-gray-900">
+          <h4 className="mt-1.5 text-sm font-medium text-[var(--c-ink)]">
             {issue.title}
           </h4>
         </div>
@@ -89,7 +89,7 @@ export function ReviewIssueCard({
       {/* File location. */}
       {issue.file_path ? (
         <div className="mt-2">
-          <code className="text-xs text-blue-600">{fileLocation}</code>
+          <code className="text-xs text-[var(--c-steel)]">{fileLocation}</code>
         </div>
       ) : null}
 
@@ -97,7 +97,7 @@ export function ReviewIssueCard({
       <button
         type="button"
         onClick={() => setExpanded(!expanded)}
-        className="mt-2 text-xs font-medium text-gray-500 hover:text-gray-700"
+        className="mt-2 text-xs font-medium text-[var(--c-mut)] hover:text-[var(--c-ink)]"
       >
         {expanded ? 'Hide details' : 'Show details'}
       </button>
@@ -107,8 +107,8 @@ export function ReviewIssueCard({
           {/* Description. */}
           {issue.description ? (
             <div>
-              <h5 className="text-xs font-medium text-gray-500">Description</h5>
-              <p className="mt-1 text-sm text-gray-700 whitespace-pre-wrap">
+              <h5 className="text-xs font-medium text-[var(--c-mut)]">Description</h5>
+              <p className="mt-1 text-sm text-[var(--c-ink)] whitespace-pre-wrap">
                 {issue.description}
               </p>
             </div>
@@ -117,8 +117,8 @@ export function ReviewIssueCard({
           {/* Code snippet. */}
           {issue.code_snippet ? (
             <div>
-              <h5 className="text-xs font-medium text-gray-500">Code</h5>
-              <pre className="mt-1 overflow-x-auto rounded bg-gray-50 p-3 text-xs text-gray-800">
+              <h5 className="text-xs font-medium text-[var(--c-mut)]">Code</h5>
+              <pre className="mt-1 overflow-x-auto rounded bg-[var(--c-hover)] p-3 text-xs text-[var(--c-ink)]">
                 {issue.code_snippet}
               </pre>
             </div>
@@ -127,8 +127,8 @@ export function ReviewIssueCard({
           {/* Suggestion. */}
           {issue.suggestion ? (
             <div>
-              <h5 className="text-xs font-medium text-gray-500">Suggestion</h5>
-              <p className="mt-1 text-sm text-green-700 whitespace-pre-wrap">
+              <h5 className="text-xs font-medium text-[var(--c-mut)]">Suggestion</h5>
+              <p className="mt-1 text-sm text-[var(--c-green)] whitespace-pre-wrap">
                 {issue.suggestion}
               </p>
             </div>
@@ -137,10 +137,10 @@ export function ReviewIssueCard({
           {/* CLAUDE.md reference. */}
           {issue.claude_md_ref ? (
             <div>
-              <h5 className="text-xs font-medium text-gray-500">
+              <h5 className="text-xs font-medium text-[var(--c-mut)]">
                 CLAUDE.md Reference
               </h5>
-              <p className="mt-1 text-sm italic text-gray-600">
+              <p className="mt-1 text-sm italic text-[var(--c-mut)]">
                 {issue.claude_md_ref}
               </p>
             </div>
@@ -148,14 +148,14 @@ export function ReviewIssueCard({
 
           {/* Status change buttons. */}
           {onStatusChange && issue.status === 'open' ? (
-            <div className="flex gap-2 pt-2 border-t border-gray-100">
+            <div className="flex gap-2 pt-2 border-t border-[var(--c-fill)]">
               <button
                 type="button"
                 onClick={() => onStatusChange(issue.id, 'fixed')}
                 disabled={isUpdating}
                 className={cn(
                   'rounded px-3 py-1 text-xs font-medium',
-                  'bg-green-50 text-green-700 hover:bg-green-100',
+                  'bg-[#178A5B]/10 text-[var(--c-green)] hover:bg-[#178A5B]/15',
                   'disabled:opacity-50 disabled:cursor-not-allowed',
                 )}
               >
@@ -167,7 +167,7 @@ export function ReviewIssueCard({
                 disabled={isUpdating}
                 className={cn(
                   'rounded px-3 py-1 text-xs font-medium',
-                  'bg-gray-50 text-gray-600 hover:bg-gray-100',
+                  'bg-[var(--c-fill)] text-[var(--c-mut)] hover:bg-[var(--c-hair)]',
                   'disabled:opacity-50 disabled:cursor-not-allowed',
                 )}
               >

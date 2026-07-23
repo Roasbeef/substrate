@@ -4,9 +4,11 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"path/filepath"
 	"strings"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/roasbeef/subtrate/internal/mail"
 	"github.com/roasbeef/subtrate/internal/queue"
 	"github.com/spf13/cobra"
@@ -20,6 +22,7 @@ var (
 	sendPriority string
 	sendDeadline string
 	sendThreadID string
+	sendAttach   []string
 )
 
 var sendCmd = &cobra.Command{
@@ -49,6 +52,9 @@ func init() {
 		"Acknowledgment deadline (e.g., '2h', '2026-01-29T10:00:00')")
 	sendCmd.Flags().StringVar(&sendThreadID, "thread", "",
 		"Thread ID for replies")
+	sendCmd.Flags().StringSliceVar(&sendAttach, "attach", nil,
+		"Image file(s) to attach; copied into the shared "+
+			"attachments dir and embedded as markdown")
 
 	sendCmd.MarkFlagRequired("to")
 	sendCmd.MarkFlagRequired("subject")
@@ -78,6 +84,16 @@ func runSend(cmd *cobra.Command, args []string) error {
 			return fmt.Errorf("failed to read body file: %w", err)
 		}
 		body = strings.TrimSpace(string(data))
+	}
+
+	// Copy attachments into the shared attachments directory and
+	// embed markdown references so the web UI renders them inline.
+	if len(sendAttach) > 0 {
+		refs, err := stageAttachments(sendAttach)
+		if err != nil {
+			return err
+		}
+		body = strings.TrimSpace(body + "\n\n" + refs)
 	}
 
 	// Validate and parse priority.
@@ -209,4 +225,54 @@ func enqueueSend(
 	}
 
 	return nil
+}
+
+// attachmentExts whitelists attachable image types, mirroring the
+// daemon's serving whitelist.
+var attachmentExts = map[string]bool{
+	".png": true, ".jpg": true, ".jpeg": true,
+	".gif": true, ".webp": true, ".svg": true,
+}
+
+// stageAttachments copies image files into the shared attachments
+// directory (~/.subtrate/attachments) under random names and returns
+// the markdown image references to append to a message body. The
+// daemon serves that directory at /api/v1/attachments/.
+func stageAttachments(paths []string) (string, error) {
+	home, err := os.UserHomeDir()
+	if err != nil {
+		return "", fmt.Errorf("resolve home: %w", err)
+	}
+	dir := filepath.Join(home, ".subtrate", "attachments")
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		return "", fmt.Errorf("create attachments dir: %w", err)
+	}
+
+	var refs []string
+	for _, src := range paths {
+		ext := strings.ToLower(filepath.Ext(src))
+		if !attachmentExts[ext] {
+			return "", fmt.Errorf(
+				"unsupported attachment type: %s", src,
+			)
+		}
+
+		data, err := os.ReadFile(src)
+		if err != nil {
+			return "", fmt.Errorf("read attachment: %w", err)
+		}
+
+		name := uuid.NewString() + ext
+		dst := filepath.Join(dir, name)
+		if err := os.WriteFile(dst, data, 0o644); err != nil {
+			return "", fmt.Errorf("write attachment: %w", err)
+		}
+
+		refs = append(refs, fmt.Sprintf(
+			"![%s](/api/v1/attachments/%s)",
+			filepath.Base(src), name,
+		))
+	}
+
+	return strings.Join(refs, "\n"), nil
 }

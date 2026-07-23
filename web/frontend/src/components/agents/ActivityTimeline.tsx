@@ -140,17 +140,17 @@ function groupByDate(entries: TimelineEntry[]): Map<string, TimelineEntry[]> {
 // Summary card component - message-preview style card matching reference.
 function SummaryCard({ entry }: { entry: TimelineEntry }) {
   return (
-    <div className="ml-1 max-w-md rounded-lg border border-gray-200 bg-white px-4 py-3 shadow-sm">
-      <p className="text-[13px] font-medium text-gray-900 mb-1">
+    <div className="ml-1 max-w-md rounded-lg border border-[var(--c-hair)] bg-[var(--c-card)] px-4 py-3 shadow-sm">
+      <p className="text-[13px] font-medium text-[var(--c-ink)] mb-1">
         Activity Summary
       </p>
-      <p className="text-[13px] text-gray-600 leading-relaxed line-clamp-3">
+      <p className="text-[13px] text-[var(--c-mut)] leading-relaxed line-clamp-3">
         {entry.description}
       </p>
       {entry.delta && entry.delta !== 'Initial summary' ? (
-        <div className="mt-2.5 flex items-start gap-1.5 border-t border-gray-100 pt-2">
-          <span className="text-xs font-bold text-blue-600">&#916;</span>
-          <p className="text-xs text-gray-500 leading-relaxed line-clamp-2">
+        <div className="mt-2.5 flex items-start gap-1.5 border-t border-[var(--c-fill)] pt-2">
+          <span className="text-xs font-bold text-[var(--c-steel)]">&#916;</span>
+          <p className="text-xs text-[var(--c-mut)] leading-relaxed line-clamp-2">
             {entry.delta}
           </p>
         </div>
@@ -162,10 +162,10 @@ function SummaryCard({ entry }: { entry: TimelineEntry }) {
 // Activity inline entry - compact text next to filled dot.
 function ActivityEntry({ entry }: { entry: TimelineEntry }) {
   return (
-    <span className="text-[13px] text-gray-600">
-      <span className="font-medium text-gray-800">{entry.title}</span>
+    <span className="text-[13px] text-[var(--c-mut)]">
+      <span className="font-medium text-[var(--c-ink)]">{entry.title}</span>
       {entry.description ? (
-        <span className="text-gray-500"> &mdash; {entry.description}</span>
+        <span className="text-[var(--c-mut)]"> &mdash; {entry.description}</span>
       ) : null}
     </span>
   );
@@ -191,13 +191,13 @@ export function ActivityTimeline({
   if (timeline.length === 0) {
     return (
       <div className={cn('py-12 text-center', className)}>
-        <div className="mx-auto mb-3 flex h-10 w-10 items-center justify-center rounded-full bg-gray-100">
-          <svg className="h-5 w-5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <div className="mx-auto mb-3 flex h-10 w-10 items-center justify-center rounded-full bg-[var(--c-fill)]">
+          <svg className="h-5 w-5 text-[var(--c-faint)]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
           </svg>
         </div>
-        <p className="text-sm font-medium text-gray-500">No activity recorded yet</p>
-        <p className="mt-1 text-xs text-gray-400">Activity and summaries will appear here.</p>
+        <p className="text-sm font-medium text-[var(--c-mut)]">No activity recorded yet</p>
+        <p className="mt-1 text-xs text-[var(--c-faint)]">Activity and summaries will appear here.</p>
       </div>
     );
   }
@@ -205,7 +205,7 @@ export function ActivityTimeline({
   return (
     <div className={cn('overflow-y-auto', className)}>
       {/* Section heading. */}
-      <h3 className="mb-4 text-xs font-semibold uppercase tracking-wider text-gray-400">
+      <h3 className="mb-4 text-xs font-semibold uppercase tracking-wider text-[var(--c-mut)]">
         Activity History
       </h3>
 
@@ -214,17 +214,17 @@ export function ActivityTimeline({
           <div key={dateKey}>
             {/* Date group header centered with horizontal rules. */}
             <div className="flex items-center gap-4 mb-5">
-              <div className="h-px flex-1 bg-gray-200" />
-              <span className="text-xs font-semibold text-gray-500 whitespace-nowrap">
+              <div className="h-px flex-1 bg-[var(--c-hair)]" />
+              <span className="text-xs font-semibold text-[var(--c-mut)] whitespace-nowrap">
                 {entries[0] ? formatTimelineDate(entries[0].timestamp) : ''}
               </span>
-              <div className="h-px flex-1 bg-gray-200" />
+              <div className="h-px flex-1 bg-[var(--c-hair)]" />
             </div>
 
             {/* Timeline entries with vertical line. */}
             <div className="relative pl-6">
               {/* Vertical timeline line. */}
-              <div className="absolute left-[7px] top-1 bottom-1 w-[2px] bg-gray-200 rounded-full" />
+              <div className="absolute left-[7px] top-1 bottom-1 w-[2px] bg-[var(--c-hair)] rounded-full" />
 
               <div className="space-y-5">
                 {entries.map((entry) => {
@@ -238,22 +238,22 @@ export function ActivityTimeline({
                       )}>
                         {isSummary ? (
                           // Open circle for summaries - larger.
-                          <div className="h-4 w-4 rounded-full border-[2.5px] border-gray-400 bg-white" />
+                          <div className="h-4 w-4 rounded-full border-[2.5px] border-[var(--c-faint)] bg-[var(--c-card)]" />
                         ) : (
                           // Filled circle for activities - smaller.
                           <div className={cn(
                             'h-2.5 w-2.5 rounded-full',
-                            entry.icon === 'heartbeat' ? 'bg-green-400' :
-                            entry.icon === 'session' ? 'bg-purple-400' :
-                            entry.icon === 'message' ? 'bg-gray-700' :
-                            'bg-gray-400',
+                            entry.icon === 'heartbeat' ? 'bg-[var(--c-green)]' :
+                            entry.icon === 'session' ? 'bg-[var(--c-violet)]' :
+                            entry.icon === 'message' ? 'bg-[var(--c-ink)]' :
+                            'bg-[var(--c-faint)]',
                           )} />
                         )}
                       </div>
 
                       {/* Timestamp column. */}
                       <div className="w-16 shrink-0 pt-0.5">
-                        <span className="text-xs text-gray-400 tabular-nums">
+                        <span className="text-xs text-[var(--c-faint)] tabular-nums">
                           {formatTimelineTime(entry.timestamp)}
                         </span>
                       </div>

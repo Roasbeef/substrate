@@ -10,10 +10,10 @@ function cn(...inputs: (string | undefined | null | false)[]) {
 
 // Color mapping for severity levels.
 const severityStyles: Record<IssueSeverity, string> = {
-  critical: 'bg-red-100 text-red-800',
-  major: 'bg-orange-100 text-orange-800',
-  minor: 'bg-yellow-100 text-yellow-800',
-  suggestion: 'bg-blue-100 text-blue-800',
+  critical: 'bg-[#B3372B]/10 text-[var(--c-rust)]',
+  major: 'bg-[#C98A1B]/12 text-[var(--c-amber)]',
+  minor: 'bg-[#33608D]/10 text-[var(--c-steel)]',
+  suggestion: 'bg-[#6B7280]/10 text-[var(--c-mut)]',
 };
 
 // Icon for severity levels.
@@ -34,7 +34,7 @@ export function SeverityBadge({ severity, className }: SeverityBadgeProps) {
     <span
       className={cn(
         'inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium',
-        severityStyles[severity] ?? 'bg-gray-100 text-gray-600',
+        severityStyles[severity] ?? 'bg-[#6B7280]/10 text-[var(--c-mut)]',
         className,
       )}
     >

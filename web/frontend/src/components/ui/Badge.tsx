@@ -32,22 +32,22 @@ export interface BadgeProps {
 
 // Variant styles mapping.
 const variantStyles: Record<BadgeVariant, string> = {
-  default: 'bg-gray-100 text-gray-800',
-  success: 'bg-green-100 text-green-800',
-  warning: 'bg-yellow-100 text-yellow-800',
-  error: 'bg-red-100 text-red-800',
-  info: 'bg-blue-100 text-blue-800',
-  outline: 'border border-gray-300 text-gray-700 bg-transparent',
+  default: 'bg-[#6B7280]/10 text-[var(--c-mut)]',
+  success: 'bg-[#178A5B]/10 text-[var(--c-green)]',
+  warning: 'bg-[#C98A1B]/12 text-[var(--c-amber)]',
+  error: 'bg-[#B3372B]/10 text-[var(--c-rust)]',
+  info: 'bg-[#33608D]/10 text-[var(--c-steel)]',
+  outline: 'border border-[var(--c-hair)] text-[var(--c-mut)] bg-transparent',
 };
 
 // Dot color mapping for variants.
 const dotColors: Record<BadgeVariant, string> = {
-  default: 'bg-gray-500',
-  success: 'bg-green-500',
-  warning: 'bg-yellow-500',
-  error: 'bg-red-500',
-  info: 'bg-blue-500',
-  outline: 'bg-gray-500',
+  default: 'bg-[var(--c-faint)]',
+  success: 'bg-[var(--c-green)]',
+  warning: 'bg-[#C98A1B]',
+  error: 'bg-[var(--c-rust)]',
+  info: 'bg-[var(--c-steel)]',
+  outline: 'bg-[var(--c-faint)]',
 };
 
 // Size styles mapping.
@@ -92,10 +92,10 @@ export function Badge({
 export type AgentStatus = 'active' | 'busy' | 'idle' | 'offline';
 
 const agentStatusConfig: Record<AgentStatus, { variant: BadgeVariant; label: string; dotColor: string }> = {
-  active: { variant: 'success', label: 'Active', dotColor: 'bg-green-500 animate-pulse' },
-  busy: { variant: 'warning', label: 'Busy', dotColor: 'bg-yellow-500' },
-  idle: { variant: 'default', label: 'Idle', dotColor: 'bg-gray-400' },
-  offline: { variant: 'outline', label: 'Offline', dotColor: 'bg-gray-300' },
+  active: { variant: 'success', label: 'Active', dotColor: 'bg-[var(--c-green)] animate-pulse' },
+  busy: { variant: 'warning', label: 'Busy', dotColor: 'bg-[#C98A1B]' },
+  idle: { variant: 'default', label: 'Idle', dotColor: 'bg-[var(--c-faint)]' },
+  offline: { variant: 'outline', label: 'Offline', dotColor: 'bg-[var(--c-dim)]' },
 };
 
 export interface StatusBadgeProps {

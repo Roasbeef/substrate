@@ -90,7 +90,7 @@ export function NotificationPrompt({ className = '' }: NotificationPromptProps):
 
   return (
     <div
-      className={`fixed bottom-4 right-4 z-50 max-w-sm rounded-lg border border-gray-200 bg-white p-4 shadow-lg dark:border-gray-700 dark:bg-gray-800 ${className}`}
+      className={`fixed bottom-4 right-4 z-50 max-w-sm rounded-lg border border-gray-200 bg-[var(--c-card)] p-4 shadow-lg dark:border-gray-700 dark:bg-gray-800 ${className}`}
       role="alert"
       aria-live="polite"
     >

@@ -190,8 +190,8 @@ function ToolbarButton({
       disabled={disabled}
       className={cn(
         'flex items-center justify-center rounded-md p-2',
-        'text-gray-500 hover:bg-gray-100 hover:text-gray-700',
-        'focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2',
+        'text-[var(--c-mut)] hover:bg-[var(--c-fill)] hover:text-[var(--c-ink)]',
+        'focus:outline-none focus:ring-2 focus:ring-[#22262A]/30 focus:ring-offset-2',
         disabled ? 'cursor-not-allowed opacity-50' : '',
         className,
       )}
@@ -365,23 +365,23 @@ export function ThreadView({
       showCloseButton={false}
     >
       {/* Toolbar. */}
-      <div className="flex flex-shrink-0 items-center justify-between border-b border-gray-200 bg-gray-50 px-4 py-2">
+      <div className="flex flex-shrink-0 items-center justify-between border-b border-[var(--c-hair)] bg-[var(--c-paper)] px-4 py-2">
         <div className="flex items-center gap-1">
           <button
             type="button"
             onClick={onClose}
             className={cn(
               'flex items-center gap-2 rounded-lg px-3 py-1.5',
-              'text-sm font-medium text-gray-700',
-              'hover:bg-gray-200 transition-colors',
-              'focus:outline-none focus:ring-2 focus:ring-blue-500',
+              'text-sm font-medium text-[var(--c-ink)]',
+              'hover:bg-[var(--c-fill)] transition-colors',
+              'focus:outline-none focus:ring-2 focus:ring-[#22262A]/30',
             )}
           >
             <ArrowLeftIcon className="h-4 w-4" />
             <span>Back to inbox</span>
           </button>
 
-          <div className="mx-3 h-5 w-px bg-gray-300" />
+          <div className="mx-3 h-5 w-px bg-[var(--c-hair)]" />
 
           {onArchive ? (
             <ToolbarButton
@@ -424,7 +424,7 @@ export function ThreadView({
             label="Next thread"
             disabled={!hasNext || isActionLoading}
           />
-          <div className="ml-2 h-5 w-px bg-gray-300" />
+          <div className="ml-2 h-5 w-px bg-[var(--c-hair)]" />
           <ToolbarButton
             onClick={() => setIsFullscreen(!isFullscreen)}
             icon={isFullscreen ? <CollapseIcon /> : <ExpandIcon />}
@@ -433,7 +433,7 @@ export function ThreadView({
           <button
             type="button"
             onClick={onClose}
-            className="rounded-md p-1.5 text-gray-400 hover:bg-gray-200 hover:text-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="rounded-md p-1.5 text-[var(--c-faint)] hover:bg-[var(--c-fill)] hover:text-[var(--c-ink)] focus:outline-none focus:ring-2 focus:ring-[#22262A]/30"
             aria-label="Close"
           >
             <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -459,7 +459,7 @@ export function ThreadView({
         ) : error ? (
           <div className="flex h-full flex-col items-center justify-center text-center">
             <svg
-              className="h-12 w-12 text-red-400"
+              className="h-12 w-12 text-[var(--c-rust)]"
               fill="none"
               viewBox="0 0 24 24"
               stroke="currentColor"
@@ -471,12 +471,12 @@ export function ThreadView({
                 d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"
               />
             </svg>
-            <p className="mt-2 text-gray-500">{error.message}</p>
+            <p className="mt-2 text-[var(--c-mut)]">{error.message}</p>
           </div>
         ) : thread ? (
           <div className="space-y-4">
             {/* Subject. */}
-            <h1 className="text-xl font-bold text-gray-900">{thread.subject}</h1>
+            <h1 className="text-xl font-bold text-[var(--c-ink)]">{thread.subject}</h1>
 
             {/* Deadline banner. */}
             {deadline ? (
@@ -515,12 +515,12 @@ export function ThreadView({
       {thread && onReply ? (
         <div
           className={cn(
-            'border-t border-gray-200 p-4',
+            'border-t border-[var(--c-hair)] p-4',
             isExpanded && 'flex-1 flex flex-col min-h-[300px]',
           )}
         >
           <div className="flex items-center justify-between mb-2">
-            <span className="text-sm text-gray-500">
+            <span className="text-sm text-[var(--c-mut)]">
               Press Ctrl+Enter to send
             </span>
             <button
@@ -528,7 +528,7 @@ export function ThreadView({
               onClick={() => setIsExpanded(!isExpanded)}
               className={cn(
                 'flex items-center gap-1 rounded px-2 py-1 text-xs',
-                'text-gray-500 hover:bg-gray-100 hover:text-gray-700',
+                'text-[var(--c-mut)] hover:bg-[var(--c-fill)] hover:text-[var(--c-ink)]',
                 'transition-colors',
               )}
               title={isExpanded ? 'Collapse' : 'Expand'}

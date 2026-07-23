@@ -111,8 +111,8 @@ function Checkbox({
         }}
         onChange={(e) => onChange(e.target.checked)}
         className={cn(
-          'h-4 w-4 rounded border-gray-300 text-blue-600',
-          'focus:ring-2 focus:ring-blue-500 focus:ring-offset-2',
+          'h-4 w-4 rounded border-[var(--c-dim)] text-[var(--c-ink)]',
+          'focus:ring-2 focus:ring-[#22262A]/30 focus:ring-offset-2',
         )}
         aria-label={ariaLabel}
       />
@@ -143,8 +143,8 @@ function ToolbarButton({
       disabled={disabled}
       className={cn(
         'flex items-center justify-center rounded-md p-2',
-        'text-gray-500 hover:bg-gray-100 hover:text-gray-700',
-        'focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2',
+        'text-[var(--c-mut)] hover:bg-[var(--c-fill)] hover:text-[var(--c-ink)]',
+        'focus:outline-none focus:ring-2 focus:ring-[#22262A]/30 focus:ring-offset-2',
         disabled ? 'cursor-not-allowed opacity-50' : '',
         className,
       )}
@@ -206,7 +206,7 @@ export function FilterBar({
   return (
     <div
       className={cn(
-        'flex items-center justify-between gap-4 border-b border-gray-200 bg-white px-4 py-2',
+        'flex items-center justify-between gap-4 border-b border-[var(--c-hair)] bg-[var(--c-card)] px-4 py-2',
         className,
       )}
     >
@@ -221,10 +221,10 @@ export function FilterBar({
 
         {hasSelection ? (
           <>
-            <span className="ml-2 text-sm text-gray-600">
+            <span className="ml-2 text-sm text-[var(--c-mut)]">
               {selectedCount} selected
             </span>
-            <div className="ml-2 flex items-center border-l border-gray-200 pl-2">
+            <div className="ml-2 flex items-center border-l border-[var(--c-hair)] pl-2">
               {onArchive ? (
                 <ToolbarButton
                   onClick={onArchive}
@@ -261,7 +261,7 @@ export function FilterBar({
                 disabled={isLoading}
               />
             ) : null}
-            <span className="text-sm text-gray-500">{totalCount} messages</span>
+            <span className="text-sm text-[var(--c-mut)]">{totalCount} messages</span>
           </div>
         )}
       </div>
@@ -303,7 +303,7 @@ export function SimpleFilterBar({
   return (
     <div
       className={cn(
-        'flex items-center justify-between gap-4 bg-white px-4 py-3',
+        'flex items-center justify-between gap-4 bg-[var(--c-card)] px-4 py-3',
         className,
       )}
     >
@@ -317,7 +317,7 @@ export function SimpleFilterBar({
           />
         ) : null}
         {totalCount !== undefined ? (
-          <span className="text-sm text-gray-500">{totalCount} messages</span>
+          <span className="text-sm text-[var(--c-mut)]">{totalCount} messages</span>
         ) : null}
       </div>
 

@@ -123,6 +123,12 @@ func NewServer(cfg *Config, st store.Storage,
 	// Register summary REST API routes.
 	s.registerSummaryRoutes()
 
+	// Register command center REST API routes.
+	s.registerCommandRoutes()
+	s.registerCommandFlowRoutes()
+	s.registerCommandDocRoutes()
+	s.registerAttachmentRoutes()
+
 	// Register WebSocket route.
 	s.mux.HandleFunc("/ws", s.handleWebSocket)
 

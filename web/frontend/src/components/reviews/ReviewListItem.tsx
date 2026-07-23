@@ -13,10 +13,10 @@ function cn(...inputs: (string | undefined | null | false)[]) {
 
 // Review type labels and styles.
 const typeStyles: Record<string, string> = {
-  full: 'bg-purple-50 text-purple-700',
-  incremental: 'bg-cyan-50 text-cyan-700',
-  security: 'bg-red-50 text-red-700',
-  performance: 'bg-amber-50 text-amber-700',
+  full: 'bg-[#5B5BD6]/10 text-[var(--c-violet)]',
+  incremental: 'bg-[#0E7490]/10 text-[var(--c-teal)]',
+  security: 'bg-[#B3372B]/10 text-[var(--c-rust)]',
+  performance: 'bg-[#C98A1B]/12 text-[var(--c-amber)]',
 };
 
 // Format Unix timestamp to relative time.
@@ -50,41 +50,41 @@ export function ReviewListItem({ review, className }: ReviewListItemProps) {
     <Link
       to={routes.review(review.review_id)}
       className={cn(
-        'flex items-center gap-4 rounded-lg border border-gray-200 bg-white px-4 py-3',
-        'transition-all hover:border-gray-300 hover:shadow-sm',
+        'flex items-center gap-4 rounded-lg border border-[var(--c-hair)] bg-[var(--c-card)] px-4 py-3',
+        'transition-all hover:border-[var(--c-ghost2)] hover:shadow-sm',
         className,
       )}
     >
       {/* Branch name as main identifier. */}
       <div className="min-w-0 flex-1">
         <div className="flex items-center gap-2">
-          <span className="truncate text-sm font-medium text-gray-900">
+          <span className="truncate text-sm font-medium text-[var(--c-ink)]">
             {review.branch}
           </span>
           <ReviewStateBadge state={review.state} />
         </div>
-        <div className="mt-1 flex items-center gap-2 text-xs text-gray-500">
+        <div className="mt-1 flex items-center gap-2 text-xs text-[var(--c-mut)]">
           <span
             className={cn(
               'rounded px-1.5 py-0.5 text-xs font-medium',
-              typeStyles[review.review_type] ?? 'bg-gray-50 text-gray-600',
+              typeStyles[review.review_type] ?? 'bg-[var(--c-fill)] text-[var(--c-mut)]',
             )}
           >
             {review.review_type}
           </span>
-          <span className="text-gray-300">|</span>
+          <span className="text-[var(--c-hair)]">|</span>
           <span>ID: {review.review_id.slice(0, 8)}</span>
         </div>
       </div>
 
       {/* Timestamp. */}
-      <div className="shrink-0 text-xs text-gray-400">
+      <div className="shrink-0 text-xs text-[var(--c-faint)]">
         {formatRelativeTime(review.created_at)}
       </div>
 
       {/* Chevron arrow. */}
       <svg
-        className="h-4 w-4 shrink-0 text-gray-400"
+        className="h-4 w-4 shrink-0 text-[var(--c-faint)]"
         fill="none"
         viewBox="0 0 24 24"
         stroke="currentColor"

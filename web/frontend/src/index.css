@@ -3,10 +3,28 @@
 /* Substrate Design System */
 @layer base {
   :root {
-    /* Primary blue palette - matches header */
-    --color-primary: #3B82F6;
-    --color-primary-hover: #2563EB;
-    --color-primary-light: #EFF6FF;
+    /* Accent: muted steel blue for links and focus; chrome is ink. */
+    --color-primary: #33608D;
+    --color-primary-hover: #2A5075;
+    --color-primary-light: #EEF2F6;
+    --color-ink: #22262A;
+    --color-paper: #F7F6F3;
+    --color-hairline: #E6E4DD;
+
+    /* Named neutrals + accents for the ink-on-paper system. Dark mode
+       overrides these under html.dark. */
+    --c-paper: #F7F6F3; --c-card: #FFFFFF; --c-card95: rgba(255,255,255,.95);
+    --c-hover: #F4F3EE; --c-fill: #F1EFE9;
+    --c-hair: #E6E4DD; --c-hair2: #EDEBE4;
+    --c-ink: #22262A; --c-ink2: #33383D; --c-text2: #4A4F55;
+    --c-inkhover: #3A4046;
+    --c-mut: #6B7280; --c-faint2: #8A8F96; --c-faint: #9BA0A6;
+    --c-dim: #B0ADA4; --c-ghost: #C9C7BF; --c-ghost2: #D8D6CE;
+    --c-green: #178A5B; --c-greenhover: #116D48;
+    --c-amber: #92610E; --c-amberink: #6d5613; --c-amberwave: #B9A15C;
+    --c-rust: #B3372B; --c-rusthover: #8F2C22;
+    --c-violet: #5B5BD6; --c-violet2: #4a4ab8;
+    --c-teal: #0E7490; --c-steel: #33608D; --c-steelhover: #2A5075;
 
     /* Status colors */
     --color-success: #22C55E;
@@ -36,8 +54,8 @@
   body {
     margin: 0;
     min-height: 100vh;
-    background-color: var(--color-gray-50);
-    color: var(--color-gray-900);
+    background-color: var(--color-paper);
+    color: var(--color-ink);
   }
 
   /* Better text rendering for headers */
@@ -332,6 +350,27 @@
   .prose-sm {
     font-size: 0.875rem;
   }
+
+  /* Attachment images in message bodies stay bounded. */
+  .prose img {
+    max-width: 100%;
+    max-height: 320px;
+    border-radius: 6px;
+    border: 1px solid var(--c-hair);
+  }
+
+  /* Compact markdown sizing for command canvas cards. */
+  .prose-command h1 {
+    font-size: 1.05em;
+  }
+
+  .prose-command h2 {
+    font-size: 1em;
+  }
+
+  .prose-command h3, .prose-command h4 {
+    font-size: 1em;
+  }
 }
 
 /* Focus visible styles for better accessibility */
@@ -346,4 +385,86 @@
   input:focus:not(:focus-visible) {
     outline: none;
   }
+}
+
+/* Command canvas surface and the heartbeat trace signature element. */
+@layer components {
+  .canvas-dots {
+    background-color: var(--c-paper);
+    background-image: radial-gradient(var(--c-dots, #DDDBD2) 1px, transparent 1.2px);
+  }
+
+  html.dark .canvas-dots {
+    --c-dots: #2A2E33;
+  }
+
+  .trace-beat {
+    stroke-dasharray: 110;
+    stroke-dashoffset: 110;
+    animation: trace-sweep 2.4s linear infinite;
+  }
+
+  .trace-idle {
+    animation: trace-fade 3.6s ease-in-out infinite;
+  }
+
+  @keyframes trace-sweep {
+    0% {
+      stroke-dashoffset: 110;
+      opacity: 0.25;
+    }
+    45% {
+      stroke-dashoffset: 0;
+      opacity: 1;
+    }
+    70% {
+      stroke-dashoffset: 0;
+      opacity: 1;
+    }
+    100% {
+      stroke-dashoffset: -110;
+      opacity: 0.25;
+    }
+  }
+
+  @keyframes trace-fade {
+    0%, 100% {
+      opacity: 0.35;
+    }
+    50% {
+      opacity: 0.9;
+    }
+  }
+}
+
+/* Dark mode: same system, inverted neutrals, brightened accents. */
+html.dark {
+  --c-paper: #131518; --c-card: #1B1E22; --c-card95: rgba(27,30,34,.95);
+  --c-hover: #22262B; --c-fill: #24282D;
+  --c-hair: #2C3036; --c-hair2: #272B30;
+  --c-ink: #E7E9EB; --c-ink2: #D3D7DB; --c-text2: #B9BEC4;
+  --c-inkhover: #C9CED4;
+  --c-mut: #9AA1A8; --c-faint2: #848B92; --c-faint: #6F767D;
+  --c-dim: #5A6067; --c-ghost: #43484E; --c-ghost2: #3A3F45;
+  --c-green: #2FB47C; --c-greenhover: #3CC68B;
+  --c-amber: #D4A147; --c-amberink: #E0B76A; --c-amberwave: #B9A15C;
+  --c-rust: #E0685C; --c-rusthover: #E88075;
+  --c-violet: #8F8FE8; --c-violet2: #A3A3EE;
+  --c-teal: #3FA8C9; --c-steel: #7FA5C9; --c-steelhover: #98B8D6;
+
+  --color-primary: #7FA5C9;
+  --color-primary-hover: #98B8D6;
+  --color-primary-light: #22303C;
+  --color-gray-50: #1B1E22; --color-gray-100: #24282D;
+  --color-gray-200: #2C3036; --color-gray-300: #3A3F45;
+  --color-gray-400: #6F767D; --color-gray-500: #9AA1A8;
+  --color-gray-600: #B9BEC4; --color-gray-700: #D3D7DB;
+  --color-gray-800: #E7E9EB; --color-gray-900: #F2F3F4;
+  --color-ink: #E7E9EB; --color-paper: #131518;
+  --color-hairline: #2C3036;
+}
+
+/* Ink-filled controls need dark text when ink flips light. */
+html.dark .bg-\[var\(--c-ink\)\] {
+  color: #16181B;
 }

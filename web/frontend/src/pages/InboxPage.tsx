@@ -1,7 +1,7 @@
 // InboxPage component - main inbox view with messages, filters, and actions.
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { useLocation, useParams } from 'react-router-dom';
+import { Link, useLocation, useParams } from 'react-router-dom';
 import {
   InboxStats,
   CategoryTabs,
@@ -43,6 +43,30 @@ interface InboxState {
 
 // Route filter type for sidebar navigation.
 type RouteFilter = 'inbox' | 'starred' | 'snoozed' | 'sent' | 'archive';
+
+// FolderLink switches between the inbox and sent views of Signals.
+function FolderLink({
+  to,
+  active,
+  children,
+}: {
+  to: string;
+  active: boolean;
+  children: React.ReactNode;
+}) {
+  return (
+    <Link
+      to={to}
+      className={
+        active
+          ? 'rounded-lg bg-[var(--c-fill)] px-2.5 py-1 font-mono text-[11px] uppercase tracking-[0.08em] text-[var(--c-ink)]'
+          : 'rounded-lg px-2.5 py-1 font-mono text-[11px] uppercase tracking-[0.08em] text-[var(--c-faint2)] hover:bg-[var(--c-hover)] hover:text-[var(--c-text2)]'
+      }
+    >
+      {children}
+    </Link>
+  );
+}
 
 // Get route filter from pathname.
 function getRouteFilter(pathname: string): RouteFilter {
@@ -511,14 +535,23 @@ export default function InboxPage() {
         </div>
       </div>
 
-      {/* Category tabs. */}
-      <div className="border-b border-gray-200 bg-white px-6">
+      {/* Category tabs + inbox/sent folder switch. Sent traffic lives
+          here as a folder rather than a separate nav destination. */}
+      <div className="flex items-center justify-between border-b border-gray-200 bg-[var(--c-card)] px-6">
         <CategoryTabs
           selected={state.category}
           onSelect={handleCategoryChange}
           tabs={categoryTabs}
           disabled={isLoading}
         />
+        <div className="flex items-center gap-1">
+          <FolderLink to="/inbox" active={routeFilter === 'inbox'}>
+            Inbox
+          </FolderLink>
+          <FolderLink to="/sent" active={routeFilter === 'sent'}>
+            Sent
+          </FolderLink>
+        </div>
       </div>
 
       {/* Sender filter (when multiple senders exist). */}
@@ -531,7 +564,7 @@ export default function InboxPage() {
             id="sender-filter"
             value={state.senderFilter ?? ''}
             onChange={(e) => handleSenderFilterChange(e.target.value || null)}
-            className="rounded-md border border-gray-300 bg-white px-3 py-1.5 text-sm text-gray-900 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+            className="rounded-md border border-gray-300 bg-[var(--c-card)] px-3 py-1.5 text-sm text-gray-900 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
           >
             <option value="">All senders</option>
             {uniqueSenders.map((sender) => (

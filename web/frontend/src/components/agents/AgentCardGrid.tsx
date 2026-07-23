@@ -94,9 +94,9 @@ function EmptyState({ filter }: { filter: AgentFilterOption }) {
 
   return (
     <div className="flex flex-col items-center justify-center py-12 text-center">
-      <div className="mb-4 rounded-full bg-gray-100 p-3">
+      <div className="mb-4 rounded-full bg-[var(--c-fill)] p-3">
         <svg
-          className="h-6 w-6 text-gray-400"
+          className="h-6 w-6 text-[var(--c-faint)]"
           fill="none"
           viewBox="0 0 24 24"
           stroke="currentColor"
@@ -109,10 +109,10 @@ function EmptyState({ filter }: { filter: AgentFilterOption }) {
           />
         </svg>
       </div>
-      <h3 className="mb-1 text-lg font-medium text-gray-900">
+      <h3 className="mb-1 text-lg font-medium text-[var(--c-ink)]">
         No{filterLabel} agents
       </h3>
-      <p className="text-sm text-gray-500">
+      <p className="text-sm text-[var(--c-mut)]">
         {filter === 'all'
           ? 'No agents have been registered yet.'
           : `No agents are currently ${filter}.`}
@@ -170,7 +170,7 @@ export function AgentCardGrid({
         <div className="flex flex-wrap items-center justify-between gap-4">
           {/* Filter tabs. */}
           {showFilters ? (
-            <div className="flex gap-1 rounded-lg bg-gray-100 p-1">
+            <div className="flex gap-1 rounded-lg bg-[var(--c-fill)] p-1">
               {filterTabs.map((tab) => (
                 <button
                   key={tab.id}
@@ -178,8 +178,8 @@ export function AgentCardGrid({
                   className={cn(
                     'rounded-md px-3 py-1.5 text-sm font-medium transition-colors',
                     filter === tab.id
-                      ? 'bg-white text-gray-900 shadow-sm'
-                      : 'text-gray-600 hover:text-gray-900',
+                      ? 'bg-[var(--c-card)] text-[var(--c-ink)] shadow-sm'
+                      : 'text-[var(--c-mut)] hover:text-[var(--c-ink)]',
                   )}
                   aria-pressed={filter === tab.id}
                 >
@@ -192,14 +192,14 @@ export function AgentCardGrid({
           {/* Sort dropdown. */}
           {showSort ? (
             <div className="flex items-center gap-2">
-              <label htmlFor="agent-sort" className="text-sm text-gray-500">
+              <label htmlFor="agent-sort" className="text-sm text-[var(--c-mut)]">
                 Sort by:
               </label>
               <select
                 id="agent-sort"
                 value={sort}
                 onChange={(e) => setSort(e.target.value as AgentSortOption)}
-                className="rounded-md border border-gray-300 bg-white px-3 py-1.5 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                className="rounded-md border border-[var(--c-hair)] bg-[var(--c-card)] px-3 py-1.5 text-sm focus:border-[var(--c-ink)] focus:outline-none focus:ring-1 focus:ring-[#22262A]/30"
               >
                 {sortOptions.map((option) => (
                   <option key={option.id} value={option.id}>

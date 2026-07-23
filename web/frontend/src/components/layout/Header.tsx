@@ -1,6 +1,6 @@
 // Header component - top navigation bar with search, agent switcher, and settings.
 
-import { type ReactNode } from 'react';
+import { type ReactNode, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { clsx } from 'clsx';
 import { twMerge } from 'tailwind-merge';
@@ -23,6 +23,25 @@ export interface HeaderProps {
   leftContent?: ReactNode;
   /** Optional right-side content (e.g., user menu). */
   rightContent?: ReactNode;
+}
+
+// Pen icon for the new-message action.
+function ComposeIcon({ className }: { className?: string }) {
+  return (
+    <svg
+      className={cn('h-5 w-5', className)}
+      fill="none"
+      viewBox="0 0 24 24"
+      stroke="currentColor"
+    >
+      <path
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        strokeWidth={2}
+        d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"
+      />
+    </svg>
+  );
 }
 
 // Menu icon for sidebar toggle.
@@ -63,30 +82,6 @@ function SearchIcon({ className }: { className?: string }) {
   );
 }
 
-// Settings icon.
-function SettingsIcon({ className }: { className?: string }) {
-  return (
-    <svg
-      className={cn('h-5 w-5', className)}
-      fill="none"
-      viewBox="0 0 24 24"
-      stroke="currentColor"
-    >
-      <path
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        strokeWidth={2}
-        d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"
-      />
-      <path
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        strokeWidth={2}
-        d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"
-      />
-    </svg>
-  );
-}
 
 // Bell icon for notifications.
 function BellIcon({ className }: { className?: string }) {
@@ -162,27 +157,46 @@ function IconButton({
 }
 
 
-// Envelope icon for branding.
-function EnvelopeIcon({ className }: { className?: string }) {
+// ThemeToggle flips between light and dark, persisting the choice.
+function ThemeToggle() {
+  const [dark, setDark] = useState(
+    () => document.documentElement.classList.contains('dark'),
+  );
+
+  const toggle = () => {
+    const next = !dark;
+    setDark(next);
+    document.documentElement.classList.toggle('dark', next);
+    localStorage.setItem('substrate-theme', next ? 'dark' : 'light');
+  };
+
   return (
-    <svg
-      className={cn('h-6 w-6', className)}
-      fill="none"
-      viewBox="0 0 24 24"
-      stroke="currentColor"
-      strokeWidth={1.5}
+    <button
+      type="button"
+      onClick={toggle}
+      title={dark ? 'Switch to light mode' : 'Switch to dark mode'}
+      aria-label="Toggle dark mode"
+      className="rounded-md p-2 hover:bg-[var(--c-fill)] hover:text-[var(--c-ink)] focus:outline-none"
     >
-      <path
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        d="M21.75 6.75v10.5a2.25 2.25 0 01-2.25 2.25h-15a2.25 2.25 0 01-2.25-2.25V6.75m19.5 0A2.25 2.25 0 0019.5 4.5h-15a2.25 2.25 0 00-2.25 2.25m19.5 0v.243a2.25 2.25 0 01-1.07 1.916l-7.5 4.615a2.25 2.25 0 01-2.36 0L3.32 8.91a2.25 2.25 0 01-1.07-1.916V6.75"
-      />
-    </svg>
+      {dark ? (
+        <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24"
+          stroke="currentColor" strokeWidth={2}>
+          <path strokeLinecap="round" strokeLinejoin="round"
+            d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" />
+        </svg>
+      ) : (
+        <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24"
+          stroke="currentColor" strokeWidth={2}>
+          <path strokeLinecap="round" strokeLinejoin="round"
+            d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" />
+        </svg>
+      )}
+    </button>
   );
 }
 
-// Blue header search bar - centered and wider.
-function BlueHeaderSearchBar() {
+// Quiet paper search bar - centered.
+function HeaderSearchBar() {
   const toggleSearch = useUIStore((state) => state.toggleSearch);
 
   return (
@@ -190,19 +204,39 @@ function BlueHeaderSearchBar() {
       type="button"
       onClick={toggleSearch}
       className={cn(
-        'flex items-center gap-2 rounded-lg bg-blue-500/80 px-4 py-2',
-        'text-sm text-white/90 placeholder-white/60',
-        'hover:bg-blue-400/80 transition-colors',
-        'focus:outline-none focus:ring-2 focus:ring-white/50',
+        'flex items-center gap-2 rounded-lg border border-[var(--c-hair)] bg-[var(--c-card)] px-4 py-1.5',
+        'text-sm text-[var(--c-faint)] transition-colors hover:border-[var(--c-ghost)]',
+        'focus:outline-none focus:ring-2 focus:ring-[#22262A]/20',
         'w-full max-w-xl',
       )}
     >
-      <SearchIcon className="text-white/70" />
-      <span className="flex-1 text-left text-white/80">Search mail...</span>
-      <kbd className="hidden rounded bg-blue-400/50 px-1.5 py-0.5 text-xs font-medium text-white/70 md:inline-block">
+      <SearchIcon className="h-4 w-4 text-[var(--c-dim)]" />
+      <span className="flex-1 text-left">
+        Search agents, threads, plans…
+      </span>
+      <kbd className="hidden rounded border border-[var(--c-hair)] px-1.5 py-0.5 font-mono text-[10px] font-medium text-[var(--c-faint)] md:inline-block">
         ⌘K
       </kbd>
     </button>
+  );
+}
+
+// The wordmark: tracked mono caps with the heartbeat trace, the
+// product's signature element carried into the chrome.
+function Wordmark() {
+  return (
+    <span className="flex items-center gap-2.5">
+      <span className="font-mono text-[13px] font-bold tracking-[0.18em] text-[var(--c-ink)]">
+        SUBSTRATE
+      </span>
+      <svg className="h-3 w-11" viewBox="0 0 64 16" aria-hidden="true">
+        <path
+          d="M0 8 H14 L18 8 L21 3 L25 13 L28 8 H40 L44 8 L47 5 L50 11 L52 8 H64"
+          fill="none" stroke="#178A5B" strokeWidth="1.5"
+          strokeLinecap="round" strokeLinejoin="round"
+        />
+      </svg>
+    </span>
   );
 }
 
@@ -210,6 +244,7 @@ function BlueHeaderSearchBar() {
 export function Header({ className, leftContent, rightContent }: HeaderProps) {
   const toggleSidebar = useUIStore((state) => state.toggleSidebar);
   const toggleSearch = useUIStore((state) => state.toggleSearch);
+  const openModal = useUIStore((state) => state.openModal);
   const { currentAgent, setCurrentAgent } = useAuthStore();
 
   // Fetch agents and messages for agent switcher.
@@ -219,13 +254,18 @@ export function Header({ className, leftContent, rightContent }: HeaderProps) {
   // Calculate total unread count.
   const totalUnreadCount = messagesData?.data?.length ?? 0;
 
+  // Live agent tally for the fleet pulse chip.
+  const liveCount = (agentsData?.agents ?? []).filter(
+    (a) => a.status === 'active' || a.status === 'busy',
+  ).length;
+
   // Check if Global (all agents) is currently selected.
   const isGlobalSelected = currentAgent === null;
 
   return (
     <header
       className={cn(
-        'flex h-14 items-center bg-blue-600 px-4 shadow-sm',
+        'flex h-12 items-center border-b border-[var(--c-hair)] bg-[var(--c-paper)] px-4',
         className,
       )}
     >
@@ -234,20 +274,15 @@ export function Header({ className, leftContent, rightContent }: HeaderProps) {
         <button
           type="button"
           onClick={toggleSidebar}
-          className="rounded-md p-2 text-white/80 hover:bg-blue-500/50 hover:text-white focus:outline-none focus:ring-2 focus:ring-white/50 md:hidden"
+          className="rounded-md p-2 text-[var(--c-mut)] hover:bg-[var(--c-fill)] hover:text-[var(--c-ink)] focus:outline-none"
           aria-label="Toggle sidebar"
         >
-          <MenuIcon className="text-white" />
+          <MenuIcon />
         </button>
 
-        {/* Logo and brand name. */}
-        <Link to={routes.inbox} className="flex items-center gap-2.5">
-          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-white/10">
-            <EnvelopeIcon className="text-white" />
-          </div>
-          <span className="hidden text-xl font-semibold tracking-tight text-white sm:inline">
-            Substrate
-          </span>
+        {/* Wordmark. */}
+        <Link to={routes.command} className="flex items-center">
+          <Wordmark />
         </Link>
 
         {leftContent}
@@ -255,32 +290,63 @@ export function Header({ className, leftContent, rightContent }: HeaderProps) {
 
       {/* Center section - search bar (takes remaining space). */}
       <div className="flex-1 flex justify-center px-4 hidden md:flex">
-        <BlueHeaderSearchBar />
+        <HeaderSearchBar />
       </div>
 
       {/* Right section - actions and custom content. */}
-      <div className="flex items-center gap-1 flex-shrink-0">
+      <div className="flex items-center gap-1 flex-shrink-0 text-[var(--c-mut)]">
         {/* Mobile search button. */}
         <div className="md:hidden">
           <button
             type="button"
             onClick={toggleSearch}
-            className="rounded-md p-2 text-white/80 hover:bg-blue-500/50 hover:text-white focus:outline-none focus:ring-2 focus:ring-white/50"
+            className="rounded-md p-2 hover:bg-[var(--c-fill)] hover:text-[var(--c-ink)] focus:outline-none"
             aria-label="Search"
           >
-            <SearchIcon className="text-white" />
+            <SearchIcon />
           </button>
         </div>
+
+        {/* New message. Steering happens on the cards; this is the
+            escape hatch for topics, broadcasts, and agents without a
+            card in view. */}
+        <button
+          type="button"
+          onClick={() => openModal('compose')}
+          className="rounded-md p-2 hover:bg-[var(--c-fill)] hover:text-[var(--c-ink)] focus:outline-none"
+          aria-label="New message"
+          title="New message"
+        >
+          <ComposeIcon />
+        </button>
+
+        {/* Fleet pulse: how many agents are working right now.
+            Click drops onto the canvas. */}
+        <Link
+          to={routes.command}
+          title="Live agents — open canvas"
+          className="mr-1 hidden items-center gap-1.5 rounded-lg border border-[var(--c-hair)] bg-[var(--c-card)] px-2 py-1 font-mono text-[10.5px] font-semibold uppercase tracking-[0.08em] text-[var(--c-mut)] hover:border-[var(--c-ghost)] hover:text-[var(--c-ink)] sm:flex"
+        >
+          <span
+            className={cn(
+              'h-1.5 w-1.5 rounded-full',
+              liveCount > 0
+                ? 'animate-pulse-dot bg-[var(--c-green)]'
+                : 'bg-[var(--c-ghost)]',
+            )}
+          />
+          {liveCount} live
+        </Link>
 
         {/* Global button - shows all messages from all agents. */}
         <button
           type="button"
           onClick={() => setCurrentAgent(null)}
           className={cn(
-            'rounded-md p-2 transition-colors focus:outline-none focus:ring-2 focus:ring-white/50',
+            'rounded-md p-2 transition-colors focus:outline-none',
             isGlobalSelected
-              ? 'bg-white/20 text-white'
-              : 'text-white/70 hover:bg-blue-500/50 hover:text-white',
+              ? 'bg-[var(--c-ink)] text-white'
+              : 'hover:bg-[var(--c-fill)] hover:text-[var(--c-ink)]',
           )}
           aria-label="View all agents"
           title="Global - View all agents"
@@ -297,26 +363,20 @@ export function Header({ className, leftContent, rightContent }: HeaderProps) {
           />
         ) : null}
 
+        {/* Theme toggle. */}
+        <ThemeToggle />
+
         {/* Notifications button. */}
         <button
           type="button"
-          className="relative rounded-md p-2 text-white/80 hover:bg-blue-500/50 hover:text-white focus:outline-none focus:ring-2 focus:ring-white/50"
+          className="relative rounded-md p-2 hover:bg-[var(--c-fill)] hover:text-[var(--c-ink)] focus:outline-none"
           aria-label="View notifications"
         >
-          <BellIcon className="text-white" />
+          <BellIcon />
           {totalUnreadCount > 0 ? (
-            <span className="absolute right-1.5 top-1.5 block h-2 w-2 rounded-full bg-red-500 ring-2 ring-blue-600" />
+            <span className="absolute right-1.5 top-1.5 block h-2 w-2 rounded-full bg-[var(--c-rust)] ring-2 ring-[var(--c-paper)]" />
           ) : null}
         </button>
-
-        {/* Settings link. */}
-        <Link
-          to={routes.settings}
-          className="rounded-md p-2 text-white/80 hover:bg-blue-500/50 hover:text-white focus:outline-none focus:ring-2 focus:ring-white/50"
-          aria-label="Settings"
-        >
-          <SettingsIcon className="text-white" />
-        </Link>
 
         {rightContent}
       </div>
@@ -360,7 +420,7 @@ export function CompactHeader({
   return (
     <header
       className={cn(
-        'flex h-14 items-center justify-between border-b border-gray-200 bg-white px-4',
+        'flex h-14 items-center justify-between border-b border-gray-200 bg-[var(--c-card)] px-4',
         className,
       )}
     >

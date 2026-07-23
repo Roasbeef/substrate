@@ -87,9 +87,9 @@ export function SessionRow({
     <tr
       onClick={onClick}
       className={cn(
-        'group border-b border-gray-100 transition-colors',
-        onClick ? 'cursor-pointer hover:bg-gray-50' : '',
-        isSelected ? 'bg-blue-50' : '',
+        'group border-b border-[var(--c-fill)] transition-colors',
+        onClick ? 'cursor-pointer hover:bg-[var(--c-hover)]' : '',
+        isSelected ? 'bg-[var(--c-fill)]' : '',
         className,
       )}
     >
@@ -101,10 +101,10 @@ export function SessionRow({
             size="sm"
           />
           <div className="min-w-0">
-            <p className="truncate text-sm font-medium text-gray-900">
+            <p className="truncate text-sm font-medium text-[var(--c-ink)]">
               {session.agent_name}
             </p>
-            <p className="truncate text-xs text-gray-500">
+            <p className="truncate text-xs text-[var(--c-mut)]">
               ID: {session.id}
             </p>
           </div>
@@ -114,11 +114,11 @@ export function SessionRow({
       {/* Project/Branch. */}
       <td className="px-3 py-3">
         <div className="min-w-0">
-          <p className="truncate text-sm text-gray-900">
+          <p className="truncate text-sm text-[var(--c-ink)]">
             {session.project ?? '—'}
           </p>
           {session.branch ? (
-            <p className="truncate text-xs text-gray-500">
+            <p className="truncate text-xs text-[var(--c-mut)]">
               <span className="font-mono">{session.branch}</span>
             </p>
           ) : null}
@@ -133,12 +133,12 @@ export function SessionRow({
       </td>
 
       {/* Duration. */}
-      <td className="px-3 py-3 text-sm text-gray-500">
+      <td className="px-3 py-3 text-sm text-[var(--c-mut)]">
         {duration}
       </td>
 
       {/* Started. */}
-      <td className="px-3 py-3 text-sm text-gray-500">
+      <td className="px-3 py-3 text-sm text-[var(--c-mut)]">
         {startedAgo}
       </td>
 
@@ -151,7 +151,7 @@ export function SessionRow({
             onClick?.();
           }}
           className={cn(
-            'text-sm text-blue-600 hover:text-blue-700',
+            'text-sm text-[var(--c-steel)] hover:text-[var(--c-ink)]',
             'opacity-0 transition-opacity group-hover:opacity-100',
           )}
         >
@@ -184,18 +184,18 @@ export function CompactSessionRow({
       onClick={onClick}
       className={cn(
         'flex items-center justify-between rounded-md px-3 py-2',
-        onClick ? 'cursor-pointer hover:bg-gray-50' : '',
+        onClick ? 'cursor-pointer hover:bg-[var(--c-hover)]' : '',
         className,
       )}
     >
       <div className="flex items-center gap-2 min-w-0">
         <Avatar name={session.agent_name} size="xs" />
         <div className="min-w-0">
-          <p className="truncate text-sm font-medium text-gray-900">
+          <p className="truncate text-sm font-medium text-[var(--c-ink)]">
             {session.agent_name}
           </p>
           {session.project ? (
-            <p className="truncate text-xs text-gray-500">
+            <p className="truncate text-xs text-[var(--c-mut)]">
               {session.project}
             </p>
           ) : null}
@@ -205,7 +205,7 @@ export function CompactSessionRow({
         <Badge variant={getStatusVariant(session.status)} size="sm">
           {session.status}
         </Badge>
-        <span className="text-xs text-gray-500">{duration}</span>
+        <span className="text-xs text-[var(--c-mut)]">{duration}</span>
       </div>
     </div>
   );

@@ -58,8 +58,8 @@ function FilterTabButton({
       className={cn(
         'rounded-md px-3 py-1.5 text-sm font-medium transition-colors',
         isActive
-          ? 'bg-gray-900 text-white'
-          : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900',
+          ? 'bg-[var(--c-ink)] text-white'
+          : 'text-[var(--c-mut)] hover:bg-[var(--c-fill)] hover:text-[var(--c-ink)]',
       )}
     >
       {label}
@@ -67,7 +67,7 @@ function FilterTabButton({
         <span
           className={cn(
             'ml-1.5',
-            isActive ? 'text-gray-300' : 'text-gray-400',
+            isActive ? 'text-white/60' : 'text-[var(--c-faint)]',
           )}
         >
           ({count})
@@ -80,16 +80,16 @@ function FilterTabButton({
 // Loading skeleton.
 function SessionListSkeleton({ rows = 5 }: { rows?: number }) {
   return (
-    <div className="divide-y divide-gray-100">
+    <div className="divide-y divide-[var(--c-fill)]">
       {Array.from({ length: rows }, (_, i) => (
         <div key={i} className="flex items-center gap-4 px-4 py-3">
-          <div className="h-8 w-8 animate-pulse rounded-full bg-gray-200" />
+          <div className="h-8 w-8 animate-pulse rounded-full bg-[var(--c-hair)]" />
           <div className="flex-1 space-y-2">
-            <div className="h-4 w-32 animate-pulse rounded bg-gray-200" />
-            <div className="h-3 w-48 animate-pulse rounded bg-gray-200" />
+            <div className="h-4 w-32 animate-pulse rounded bg-[var(--c-hair)]" />
+            <div className="h-3 w-48 animate-pulse rounded bg-[var(--c-hair)]" />
           </div>
-          <div className="h-5 w-16 animate-pulse rounded bg-gray-200" />
-          <div className="h-4 w-12 animate-pulse rounded bg-gray-200" />
+          <div className="h-5 w-16 animate-pulse rounded bg-[var(--c-hair)]" />
+          <div className="h-4 w-12 animate-pulse rounded bg-[var(--c-hair)]" />
         </div>
       ))}
     </div>
@@ -108,7 +108,7 @@ function EmptyState({ filter }: { filter: FilterTab }) {
   return (
     <div className="py-12 text-center">
       <svg
-        className="mx-auto h-12 w-12 text-gray-400"
+        className="mx-auto h-12 w-12 text-[var(--c-faint)]"
         fill="none"
         viewBox="0 0 24 24"
         stroke="currentColor"
@@ -120,7 +120,7 @@ function EmptyState({ filter }: { filter: FilterTab }) {
           d="M9 5H7a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"
         />
       </svg>
-      <p className="mt-2 text-sm text-gray-500">{messages[filter]}</p>
+      <p className="mt-2 text-sm text-[var(--c-mut)]">{messages[filter]}</p>
     </div>
   );
 }
@@ -130,7 +130,7 @@ function ErrorState({ message, onRetry }: { message: string; onRetry?: () => voi
   return (
     <div className="py-12 text-center">
       <svg
-        className="mx-auto h-12 w-12 text-red-400"
+        className="mx-auto h-12 w-12 text-[var(--c-rust)]"
         fill="none"
         viewBox="0 0 24 24"
         stroke="currentColor"
@@ -142,12 +142,12 @@ function ErrorState({ message, onRetry }: { message: string; onRetry?: () => voi
           d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"
         />
       </svg>
-      <p className="mt-2 text-sm text-red-600">{message}</p>
+      <p className="mt-2 text-sm text-[var(--c-rust)]">{message}</p>
       {onRetry ? (
         <button
           type="button"
           onClick={onRetry}
-          className="mt-3 text-sm font-medium text-blue-600 hover:text-blue-700"
+          className="mt-3 text-sm font-medium text-[var(--c-steel)] hover:text-[var(--c-ink)]"
         >
           Try again
         </button>
@@ -230,7 +230,7 @@ export function SessionList({
       ) : null}
 
       {/* Table. */}
-      <div className="overflow-hidden rounded-lg border border-gray-200 bg-white">
+      <div className="overflow-hidden rounded-lg border border-[var(--c-hair)] bg-[var(--c-card)]">
         {isLoading ? (
           <SessionListSkeleton />
         ) : error ? (
@@ -238,36 +238,36 @@ export function SessionList({
         ) : !filteredSessions || filteredSessions.length === 0 ? (
           <EmptyState filter={filter} />
         ) : (
-          <table className="min-w-full divide-y divide-gray-200">
-            <thead className="bg-gray-50">
+          <table className="min-w-full divide-y divide-[var(--c-hair)]">
+            <thead className="bg-[var(--c-hover)]">
               <tr>
                 <th
                   scope="col"
-                  className="py-3 pl-4 pr-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500"
+                  className="py-3 pl-4 pr-3 text-left text-xs font-medium uppercase tracking-wider text-[var(--c-mut)]"
                 >
                   Agent
                 </th>
                 <th
                   scope="col"
-                  className="px-3 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500"
+                  className="px-3 py-3 text-left text-xs font-medium uppercase tracking-wider text-[var(--c-mut)]"
                 >
                   Project
                 </th>
                 <th
                   scope="col"
-                  className="px-3 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500"
+                  className="px-3 py-3 text-left text-xs font-medium uppercase tracking-wider text-[var(--c-mut)]"
                 >
                   Status
                 </th>
                 <th
                   scope="col"
-                  className="px-3 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500"
+                  className="px-3 py-3 text-left text-xs font-medium uppercase tracking-wider text-[var(--c-mut)]"
                 >
                   Duration
                 </th>
                 <th
                   scope="col"
-                  className="px-3 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500"
+                  className="px-3 py-3 text-left text-xs font-medium uppercase tracking-wider text-[var(--c-mut)]"
                 >
                   Started
                 </th>
@@ -276,7 +276,7 @@ export function SessionList({
                 </th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-gray-100 bg-white">
+            <tbody className="divide-y divide-[var(--c-fill)] bg-[var(--c-card)]">
               {filteredSessions.map((session) => (
                 <SessionRow
                   key={session.id}
@@ -327,16 +327,16 @@ export function CompactSessionList({
     <div className={cn('', className)}>
       {/* Section header. */}
       <div className="mb-2 flex items-center justify-between px-3">
-        <h3 className="text-xs font-semibold uppercase tracking-wider text-gray-500">
+        <h3 className="text-xs font-semibold uppercase tracking-wider text-[var(--c-mut)]">
           {title}
           {!isLoading && sessions ? (
-            <span className="ml-1 text-gray-400">({sessions.length})</span>
+            <span className="ml-1 text-[var(--c-faint)]">({sessions.length})</span>
           ) : null}
         </h3>
         {onViewAllClick ? (
           <button
             onClick={onViewAllClick}
-            className="text-xs font-medium text-blue-600 hover:text-blue-700"
+            className="text-xs font-medium text-[var(--c-steel)] hover:text-[var(--c-ink)]"
           >
             View All
           </button>
@@ -348,14 +348,14 @@ export function CompactSessionList({
         <div className="space-y-1 px-3">
           {Array.from({ length: maxVisible }, (_, i) => (
             <div key={i} className="flex items-center gap-3 py-2">
-              <div className="h-6 w-6 animate-pulse rounded-full bg-gray-200" />
-              <div className="h-4 flex-1 animate-pulse rounded bg-gray-200" />
+              <div className="h-6 w-6 animate-pulse rounded-full bg-[var(--c-hair)]" />
+              <div className="h-4 flex-1 animate-pulse rounded bg-[var(--c-hair)]" />
             </div>
           ))}
         </div>
       ) : !visibleSessions || visibleSessions.length === 0 ? (
         <div className="px-3 py-4 text-center">
-          <p className="text-sm text-gray-500">No active sessions</p>
+          <p className="text-sm text-[var(--c-mut)]">No active sessions</p>
         </div>
       ) : (
         <div className="space-y-0.5">
@@ -369,7 +369,7 @@ export function CompactSessionList({
           {hasMore ? (
             <button
               onClick={onViewAllClick}
-              className="w-full rounded-md px-3 py-2 text-left text-sm text-gray-500 hover:bg-gray-50"
+              className="w-full rounded-md px-3 py-2 text-left text-sm text-[var(--c-mut)] hover:bg-[var(--c-hover)]"
             >
               +{(sessions?.length ?? 0) - maxVisible} more...
             </button>

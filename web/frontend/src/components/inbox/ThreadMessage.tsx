@@ -213,8 +213,8 @@ export function ThreadMessage({
   return (
     <div
       className={cn(
-        'rounded-lg border bg-white p-4 transition-colors',
-        isFocused ? 'border-blue-300 ring-2 ring-blue-100' : 'border-gray-200',
+        'rounded-lg border bg-[var(--c-card)] p-4 transition-colors',
+        isFocused ? 'border-[#22262A]/30 ring-2 ring-[#22262A]/10' : 'border-[var(--c-hair)]',
         className,
       )}
       role="article"
@@ -229,11 +229,11 @@ export function ThreadMessage({
               className="flex items-center gap-2"
               title={formatAgentDisplayName(getSenderAsAgent(message))}
             >
-              <span className="font-medium text-gray-900">
+              <span className="font-medium text-[var(--c-ink)]">
                 {message.sender_name}
               </span>
               {getAgentContext(getSenderAsAgent(message)) ? (
-                <span className="text-xs text-gray-400">
+                <span className="text-xs text-[var(--c-faint)]">
                   @{getAgentContext(getSenderAsAgent(message))}
                 </span>
               ) : null}
@@ -241,18 +241,18 @@ export function ThreadMessage({
                 <PriorityBadge priority={message.priority} size="sm" />
               ) : null}
             </div>
-            <span className="text-sm text-gray-500">
+            <span className="text-sm text-[var(--c-mut)]">
               {formatMessageDate(message.created_at)}
             </span>
             {/* Recipient (To) field. */}
             {message.recipient_names && message.recipient_names.length > 0 ? (
-              <div className="text-sm text-gray-500">
-                <span className="text-gray-400">To: </span>
+              <div className="text-sm text-[var(--c-mut)]">
+                <span className="text-[var(--c-faint)]">To: </span>
                 {message.recipient_names.join(', ')}
               </div>
             ) : message.recipients && message.recipients.length > 0 ? (
-              <div className="text-sm text-gray-500">
-                <span className="text-gray-400">To: </span>
+              <div className="text-sm text-[var(--c-mut)]">
+                <span className="text-[var(--c-faint)]">To: </span>
                 {message.recipients.map((r) => r.agent_name).join(', ')}
               </div>
             ) : null}
@@ -261,34 +261,34 @@ export function ThreadMessage({
 
         {/* Show subject only for first message. */}
         {isFirst ? null : (
-          <span className="text-xs text-gray-400">Reply</span>
+          <span className="text-xs text-[var(--c-faint)]">Reply</span>
         )}
       </div>
 
       {/* Subject (only for first message). */}
       {isFirst ? (
-        <h2 className="mt-3 text-lg font-semibold text-gray-900">
+        <h2 className="mt-3 text-lg font-semibold text-[var(--c-ink)]">
           {message.subject}
         </h2>
       ) : null}
 
       {/* Message body with rendered markdown. */}
       <div
-        className="prose prose-sm mt-3 max-w-none text-gray-700"
+        className="prose prose-sm mt-3 max-w-none text-[var(--c-ink)]"
         dangerouslySetInnerHTML={{ __html: renderedBody }}
       />
 
       {/* Embedded diff section (from substrate send-diff). */}
       {patch ? (
-        <div className="mt-4 border-t border-gray-100 pt-3">
+        <div className="mt-4 border-t border-[var(--c-fill)] pt-3">
           <button
             type="button"
             onClick={() => setDiffExpanded(!diffExpanded)}
             className={cn(
               'rounded-lg border px-3 py-1.5 text-sm font-medium transition-colors',
               diffExpanded
-                ? 'border-blue-200 bg-blue-50 text-blue-700'
-                : 'border-gray-200 text-gray-600 hover:bg-gray-50',
+                ? 'border-[#0E7490]/30 bg-[#0E7490]/10 text-[var(--c-teal)]'
+                : 'border-[var(--c-hair)] text-[var(--c-mut)] hover:bg-[var(--c-hover)]',
             )}
           >
             {diffExpanded ? 'Hide diff' : 'Show diff'}
@@ -300,8 +300,8 @@ export function ThreadMessage({
               className={cn(
                 'ml-2 rounded-lg border px-3 py-1.5 text-sm font-medium transition-colors',
                 reviewMode
-                  ? 'border-green-200 bg-green-50 text-green-700'
-                  : 'border-gray-200 text-gray-600 hover:bg-gray-50',
+                  ? 'border-[#178A5B]/30 bg-[#178A5B]/10 text-[var(--c-green)]'
+                  : 'border-[var(--c-hair)] text-[var(--c-mut)] hover:bg-[var(--c-hover)]',
               )}
             >
               {reviewMode ? 'Exit Review' : 'Review'}
@@ -359,28 +359,28 @@ export function CompactThreadMessage({
       type="button"
       onClick={onClick}
       className={cn(
-        'flex w-full items-center gap-3 rounded-lg border border-gray-200 bg-gray-50 p-3 text-left',
-        'hover:bg-gray-100 transition-colors',
-        'focus:outline-none focus:ring-2 focus:ring-blue-500',
+        'flex w-full items-center gap-3 rounded-lg border border-[var(--c-hair)] bg-[var(--c-paper)] p-3 text-left',
+        'hover:bg-[var(--c-fill)] transition-colors',
+        'focus:outline-none focus:ring-2 focus:ring-[#22262A]/30',
         className,
       )}
     >
       <Avatar name={message.sender_name} size="sm" />
       <div className="min-w-0 flex-1" title={formatAgentDisplayName(getSenderAsAgent(message))}>
-        <span className="truncate text-sm font-medium text-gray-900">
+        <span className="truncate text-sm font-medium text-[var(--c-ink)]">
           {message.sender_name}
         </span>
         {getAgentContext(getSenderAsAgent(message)) ? (
-          <span className="text-xs text-gray-400">
+          <span className="text-xs text-[var(--c-faint)]">
             @{getAgentContext(getSenderAsAgent(message))}
           </span>
         ) : null}
-        <span className="ml-2 truncate text-sm text-gray-500">
+        <span className="ml-2 truncate text-sm text-[var(--c-mut)]">
           {message.body.slice(0, 80)}
           {message.body.length > 80 ? '...' : ''}
         </span>
       </div>
-      <span className="flex-shrink-0 text-xs text-gray-400">
+      <span className="flex-shrink-0 text-xs text-[var(--c-faint)]">
         {formatMessageDate(message.created_at)}
       </span>
     </button>
@@ -421,13 +421,13 @@ export function DeadlineBanner({
     <div
       className={cn(
         'flex items-center justify-between rounded-lg px-4 py-3',
-        isPast ? 'bg-red-50' : 'bg-yellow-50',
+        isPast ? 'bg-[#B3372B]/10' : 'bg-[#C98A1B]/12',
         className,
       )}
     >
       <div className="flex items-center gap-2">
         <svg
-          className={cn('h-5 w-5', isPast ? 'text-red-500' : 'text-yellow-500')}
+          className={cn('h-5 w-5', isPast ? 'text-[var(--c-rust)]' : 'text-[var(--c-amber)]')}
           fill="none"
           viewBox="0 0 24 24"
           stroke="currentColor"
@@ -442,7 +442,7 @@ export function DeadlineBanner({
         <span
           className={cn(
             'text-sm font-medium',
-            isPast ? 'text-red-700' : 'text-yellow-700',
+            isPast ? 'text-[var(--c-rust)]' : 'text-[var(--c-amber)]',
           )}
         >
           {isPast ? 'Deadline passed: ' : 'Deadline: '}
@@ -459,8 +459,8 @@ export function DeadlineBanner({
             'rounded px-3 py-1 text-sm font-medium transition-colors',
             'focus:outline-none focus:ring-2 focus:ring-offset-2',
             isPast
-              ? 'bg-red-100 text-red-700 hover:bg-red-200 focus:ring-red-500'
-              : 'bg-yellow-100 text-yellow-700 hover:bg-yellow-200 focus:ring-yellow-500',
+              ? 'bg-[#B3372B]/10 text-[var(--c-rust)] hover:bg-[#B3372B]/20 focus:ring-[#B3372B]/30'
+              : 'bg-[#C98A1B]/12 text-[var(--c-amber)] hover:bg-[#C98A1B]/20 focus:ring-[#92610E]/30',
             isLoading ? 'cursor-not-allowed opacity-50' : '',
           )}
         >

@@ -60,16 +60,16 @@ const baseInputStyles = cn(
   'block w-full rounded-md border shadow-sm',
   'transition-colors duration-150 ease-in-out',
   'focus:outline-none focus:ring-2 focus:ring-offset-0',
-  'disabled:cursor-not-allowed disabled:bg-gray-50 disabled:text-gray-500',
-  'placeholder:text-gray-400',
+  'disabled:cursor-not-allowed disabled:bg-[var(--c-hover)] disabled:text-[var(--c-faint)]',
+  'placeholder:text-[var(--c-faint)]',
 );
 
 // Get border and focus styles based on error state.
 function getBorderStyles(hasError: boolean): string {
   if (hasError) {
-    return 'border-red-300 focus:border-red-500 focus:ring-red-500';
+    return 'border-[#B3372B]/40 focus:border-[var(--c-rust)] focus:ring-[#B3372B]/30';
   }
-  return 'border-gray-300 focus:border-blue-500 focus:ring-blue-500';
+  return 'border-[var(--c-hair)] focus:border-[var(--c-ink)] focus:ring-[#22262A]/30';
 }
 
 // Input wrapper for icons.
@@ -93,7 +93,7 @@ function InputWrapper({
       {leftIcon ? (
         <div
           className={cn(
-            'pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3 text-gray-400',
+            'pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3 text-[var(--c-faint)]',
             iconSizeStyles[size],
           )}
         >
@@ -104,7 +104,7 @@ function InputWrapper({
       {rightIcon ? (
         <div
           className={cn(
-            'pointer-events-none absolute inset-y-0 right-0 flex items-center pr-3 text-gray-400',
+            'pointer-events-none absolute inset-y-0 right-0 flex items-center pr-3 text-[var(--c-faint)]',
             iconSizeStyles[size],
           )}
         >
@@ -126,9 +126,9 @@ function Label({
   required?: boolean | undefined;
 }) {
   return (
-    <label htmlFor={htmlFor} className="mb-1 block text-sm font-medium text-gray-700">
+    <label htmlFor={htmlFor} className="mb-1 block text-sm font-medium text-[var(--c-ink)]">
       {children}
-      {required ? <span className="ml-1 text-red-500">*</span> : null}
+      {required ? <span className="ml-1 text-[var(--c-rust)]">*</span> : null}
     </label>
   );
 }
@@ -144,7 +144,7 @@ function HelperText({
   id?: string | undefined;
 }) {
   return (
-    <p id={id} className={cn('mt-1 text-sm', isError ? 'text-red-600' : 'text-gray-500')}>
+    <p id={id} className={cn('mt-1 text-sm', isError ? 'text-[var(--c-rust)]' : 'text-[var(--c-mut)]')}>
       {children}
     </p>
   );
@@ -345,7 +345,7 @@ export const Select = forwardRef<HTMLSelectElement, SelectProps>(
             baseInputStyles,
             getBorderStyles(hasError),
             sizeStyles[size],
-            'appearance-none bg-white pr-10',
+            'appearance-none bg-[var(--c-card)] pr-10',
             'bg-no-repeat bg-right-3',
             className,
           )}

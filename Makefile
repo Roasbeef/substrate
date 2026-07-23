@@ -282,9 +282,11 @@ run-web: run
 run-web-dev:
 	go run ./cmd/substrated --web :$(WEB_PORT)
 
-# Start web server in background.
+# Start web server in background. The daemon embeds the frontend at
+# go-build time, so the bundle must be rebuilt first or the server
+# serves whatever stale dist/ happens to be on disk.
 .PHONY: start
-start: build-daemon
+start: bun-build build-daemon
 	@echo "Starting Substrate web server on port $(WEB_PORT)..."
 	@./substrated -web :$(WEB_PORT) &
 	@sleep 1
@@ -299,9 +301,9 @@ stop:
 	@-lsof -ti :$(WEB_PORT) | xargs kill -9 2>/dev/null || true
 	@echo "Server stopped."
 
-# Restart web server (stop, rebuild, start).
+# Restart web server (stop, rebuild frontend + daemon, start).
 .PHONY: restart
-restart: stop build-daemon
+restart: stop bun-build build-daemon
 	@echo "Starting Substrate web server on port $(WEB_PORT)..."
 	@./substrated -web :$(WEB_PORT) &
 	@sleep 1

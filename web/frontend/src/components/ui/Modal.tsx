@@ -136,7 +136,7 @@ export function Modal({
             >
               <DialogPanel
                 className={cn(
-                  'transform rounded-lg bg-white shadow-xl transition-all',
+                  'transform rounded-lg bg-[var(--c-card)] shadow-xl transition-all',
                   !resizable && 'w-full',
                   !rawContent && !resizable && 'overflow-hidden',
                   resizable && 'resize overflow-auto min-w-[320px] min-h-[200px] max-w-[calc(100vw-2rem)] max-h-[calc(100vh-2rem)]',
@@ -147,18 +147,18 @@ export function Modal({
               >
                 {/* Header - only show if not using rawContent mode. */}
                 {!rawContent && (title || showCloseButton || headerActions) ? (
-                  <div className="flex items-start justify-between border-b border-gray-200 px-6 py-4">
+                  <div className="flex items-start justify-between border-b border-[var(--c-hair)] px-6 py-4">
                     <div>
                       {title ? (
                         <DialogTitle
                           as="h3"
-                          className="text-lg font-semibold text-gray-900"
+                          className="text-lg font-semibold text-[var(--c-ink)]"
                         >
                           {title}
                         </DialogTitle>
                       ) : null}
                       {description ? (
-                        <p className="mt-1 text-sm text-gray-500">{description}</p>
+                        <p className="mt-1 text-sm text-[var(--c-mut)]">{description}</p>
                       ) : null}
                     </div>
                     <div className="ml-4 flex items-center gap-1">
@@ -166,7 +166,7 @@ export function Modal({
                       {showCloseButton ? (
                         <button
                           type="button"
-                          className="rounded-md p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
+                          className="rounded-md p-1 text-[var(--c-faint)] hover:bg-[var(--c-fill)] hover:text-[var(--c-mut)] focus:outline-none focus:ring-2 focus:ring-[#22262A]/30 focus:ring-offset-2"
                           onClick={onClose}
                           aria-label="Close modal"
                         >
@@ -198,7 +198,7 @@ export function ModalFooter({ children, className }: ModalFooterProps) {
   return (
     <div
       className={cn(
-        'flex justify-end gap-3 border-t border-gray-200 px-6 py-4 -mx-6 -mb-4 mt-4',
+        'flex justify-end gap-3 border-t border-[var(--c-hair)] px-6 py-4 -mx-6 -mb-4 mt-4',
         className,
       )}
     >
@@ -233,16 +233,16 @@ export function ConfirmModal({
 }: ConfirmModalProps) {
   const confirmButtonClass =
     variant === 'danger'
-      ? 'bg-red-600 hover:bg-red-700 focus:ring-red-500'
-      : 'bg-blue-600 hover:bg-blue-700 focus:ring-blue-500';
+      ? 'bg-[var(--c-rust)] hover:bg-[#8f2c22] focus:ring-[#B3372B]/40'
+      : 'bg-[var(--c-ink)] hover:bg-[var(--c-inkhover)] focus:ring-[#22262A]/30';
 
   return (
     <Modal isOpen={isOpen} onClose={onClose} size="sm" title={title}>
-      <p className="text-gray-600">{message}</p>
+      <p className="text-[var(--c-mut)]">{message}</p>
       <ModalFooter>
         <button
           type="button"
-          className="rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
+          className="rounded-md border border-[var(--c-hair)] bg-[var(--c-card)] px-4 py-2 text-sm font-medium text-[var(--c-ink)] hover:bg-[var(--c-hover)] focus:outline-none focus:ring-2 focus:ring-[#22262A]/30 focus:ring-offset-2"
           onClick={onClose}
           disabled={isLoading}
         >

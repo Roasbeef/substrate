@@ -1,13 +1,15 @@
 // Sidebar component - main navigation sidebar with nav links and actions.
 
-import { type ReactNode, useState } from 'react';
-import { Link, useLocation, useNavigate, useSearchParams } from 'react-router-dom';
+import { type ReactNode, useMemo, useState } from 'react';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { clsx } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 import { useUIStore, type SidebarSection } from '@/stores/ui.js';
+import { useCanvasStore } from '@/stores/canvas.js';
 import { useAgentsStatus } from '@/hooks/useAgents.js';
-import { useTopics } from '@/hooks/useTopics.js';
+import { useMessages } from '@/hooks/useMessages.js';
 import { routes } from '@/lib/routes.js';
+import { HeartbeatTrace } from '@/components/command/HeartbeatTrace.js';
 
 // Combine clsx and tailwind-merge for class name handling.
 function cn(...inputs: (string | undefined | null | false)[]) {
@@ -24,6 +26,19 @@ interface NavItem {
 }
 
 // Icon components for navigation.
+function CommandIcon() {
+  return (
+    <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+      <path
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        strokeWidth={2}
+        d="M9 3H5a2 2 0 00-2 2v4m6-6h10a2 2 0 012 2v4M9 3v18m0 0h10a2 2 0 002-2V9M9 21H5a2 2 0 01-2-2V9m0 0h18"
+      />
+    </svg>
+  );
+}
+
 function InboxIcon() {
   return (
     <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -32,19 +47,6 @@ function InboxIcon() {
         strokeLinejoin="round"
         strokeWidth={2}
         d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4"
-      />
-    </svg>
-  );
-}
-
-function SendIcon() {
-  return (
-    <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-      <path
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        strokeWidth={2}
-        d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"
       />
     </svg>
   );
@@ -121,14 +123,6 @@ function SettingsIcon() {
   );
 }
 
-function PlusIcon() {
-  return (
-    <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-    </svg>
-  );
-}
-
 function ChevronDownIcon({ className }: { className?: string }) {
   return (
     <svg className={cn('h-4 w-4', className)} fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -137,28 +131,15 @@ function ChevronDownIcon({ className }: { className?: string }) {
   );
 }
 
-function HashtagIcon() {
+// CollapseIcon points into the sidebar edge: « to shrink, » to grow.
+function CollapseIcon({ expand = false }: { expand?: boolean }) {
   return (
-    <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-      <path
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        strokeWidth={2}
-        d="M7 20l4-16m2 16l4-16M6 9h14M4 15h14"
-      />
-    </svg>
-  );
-}
-
-function UserCircleIcon() {
-  return (
-    <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-      <path
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        strokeWidth={2}
-        d="M5.121 17.804A13.937 13.937 0 0112 16c2.5 0 4.847.655 6.879 1.804M15 10a3 3 0 11-6 0 3 3 0 016 0zm6 2a9 9 0 11-18 0 9 9 0 0118 0z"
-      />
+    <svg
+      className={cn('h-4 w-4', expand && 'rotate-180')}
+      fill="none" viewBox="0 0 24 24" stroke="currentColor"
+    >
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+        d="M11 19l-7-7 7-7m8 14l-7-7 7-7" />
     </svg>
   );
 }
@@ -171,11 +152,12 @@ function SmallPlusIcon() {
   );
 }
 
-// Default navigation items.
+// Default navigation items. Sent lives inside Signals as a folder
+// now that timelines are two-way everywhere.
 const navItems: NavItem[] = [
-  { id: 'inbox', label: 'Inbox', path: routes.inbox, icon: <InboxIcon /> },
-  { id: 'sent', label: 'Sent', path: routes.sent, icon: <SendIcon /> },
-  { id: 'agents', label: 'Agents', path: routes.agents, icon: <UsersIcon /> },
+  { id: 'command', label: 'Canvas', path: routes.command, icon: <CommandIcon /> },
+  { id: 'inbox', label: 'Signals', path: routes.inbox, icon: <InboxIcon /> },
+  { id: 'agents', label: 'Fleet', path: routes.agents, icon: <UsersIcon /> },
   { id: 'reviews', label: 'Reviews', path: routes.reviews, icon: <CodeReviewIcon /> },
   { id: 'tasks', label: 'Tasks', path: routes.tasks, icon: <TasksIcon /> },
   { id: 'plans', label: 'Plans', path: routes.plans, icon: <PlansIcon /> },
@@ -204,22 +186,23 @@ function NavLink({ item, isActive, collapsed = false }: NavLinkProps) {
     <Link
       to={item.path}
       className={cn(
-        'flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors',
+        'flex items-center gap-2.5 rounded-lg px-2.5 py-[7px] text-[13px] font-medium transition-colors',
+        '[&_svg]:h-[18px] [&_svg]:w-[18px]',
         isActive
-          ? 'bg-blue-50 text-blue-700'
-          : 'text-gray-700 hover:bg-gray-100 hover:text-gray-900',
+          ? 'border border-[var(--c-hair)] bg-[var(--c-card)] font-semibold text-[var(--c-ink)] shadow-[0_1px_2px_rgba(28,32,36,0.06)]'
+          : 'text-[var(--c-mut)] hover:bg-[var(--c-fill)] hover:text-[var(--c-ink)]',
         collapsed ? 'justify-center' : '',
       )}
       title={collapsed ? item.label : undefined}
     >
-      <span className={cn(isActive ? 'text-blue-600' : 'text-gray-400')}>
+      <span className={cn(isActive ? 'text-[var(--c-ink)]' : 'text-[var(--c-dim)]')}>
         {item.icon}
       </span>
       {!collapsed ? (
         <>
           <span className="flex-1">{item.label}</span>
           {item.badge && item.badge > 0 ? (
-            <span className="rounded-full bg-blue-100 px-2 py-0.5 text-xs font-medium text-blue-700">
+            <span className="rounded-full bg-[#33608D]/10 px-1.5 py-px font-mono text-[10px] font-semibold text-[var(--c-steel)]">
               {item.badge}
             </span>
           ) : null}
@@ -248,22 +231,22 @@ function SidebarSectionHeader({
   onAddClick,
 }: SidebarSectionHeaderProps) {
   return (
-    <div className="flex items-center justify-between px-3 py-2">
+    <div className="flex items-center justify-between px-2.5 py-1.5">
       <button
         type="button"
         onClick={onToggle}
-        className="flex flex-1 items-center gap-2 text-sm font-semibold text-gray-500 hover:text-gray-700"
+        className="flex flex-1 items-center gap-1.5 font-mono text-[10px] font-semibold uppercase tracking-[0.14em] text-[var(--c-mut)] hover:text-[var(--c-ink)]"
       >
         <ChevronDownIcon
           className={cn(
-            'transition-transform',
+            'h-3 w-3 text-[var(--c-dim)] transition-transform',
             !isExpanded && '-rotate-90',
           )}
         />
-        <span className="text-gray-400">{icon}</span>
+        {icon}
         <span>{label}</span>
         {count !== undefined && count > 0 ? (
-          <span className="rounded-full bg-gray-100 px-2 py-0.5 text-xs text-gray-500">
+          <span className="font-mono text-[10px] normal-case tracking-normal text-[var(--c-faint)]">
             {count}
           </span>
         ) : null}
@@ -272,47 +255,13 @@ function SidebarSectionHeader({
         <button
           type="button"
           onClick={onAddClick}
-          className="rounded p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-600"
+          className="rounded p-1 text-[var(--c-dim)] hover:bg-[var(--c-fill)] hover:text-[var(--c-text2)]"
           title={`Add ${label.slice(0, -1)}`}
         >
           <SmallPlusIcon />
         </button>
       ) : null}
     </div>
-  );
-}
-
-// Topic item in sidebar.
-interface TopicItemProps {
-  name: string;
-  messageCount?: number;
-  onClick?: () => void;
-  isActive?: boolean;
-}
-
-function TopicItem({ name, messageCount, onClick, isActive = false }: TopicItemProps) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className={cn(
-        'flex w-full items-center gap-2 rounded-lg px-3 py-1.5 text-sm',
-        isActive
-          ? 'bg-blue-50 text-blue-700'
-          : 'text-gray-700 hover:bg-gray-100',
-      )}
-    >
-      <span className={isActive ? 'text-blue-500' : 'text-gray-400'}>
-        <HashtagIcon />
-      </span>
-      <span className="flex-1 truncate text-left">{name}</span>
-      {messageCount !== undefined && messageCount > 0 ? (
-        <span className={cn(
-          'text-xs',
-          isActive ? 'text-blue-600' : 'text-gray-400',
-        )}>{messageCount}</span>
-      ) : null}
-    </button>
   );
 }
 
@@ -324,27 +273,15 @@ interface AgentItemProps {
 }
 
 function AgentItem({ name, status, onClick }: AgentItemProps) {
-  const statusColors = {
-    active: 'bg-green-400',
-    busy: 'bg-yellow-400',
-    idle: 'bg-gray-400',
-    offline: 'bg-gray-300',
-  };
-
   return (
     <button
       type="button"
       onClick={onClick}
-      className="flex w-full items-center gap-2 rounded-lg px-3 py-1.5 text-sm text-gray-700 hover:bg-gray-100"
+      className="flex w-full items-center gap-2.5 rounded-lg px-3 py-1.5 text-sm text-[var(--c-mut)] hover:bg-[var(--c-fill)] hover:text-[var(--c-ink)]"
+      title={status}
     >
-      <span className="text-gray-400">
-        <UserCircleIcon />
-      </span>
+      <HeartbeatTrace status={status} className="w-9 shrink-0" />
       <span className="flex-1 truncate text-left">{name}</span>
-      <span
-        className={cn('h-2 w-2 rounded-full', statusColors[status])}
-        title={status}
-      />
     </button>
   );
 }
@@ -353,8 +290,6 @@ function AgentItem({ name, status, onClick }: AgentItemProps) {
 export interface SidebarProps {
   /** Custom navigation items (overrides defaults). */
   navItems?: NavItem[];
-  /** Whether to show the compose button. */
-  showComposeButton?: boolean;
   /** Whether to show the settings link. */
   showSettings?: boolean;
   /** Additional class name. */
@@ -368,6 +303,7 @@ function useActiveSection(): SidebarSection {
   const location = useLocation();
   const path = location.pathname;
 
+  if (path.startsWith('/command')) return 'command';
   if (path.startsWith('/agents')) return 'agents';
   if (path.startsWith('/reviews')) return 'reviews';
   if (path.startsWith('/tasks')) return 'tasks';
@@ -379,67 +315,68 @@ function useActiveSection(): SidebarSection {
 // Main Sidebar component.
 export function Sidebar({
   navItems: customNavItems,
-  showComposeButton = true,
   showSettings = true,
   className,
   footer,
 }: SidebarProps) {
   const openModal = useUIStore((state) => state.openModal);
   const sidebarCollapsed = useUIStore((state) => state.sidebarCollapsed);
+  const toggleSidebar = useUIStore((state) => state.toggleSidebar);
   const activeSection = useActiveSection();
   const navigate = useNavigate();
-  const [searchParams] = useSearchParams();
+  const setFocusedCard = useCanvasStore((s) => s.setFocusedCard);
 
-  // State for collapsible sections.
-  const [topicsExpanded, setTopicsExpanded] = useState(true);
+  // State for the collapsible live-agents section.
   const [agentsExpanded, setAgentsExpanded] = useState(true);
 
-  // Get active topic from URL params.
-  const activeTopic = searchParams.get('topic');
-
-  // Fetch topics and agents.
-  const { data: topics } = useTopics();
   const { data: agentsData } = useAgentsStatus();
 
-  // Handle topic click - navigate to inbox with topic filter.
-  const handleTopicClick = (topicName: string) => {
-    navigate(`/inbox?topic=${encodeURIComponent(topicName)}`);
+  // Unread mail count badges the Signals row. Shares the header's
+  // query, so no extra request.
+  const { data: unreadData } = useMessages({ filter: 'unread' });
+  const unreadCount = unreadData?.data?.length ?? 0;
+
+  // liveAgents is the current working set: busy sessions first, then
+  // recently active ones.
+  const liveAgents = useMemo(() => {
+    const live = (agentsData?.agents ?? []).filter(
+      (a) => a.status === 'active' || a.status === 'busy',
+    );
+    return live.sort((a, b) => {
+      if (a.status !== b.status) {
+        return a.status === 'busy' ? -1 : 1;
+      }
+      return a.name.localeCompare(b.name);
+    });
+  }, [agentsData?.agents]);
+
+  // handleAgentClick jumps to the agent's dossier on the canvas.
+  const handleAgentClick = (agentId: number) => {
+    setFocusedCard(agentId);
+    navigate(routes.command);
   };
 
-  const items = customNavItems ?? navItems;
+  const items = (customNavItems ?? navItems).map((it) =>
+    it.id === 'inbox' && unreadCount > 0
+      ? { ...it, badge: unreadCount }
+      : it,
+  );
 
+  // Collapsed: render the thin icon strip instead of disappearing.
   if (sidebarCollapsed) {
-    return null;
+    return <CollapsedSidebar className={className} />;
   }
 
   return (
     <aside
       className={cn(
-        'flex h-full w-64 flex-col border-r border-gray-200 bg-white',
+        'flex h-full w-64 flex-col border-r border-[var(--c-hair)] bg-[var(--c-paper)]',
         className,
       )}
     >
       <Logo />
 
-      {showComposeButton ? (
-        <div className="px-3 py-3">
-          <button
-            type="button"
-            onClick={() => openModal('compose')}
-            className={cn(
-              'flex w-full items-center justify-center gap-2 rounded-2xl px-6 py-3',
-              'bg-blue-600 text-white font-medium shadow-md',
-              'hover:bg-blue-700 hover:shadow-lg transition-all',
-              'focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2',
-            )}
-          >
-            <PlusIcon />
-            <span>Compose</span>
-          </button>
-        </div>
-      ) : null}
-
-      <nav className="flex-1 space-y-1 overflow-y-auto px-3 py-2">
+      <nav className="flex-1 space-y-1 overflow-y-auto px-3 py-3">
         {items.map((item) => (
           <NavLink
             key={item.id}
@@ -448,56 +385,41 @@ export function Sidebar({
           />
         ))}
 
-        {/* Topics Section */}
-        <div className="mt-4 border-t border-gray-100 pt-2">
+        {/* Live agents: the working set right now. Clicking one jumps
+            to its card on the canvas in focus mode. */}
+        <div className="mt-4 border-t border-[var(--c-hair2)] pt-2">
           <SidebarSectionHeader
-            label="Topics"
-            icon={<HashtagIcon />}
-            isExpanded={topicsExpanded}
-            onToggle={() => setTopicsExpanded(!topicsExpanded)}
-            {...(topics?.length !== undefined && { count: topics.length })}
-          />
-          {topicsExpanded ? (
-            <div className="ml-2 space-y-0.5">
-              {topics && topics.length > 0 ? (
-                topics.slice(0, 5).map((topic) => (
-                  <TopicItem
-                    key={topic.id}
-                    name={topic.name}
-                    messageCount={topic.message_count}
-                    onClick={() => handleTopicClick(topic.name)}
-                    isActive={activeTopic === topic.name}
-                  />
-                ))
-              ) : (
-                <p className="px-3 py-2 text-xs text-gray-400">No topics yet</p>
-              )}
-            </div>
-          ) : null}
-        </div>
-
-        {/* Agents Section */}
-        <div className="mt-4 border-t border-gray-100 pt-2">
-          <SidebarSectionHeader
-            label="Agents"
-            icon={<UserCircleIcon />}
+            label="Live"
+            icon={
+              <span
+                className={cn(
+                  'h-1.5 w-1.5 rounded-full',
+                  liveAgents.length > 0
+                    ? 'animate-pulse-dot bg-[var(--c-green)]'
+                    : 'bg-[var(--c-ghost)]',
+                )}
+              />
+            }
             isExpanded={agentsExpanded}
             onToggle={() => setAgentsExpanded(!agentsExpanded)}
-            {...(agentsData?.agents.length !== undefined && { count: agentsData.agents.length })}
+            {...(liveAgents.length > 0 && { count: liveAgents.length })}
             onAddClick={() => openModal('newAgent')}
           />
           {agentsExpanded ? (
             <div className="ml-2 space-y-0.5">
-              {agentsData && agentsData.agents.length > 0 ? (
-                agentsData.agents.slice(0, 5).map((agent) => (
+              {liveAgents.length > 0 ? (
+                liveAgents.slice(0, 8).map((agent) => (
                   <AgentItem
                     key={agent.id}
                     name={agent.name}
                     status={agent.status}
+                    onClick={() => handleAgentClick(agent.id)}
                   />
                 ))
               ) : (
-                <p className="px-3 py-2 text-xs text-gray-400">No agents yet</p>
+                <p className="px-3 py-2 text-xs text-[var(--c-dim)]">
+                  No live agents
+                </p>
               )}
             </div>
           ) : null}
@@ -506,74 +428,88 @@ export function Sidebar({
 
       {footer}
 
-      {showSettings ? (
-        <div className="border-t border-gray-200 p-3">
+      <div className="flex items-center gap-1 border-t border-[var(--c-hair)] p-3">
+        {showSettings ? (
           <Link
             to={routes.settings}
-            className="flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-100"
+            className="flex flex-1 items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium text-[var(--c-mut)] hover:bg-[var(--c-fill)] hover:text-[var(--c-ink)]"
           >
-            <span className="text-gray-400">
+            <span className="text-[var(--c-dim)]">
               <SettingsIcon />
             </span>
             <span>Settings</span>
           </Link>
-        </div>
-      ) : null}
+        ) : (
+          <div className="flex-1" />
+        )}
+        <button
+          type="button"
+          onClick={toggleSidebar}
+          title="Collapse sidebar"
+          aria-label="Collapse sidebar"
+          className="rounded-lg p-2 text-[var(--c-dim)] hover:bg-[var(--c-fill)] hover:text-[var(--c-ink)]"
+        >
+          <CollapseIcon />
+        </button>
+      </div>
     </aside>
   );
 }
 
-// Collapsed sidebar variant.
-export function CollapsedSidebar({ className }: { className?: string }) {
+// CollapsedSidebar is the thin icon strip: compose, icon-only nav
+// with tooltips, then settings and the expand control at the foot.
+export function CollapsedSidebar({
+  className,
+}: {
+  className?: string | undefined;
+}) {
   const activeSection = useActiveSection();
-  const openModal = useUIStore((state) => state.openModal);
+  const toggleSidebar = useUIStore((state) => state.toggleSidebar);
 
   return (
     <aside
       className={cn(
-        'flex h-full w-16 flex-col border-r border-gray-200 bg-white',
+        'flex h-full w-14 flex-col items-center border-r border-[var(--c-hair)] bg-[var(--c-paper)]',
         className,
       )}
     >
-      <Logo collapsed />
-
-      <div className="px-2 py-2">
-        <button
-          type="button"
-          onClick={() => openModal('compose')}
-          className={cn(
-            'flex h-10 w-10 items-center justify-center rounded-lg',
-            'bg-blue-600 text-white hover:bg-blue-700',
-            'focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2',
-          )}
-          aria-label="Compose"
-        >
-          <PlusIcon />
-        </button>
-      </div>
-
-      <nav className="flex-1 space-y-1 px-2 py-2">
+      <nav className="flex flex-1 flex-col items-center gap-1 py-3">
         {navItems.map((item) => (
-          <NavLink
+          <Link
             key={item.id}
-            item={item}
-            isActive={activeSection === item.id}
-            collapsed
-          />
+            to={item.path}
+            title={item.label}
+            aria-label={item.label}
+            className={cn(
+              'flex h-9 w-9 items-center justify-center rounded-lg transition-colors',
+              activeSection === item.id
+                ? 'border border-[var(--c-hair)] bg-[var(--c-card)] text-[var(--c-ink)] shadow-[0_1px_2px_rgba(28,32,36,0.06)]'
+                : 'text-[var(--c-dim)] hover:bg-[var(--c-fill)] hover:text-[var(--c-ink)]',
+            )}
+          >
+            {item.icon}
+          </Link>
         ))}
       </nav>
 
-      <div className="border-t border-gray-200 p-2">
+      <div className="flex flex-col items-center gap-1 border-t border-[var(--c-hair)] py-2">
         <Link
           to={routes.settings}
-          className={cn(
-            'flex h-10 w-10 items-center justify-center rounded-lg',
-            'text-gray-400 hover:bg-gray-100 hover:text-gray-500',
-          )}
+          className="flex h-9 w-9 items-center justify-center rounded-lg text-[var(--c-dim)] hover:bg-[var(--c-fill)] hover:text-[var(--c-ink)]"
           aria-label="Settings"
+          title="Settings"
         >
           <SettingsIcon />
         </Link>
+        <button
+          type="button"
+          onClick={toggleSidebar}
+          title="Expand sidebar"
+          aria-label="Expand sidebar"
+          className="flex h-9 w-9 items-center justify-center rounded-lg text-[var(--c-dim)] hover:bg-[var(--c-fill)] hover:text-[var(--c-ink)]"
+        >
+          <CollapseIcon expand />
+        </button>
       </div>
     </aside>
   );

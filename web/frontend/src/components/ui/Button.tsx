@@ -30,7 +30,7 @@ export interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
 // Variant styles mapping.
 const variantStyles: Record<ButtonVariant, string> = {
   primary:
-    'bg-blue-600 text-white hover:bg-blue-700 focus:ring-blue-500 disabled:bg-blue-400',
+    'bg-[var(--c-ink)] text-white hover:bg-[var(--c-inkhover)] focus:ring-[#22262A]/40 disabled:bg-[var(--c-faint)]',
   secondary:
     'bg-gray-100 text-gray-900 hover:bg-gray-200 focus:ring-gray-500 disabled:bg-gray-50 disabled:text-gray-400',
   outline:
@@ -38,7 +38,7 @@ const variantStyles: Record<ButtonVariant, string> = {
   ghost:
     'text-gray-700 hover:bg-gray-100 focus:ring-gray-500 disabled:text-gray-400',
   danger:
-    'bg-red-600 text-white hover:bg-red-700 focus:ring-red-500 disabled:bg-red-400',
+    'bg-[var(--c-rust)] text-white hover:bg-[var(--c-rusthover)] focus:ring-[#B3372B]/40 disabled:bg-[#D8A29C]',
 };
 
 // Size styles mapping.

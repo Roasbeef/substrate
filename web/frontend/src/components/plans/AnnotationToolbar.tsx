@@ -61,7 +61,7 @@ export function AnnotationToolbar({
   return createPortal(
     <div
       ref={toolbarRef}
-      className="fixed z-[100] flex items-center gap-0.5 rounded-lg border border-gray-200 bg-white px-1 py-1 shadow-lg"
+      className="fixed z-[100] flex items-center gap-0.5 rounded-lg border border-[var(--c-hair)] bg-[var(--c-card)] px-1 py-1 shadow-lg"
       style={{
         top: `${position.top}px`,
         left: `${position.left}px`,
@@ -72,7 +72,7 @@ export function AnnotationToolbar({
       <button
         type="button"
         onClick={onRequestComment}
-        className="flex items-center gap-1 rounded-md px-2 py-1.5 text-xs font-medium text-gray-700 hover:bg-blue-50 hover:text-blue-700"
+        className="flex items-center gap-1 rounded-md px-2 py-1.5 text-xs font-medium text-[var(--c-ink)] hover:bg-[#33608D]/10 hover:text-[var(--c-steel)]"
         title="Add comment"
       >
         <svg
@@ -91,13 +91,13 @@ export function AnnotationToolbar({
         Comment
       </button>
 
-      <div className="mx-0.5 h-5 w-px bg-gray-200" />
+      <div className="mx-0.5 h-5 w-px bg-[var(--c-hair)]" />
 
       {/* Delete button. */}
       <button
         type="button"
         onClick={() => onAnnotate(PlanAnnotationType.DELETION)}
-        className="flex items-center gap-1 rounded-md px-2 py-1.5 text-xs font-medium text-gray-700 hover:bg-red-50 hover:text-red-700"
+        className="flex items-center gap-1 rounded-md px-2 py-1.5 text-xs font-medium text-[var(--c-ink)] hover:bg-[#B3372B]/10 hover:text-[var(--c-rust)]"
         title="Mark for deletion"
       >
         <svg
@@ -120,7 +120,7 @@ export function AnnotationToolbar({
       <button
         type="button"
         onClick={() => onAnnotate(PlanAnnotationType.REPLACEMENT)}
-        className="flex items-center gap-1 rounded-md px-2 py-1.5 text-xs font-medium text-gray-700 hover:bg-amber-50 hover:text-amber-700"
+        className="flex items-center gap-1 rounded-md px-2 py-1.5 text-xs font-medium text-[var(--c-ink)] hover:bg-[#C98A1B]/12 hover:text-[var(--c-amber)]"
         title="Replace text"
       >
         <svg
@@ -143,7 +143,7 @@ export function AnnotationToolbar({
       <button
         type="button"
         onClick={() => onAnnotate(PlanAnnotationType.INSERTION)}
-        className="flex items-center gap-1 rounded-md px-2 py-1.5 text-xs font-medium text-gray-700 hover:bg-green-50 hover:text-green-700"
+        className="flex items-center gap-1 rounded-md px-2 py-1.5 text-xs font-medium text-[var(--c-ink)] hover:bg-[#178A5B]/10 hover:text-[var(--c-green)]"
         title="Insert text"
       >
         <svg
