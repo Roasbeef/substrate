@@ -5,6 +5,7 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"net"
 	"net/http"
 	"time"
 
@@ -179,6 +180,24 @@ func (s *Server) Shutdown(ctx context.Context) error {
 	return nil
 }
 
+// dialEndpoint returns the address the gateway should dial to reach our own
+// gRPC server, rewriting a "localhost" host to the IPv4 loopback. The gRPC
+// server binds 127.0.0.1, but "localhost" resolves to ::1 first on a
+// dual-stack host. Anything else listening on the IPv6 loopback or wildcard
+// for that port, such as a published Docker port, then accepts the connection
+// without speaking gRPC. The TCP handshake succeeds, so the client treats the
+// endpoint as live and stays pinned to it, failing every RPC with an
+// "error reading server preface" until the process restarts. Addresses with
+// any other host are left untouched so a remote endpoint still works.
+func dialEndpoint(addr string) string {
+	host, port, err := net.SplitHostPort(addr)
+	if err != nil || host != "localhost" {
+		return addr
+	}
+
+	return net.JoinHostPort("127.0.0.1", port)
+}
+
 // registerGateway sets up the grpc-gateway REST proxy to forward requests to the
 // gRPC server. This allows REST clients to access gRPC services via HTTP/JSON.
 func (s *Server) registerGateway(ctx context.Context) error {
@@ -194,6 +213,7 @@ func (s *Server) registerGateway(ctx context.Context) error {
 	// max receive size (4MB) is too small for inboxes with large diff
 	// attachments, so we raise the gateway client limit to 100MB.
 	const maxGatewayRecvSize = 100 * 1024 * 1024
+	endpoint := dialEndpoint(s.grpcEndpoint)
 	opts := []grpc.DialOption{
 		grpc.WithTransportCredentials(insecure.NewCredentials()),
 		grpc.WithDefaultCallOptions(
@@ -203,7 +223,7 @@ func (s *Server) registerGateway(ctx context.Context) error {
 
 	// Register Mail service handler.
 	err := subtraterpc.RegisterMailHandlerFromEndpoint(
-		ctx, s.gatewayMux, s.grpcEndpoint, opts,
+		ctx, s.gatewayMux, endpoint, opts,
 	)
 	if err != nil {
 		return fmt.Errorf("failed to register Mail handler: %w", err)
@@ -211,7 +231,7 @@ func (s *Server) registerGateway(ctx context.Context) error {
 
 	// Register Agent service handler.
 	err = subtraterpc.RegisterAgentHandlerFromEndpoint(
-		ctx, s.gatewayMux, s.grpcEndpoint, opts,
+		ctx, s.gatewayMux, endpoint, opts,
 	)
 	if err != nil {
 		return fmt.Errorf("failed to register Agent handler: %w", err)
@@ -219,7 +239,7 @@ func (s *Server) registerGateway(ctx context.Context) error {
 
 	// Register Session service handler.
 	err = subtraterpc.RegisterSessionHandlerFromEndpoint(
-		ctx, s.gatewayMux, s.grpcEndpoint, opts,
+		ctx, s.gatewayMux, endpoint, opts,
 	)
 	if err != nil {
 		return fmt.Errorf("failed to register Session handler: %w", err)
@@ -227,7 +247,7 @@ func (s *Server) registerGateway(ctx context.Context) error {
 
 	// Register Activity service handler.
 	err = subtraterpc.RegisterActivityHandlerFromEndpoint(
-		ctx, s.gatewayMux, s.grpcEndpoint, opts,
+		ctx, s.gatewayMux, endpoint, opts,
 	)
 	if err != nil {
 		return fmt.Errorf("failed to register Activity handler: %w", err)
@@ -235,7 +255,7 @@ func (s *Server) registerGateway(ctx context.Context) error {
 
 	// Register Stats service handler.
 	err = subtraterpc.RegisterStatsHandlerFromEndpoint(
-		ctx, s.gatewayMux, s.grpcEndpoint, opts,
+		ctx, s.gatewayMux, endpoint, opts,
 	)
 	if err != nil {
 		return fmt.Errorf("failed to register Stats handler: %w", err)
@@ -243,7 +263,7 @@ func (s *Server) registerGateway(ctx context.Context) error {
 
 	// Register ReviewService handler.
 	err = subtraterpc.RegisterReviewServiceHandlerFromEndpoint(
-		ctx, s.gatewayMux, s.grpcEndpoint, opts,
+		ctx, s.gatewayMux, endpoint, opts,
 	)
 	if err != nil {
 		return fmt.Errorf(
@@ -253,7 +273,7 @@ func (s *Server) registerGateway(ctx context.Context) error {
 
 	// Register TaskService handler.
 	err = subtraterpc.RegisterTaskServiceHandlerFromEndpoint(
-		ctx, s.gatewayMux, s.grpcEndpoint, opts,
+		ctx, s.gatewayMux, endpoint, opts,
 	)
 	if err != nil {
 		return fmt.Errorf(
@@ -263,7 +283,7 @@ func (s *Server) registerGateway(ctx context.Context) error {
 
 	// Register PlanReviewService handler.
 	err = subtraterpc.RegisterPlanReviewServiceHandlerFromEndpoint(
-		ctx, s.gatewayMux, s.grpcEndpoint, opts,
+		ctx, s.gatewayMux, endpoint, opts,
 	)
 	if err != nil {
 		return fmt.Errorf(
@@ -274,7 +294,7 @@ func (s *Server) registerGateway(ctx context.Context) error {
 
 	// Register AnnotationService handler.
 	err = subtraterpc.RegisterAnnotationServiceHandlerFromEndpoint(
-		ctx, s.gatewayMux, s.grpcEndpoint, opts,
+		ctx, s.gatewayMux, endpoint, opts,
 	)
 	if err != nil {
 		return fmt.Errorf(
@@ -289,6 +309,6 @@ func (s *Server) registerGateway(ctx context.Context) error {
 		s.gatewayMux.ServeHTTP(w, r)
 	})
 
-	log.Printf("grpc-gateway REST proxy registered at /api/v1/ -> %s", s.grpcEndpoint)
+	log.Printf("grpc-gateway REST proxy registered at /api/v1/ -> %s", endpoint)
 	return nil
 }
