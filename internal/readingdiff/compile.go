@@ -513,12 +513,17 @@ func render(lines []line, lay layout, st *planState, summary string) *Result {
 }
 
 // buildSegments groups consecutive original lines that shared a fate into runs.
+//
+// Two adjacent folds are kept as separate segments even though both classify
+// as folded. Each fold emits exactly one ellipsis row, so a viewer walking the
+// segment list alongside the rendered output relies on one folded segment
+// meaning one emitted row. Merging them would desynchronize that walk and shift
+// every block after the pair.
 func buildSegments(st *planState, n int) []Segment {
 	if n == 0 {
 		return nil
 	}
 
-	var segs []Segment
 	classify := func(i int) SegmentKind {
 		switch {
 		case !st.hidden[i]:
@@ -530,11 +535,24 @@ func buildSegments(st *planState, n int) []Segment {
 		}
 	}
 
-	cur := classify(0)
+	// foldID distinguishes which fold covers a line, so a boundary between two
+	// folds breaks the run. Non-folded lines all share -1 and never split on
+	// this account.
+	foldID := func(i int) int {
+		if st.hidden[i] {
+			return st.folded[i]
+		}
+
+		return -1
+	}
+
+	var segs []Segment
+	cur, curFold := classify(0), foldID(0)
 	start := 0
+
 	for i := 1; i < n; i++ {
-		k := classify(i)
-		if k == cur {
+		k, f := classify(i), foldID(i)
+		if k == cur && f == curFold {
 			continue
 		}
 		segs = append(segs, Segment{
@@ -542,7 +560,7 @@ func buildSegments(st *planState, n int) []Segment {
 			StartLine: start + 1,
 			EndLine:   i,
 		})
-		cur, start = k, i
+		cur, curFold, start = k, f, i
 	}
 	segs = append(segs, Segment{
 		Kind:      cur,

@@ -363,9 +363,13 @@ func TestSegmentsTileTheInput(t *testing.T) {
 		}
 		require.Equal(t, res.Segments[i-1].EndLine+1, seg.StartLine,
 			"segment %d does not start where segment %d ended", i, i-1)
-		require.NotEqual(t, res.Segments[i-1].Kind, seg.Kind,
-			"adjacent segments %d and %d share a kind and should have "+
-				"been merged", i-1, i)
+
+		// Adjacent segments normally differ in kind, but two neighbouring
+		// folds stay separate on purpose: each emits its own ellipsis row.
+		if res.Segments[i-1].Kind == seg.Kind {
+			require.Equal(t, SegFolded, seg.Kind,
+				"only folds may repeat as adjacent segments")
+		}
 	}
 }
 
@@ -392,4 +396,44 @@ func TestCompileEmptyDiff(t *testing.T) {
 	require.NoError(t, err)
 	require.Empty(t, res.ReadingDiff)
 	require.Empty(t, res.ElisionLine())
+}
+
+// TestSegmentsSplitPerFold asserts each fold gets its own segment even when two
+// folds are adjacent.
+//
+// A viewer walks the segment list in step with the rendered rows, and one fold
+// emits exactly one ellipsis row. If two adjacent folds merged into a single
+// folded segment, the viewer would consume one row where two were emitted and
+// every block after the pair would be shifted.
+func TestSegmentsSplitPerFold(t *testing.T) {
+	t.Parallel()
+
+	first := lineOf(t, goDiff, `+	if _, err := rand.Read(b); err != nil {`)
+
+	// Two folds that touch: rows N..N+1 and N+2..N+3, all additions in one
+	// hunk.
+	plan := emptyPlan()
+	plan.Fold = []Range{
+		{StartLine: first, EndLine: first + 1},
+		{StartLine: first + 2, EndLine: first + 3},
+	}
+
+	res, err := Compile(goDiff, plan)
+	require.NoError(t, err)
+	require.Equal(t, 2, res.Stats.FoldCount)
+
+	var folded []Segment
+	for _, seg := range res.Segments {
+		if seg.Kind == SegFolded {
+			folded = append(folded, seg)
+		}
+	}
+	require.Len(t, folded, 2,
+		"each fold must own a segment so one segment means one emitted row")
+	require.Equal(t, first, folded[0].StartLine)
+	require.Equal(t, first+2, folded[1].StartLine)
+
+	// The rendered output really does carry one ellipsis row per fold.
+	require.Equal(t, 2,
+		strings.Count(res.ReadingDiff, "+\t...\n"))
 }

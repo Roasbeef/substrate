@@ -20,6 +20,12 @@ const DiffViewer = lazy(() =>
   })),
 );
 
+const ReadingDiffView = lazy(() =>
+  import('@/components/reviews/ReadingDiffView.js').then((m) => ({
+    default: m.ReadingDiffView,
+  })),
+);
+
 // docPathRe finds repo-relative file references like docs/design.md
 // so they can become implicit attachments.
 const DOC_PATH_RE =
@@ -80,6 +86,10 @@ export function EventCard({
     defaultExpanded ?? event.needs_action,
   );
   const [planComment, setPlanComment] = useState('');
+
+  // Diffs open abridged. The reading diff is what the operator wants to look
+  // at first; the full patch stays one click away for when it is not enough.
+  const [readingMode, setReadingMode] = useState(true);
 
   const kind = eventKinds[event.kind] ?? eventKinds.message;
   const updatePlan = useUpdatePlanReviewStatus();
@@ -312,7 +322,26 @@ export function EventCard({
                   </div>
                 }
               >
-                <DiffViewer patch={patch} initialStyle="unified" />
+                {readingMode ? (
+                  <ReadingDiffView
+                    patch={patch}
+                    onShowFull={() => setReadingMode(false)}
+                  />
+                ) : (
+                  <div>
+                    <div className="flex justify-end border-b border-[var(--c-hair)] px-3 py-1.5">
+                      <button
+                        type="button"
+                        data-testid="reading-diff-toggle"
+                        onClick={() => setReadingMode(true)}
+                        className="text-[12px] font-medium text-[var(--c-steel)] hover:underline"
+                      >
+                        Reading diff
+                      </button>
+                    </div>
+                    <DiffViewer patch={patch} initialStyle="unified" />
+                  </div>
+                )}
               </Suspense>
             </div>
           )}

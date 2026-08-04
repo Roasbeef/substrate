@@ -5,6 +5,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"fmt"
+	"strings"
 	"sync"
 )
 
@@ -102,6 +103,16 @@ func CacheKey(raw, model, rubric string) string {
 // that, opening the same diff in two browser tabs would spawn two agents and
 // bill for both.
 func (s *Service) Get(ctx context.Context, req Request) (*Result, error) {
+	// Normalize the patch before it is either hashed or compiled.
+	//
+	// Callers arrive with the same patch spelled slightly differently: the web
+	// client trims the text it slices out of a message body, while a CLI
+	// pipes it through with its trailing newline intact. Hashing the raw bytes
+	// would treat those as different patches and pay for the abridgement
+	// twice. Leading and trailing whitespace is never meaningful in a unified
+	// diff, so trimming it costs nothing and makes the cache actually hit.
+	req.UnifiedDiff = strings.TrimSpace(req.UnifiedDiff)
+
 	key := CacheKey(req.UnifiedDiff, s.model, s.rubric)
 
 	if s.cache != nil {

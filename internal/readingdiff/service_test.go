@@ -2,6 +2,7 @@ package readingdiff
 
 import (
 	"context"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"testing"
@@ -214,4 +215,44 @@ func TestNewServiceRequiresGenerator(t *testing.T) {
 
 	_, err := NewService(ServiceConfig{})
 	require.ErrorContains(t, err, "generator is required")
+}
+
+// TestServiceNormalizesWhitespace asserts the same patch spelled with
+// different surrounding whitespace hits one cache entry.
+//
+// This is not hypothetical tidiness. The web client slices a patch out of a
+// message body and trims it, while a CLI pipes the same patch through with its
+// trailing newline intact. Hashing the raw bytes made those two spellings miss
+// each other's cache entry and pay for the abridgement twice.
+func TestServiceNormalizesWhitespace(t *testing.T) {
+	t.Parallel()
+
+	gen := &countingGenerator{}
+	svc := newTestService(t, gen, newMemCache())
+
+	variants := []string{
+		goDiff,
+		strings.TrimSpace(goDiff),
+		"\n\n" + goDiff + "\n\n",
+		goDiff + "\n",
+	}
+
+	var first string
+	for i, patch := range variants {
+		res, err := svc.Get(context.Background(), Request{
+			UnifiedDiff: patch,
+		})
+		require.NoError(t, err)
+
+		if i == 0 {
+			first = res.ReadingDiff
+
+			continue
+		}
+		require.Equal(t, first, res.ReadingDiff,
+			"variant %d produced a different reading diff", i)
+	}
+
+	require.Equal(t, int32(1), gen.calls.Load(),
+		"whitespace variants of one patch must share a cache entry")
 }
