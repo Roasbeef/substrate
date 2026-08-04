@@ -187,6 +187,21 @@ type PlanReview struct {
 	ReviewedAt      sql.NullInt64
 }
 
+type ReadingDiff struct {
+	ID             int64
+	CacheKey       string
+	ReadingDiff    string
+	Summary        string
+	Segments       string
+	RawChanged     int64
+	VisibleChanged int64
+	RawFiles       int64
+	VisibleFiles   int64
+	Model          string
+	RubricHash     string
+	CreatedAt      int64
+}
+
 type Review struct {
 	ID          int64
 	ReviewID    string

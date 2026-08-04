@@ -19,6 +19,7 @@ type Querier interface {
 	CountInboxCategories(ctx context.Context, agentID int64) (CountInboxCategoriesRow, error)
 	CountOpenIssues(ctx context.Context, reviewID string) (int64, error)
 	CountPendingOperations(ctx context.Context) (int64, error)
+	CountReadingDiffs(ctx context.Context) (int64, error)
 	CountReviewIssuesByStatus(ctx context.Context, arg CountReviewIssuesByStatusParams) (int64, error)
 	CountReviewsByRequester(ctx context.Context, requesterID int64) (int64, error)
 	CountReviewsByState(ctx context.Context, state string) (int64, error)
@@ -38,6 +39,7 @@ type Querier interface {
 	CreateMessageRecipient(ctx context.Context, arg CreateMessageRecipientParams) error
 	CreatePlanAnnotation(ctx context.Context, arg CreatePlanAnnotationParams) (PlanAnnotation, error)
 	CreatePlanReview(ctx context.Context, arg CreatePlanReviewParams) (PlanReview, error)
+	CreateReadingDiff(ctx context.Context, arg CreateReadingDiffParams) (ReadingDiff, error)
 	CreateReview(ctx context.Context, arg CreateReviewParams) (Review, error)
 	CreateReviewIssue(ctx context.Context, arg CreateReviewIssueParams) (ReviewIssue, error)
 	CreateReviewIteration(ctx context.Context, arg CreateReviewIterationParams) (ReviewIteration, error)
@@ -58,6 +60,7 @@ type Querier interface {
 	DeletePlanAnnotation(ctx context.Context, annotationID string) error
 	DeletePlanAnnotationsByReview(ctx context.Context, planReviewID string) error
 	DeletePlanReview(ctx context.Context, planReviewID string) error
+	DeleteReadingDiffsBefore(ctx context.Context, createdAt int64) error
 	DeleteReview(ctx context.Context, reviewID string) error
 	DeleteReviewIssues(ctx context.Context, reviewID string) error
 	DeleteReviewIterations(ctx context.Context, reviewID string) error
@@ -124,6 +127,7 @@ type Querier interface {
 	GetPlanReviewBySession(ctx context.Context, sessionID sql.NullString) (PlanReview, error)
 	GetPlanReviewByThread(ctx context.Context, threadID string) (PlanReview, error)
 	GetQueueStats(ctx context.Context) (GetQueueStatsRow, error)
+	GetReadingDiffByKey(ctx context.Context, cacheKey string) (ReadingDiff, error)
 	GetReview(ctx context.Context, reviewID string) (Review, error)
 	GetReviewByID(ctx context.Context, id int64) (Review, error)
 	GetReviewIssue(ctx context.Context, id int64) (ReviewIssue, error)

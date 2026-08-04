@@ -273,6 +273,34 @@ type SummaryStore interface {
 	DeleteOldSummaries(ctx context.Context, olderThan time.Time) error
 }
 
+// ReadingDiffStore caches abridged renderings of a patch.
+//
+// Abridging runs a model over the whole diff, so it costs tokens and takes
+// minutes. Entries are addressed by a content hash covering the patch, the
+// model, and the generation rubric, which means a cache hit is always a result
+// the current code would reproduce.
+type ReadingDiffStore interface {
+	// GetReadingDiff returns the cached abridgement for a key. A miss is
+	// reported as ErrNotFound.
+	GetReadingDiff(
+		ctx context.Context, cacheKey string,
+	) (ReadingDiffRecord, error)
+
+	// SaveReadingDiff stores an abridgement, replacing any existing entry
+	// with the same key.
+	SaveReadingDiff(
+		ctx context.Context, params SaveReadingDiffParams,
+	) (ReadingDiffRecord, error)
+
+	// DeleteReadingDiffsBefore prunes entries older than a given time.
+	DeleteReadingDiffsBefore(
+		ctx context.Context, olderThan time.Time,
+	) error
+
+	// CountReadingDiffs returns how many entries are cached.
+	CountReadingDiffs(ctx context.Context) (int64, error)
+}
+
 // SessionStore handles session identity persistence.
 type SessionStore interface {
 	// CreateSessionIdentity creates a new session identity mapping.
@@ -629,6 +657,7 @@ type Storage interface {
 	TopicStore
 	ActivityStore
 	SummaryStore
+	ReadingDiffStore
 	SessionStore
 	TaskStore
 	ReviewStore
@@ -1153,6 +1182,41 @@ type AgentSummary struct {
 	TranscriptHash string
 	CostUSD        float64
 	CreatedAt      time.Time
+}
+
+// ReadingDiffRecord is a cached abridgement of a patch.
+type ReadingDiffRecord struct {
+	ID          int64
+	CacheKey    string
+	ReadingDiff string
+	Summary     string
+
+	// Segments is the JSON segment map tiling the original patch lines. It is
+	// carried as encoded text because the store layer has no reason to know
+	// the compiler's types.
+	Segments string
+
+	RawChanged     int
+	VisibleChanged int
+	RawFiles       int
+	VisibleFiles   int
+	Model          string
+	RubricHash     string
+	CreatedAt      time.Time
+}
+
+// SaveReadingDiffParams contains parameters for caching an abridgement.
+type SaveReadingDiffParams struct {
+	CacheKey       string
+	ReadingDiff    string
+	Summary        string
+	Segments       string
+	RawChanged     int
+	VisibleChanged int
+	RawFiles       int
+	VisibleFiles   int
+	Model          string
+	RubricHash     string
 }
 
 // CreateSummaryParams contains parameters for creating an agent summary.

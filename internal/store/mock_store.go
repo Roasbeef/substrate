@@ -26,6 +26,7 @@ type MockStore struct {
 	subscriptions     map[int64]map[int64]bool // [topicID][agentID]
 	activities        []Activity
 	summaries         []AgentSummary
+	readingDiffs      map[string]ReadingDiffRecord
 	sessionIdentities map[string]SessionIdentity
 
 	// Task data stores.
@@ -62,6 +63,7 @@ func NewMockStore() *MockStore {
 		subscriptions:        make(map[int64]map[int64]bool),
 		activities:           make([]Activity, 0),
 		summaries:            make([]AgentSummary, 0),
+		readingDiffs:         make(map[string]ReadingDiffRecord),
 		sessionIdentities:    make(map[string]SessionIdentity),
 		taskLists:            make(map[string]TaskList),
 		tasks:                make(map[int64]Task),
@@ -1459,6 +1461,71 @@ func (m *MockStore) GetSummaryHistory(
 		}
 	}
 	return result, nil
+}
+
+// GetReadingDiff returns the cached abridgement for a key.
+func (m *MockStore) GetReadingDiff(
+	ctx context.Context, cacheKey string,
+) (ReadingDiffRecord, error) {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+
+	rec, ok := m.readingDiffs[cacheKey]
+	if !ok {
+		return ReadingDiffRecord{}, sql.ErrNoRows
+	}
+
+	return rec, nil
+}
+
+// SaveReadingDiff stores an abridgement, replacing any existing entry.
+func (m *MockStore) SaveReadingDiff(
+	ctx context.Context, params SaveReadingDiffParams,
+) (ReadingDiffRecord, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	rec := ReadingDiffRecord{
+		ID:             int64(len(m.readingDiffs) + 1),
+		CacheKey:       params.CacheKey,
+		ReadingDiff:    params.ReadingDiff,
+		Summary:        params.Summary,
+		Segments:       params.Segments,
+		RawChanged:     params.RawChanged,
+		VisibleChanged: params.VisibleChanged,
+		RawFiles:       params.RawFiles,
+		VisibleFiles:   params.VisibleFiles,
+		Model:          params.Model,
+		RubricHash:     params.RubricHash,
+		CreatedAt:      time.Now(),
+	}
+	m.readingDiffs[params.CacheKey] = rec
+
+	return rec, nil
+}
+
+// DeleteReadingDiffsBefore prunes entries older than a given time.
+func (m *MockStore) DeleteReadingDiffsBefore(
+	ctx context.Context, olderThan time.Time,
+) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	for key, rec := range m.readingDiffs {
+		if rec.CreatedAt.Before(olderThan) {
+			delete(m.readingDiffs, key)
+		}
+	}
+
+	return nil
+}
+
+// CountReadingDiffs returns how many entries are cached.
+func (m *MockStore) CountReadingDiffs(ctx context.Context) (int64, error) {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+
+	return int64(len(m.readingDiffs)), nil
 }
 
 // DeleteOldSummaries removes summaries older than a given time.

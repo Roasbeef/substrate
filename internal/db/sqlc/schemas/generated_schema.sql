@@ -192,6 +192,38 @@ CREATE TABLE plan_reviews (
     reviewed_at INTEGER
 );
 
+CREATE TABLE reading_diffs (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+
+    -- cache_key is sha256(rubric_hash || model || raw_diff), hex encoded.
+    cache_key TEXT NOT NULL UNIQUE,
+
+    -- reading_diff is the compiled, abridged patch text.
+    reading_diff TEXT NOT NULL,
+
+    -- summary is the generator's one-line description of the change.
+    summary TEXT NOT NULL DEFAULT '',
+
+    -- segments is the JSON segment map tiling the original patch lines, which
+    -- lets the viewer expand an elided region back in place.
+    segments TEXT NOT NULL DEFAULT '[]',
+
+    -- Retention counters are stored as columns rather than only inside the
+    -- stats blob so the elision manifest can be rendered without decoding it.
+    raw_changed INTEGER NOT NULL DEFAULT 0,
+    visible_changed INTEGER NOT NULL DEFAULT 0,
+    raw_files INTEGER NOT NULL DEFAULT 0,
+    visible_files INTEGER NOT NULL DEFAULT 0,
+
+    -- model records which model produced the plan, for provenance in the UI.
+    model TEXT NOT NULL DEFAULT '',
+
+    -- rubric_hash records the protocol version the entry was produced under.
+    rubric_hash TEXT NOT NULL DEFAULT '',
+
+    created_at INTEGER NOT NULL
+);
+
 CREATE TABLE review_issues (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     review_id TEXT NOT NULL REFERENCES reviews(review_id),
@@ -394,6 +426,8 @@ CREATE INDEX idx_plan_reviews_session ON plan_reviews(session_id);
 CREATE INDEX idx_plan_reviews_state ON plan_reviews(state);
 
 CREATE INDEX idx_plan_reviews_thread ON plan_reviews(thread_id);
+
+CREATE INDEX idx_reading_diffs_created ON reading_diffs(created_at);
 
 CREATE INDEX idx_recipients_agent ON message_recipients(agent_id);
 

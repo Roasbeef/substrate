@@ -203,6 +203,16 @@ type QueryStore interface {
 	GetAgentSummaryHistory(
 		ctx context.Context, arg sqlc.GetAgentSummaryHistoryParams,
 	) ([]sqlc.AgentSummary, error)
+
+	// Reading diff cache.
+	GetReadingDiffByKey(
+		ctx context.Context, cacheKey string,
+	) (sqlc.ReadingDiff, error)
+	CreateReadingDiff(
+		ctx context.Context, arg sqlc.CreateReadingDiffParams,
+	) (sqlc.ReadingDiff, error)
+	DeleteReadingDiffsBefore(ctx context.Context, createdAt int64) error
+	CountReadingDiffs(ctx context.Context) (int64, error)
 	DeleteOldAgentSummaries(
 		ctx context.Context, createdAt int64,
 	) error
@@ -1536,6 +1546,88 @@ func (s *SqlcStore) DeleteOldSummaries(ctx context.Context,
 }
 
 // =============================================================================
+// ReadingDiffStore implementation
+// =============================================================================
+
+// readingDiffFromSqlc converts a generated row into the domain record.
+func readingDiffFromSqlc(row sqlc.ReadingDiff) ReadingDiffRecord {
+	return ReadingDiffRecord{
+		ID:             row.ID,
+		CacheKey:       row.CacheKey,
+		ReadingDiff:    row.ReadingDiff,
+		Summary:        row.Summary,
+		Segments:       row.Segments,
+		RawChanged:     int(row.RawChanged),
+		VisibleChanged: int(row.VisibleChanged),
+		RawFiles:       int(row.RawFiles),
+		VisibleFiles:   int(row.VisibleFiles),
+		Model:          row.Model,
+		RubricHash:     row.RubricHash,
+		CreatedAt:      time.Unix(row.CreatedAt, 0),
+	}
+}
+
+// readingDiffParams converts domain save params into generated params,
+// stamping the creation time.
+func readingDiffParams(p SaveReadingDiffParams,
+	now time.Time) sqlc.CreateReadingDiffParams {
+
+	return sqlc.CreateReadingDiffParams{
+		CacheKey:       p.CacheKey,
+		ReadingDiff:    p.ReadingDiff,
+		Summary:        p.Summary,
+		Segments:       p.Segments,
+		RawChanged:     int64(p.RawChanged),
+		VisibleChanged: int64(p.VisibleChanged),
+		RawFiles:       int64(p.RawFiles),
+		VisibleFiles:   int64(p.VisibleFiles),
+		Model:          p.Model,
+		RubricHash:     p.RubricHash,
+		CreatedAt:      now.Unix(),
+	}
+}
+
+// GetReadingDiff returns the cached abridgement for a key.
+func (s *SqlcStore) GetReadingDiff(ctx context.Context,
+	cacheKey string,
+) (ReadingDiffRecord, error) {
+	row, err := s.db.GetReadingDiffByKey(ctx, cacheKey)
+	if err != nil {
+		// sql.ErrNoRows is passed through unwrapped so callers can treat a
+		// cache miss with errors.Is, matching the other stores here.
+		return ReadingDiffRecord{}, err
+	}
+
+	return readingDiffFromSqlc(row), nil
+}
+
+// SaveReadingDiff stores an abridgement, replacing any existing entry.
+func (s *SqlcStore) SaveReadingDiff(ctx context.Context,
+	params SaveReadingDiffParams,
+) (ReadingDiffRecord, error) {
+	row, err := s.db.CreateReadingDiff(
+		ctx, readingDiffParams(params, time.Now()),
+	)
+	if err != nil {
+		return ReadingDiffRecord{}, err
+	}
+
+	return readingDiffFromSqlc(row), nil
+}
+
+// DeleteReadingDiffsBefore prunes entries older than a given time.
+func (s *SqlcStore) DeleteReadingDiffsBefore(ctx context.Context,
+	olderThan time.Time,
+) error {
+	return s.db.DeleteReadingDiffsBefore(ctx, olderThan.Unix())
+}
+
+// CountReadingDiffs returns how many entries are cached.
+func (s *SqlcStore) CountReadingDiffs(ctx context.Context) (int64, error) {
+	return s.db.CountReadingDiffs(ctx)
+}
+
+// =============================================================================
 // SessionStore implementation
 // =============================================================================
 
@@ -2357,6 +2449,44 @@ func (s *txSqlcStore) DeleteOldSummaries(ctx context.Context,
 	olderThan time.Time,
 ) error {
 	return s.queries.DeleteOldAgentSummaries(ctx, olderThan.Unix())
+}
+
+// GetReadingDiff returns the cached abridgement for a key.
+func (s *txSqlcStore) GetReadingDiff(ctx context.Context,
+	cacheKey string,
+) (ReadingDiffRecord, error) {
+	row, err := s.queries.GetReadingDiffByKey(ctx, cacheKey)
+	if err != nil {
+		return ReadingDiffRecord{}, err
+	}
+
+	return readingDiffFromSqlc(row), nil
+}
+
+// SaveReadingDiff stores an abridgement, replacing any existing entry.
+func (s *txSqlcStore) SaveReadingDiff(ctx context.Context,
+	params SaveReadingDiffParams,
+) (ReadingDiffRecord, error) {
+	row, err := s.queries.CreateReadingDiff(
+		ctx, readingDiffParams(params, time.Now()),
+	)
+	if err != nil {
+		return ReadingDiffRecord{}, err
+	}
+
+	return readingDiffFromSqlc(row), nil
+}
+
+// DeleteReadingDiffsBefore prunes entries older than a given time.
+func (s *txSqlcStore) DeleteReadingDiffsBefore(ctx context.Context,
+	olderThan time.Time,
+) error {
+	return s.queries.DeleteReadingDiffsBefore(ctx, olderThan.Unix())
+}
+
+// CountReadingDiffs returns how many entries are cached.
+func (s *txSqlcStore) CountReadingDiffs(ctx context.Context) (int64, error) {
+	return s.queries.CountReadingDiffs(ctx)
 }
 
 // CreateSessionIdentity creates a new session identity mapping.
