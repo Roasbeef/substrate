@@ -15,6 +15,7 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"strings"
 
 	"github.com/roasbeef/subtrate/internal/db"
 	"github.com/roasbeef/subtrate/internal/readingdiff"
@@ -66,7 +67,12 @@ func main() {
 		}
 	}
 
-	res, err := readingdiff.Compile(string(patch), plan)
+	// Normalize exactly as Service.Get does. It trims before both hashing and
+	// compiling, so seeding the untrimmed bytes writes a key the web lookup
+	// never computes — and every patch file ends with the newline git writes.
+	patchText := strings.TrimSpace(string(patch))
+
+	res, err := readingdiff.Compile(patchText, plan)
 	if err != nil {
 		log.Fatalf("compile plan: %v", err)
 	}
@@ -86,7 +92,7 @@ func main() {
 	// The key must match what the service computes, or the seeded row is
 	// simply never found.
 	key := readingdiff.CacheKey(
-		string(patch), *model, plangen.RubricHash(),
+		patchText, *model, plangen.RubricHash(),
 	)
 	if err := cache.Store(
 		context.Background(), key, *model, plangen.RubricHash(), res,

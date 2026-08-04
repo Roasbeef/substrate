@@ -166,6 +166,94 @@ export function DiffViewer({
     return parsed.flatMap((p) => p.files);
   }, [patch]);
 
+  // Per-file props, memoized together.
+  //
+  // Review mode previously built `options`, `lineAnnotations`,
+  // `renderGutterUtility`, and `renderAnnotation` as fresh object and function
+  // literals inside the render loop. That gave every FileDiff four new prop
+  // identities on every render, defeating its internal memoization and forcing
+  // a full syntax re-highlight of every file for any state change — which is
+  // why a large patch would hang or crash the tab the moment review mode was
+  // switched on. Non-review mode never hit it because it passed the stable
+  // baseOptions reference.
+  const perFileProps = useMemo(() => {
+    return fileDiffs.map((fileDiff, idx) => {
+      const filePath = cleanPath(
+        fileDiff.name ?? fileDiff.prevName ?? `file-${idx}`,
+      );
+
+      if (!reviewMode) {
+        return { options: baseOptions };
+      }
+
+      const select = (range: { start: number; end: number; side?: string }) => {
+        handleLineSelectionEnd(range, filePath);
+      };
+
+      return {
+        options: {
+          ...baseOptions,
+          // Deliberately no onGutterUtilityClick. @pierre/diffs offers two
+          // mutually exclusive gutter APIs and throws when given both, which
+          // is what crashed review mode: the error surfaced once per file, so
+          // a 40-file patch threw 40 times and React unmounted the tree into
+          // the "Something went wrong" boundary. renderGutterUtility below is
+          // the richer of the two and already routes clicks to the same
+          // handler, so the click callback was pure duplication.
+          onLineSelectionEnd: (
+            range: { start: number; end: number; side?: string } | null,
+          ) => {
+            if (!range) return;
+            select(range);
+          },
+        },
+        lineAnnotations: getFileLineAnnotations(filePath, annotations),
+        renderGutterUtility: (
+          getHoveredLine: () => { lineNumber: number; side: string } | undefined,
+        ) => {
+          const line = getHoveredLine();
+          if (!line) return null;
+          return (
+            <button
+              style={{
+                background: 'none', border: 'none', cursor: 'pointer',
+                color: '#60a5fa', fontSize: '16px', fontWeight: 'bold',
+                padding: '0 4px', lineHeight: '1',
+              }}
+              onClick={(e) => {
+                e.stopPropagation();
+                select({
+                  start: line.lineNumber,
+                  end: line.lineNumber,
+                  side: line.side,
+                });
+              }}
+            >
+              +
+            </button>
+          );
+        },
+        ...(onUpdateAnnotation && onDeleteAnnotation
+          ? {
+              renderAnnotation: (
+                ann: DiffLineAnnotation<DiffAnnotation>,
+              ) => (
+                <DiffAnnotationCard
+                  annotation={ann.metadata!}
+                  onUpdate={onUpdateAnnotation}
+                  onDelete={onDeleteAnnotation}
+                />
+              ),
+            }
+          : {}),
+      };
+    });
+  }, [
+    fileDiffs, reviewMode, baseOptions, handleLineSelectionEnd,
+    getFileLineAnnotations, annotations, onUpdateAnnotation,
+    onDeleteAnnotation,
+  ]);
+
   const handleCopy = useCallback(() => {
     navigator.clipboard.writeText(patch).then(() => {
       setCopied(true);
@@ -416,57 +504,7 @@ export function DiffViewer({
         >
           <FileDiff
             fileDiff={fileDiff}
-            options={reviewMode ? {
-              ...baseOptions,
-              onGutterUtilityClick: (range: { start: number; end: number; side?: string }) => {
-                const fp = cleanPath(fileDiff.name ?? fileDiff.prevName ?? `file-${idx}`);
-                handleLineSelectionEnd(range, fp);
-              },
-              onLineSelectionEnd: (range: { start: number; end: number; side?: string } | null) => {
-                if (!range) return;
-                const fp = cleanPath(fileDiff.name ?? fileDiff.prevName ?? `file-${idx}`);
-                handleLineSelectionEnd(range, fp);
-              },
-            } : baseOptions}
-            {...(reviewMode ? {
-              lineAnnotations: getFileLineAnnotations(
-                cleanPath(fileDiff.name ?? fileDiff.prevName ?? `file-${idx}`),
-                annotations,
-              ),
-              renderGutterUtility: (getHoveredLine: () => { lineNumber: number; side: string } | undefined) => {
-                const line = getHoveredLine();
-                if (!line) return null;
-                return (
-                  <button
-                    style={{
-                      background: 'none', border: 'none', cursor: 'pointer',
-                      color: '#60a5fa', fontSize: '16px', fontWeight: 'bold',
-                      padding: '0 4px', lineHeight: '1',
-                    }}
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      const fp = cleanPath(fileDiff.name ?? fileDiff.prevName ?? `file-${idx}`);
-                      handleLineSelectionEnd({
-                        start: line.lineNumber,
-                        end: line.lineNumber,
-                        side: line.side,
-                      }, fp);
-                    }}
-                  >
-                    +
-                  </button>
-                );
-              },
-            } : {})}
-            {...(reviewMode && onUpdateAnnotation && onDeleteAnnotation ? {
-              renderAnnotation: (ann: DiffLineAnnotation<DiffAnnotation>) => (
-                <DiffAnnotationCard
-                  annotation={ann.metadata!}
-                  onUpdate={onUpdateAnnotation}
-                  onDelete={onDeleteAnnotation}
-                />
-              ),
-            } : {})}
+            {...perFileProps[idx]}
           />
         </div>
       ))}

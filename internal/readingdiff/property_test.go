@@ -389,7 +389,7 @@ func TestPropertyCompileRejectsCleanly(t *testing.T) {
 
 	rapid.Check(t, func(t *rapid.T) {
 		raw := genDiff(t)
-		plan := genPlan(t, len(splitLines(raw)))
+		plan := genStructuredPlan(t, raw)
 
 		res, err := Compile(raw, plan)
 		if err != nil {
@@ -438,7 +438,7 @@ func TestPropertySegmentsTile(t *testing.T) {
 
 	rapid.Check(t, func(t *rapid.T) {
 		raw := genDiff(t)
-		plan := genPlan(t, len(splitLines(raw)))
+		plan := genStructuredPlan(t, raw)
 
 		res, err := Compile(raw, plan)
 		if err != nil {
@@ -469,7 +469,7 @@ func TestPropertyStatsBalance(t *testing.T) {
 
 	rapid.Check(t, func(t *rapid.T) {
 		raw := genDiff(t)
-		plan := genPlan(t, len(splitLines(raw)))
+		plan := genStructuredPlan(t, raw)
 
 		res, err := Compile(raw, plan)
 		if err != nil {
@@ -494,7 +494,7 @@ func TestPropertyNoOrphanHeaders(t *testing.T) {
 
 	rapid.Check(t, func(t *rapid.T) {
 		raw := genDiff(t)
-		plan := genPlan(t, len(splitLines(raw)))
+		plan := genStructuredPlan(t, raw)
 
 		res, err := Compile(raw, plan)
 		if err != nil {

@@ -137,16 +137,29 @@ func (s *Service) Get(ctx context.Context, req Request) (*Result, error) {
 	s.inflight[key] = call
 	s.mu.Unlock()
 
-	call.res, call.err = Abridge(ctx, s.gen, req)
+	// Release the entry through a defer so a panic in the generator cannot
+	// leave a key permanently occupied, which would make every later request
+	// for that patch block until its own deadline and never recompute.
+	//
+	// Publish before removing, so a late joiner either finds the completed
+	// call or misses it and recomputes, never observing a half-populated one.
+	func() {
+		defer func() {
+			close(call.done)
 
-	// Publish the result before removing the entry, so a late joiner either
-	// finds the completed call or misses it and recomputes, never observing
-	// a half-populated one.
-	close(call.done)
+			s.mu.Lock()
+			delete(s.inflight, key)
+			s.mu.Unlock()
+		}()
 
-	s.mu.Lock()
-	delete(s.inflight, key)
-	s.mu.Unlock()
+		// Detach the shared computation from this caller's request. Joiners
+		// wait on the same call, so binding it to whoever arrived first means
+		// one browser tab closing cancels the abridgement the other tab is
+		// still waiting for.
+		call.res, call.err = Abridge(
+			context.WithoutCancel(ctx), s.gen, req,
+		)
+	}()
 
 	if call.err != nil {
 		return nil, call.err

@@ -109,9 +109,12 @@ to four minutes. Results live in the `reading_diffs` table, keyed by
 sha256(rubric_hash ‖ model ‖ patch)
 ```
 
-Every input that shapes the answer is in the key, so a hit is always a result
-the current code would reproduce. Editing the rubric or switching models misses
-and recomputes instead of serving output the prompt would no longer produce.
+Editing the rubric or switching models misses the cache and recomputes instead
+of serving output the prompt would no longer produce. Two inputs sit outside
+the key and are worth knowing about: the client-supplied `repo_path`, and the
+user-turn instruction built in `buildPrompt`. `RubricHash` covers the system
+prompt but not that instruction, so changing its wording means bumping
+`protocolVersion` by hand.
 
 Two details keep the cache honest:
 
@@ -166,8 +169,15 @@ POST /api/v1/reading-diff
 
 The patch travels in the body because a diff routinely runs to hundreds of
 kilobytes and is the cache key rather than a resource identifier. `repo_path`
-is optional; without it the agent judges from the diff text alone and every
-file tool is denied.
+is optional; without it the agent judges from the diff text alone, and any tool
+call naming a path is denied. Searches that name no path are still allowed,
+since there is no configured root to confine them against.
+
+`repo_path` is client-supplied and is **not** part of the cache key. Two
+requests for one patch under different repository paths therefore share an
+entry. That is safe — both are valid projections of the same patch — but it
+means a hit is reproducible for a given patch, not for a given patch *and*
+working tree.
 
 ```json
 {

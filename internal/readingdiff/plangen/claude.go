@@ -265,9 +265,10 @@ var jsonBlockRE = regexp.MustCompile("(?s)```(?:json)?\\s*\\n(.*?)```")
 // parsePlan extracts the edit plan from an agent's reply.
 //
 // The agent is asked for a single fenced json block, but models routinely wrap
-// it in commentary or emit several blocks while thinking aloud. Scanning all
-// candidates and taking the last one that both parses and carries the required
-// keys tolerates that without accepting a half-written draft.
+// it in commentary or emit several blocks while thinking aloud. Scanning
+// candidates from the last backwards, and requiring each to carry a summary and
+// at least one edit key, tolerates that without accepting a draft or an echoed
+// copy of the example in the system prompt.
 func parsePlan(text string) (readingdiff.Plan, error) {
 	var zero readingdiff.Plan
 
@@ -299,11 +300,40 @@ func parsePlan(text string) (readingdiff.Plan, error) {
 	return zero, fmt.Errorf("no valid json plan in agent output: %w", lastErr)
 }
 
-// decodePlan strictly decodes one candidate block into a plan, normalizing
-// absent arrays to empty ones so a plan that omits a category is treated as
-// "no edits here" rather than rejected for a null field.
+// decodePlan strictly decodes one candidate block into a plan.
+//
+// A candidate must actually look like a plan, not merely be valid JSON. The
+// loop above parses every assistant message and takes the first block that
+// decodes, and the system prompt itself contains a worked example with real
+// coordinates in it. Without a presence check, a model restating the output
+// format would have its example accepted as the plan, and a bare "{}" would
+// compile into a deliberate-looking "keep everything" — the one failure the
+// reader cannot distinguish from a considered judgment.
+//
+// Absent arrays are still normalized to empty, so a plan that legitimately has
+// no edits of one kind is not rejected for a missing key.
 func decodePlan(raw string) (readingdiff.Plan, error) {
 	var plan readingdiff.Plan
+
+	var present map[string]json.RawMessage
+	if err := json.Unmarshal([]byte(raw), &present); err != nil {
+		return plan, fmt.Errorf("decode plan envelope: %w", err)
+	}
+	if _, ok := present["summary"]; !ok {
+		return plan, fmt.Errorf(
+			"candidate has no summary key, so it is not a plan")
+	}
+	hasEdits := false
+	for _, key := range []string{"remove", "fold", "replace"} {
+		if _, ok := present[key]; ok {
+			hasEdits = true
+		}
+	}
+	if !hasEdits {
+		return plan, fmt.Errorf(
+			"candidate has no remove, fold, or replace key, so it is not " +
+				"a plan")
+	}
 
 	dec := json.NewDecoder(strings.NewReader(raw))
 	dec.DisallowUnknownFields()

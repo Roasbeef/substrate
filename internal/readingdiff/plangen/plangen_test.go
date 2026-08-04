@@ -64,19 +64,61 @@ func TestParsePlanAcceptsRealisticOutput(t *testing.T) {
 }
 
 // TestParsePlanNormalizesMissingArrays asserts an omitted category becomes an
-// empty slice. The compiler rejects nil arrays on purpose, so that a generator
-// cannot silently drop a category, but an absent key in valid JSON is an
-// honest "no edits here" and should not cost a retry.
+// empty slice. The compiler rejects nil arrays on purpose, so a generator
+// cannot silently drop a category, but omitting one key while supplying another
+// is an honest "no edits of that kind" and should not cost a retry.
 func TestParsePlanNormalizesMissingArrays(t *testing.T) {
 	t.Parallel()
 
-	got, err := parsePlan("```json\n{\"summary\":\"only a summary\"}\n```")
+	got, err := parsePlan("```json\n{\"summary\":\"partial\"," +
+		"\"remove\":[{\"start_line\":3,\"end_line\":4}]}\n```")
 	require.NoError(t, err)
 
-	require.NotNil(t, got.Remove)
+	require.Len(t, got.Remove, 1)
 	require.NotNil(t, got.Fold)
 	require.NotNil(t, got.Replace)
 	require.NoError(t, got.Validate())
+}
+
+// TestParsePlanRejectsNonPlanJSON asserts a JSON block that is merely
+// well-formed is not mistaken for a plan.
+//
+// The streaming loop parses every assistant message and takes the first block
+// that decodes, and the system prompt itself contains a worked example with
+// real coordinates. Without a presence check, a model restating the output
+// format would have its example applied to the reader's diff, and a bare "{}"
+// would compile into a deliberate-looking "keep everything" — the one outcome
+// a reader cannot tell apart from considered judgment.
+func TestParsePlanRejectsNonPlanJSON(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name string
+		text string
+	}{
+		{name: "empty object", text: "```json\n{}\n```"},
+		{
+			name: "summary with no edit keys",
+			text: "```json\n{\"summary\":\"I will now abridge this\"}\n```",
+		},
+		{
+			name: "edit keys with no summary",
+			text: "```json\n{\"remove\":[],\"fold\":[],\"replace\":[]}\n```",
+		},
+		{
+			name: "unrelated object",
+			text: "```json\n{\"status\":\"thinking\",\"step\":2}\n```",
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			_, err := parsePlan(tc.text)
+			require.Error(t, err)
+		})
+	}
 }
 
 // TestParsePlanRejectsBadOutput asserts the parser fails loudly rather than

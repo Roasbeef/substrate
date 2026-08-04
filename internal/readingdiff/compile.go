@@ -236,6 +236,10 @@ func Compile(raw string, plan Plan) (*Result, error) {
 		problems = append(problems, err)
 	}
 
+	if err := checkStructuralConsistency(lay, st, modelRemoved); err != nil {
+		problems = append(problems, err)
+	}
+
 	if len(problems) > 0 {
 		return nil, errors.Join(problems...)
 	}
@@ -243,6 +247,66 @@ func Compile(raw string, plan Plan) (*Result, error) {
 	pruneEmptyStructure(lay, st)
 
 	return render(lines, lay, st, plan.Summary), nil
+}
+
+// checkStructuralConsistency rejects a plan that hides a header while keeping
+// rows that depend on it.
+//
+// Removing rows is otherwise unrestricted, and deliberately so: the rubric
+// tells the generator to drop a whole generated file, which means removing its
+// header block along with its hunks. What must not happen is removing a header
+// on its own. A hunk whose @@ line is gone renders as a seamless continuation
+// of the hunk above it, and a file whose header block is gone renders under the
+// previous file's name. Nothing is invented in either case, yet the diff now
+// says the change happened somewhere it did not — which is worse than hiding
+// it, because the reader has no way to tell.
+//
+// The check runs on the model's own removals only. Import stripping and the
+// emptiness prune never hide a header while leaving its contents visible.
+func checkStructuralConsistency(lay layout, st *planState,
+	modelRemoved []bool) error {
+
+	for hunkID, bounds := range lay.hunkBounds {
+		header := bounds.start
+		if header >= len(modelRemoved) || !modelRemoved[header] {
+			continue
+		}
+
+		for i := bounds.start + 1; i < bounds.end && i < len(st.hidden); i++ {
+			if lay.hunkID[i] != hunkID || !lay.kinds[i].IsHunkSource() {
+				continue
+			}
+			if st.represented(i) {
+				return fmt.Errorf(
+					"remove: line %d hides the header of the hunk "+
+						"containing line %d, which would render under the "+
+						"previous hunk; remove the whole hunk or keep its "+
+						"header", header+1, i+1)
+			}
+		}
+	}
+
+	for fileID, bounds := range lay.fileBounds {
+		head := bounds.start
+		if head >= len(modelRemoved) || !modelRemoved[head] {
+			continue
+		}
+
+		for i := bounds.start + 1; i < bounds.end && i < len(st.hidden); i++ {
+			if lay.fileID[i] != fileID {
+				continue
+			}
+			if lay.kinds[i].IsHunkSource() && st.represented(i) {
+				return fmt.Errorf(
+					"remove: line %d hides the header of the file "+
+						"containing line %d, which would attribute that "+
+						"change to the previous file; remove the whole file "+
+						"section or keep its header", head+1, i+1)
+			}
+		}
+	}
+
+	return nil
 }
 
 // checkSupported rejects diff dialects the parser does not model.
@@ -437,6 +501,12 @@ func checkReplacementOverlap(lines []line, lay layout, st *planState) error {
 // pruneEmptyStructure hides hunk headers and file sections that no longer
 // introduce anything, so the reader never meets an orphan header announcing a
 // change that was entirely elided.
+// Clearing folded alongside foldAt is load-bearing. A pruned hunk emits no
+// ellipsis row, so leaving folded set would make buildSegments report a folded
+// segment with nothing rendered for it. The viewer walks segments in step with
+// the rendered rows and would consume the following row for that phantom fold,
+// shifting every later block onto the wrong lines — real code under the wrong
+// heading, with no error anywhere.
 func pruneEmptyStructure(lay layout, st *planState) {
 	for hunkID, bounds := range lay.hunkBounds {
 		if hunkVisible(lay, st, hunkID, bounds) {
@@ -445,6 +515,7 @@ func pruneEmptyStructure(lay layout, st *planState) {
 		for i := bounds.start; i < bounds.end && i < len(st.hidden); i++ {
 			st.hidden[i] = true
 			st.foldAt[i] = -1
+			st.folded[i] = -1
 		}
 	}
 
@@ -455,6 +526,7 @@ func pruneEmptyStructure(lay layout, st *planState) {
 		for i := bounds.start; i < bounds.end && i < len(st.hidden); i++ {
 			st.hidden[i] = true
 			st.foldAt[i] = -1
+			st.folded[i] = -1
 		}
 	}
 }
@@ -474,13 +546,38 @@ func hunkVisible(lay layout, st *planState, hunkID int, bounds span) bool {
 	return false
 }
 
-// fileVisible reports whether a file section still contains a visible hunk.
+// fileVisible reports whether a file section still shows the reader anything.
+//
+// A section normally qualifies by keeping a visible hunk. But a rename, a mode
+// change, and a binary file all carry their entire meaning in metadata and have
+// no hunks at all, so requiring a hunk header would delete them from every
+// reading diff — including under the empty plan, where no generator chose to
+// hide anything. "This file was renamed" is reviewable signal, and its only
+// other trace would be a shrinking file count.
 func fileVisible(lay layout, st *planState, fileID int, bounds span) bool {
+	hasHunk := false
+
 	for i := bounds.start; i < bounds.end && i < len(st.hidden); i++ {
 		if lay.fileID[i] != fileID {
 			continue
 		}
-		if lay.kinds[i] == KindHunkHeader && !st.hidden[i] {
+		if lay.kinds[i] == KindHunkHeader {
+			hasHunk = true
+			if !st.hidden[i] {
+				return true
+			}
+		}
+	}
+	if hasHunk {
+		return false
+	}
+
+	// No hunks at all: keep the section when its metadata still says something,
+	// which is the rename, mode-change, and binary case.
+	for i := bounds.start; i < bounds.end && i < len(st.hidden); i++ {
+		if lay.fileID[i] == fileID && lay.kinds[i] == KindMeta &&
+			!st.hidden[i] {
+
 			return true
 		}
 	}
