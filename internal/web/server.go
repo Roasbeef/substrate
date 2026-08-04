@@ -15,6 +15,7 @@ import (
 	subtraterpc "github.com/roasbeef/subtrate/internal/api/grpc"
 	"github.com/roasbeef/subtrate/internal/mail"
 	"github.com/roasbeef/subtrate/internal/mailclient"
+	"github.com/roasbeef/subtrate/internal/readingdiff"
 	"github.com/roasbeef/subtrate/internal/store"
 	"github.com/roasbeef/subtrate/internal/summary"
 	"google.golang.org/grpc"
@@ -33,8 +34,13 @@ type Server struct {
 	actClient    *mailclient.ActivityClient // Shared activity client (required).
 	notifHubRef  NotificationHubRef         // Notification hub reference (optional).
 	summarySvc   *summary.Service           // Summary service (optional).
-	hub          *Hub                       // WebSocket hub for real-time updates.
-	notifBridge  *HubNotificationBridge     // Bridge for actor notifications to WebSocket.
+
+	// readingDiffs abridges patches into reading diffs. Nil when the daemon
+	// was started without a plan generator, in which case the endpoint
+	// reports the feature as unavailable instead of failing obscurely.
+	readingDiffs *readingdiff.Service
+	hub          *Hub                   // WebSocket hub for real-time updates.
+	notifBridge  *HubNotificationBridge // Bridge for actor notifications to WebSocket.
 	mux          *http.ServeMux
 	gatewayMux   *runtime.ServeMux // grpc-gateway REST proxy mux (optional).
 	srv          *http.Server
@@ -55,6 +61,9 @@ type Config struct {
 	// NotificationHubRef is the notification hub reference (optional).
 	// When provided, enables real-time actor-based notifications to WebSocket clients.
 	NotificationHubRef NotificationHubRef
+
+	// ReadingDiffSvc abridges patches into reading diffs (optional).
+	ReadingDiffSvc *readingdiff.Service
 
 	// SummarySvc is the summary service (optional).
 	// When provided, enables agent summary REST endpoints.
@@ -96,6 +105,7 @@ func NewServer(cfg *Config, st store.Storage,
 		actClient:    mailclient.NewActivityClient(cfg.ActivityRef),
 		notifHubRef:  cfg.NotificationHubRef,
 		summarySvc:   cfg.SummarySvc,
+		readingDiffs: cfg.ReadingDiffSvc,
 		mux:          http.NewServeMux(),
 		addr:         cfg.Addr,
 		grpcEndpoint: cfg.GRPCEndpoint,
@@ -129,6 +139,7 @@ func NewServer(cfg *Config, st store.Storage,
 	s.registerCommandFlowRoutes()
 	s.registerCommandDocRoutes()
 	s.registerAttachmentRoutes()
+	s.registerReadingDiffRoutes()
 
 	// Register WebSocket route.
 	s.mux.HandleFunc("/ws", s.handleWebSocket)

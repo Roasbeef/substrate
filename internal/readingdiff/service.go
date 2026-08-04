@@ -3,10 +3,7 @@ package readingdiff
 import (
 	"context"
 	"crypto/sha256"
-	"database/sql"
 	"encoding/hex"
-	"encoding/json"
-	"errors"
 	"fmt"
 	"sync"
 )
@@ -155,108 +152,4 @@ func (s *Service) Get(ctx context.Context, req Request) (*Result, error) {
 	}
 
 	return call.res, nil
-}
-
-// storeCache adapts the application's storage layer to the Cache interface.
-type storeCache struct {
-	store ReadingDiffStorage
-}
-
-// ReadingDiffStorage is the slice of the application store this package uses.
-type ReadingDiffStorage interface {
-	GetReadingDiff(ctx context.Context, cacheKey string) (
-		ReadingDiffRecord, error)
-	SaveReadingDiff(ctx context.Context, params SaveReadingDiffParams) (
-		ReadingDiffRecord, error)
-}
-
-// ReadingDiffRecord mirrors the persisted row. It is redeclared here rather
-// than imported so this package does not depend on the store package, which
-// would create an import cycle once the store learns about reading diffs.
-type ReadingDiffRecord struct {
-	CacheKey       string
-	ReadingDiff    string
-	Summary        string
-	Segments       string
-	RawChanged     int
-	VisibleChanged int
-	RawFiles       int
-	VisibleFiles   int
-	Model          string
-	RubricHash     string
-}
-
-// SaveReadingDiffParams mirrors the persisted insert parameters.
-type SaveReadingDiffParams struct {
-	CacheKey       string
-	ReadingDiff    string
-	Summary        string
-	Segments       string
-	RawChanged     int
-	VisibleChanged int
-	RawFiles       int
-	VisibleFiles   int
-	Model          string
-	RubricHash     string
-}
-
-// NewStoreCache adapts a storage implementation into a Cache.
-func NewStoreCache(st ReadingDiffStorage) Cache {
-	return &storeCache{store: st}
-}
-
-// Load reads a cached abridgement, treating a missing row and a corrupt one
-// alike as a miss. A cache is an optimization, so an unreadable entry should
-// cost a recomputation rather than an error.
-func (c *storeCache) Load(ctx context.Context, key string) (*Result, bool) {
-	rec, err := c.store.GetReadingDiff(ctx, key)
-	if err != nil {
-		if !errors.Is(err, sql.ErrNoRows) {
-			return nil, false
-		}
-
-		return nil, false
-	}
-
-	var segments []Segment
-	if err := json.Unmarshal([]byte(rec.Segments), &segments); err != nil {
-		return nil, false
-	}
-
-	return &Result{
-		ReadingDiff: rec.ReadingDiff,
-		Summary:     rec.Summary,
-		Segments:    segments,
-		Stats: Stats{
-			RawChanged:     rec.RawChanged,
-			VisibleChanged: rec.VisibleChanged,
-			RawFiles:       rec.RawFiles,
-			VisibleFiles:   rec.VisibleFiles,
-		},
-	}, true
-}
-
-// Store persists a compiled abridgement.
-func (c *storeCache) Store(ctx context.Context, key, model, rubric string,
-	res *Result) error {
-
-	segments, err := json.Marshal(res.Segments)
-	if err != nil {
-		return fmt.Errorf("encode segments: %w", err)
-	}
-
-	_, err = c.store.SaveReadingDiff(ctx, SaveReadingDiffParams{
-		CacheKey:       key,
-		ReadingDiff:    res.ReadingDiff,
-		Summary:        res.Summary,
-		Segments:       string(segments),
-		RawChanged:     res.Stats.RawChanged,
-		VisibleChanged: res.Stats.VisibleChanged,
-		RawFiles:       res.Stats.RawFiles,
-		VisibleFiles:   res.Stats.VisibleFiles,
-		Model:          model,
-		RubricHash:     rubric,
-	})
-
-	return err
 }

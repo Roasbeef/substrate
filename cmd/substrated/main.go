@@ -22,6 +22,8 @@ import (
 	"github.com/roasbeef/subtrate/internal/db"
 	"github.com/roasbeef/subtrate/internal/mail"
 	"github.com/roasbeef/subtrate/internal/mcp"
+	"github.com/roasbeef/subtrate/internal/readingdiff"
+	"github.com/roasbeef/subtrate/internal/readingdiff/plangen"
 	"github.com/roasbeef/subtrate/internal/review"
 	"github.com/roasbeef/subtrate/internal/store"
 	"github.com/roasbeef/subtrate/internal/summary"
@@ -256,6 +258,22 @@ func main() {
 	)
 	log.Println("Summary service created")
 
+	// Build the reading-diff service. Abridging asks a Claude agent to plan
+	// the elision, and the compiler applies that plan to the immutable patch,
+	// so results are cached by a hash of the patch, model, and rubric.
+	readingDiffSvc, err := readingdiff.NewService(readingdiff.ServiceConfig{
+		Generator: plangen.New(plangen.Config{
+			Logf: log.Printf,
+		}),
+		Cache:      readingdiff.NewStoreCache(storage),
+		Model:      plangen.DefaultModel,
+		RubricHash: plangen.RubricHash(),
+	})
+	if err != nil {
+		log.Fatalf("Failed to create reading diff service: %v", err)
+	}
+	log.Println("Reading diff service created")
+
 	// Create the MCP server if MCP stdio mode is enabled.
 	var mcpServer *mcp.Server
 	if *enableMCP {
@@ -324,6 +342,7 @@ func main() {
 
 		// Wire summary service into the web server.
 		webCfg.SummarySvc = summarySvc
+		webCfg.ReadingDiffSvc = readingDiffSvc
 
 		webServer, err := web.NewServer(webCfg, storage, agentReg)
 		if err != nil {
