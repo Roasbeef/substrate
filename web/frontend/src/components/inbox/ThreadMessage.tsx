@@ -16,6 +16,12 @@ import { exportDiffAnnotations } from '@/lib/feedback-export.js';
 import { formatAgentDisplayName, getAgentContext } from '@/lib/utils.js';
 
 // Lazy-load DiffViewer to avoid bundling Shiki grammars in inbox chunk.
+const ReadingDiffView = lazy(
+  () => import('@/components/reviews/ReadingDiffView.js').then(
+    (m) => ({ default: m.ReadingDiffView }),
+  ),
+);
+
 const DiffViewer = lazy(
   () => import('@/components/reviews/DiffViewer.js').then(
     (m) => ({ default: m.DiffViewer }),
@@ -122,6 +128,13 @@ export function ThreadMessage({
   // Track whether the diff section is expanded.
   const [diffExpanded, setDiffExpanded] = useState(false);
   const [reviewMode, setReviewMode] = useState(false);
+
+  // Diffs open abridged. Reading mode is deliberately read-only: annotations
+  // anchor to line numbers in the full patch, and a reading diff renumbers
+  // everything, so letting someone annotate the abridged view would file
+  // comments against the wrong lines. Entering Review therefore drops back to
+  // the full patch.
+  const [readingMode, setReadingMode] = useState(true);
 
   // Diff annotation support, scoped to this message's ID.
   const {
@@ -296,7 +309,12 @@ export function ThreadMessage({
           {diffExpanded && (
             <button
               type="button"
-              onClick={() => setReviewMode(!reviewMode)}
+              onClick={() => {
+                if (!reviewMode) {
+                  setReadingMode(false);
+                }
+                setReviewMode(!reviewMode);
+              }}
               className={cn(
                 'ml-2 rounded-lg border px-3 py-1.5 text-sm font-medium transition-colors',
                 reviewMode
@@ -321,15 +339,35 @@ export function ThreadMessage({
                   </div>
                 }
               >
-                <DiffViewer
-                  patch={patch}
-                  reviewMode={reviewMode}
-                  annotations={diffAnnotations}
-                  onAddAnnotation={handleAddDiffAnnotation}
-                  onUpdateAnnotation={handleUpdateDiffAnnotation}
-                  onDeleteAnnotation={handleDeleteDiffAnnotation}
-                  onSubmitReview={handleSubmitReview}
-                />
+                {readingMode && !reviewMode ? (
+                  <ReadingDiffView
+                    patch={patch}
+                    onShowFull={() => setReadingMode(false)}
+                  />
+                ) : (
+                  <div>
+                    {!reviewMode && (
+                      <div className="mb-1 flex justify-end">
+                        <button
+                          type="button"
+                          onClick={() => setReadingMode(true)}
+                          className="text-[12px] font-medium text-[var(--c-steel)] hover:underline"
+                        >
+                          Reading diff
+                        </button>
+                      </div>
+                    )}
+                    <DiffViewer
+                      patch={patch}
+                      reviewMode={reviewMode}
+                      annotations={diffAnnotations}
+                      onAddAnnotation={handleAddDiffAnnotation}
+                      onUpdateAnnotation={handleUpdateDiffAnnotation}
+                      onDeleteAnnotation={handleDeleteDiffAnnotation}
+                      onSubmitReview={handleSubmitReview}
+                    />
+                  </div>
+                )}
               </Suspense>
             </div>
           ) : null}

@@ -27,6 +27,16 @@ const DiffViewer = lazy(() =>
   import('./DiffViewer.js').then((m) => ({ default: m.DiffViewer })),
 );
 
+// autoAbridgeMaxBytes is the largest patch abridged without being asked.
+//
+// Abridging runs a model over the whole patch, so cost and latency scale with
+// size: a few hundred lines returns in seconds, while a forty-file branch diff
+// can occupy the model for minutes and may burn a retry before it lands. Above
+// this threshold the reader gets the full diff immediately and an explicit
+// button, because silently making someone wait minutes for a view they did not
+// ask for is worse than showing them the patch they already have.
+const autoAbridgeMaxBytes = 60 * 1024;
+
 export interface ReadingDiffViewProps {
   // The raw unified patch to abridge.
   patch: string;
@@ -124,9 +134,13 @@ export function ReadingDiffView({
 }: ReadingDiffViewProps) {
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
 
+  const oversized = patch.length > autoAbridgeMaxBytes;
+  const [requested, setRequested] = useState(!oversized);
+
   const { data, isLoading, error } = useQuery({
     queryKey: ['reading-diff', patch, repoPath ?? ''],
     queryFn: ({ signal }) => fetchReadingDiff(patch, repoPath, signal),
+    enabled: requested,
     // Abridging is expensive and content-addressed, so there is never a reason
     // to refetch the same patch within a session.
     staleTime: Infinity,
@@ -161,11 +175,58 @@ export function ReadingDiffView({
     setExpanded(allOpen ? new Set() : new Set(view.regions.map((r) => r.key)));
   }, [view, allOpen]);
 
+  // A large patch is not abridged until asked. Show it in full meanwhile, so
+  // the reader is never staring at a spinner instead of the diff they opened.
+  if (!requested) {
+    return (
+      <div data-testid="reading-diff-optional">
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-1 border-b border-[var(--c-hair)] px-3 py-2">
+          <span className="text-[12px] text-[var(--c-ink-3)]">
+            {Math.round(patch.length / 1024)} KB of diff. Abridging one this
+            large can take a few minutes.
+          </span>
+          <button
+            type="button"
+            data-testid="reading-diff-request"
+            onClick={() => setRequested(true)}
+            className="ml-auto text-[12px] font-medium text-[var(--c-steel)] hover:underline"
+          >
+            Abridge it
+          </button>
+        </div>
+        <Suspense
+          fallback={
+            <div className="flex justify-center p-4">
+              <Spinner size="sm" />
+            </div>
+          }
+        >
+          <DiffViewer patch={patch} initialStyle="unified" />
+        </Suspense>
+      </div>
+    );
+  }
+
   if (isLoading) {
     return (
-      <div className="flex items-center gap-2 p-4 text-[13px] text-[var(--c-ink-3)]">
-        <Spinner size="sm" />
-        <span>Abridging the diff. This can take a minute.</span>
+      <div className="p-4 text-[13px] text-[var(--c-ink-3)]">
+        <div className="flex items-center gap-2">
+          <Spinner size="sm" />
+          <span>
+            Abridging {Math.round(patch.length / 1024)} KB of diff. A model is
+            reading the whole patch, which can take a few minutes.
+          </span>
+        </div>
+        <button
+          type="button"
+          onClick={() => {
+            setRequested(false);
+            if (onShowFull) onShowFull();
+          }}
+          className="mt-1.5 font-medium text-[var(--c-steel)] hover:underline"
+        >
+          Stop waiting and show the full diff
+        </button>
       </div>
     );
   }
