@@ -2,8 +2,10 @@ package web
 
 import (
 	"encoding/json"
+	"log"
 	"net/http"
 	"strings"
+	"time"
 
 	"github.com/roasbeef/subtrate/internal/readingdiff"
 )
@@ -12,6 +14,11 @@ import (
 // compiler's own diff limit so an oversized patch produces the compiler's
 // actionable message rather than a bare 413.
 const maxReadingDiffRequestBytes = readingdiff.MaxDiffBytes + (32 << 10)
+
+// readingDiffTimeout bounds one abridgement request end to end. It sits above
+// the generator's own budget so a stuck model surfaces as the generator's
+// clearer error rather than as a severed connection.
+const readingDiffTimeout = 12 * time.Minute
 
 // ReadingDiffRequest is the payload for POST /api/v1/reading-diff.
 type ReadingDiffRequest struct {
@@ -59,6 +66,27 @@ func (s *Server) handleReadingDiff(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
 
 		return
+	}
+
+	// Extend this response's deadlines past the server-wide 15 second write
+	// timeout.
+	//
+	// A cache miss runs a model over the whole patch and can take minutes,
+	// which the shared timeout would cut off mid-flight — the connection dies
+	// while the handler is still computing, so the caller waits out the whole
+	// abridgement and then receives nothing. That made every fresh
+	// abridgement impossible while cache hits, being instant, worked fine and
+	// hid the problem.
+	//
+	// Raising the timeout for the whole server would weaken it for every other
+	// endpoint, so the deadline is lifted only here.
+	rc := http.NewResponseController(w)
+	deadline := time.Now().Add(readingDiffTimeout)
+	if err := rc.SetWriteDeadline(deadline); err != nil {
+		log.Printf("reading-diff: cannot extend write deadline: %v", err)
+	}
+	if err := rc.SetReadDeadline(deadline); err != nil {
+		log.Printf("reading-diff: cannot extend read deadline: %v", err)
 	}
 
 	if s.readingDiffs == nil {

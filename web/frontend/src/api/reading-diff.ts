@@ -37,6 +37,15 @@ export interface ReadingDiff {
   stats: ReadingDiffStats;
 }
 
+// readingDiffClientTimeoutMs bounds how long the browser waits.
+//
+// It sits just above the server's own ceiling so a normal slow abridgement is
+// never cut off, while a request that has genuinely stalled — a severed
+// connection, a wedged subprocess — fails with a message instead of spinning
+// forever. An unbounded fetch is how a broken backend presented as "still
+// loading" for minutes on end.
+const readingDiffClientTimeoutMs = 13 * 60 * 1000;
+
 // Request an abridgement of a patch.
 //
 // The call can take minutes on a cache miss, because the server runs an agent
@@ -47,9 +56,16 @@ export function fetchReadingDiff(
   repoPath?: string,
   signal?: AbortSignal,
 ): Promise<ReadingDiff> {
+  // Combine the caller's signal with a timeout, so either unmounting the view
+  // or exceeding the ceiling aborts the request.
+  const timeout = AbortSignal.timeout(readingDiffClientTimeoutMs);
+  const combined = signal
+    ? AbortSignal.any([signal, timeout])
+    : timeout;
+
   return post<ReadingDiff>(
     '/reading-diff',
     repoPath ? { patch, repo_path: repoPath } : { patch },
-    signal,
+    combined,
   );
 }
