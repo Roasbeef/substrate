@@ -397,8 +397,8 @@ func checkReplacement(lines []line, lay layout, st *planState,
 	if !isElisionProjection(rep.Old, rep.New) {
 		return fmt.Errorf(
 			"new text %q is not an elision of %q; characters may only be "+
-				"removed, and every omitted span must be marked with ...",
-			rep.New, rep.Old)
+				"removed, and every omitted span must be marked with an "+
+				"ellipsis", rep.New, rep.Old)
 	}
 
 	return nil
