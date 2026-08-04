@@ -116,15 +116,36 @@ func (s *Server) handleReadingDiff(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Surface each stage server-side. Abridging takes minutes and the caller
+	// sees only a spinner, so without this there is no way to tell a model
+	// still reading from a compiler rejection being retried.
+	start := time.Now()
 	res, err := s.readingDiffs.Get(r.Context(), readingdiff.Request{
 		UnifiedDiff: req.Patch,
 		RepoRoot:    req.RepoPath,
+		Progress: func(msg string) {
+			log.Printf("reading-diff [%dB]: %s", len(req.Patch), msg)
+		},
 	})
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusUnprocessableEntity)
+		log.Printf("reading-diff [%dB] failed after %s: %v",
+			len(req.Patch), time.Since(start).Round(time.Millisecond), err)
+
+		// Errors go out as JSON so the browser reports the reason instead of
+		// choking on a plain-text body while trying to parse one.
+		writeJSON(w, http.StatusUnprocessableEntity, map[string]any{
+			"error": map[string]string{
+				"code":    "abridge_failed",
+				"message": err.Error(),
+			},
+		})
 
 		return
 	}
+
+	log.Printf("reading-diff [%dB] done in %s: %s",
+		len(req.Patch), time.Since(start).Round(time.Millisecond),
+		res.ElisionLine())
 
 	segments := res.Segments
 	if segments == nil {

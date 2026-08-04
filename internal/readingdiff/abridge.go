@@ -93,12 +93,14 @@ func Abridge(ctx context.Context, gen Generator,
 
 		res, err := Compile(req.UnifiedDiff, plan)
 		if err == nil {
-			progress("compiled")
+			progress(fmt.Sprintf("compiled on attempt %d: %s",
+				attempt, res.ElisionLine()))
 
 			return res, nil
 		}
 
-		progress(fmt.Sprintf("plan rejected, retrying: %v", err))
+		progress(fmt.Sprintf(
+			"attempt %d rejected by the compiler: %v", attempt, err))
 		feedback = fmt.Sprintf(
 			"Your previous plan was rejected by the compiler:\n\n%v\n\n"+
 				"Coordinates address the ORIGINAL numbered diff and never "+

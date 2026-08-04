@@ -185,7 +185,13 @@ func (w *Warmer) warmOnce(ctx context.Context) {
 		w.cfg.Log.InfoContext(ctx, "reading diff warmer: abridging",
 			"bytes", len(patch), "key", key[:12])
 
-		res, err := w.cfg.Service.Get(ctx, Request{UnifiedDiff: patch})
+		res, err := w.cfg.Service.Get(ctx, Request{
+			UnifiedDiff: patch,
+			Progress: func(msg string) {
+				w.cfg.Log.InfoContext(ctx, "reading diff warmer",
+					"key", key[:12], "stage", msg)
+			},
+		})
 		if err != nil {
 			w.cfg.Log.WarnContext(ctx, "reading diff warmer: abridge failed",
 				"key", key[:12], "elapsed", time.Since(start).String(),

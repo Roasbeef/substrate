@@ -100,12 +100,20 @@ func (g *Generator) Generate(ctx context.Context, req readingdiff.Request,
 	}()
 
 	prompt := buildPrompt(req, feedback)
+	start := time.Now()
+
+	g.cfg.Logf("plangen: start model=%s patch=%dB prompt=%dB retry=%v",
+		g.cfg.Model, len(req.UnifiedDiff), len(prompt), feedback != "")
 
 	var (
 		lastText  string
 		resultErr error
+		parseErr  error
+		msgCount  int
 	)
 	for msg := range client.Query(ctx, prompt) {
+		msgCount++
+
 		switch m := msg.(type) {
 		case claudeagent.AssistantMessage:
 			if text := m.ContentText(); text != "" {
@@ -114,9 +122,25 @@ func (g *Generator) Generate(ctx context.Context, req readingdiff.Request,
 				// The plan is the whole deliverable, so stop as soon as one
 				// parses rather than waiting for the subprocess to wind down
 				// through its stop hooks.
-				if plan, perr := parsePlan(text); perr == nil {
+				plan, perr := parsePlan(text)
+				if perr == nil {
+					g.cfg.Logf(
+						"plangen: plan accepted after %s (%d messages, "+
+							"remove=%d fold=%d replace=%d)",
+						time.Since(start).Round(time.Millisecond), msgCount,
+						len(plan.Remove), len(plan.Fold), len(plan.Replace))
+
 					return plan, nil
 				}
+
+				// Record why a candidate was rejected. Every message is
+				// examined, so most of these are the model narrating rather
+				// than a real failure; keeping the last one means the final
+				// error can say what was actually wrong with the output.
+				parseErr = perr
+				g.cfg.Logf(
+					"plangen: message %d (%dB) is not a plan yet: %v",
+					msgCount, len(text), perr)
 			}
 
 		case claudeagent.ResultMessage:
@@ -136,24 +160,54 @@ func (g *Generator) Generate(ctx context.Context, req readingdiff.Request,
 		}
 	}
 
+	elapsed := time.Since(start).Round(time.Millisecond)
+
 	// An agent that failed outright is reported as such. Falling through to
 	// "no json plan found" would blame the parser for an auth or subprocess
 	// failure and send the caller looking in the wrong place.
 	if resultErr != nil {
+		g.cfg.Logf("plangen: failed after %s (%d messages): %v",
+			elapsed, msgCount, resultErr)
+
 		return zero, resultErr
 	}
 
 	if err := ctx.Err(); err != nil {
-		return zero, fmt.Errorf("plan generation timed out: %w", err)
+		g.cfg.Logf("plangen: timed out after %s (%d messages, last text %dB)",
+			elapsed, msgCount, len(lastText))
+
+		return zero, fmt.Errorf(
+			"plan generation timed out after %s: %w", elapsed, err)
 	}
 	if lastText == "" {
-		return zero, fmt.Errorf("agent returned no output")
+		g.cfg.Logf("plangen: no output after %s (%d messages)",
+			elapsed, msgCount)
+
+		return zero, fmt.Errorf(
+			"agent produced no output in %s across %d messages",
+			elapsed, msgCount)
 	}
 
 	plan, err := parsePlan(lastText)
 	if err != nil {
-		return zero, err
+		if parseErr != nil {
+			err = parseErr
+		}
+
+		// Log a slice of what the agent actually said. Without it this error
+		// names a symptom and gives no way to tell a refusal from a malformed
+		// plan from a model that ignored the format entirely.
+		g.cfg.Logf("plangen: unusable output after %s (%d messages): %v\n"+
+			"---- agent said ----\n%s\n--------------------",
+			elapsed, msgCount, err, truncate(lastText, 2000))
+
+		return zero, fmt.Errorf(
+			"agent output was not a usable plan after %s: %w; it said: %q",
+			elapsed, err, truncate(strings.TrimSpace(lastText), 300))
 	}
+
+	g.cfg.Logf("plangen: plan accepted from final text after %s (%d messages)",
+		elapsed, msgCount)
 
 	return plan, nil
 }

@@ -43,6 +43,10 @@ type inflightCall struct {
 	done chan struct{}
 	res  *Result
 	err  error
+
+	// storeErr records a failed cache write, which is advisory: the answer is
+	// already in hand, and the only cost is recomputing it next time.
+	storeErr error
 }
 
 // ServiceConfig configures a Service.
@@ -141,10 +145,25 @@ func (s *Service) Get(ctx context.Context, req Request) (*Result, error) {
 	// leave a key permanently occupied, which would make every later request
 	// for that patch block until its own deadline and never recompute.
 	//
-	// Publish before removing, so a late joiner either finds the completed
-	// call or misses it and recomputes, never observing a half-populated one.
+	// The ordering inside matters. The result is written to the cache before
+	// the in-flight entry is removed, because a caller arriving between those
+	// two steps would find neither an in-flight call to wait on nor a cached
+	// answer, and would pay for the whole abridgement a second time. Publishing
+	// before removing likewise means a late joiner either finds the completed
+	// call or misses it cleanly, never a half-populated one.
 	func() {
 		defer func() {
+			if call.err == nil && s.cache != nil {
+				if err := s.cache.Store(
+					context.WithoutCancel(ctx), key,
+					s.model, s.rubric, call.res,
+				); err != nil {
+					// A cache write failure costs a recomputation later; it
+					// must not fail a request whose answer is in hand.
+					call.storeErr = err
+				}
+			}
+
 			close(call.done)
 
 			s.mu.Lock()
@@ -163,16 +182,6 @@ func (s *Service) Get(ctx context.Context, req Request) (*Result, error) {
 
 	if call.err != nil {
 		return nil, call.err
-	}
-
-	if s.cache != nil {
-		if err := s.cache.Store(
-			ctx, key, s.model, s.rubric, call.res,
-		); err != nil {
-			// A cache write failure costs a recomputation later; it must not
-			// fail a request whose answer is already in hand.
-			return call.res, nil
-		}
 	}
 
 	return call.res, nil

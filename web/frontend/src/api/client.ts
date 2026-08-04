@@ -69,16 +69,44 @@ async function request<T>(
     return undefined as T;
   }
 
-  const data: unknown = await response.json();
+  // Read the body as text and only then attempt to parse it.
+  //
+  // Parsing unconditionally hid every plain-text error the backend produces.
+  // Handlers that call http.Error write text/plain, so JSON.parse threw a
+  // SyntaxError and the caller saw "Unexpected token 'r'" instead of the
+  // server's actual explanation — the real failure was discarded in the act of
+  // reporting it.
+  const raw = await response.text();
+
+  let data: unknown;
+  let parsed = false;
+  if (raw !== '') {
+    try {
+      data = JSON.parse(raw) as unknown;
+      parsed = true;
+    } catch {
+      // Left unparsed; handled below.
+    }
+  }
 
   // Check for error responses.
   if (!response.ok) {
-    const errorData = data as APIError;
+    const errorData = parsed ? (data as APIError) : undefined;
     throw new ApiError(
-      errorData.error?.code ?? 'unknown_error',
-      errorData.error?.message ?? 'An unknown error occurred',
+      errorData?.error?.code ?? 'unknown_error',
+      // Prefer a structured message, then the raw body, which is where a
+      // plain-text handler puts the only useful information there is.
+      errorData?.error?.message ?? (raw.trim() || 'An unknown error occurred'),
       response.status,
-      errorData.error?.details,
+      errorData?.error?.details,
+    );
+  }
+
+  if (!parsed && raw !== '') {
+    throw new ApiError(
+      'invalid_response',
+      `expected JSON but got: ${raw.slice(0, 200)}`,
+      response.status,
     );
   }
 
