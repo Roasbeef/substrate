@@ -171,6 +171,9 @@ func Compile(raw string, plan Plan) (*Result, error) {
 	if len(lines) == 0 {
 		return &Result{Summary: plan.Summary}, nil
 	}
+	if err := checkSupported(lines); err != nil {
+		return nil, err
+	}
 	lay := analyze(lines)
 
 	st := newPlanState(len(lines))
@@ -240,6 +243,35 @@ func Compile(raw string, plan Plan) (*Result, error) {
 	pruneEmptyStructure(lay, st)
 
 	return render(lines, lay, st, plan.Summary), nil
+}
+
+// checkSupported rejects diff dialects the parser does not model.
+//
+// A combined diff, which git emits for a merge without --first-parent, carries
+// two columns of markers and "@@@" hunk headers. The hunk-budget parser assumes
+// one old side and one new side, so it would classify those rows as unstructured
+// text: no crash, but every row of the merge would silently survive abridging
+// while appearing to have been considered. Refusing with advice beats quietly
+// doing nothing.
+func checkSupported(lines []line) error {
+	for i, l := range lines {
+		switch {
+		case strings.HasPrefix(l.text, "diff --cc "),
+			strings.HasPrefix(l.text, "diff --combined "):
+
+			return fmt.Errorf(
+				"readingdiff: combined diff on line %d is unsupported; "+
+					"use a first-parent or two-tree diff", i+1)
+
+		case strings.HasPrefix(l.text, "@@@"):
+			return fmt.Errorf(
+				"readingdiff: combined diff hunk on line %d is "+
+					"unsupported; use a first-parent or two-tree diff",
+				i+1)
+		}
+	}
+
+	return nil
 }
 
 // checkBounds verifies a range lies inside the diff.

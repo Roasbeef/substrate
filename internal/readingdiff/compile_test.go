@@ -437,3 +437,30 @@ func TestSegmentsSplitPerFold(t *testing.T) {
 	require.Equal(t, 2,
 		strings.Count(res.ReadingDiff, "+\t...\n"))
 }
+
+// TestCompileRejectsCombinedDiff asserts a merge diff is refused rather than
+// silently passed through.
+//
+// The hunk-budget parser assumes one old side and one new side. A combined
+// diff has two, so its rows would be read as unstructured text and every one
+// of them would survive abridging while appearing to have been considered.
+// That is worse than an error, because the reader cannot tell it happened.
+func TestCompileRejectsCombinedDiff(t *testing.T) {
+	t.Parallel()
+
+	combined := "diff --cc internal/web/server.go\n" +
+		"index 1111111,2222222..3333333\n" +
+		"--- a/internal/web/server.go\n" +
+		"+++ b/internal/web/server.go\n" +
+		"@@@ -1,3 -1,3 +1,4 @@@\n" +
+		"  package web\n" +
+		"+ added on one side\n"
+
+	_, err := Compile(combined, emptyPlan())
+	require.ErrorContains(t, err, "combined diff")
+
+	// The bare @@@ header is caught even without the diff --cc line, since
+	// some tools emit the hunks alone.
+	_, err = Compile("@@@ -1,1 -1,1 +1,1 @@@\n  x\n", emptyPlan())
+	require.ErrorContains(t, err, "combined diff")
+}

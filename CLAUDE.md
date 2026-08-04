@@ -362,6 +362,13 @@ See `docs/command-center.md`. Its feed API is `GET /api/v1/command/feed`
 (hand-registered in `internal/web/api_command.go`); canvas layout state
 lives in `web/frontend/src/stores/canvas.ts`.
 
+Diff messages open as **reading diffs**: the patch abridged down to the
+rows worth reading, with every hidden region expandable in place. A model
+picks what to hide but can only emit coordinates, and the compiler in
+`internal/readingdiff` applies them to the immutable patch, so the output
+is provably the input minus checked deletions. See `docs/reading-diffs.md`.
+API is `POST /api/v1/reading-diff`; results are cached in `reading_diffs`.
+
 ```
 web/frontend/src/
 ├── api/           # Typed API client
