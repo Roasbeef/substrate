@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"path/filepath"
+	"sort"
 	"strings"
 
 	claudeagent "github.com/roasbeef/claude-agent-sdk-go"
@@ -18,6 +19,18 @@ var readOnlyTools = map[string]bool{
 	"Grep": true,
 	"Glob": true,
 	"LS":   true,
+}
+
+// toolNames returns the read-only tool names in a stable order, for callers
+// that need to name them to the SDK rather than judge a request.
+func toolNames() []string {
+	names := make([]string, 0, len(readOnlyTools))
+	for name := range readOnlyTools {
+		names = append(names, name)
+	}
+	sort.Strings(names)
+
+	return names
 }
 
 // readOnlyPolicy returns a permission callback that allows only read-only
@@ -56,21 +69,25 @@ func readOnlyPolicy(repoRoot string) claudeagent.CanUseToolFunc {
 			}
 		}
 
-		path, ok := toolPath(req.Arguments)
-
 		if root == "" {
-			// With no repository to confine to, the generator was asked to
-			// judge from the diff alone. Allow only operations that name no
-			// path, so an unconfined read cannot reach arbitrary files.
-			if ok {
-				return claudeagent.PermissionDeny{
-					Reason: "no repository is configured for this " +
-						"abridgement; judge from the diff text alone",
-				}
+			// With no repository to confine to, the generator was told to
+			// judge from the diff alone, so nothing is allowed.
+			//
+			// An earlier version permitted calls that named no path, on the
+			// theory that they could not reach a specific file. That was
+			// wrong twice over: a pathless Grep is scoped to the working
+			// directory, which here is wherever the daemon happens to be
+			// running rather than anything to do with the diff; and a tool
+			// that is sometimes allowed invites the model to keep trying,
+			// spending turns on a capability the prompt already told it not
+			// to use.
+			return claudeagent.PermissionDeny{
+				Reason: "no repository is configured for this abridgement; " +
+					"judge from the diff text alone",
 			}
-
-			return claudeagent.PermissionAllow{}
 		}
+
+		path, ok := toolPath(req.Arguments)
 
 		if !ok {
 			// A search with no explicit path is scoped to the working

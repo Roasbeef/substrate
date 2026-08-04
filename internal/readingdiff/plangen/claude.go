@@ -7,6 +7,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"strconv"
 	"strings"
 	"time"
 
@@ -109,14 +110,17 @@ func (g *Generator) Generate(ctx context.Context, req readingdiff.Request,
 		lastText  string
 		resultErr error
 		parseErr  error
-		msgCount  int
+		stats     = newStreamStats()
 	)
 	for msg := range client.Query(ctx, prompt) {
-		msgCount++
+		stats.messages++
 
 		switch m := msg.(type) {
 		case claudeagent.AssistantMessage:
+			stats.noteToolUses(m)
+
 			if text := m.ContentText(); text != "" {
+				stats.assistantText++
 				lastText = text
 
 				// The plan is the whole deliverable, so stop as soon as one
@@ -125,10 +129,11 @@ func (g *Generator) Generate(ctx context.Context, req readingdiff.Request,
 				plan, perr := parsePlan(text)
 				if perr == nil {
 					g.cfg.Logf(
-						"plangen: plan accepted after %s (%d messages, "+
+						"plangen: plan accepted after %s (%s, "+
 							"remove=%d fold=%d replace=%d)",
-						time.Since(start).Round(time.Millisecond), msgCount,
-						len(plan.Remove), len(plan.Fold), len(plan.Replace))
+						time.Since(start).Round(time.Millisecond),
+						stats.summary(), len(plan.Remove), len(plan.Fold),
+						len(plan.Replace))
 
 					return plan, nil
 				}
@@ -140,8 +145,64 @@ func (g *Generator) Generate(ctx context.Context, req readingdiff.Request,
 				parseErr = perr
 				g.cfg.Logf(
 					"plangen: message %d (%dB) is not a plan yet: %v",
-					msgCount, len(text), perr)
+					stats.messages, len(text), perr)
 			}
+
+		case claudeagent.SystemMessage:
+			stats.systems[m.Subtype]++
+
+			// The init banner is the one cheap answer to "is this subprocess
+			// even wired up": it names the model actually selected, where the
+			// credential came from, and which tools the model believes it has.
+			// An empty APIKeySource here means the run is doomed before the
+			// first token, which is otherwise indistinguishable from a slow
+			// abridgement.
+			if m.Subtype == "" || m.Subtype == "init" {
+				g.cfg.Logf("plangen: init model=%s auth=%q cwd=%s "+
+					"mode=%s tools=%d",
+					m.Model, m.APIKeySource, m.Cwd, m.PermissionMode,
+					len(m.Tools))
+			}
+
+		case claudeagent.APIRetryMessage:
+			// Retries are how an unreachable model presents itself. They are
+			// counted rather than logged individually, because a wedged
+			// credential produces dozens and the useful signal is the total
+			// plus the status code.
+			stats.retries++
+			stats.lastRetry = describeRetry(m)
+			if stats.retries == 1 {
+				g.cfg.Logf("plangen: api retry %s", stats.lastRetry)
+			}
+
+		case claudeagent.PermissionDeniedMessage:
+			// A denial loop is the other way a run burns minutes without
+			// producing text: the model retries a tool the policy will never
+			// allow. Counting them distinguishes that from an unreachable API.
+			stats.denials++
+			stats.lastDenial = m.ToolName
+			if stats.denials == 1 {
+				g.cfg.Logf("plangen: tool denied tool=%s reason=%q",
+					m.ToolName, truncate(m.Message, 200))
+			}
+
+		case claudeagent.HookStartedMessage:
+			// Hooks must never run here. This generator disables setting
+			// sources, skills, and hooks precisely so the operator's own
+			// automation cannot fire inside a read-only analysis, and the
+			// project's Stop hook blocks for minutes by design. Seeing one at
+			// all means an isolation option stopped working, so it is counted
+			// and named rather than silently tolerated.
+			stats.hooks++
+			stats.lastHook = m.HookEvent
+			if stats.hooks == 1 {
+				g.cfg.Logf("plangen: unexpected hook fired event=%s name=%s",
+					m.HookEvent, m.HookName)
+			}
+
+		case claudeagent.HookResponseMessage:
+			stats.hooks++
+			stats.lastHook = m.HookEvent
 
 		case claudeagent.ResultMessage:
 			if m.Result != "" {
@@ -153,39 +214,48 @@ func (g *Generator) Generate(ctx context.Context, req readingdiff.Request,
 				truncate(m.Result, 400), m.Errors)
 
 			if m.IsError {
-				resultErr = fmt.Errorf(
-					"agent reported an error: %s",
-					strings.TrimSpace(truncate(m.Result, 400)))
+				resultErr = fmt.Errorf("agent reported an error: %s",
+					resultDetail(m))
 			}
 		}
 	}
 
 	elapsed := time.Since(start).Round(time.Millisecond)
 
+	// Log the whole stream once, whatever the outcome. Without this a run that
+	// produced no text left nothing behind to distinguish "the model was never
+	// reached" from "the model refused" from "the model is still thinking".
+	g.cfg.Logf("plangen: stream finished in %s (%s)", elapsed, stats.summary())
+
+	// A run that never got a word out of the model is not a planning failure.
+	// Reporting it as one sends the reader to the prompt and the parser, which
+	// are the two things working correctly, so name the actual cause instead.
+	// This is checked before the result error because the result's own message
+	// for this case is the CLI's internal diagnostic, which explains nothing.
+	if stats.assistantText == 0 {
+		g.cfg.Logf("plangen: model never spoke after %s: %s",
+			elapsed, stats.diagnose())
+
+		return zero, fmt.Errorf("%w after %s: %s (%s)", ErrModelSilent,
+			elapsed, stats.diagnose(), stats.summary())
+	}
+
 	// An agent that failed outright is reported as such. Falling through to
 	// "no json plan found" would blame the parser for an auth or subprocess
 	// failure and send the caller looking in the wrong place.
 	if resultErr != nil {
-		g.cfg.Logf("plangen: failed after %s (%d messages): %v",
-			elapsed, msgCount, resultErr)
+		g.cfg.Logf("plangen: failed after %s (%s): %v",
+			elapsed, stats.summary(), resultErr)
 
 		return zero, resultErr
 	}
 
 	if err := ctx.Err(); err != nil {
-		g.cfg.Logf("plangen: timed out after %s (%d messages, last text %dB)",
-			elapsed, msgCount, len(lastText))
+		g.cfg.Logf("plangen: timed out after %s (%s, last text %dB)",
+			elapsed, stats.summary(), len(lastText))
 
 		return zero, fmt.Errorf(
 			"plan generation timed out after %s: %w", elapsed, err)
-	}
-	if lastText == "" {
-		g.cfg.Logf("plangen: no output after %s (%d messages)",
-			elapsed, msgCount)
-
-		return zero, fmt.Errorf(
-			"agent produced no output in %s across %d messages",
-			elapsed, msgCount)
 	}
 
 	plan, err := parsePlan(lastText)
@@ -197,20 +267,41 @@ func (g *Generator) Generate(ctx context.Context, req readingdiff.Request,
 		// Log a slice of what the agent actually said. Without it this error
 		// names a symptom and gives no way to tell a refusal from a malformed
 		// plan from a model that ignored the format entirely.
-		g.cfg.Logf("plangen: unusable output after %s (%d messages): %v\n"+
+		g.cfg.Logf("plangen: unusable output after %s (%s): %v\n"+
 			"---- agent said ----\n%s\n--------------------",
-			elapsed, msgCount, err, truncate(lastText, 2000))
+			elapsed, stats.summary(), err, truncate(lastText, 2000))
 
 		return zero, fmt.Errorf(
 			"agent output was not a usable plan after %s: %w; it said: %q",
 			elapsed, err, truncate(strings.TrimSpace(lastText), 300))
 	}
 
-	g.cfg.Logf("plangen: plan accepted from final text after %s (%d messages)",
-		elapsed, msgCount)
+	g.cfg.Logf("plangen: plan accepted from final text after %s (%s)",
+		elapsed, stats.summary())
 
 	return plan, nil
 }
+
+// TextOnlyMaxTurns bounds a generation that works from the diff alone. One
+// turn is all a self-contained judgment needs.
+const TextOnlyMaxTurns = 1
+
+// RepoReadMaxTurns bounds a generation allowed to inspect the repository. It
+// leaves room to look up a handful of call sites without permitting an
+// open-ended exploration.
+const RepoReadMaxTurns = 12
+
+// maxTurns returns the turn ceiling appropriate to a request.
+func (g *Generator) maxTurns(req readingdiff.Request) int {
+	if req.RepoRoot != "" {
+		return RepoReadMaxTurns
+	}
+
+	return TextOnlyMaxTurns
+}
+
+// strPtr returns a pointer to s, for the SDK's optional-argument map.
+func strPtr(s string) *string { return &s }
 
 // clientOptions assembles the SDK options, returning a cleanup that removes
 // any temporary config directory.
@@ -231,10 +322,33 @@ func (g *Generator) clientOptions(req readingdiff.Request) ([]claudeagent.Option
 		claudeagent.WithNoSessionPersistence(),
 		claudeagent.WithSettingSources(nil),
 		claudeagent.WithSkillsDisabled(),
+
 		claudeagent.WithStderr(func(data string) {
 			g.cfg.Logf("plangen: cli stderr: %s", data)
 		}),
 	}
+
+	// Bound the conversation and, with no repository to read, withhold the
+	// read-only tools outright.
+	//
+	// These go through ExtraArgs rather than the SDK's WithMaxTurns and
+	// WithDisallowedTools, which are write-only in v1.1.0: both set a field on
+	// Options that the transport never reads when building the command line,
+	// so calling them looks like a bound and enforces nothing. The CLI itself
+	// accepts --max-turns and --disallowed-tools, and ExtraArgs is the path
+	// that reaches it.
+	//
+	// The bound matters because abridging is a single judgment over text that
+	// is entirely in the prompt: the useful answer arrives on the first turn,
+	// and anything past it is the agent wandering. One unbounded request
+	// accumulated 79 messages over 97 seconds and produced nothing.
+	extra := map[string]*string{
+		"max-turns": strPtr(strconv.Itoa(g.maxTurns(req))),
+	}
+	if req.RepoRoot == "" {
+		extra["disallowed-tools"] = strPtr(strings.Join(toolNames(), ","))
+	}
+	opts = append(opts, claudeagent.WithExtraArgs(extra))
 
 	// Forward credentials explicitly. A daemon started from a
 	// non-interactive shell may otherwise hand the subprocess an empty

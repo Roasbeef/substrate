@@ -9,6 +9,8 @@ import (
 
 	claudeagent "github.com/roasbeef/claude-agent-sdk-go"
 	"github.com/stretchr/testify/require"
+
+	"github.com/roasbeef/subtrate/internal/readingdiff"
 )
 
 // TestParsePlanAcceptsRealisticOutput covers the shapes a model actually
@@ -299,4 +301,162 @@ func TestReadOnlyPolicyWithoutRootDeniesPathReads(t *testing.T) {
 		t, "Bash", map[string]string{"command": "rm -rf /"},
 	))
 	require.False(t, bash.IsAllow())
+
+	// A search that names no path must be refused as well. It would otherwise
+	// run against the daemon's own working directory, which has nothing to do
+	// with the diff being abridged, and would give the model a capability the
+	// prompt explicitly told it not to use.
+	pathless := policy(context.Background(), permissionRequest(
+		t, "Grep", map[string]string{"pattern": "func main"},
+	))
+	require.False(t, pathless.IsAllow())
+}
+
+// TestStreamStatsDiagnosesSilentRuns asserts that a run in which the model
+// never spoke is explained by its most upstream cause.
+//
+// This is the case the old logging could not describe: a failed generation
+// reported only a message count, and 79 messages meant equally well that the
+// API was unreachable, that a hook had eaten the turn, or that the model was
+// looping on a forbidden tool. Each of those sends a reader somewhere
+// different, so the diagnosis has to name which one it was.
+func TestStreamStatsDiagnosesSilentRuns(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name  string
+		build func(*streamStats)
+		want  string
+	}{
+		{
+			name: "api never reached",
+			build: func(s *streamStats) {
+				s.retries = 12
+				s.lastRetry = "attempt 12/12, status 401, error auth"
+				// Hook and tool activity downstream of an unreachable API
+				// must not shadow the real cause.
+				s.hooks = 3
+				s.lastHook = "Stop"
+			},
+			want: "the API was never reached",
+		},
+		{
+			name: "turn failed upstream",
+			build: func(s *streamStats) {
+				s.turnErrors = 2
+				s.lastTurnError = "overloaded_error"
+			},
+			want: "every assistant turn failed upstream",
+		},
+		{
+			name: "hooks consumed the turn",
+			build: func(s *streamStats) {
+				s.hooks = 4
+				s.lastHook = "SessionStart"
+			},
+			want: "loaded external automation",
+		},
+		{
+			name: "denial loop",
+			build: func(s *streamStats) {
+				s.denials = 9
+				s.lastDenial = "Read"
+			},
+			want: "tool calls were denied",
+		},
+		{
+			name: "wandered through tools",
+			build: func(s *streamStats) {
+				s.toolUses["Grep"] = 5
+				s.toolUses["Read"] = 2
+			},
+			want: "Grep:5,Read:2",
+		},
+		{
+			name:  "nothing at all",
+			build: func(s *streamStats) {},
+			want:  "no assistant text",
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			stats := newStreamStats()
+			tc.build(stats)
+
+			require.Contains(t, stats.diagnose(), tc.want)
+		})
+	}
+}
+
+// TestStreamStatsSummaryOmitsQuietCategories keeps the common log line short
+// while ensuring an unusual run is fully described. A summary padded with
+// zeroes buries the one number that matters.
+func TestStreamStatsSummaryOmitsQuietCategories(t *testing.T) {
+	t.Parallel()
+
+	quiet := newStreamStats()
+	quiet.messages = 6
+	quiet.assistantText = 1
+	require.Equal(t, "messages=6 text=1", quiet.summary())
+
+	noisy := newStreamStats()
+	noisy.messages = 79
+	noisy.retries = 40
+	noisy.hooks = 2
+	noisy.lastHook = "Stop"
+	noisy.toolUses["Read"] = 3
+	noisy.systems["api_error"] = 5
+
+	got := noisy.summary()
+	for _, want := range []string{
+		"messages=79", "text=0", "retries=40", "hooks=2(Stop)",
+		"tools=Read:3", "system=api_error:5",
+	} {
+		require.Contains(t, got, want)
+	}
+}
+
+// TestResultDetailNeverEmpty asserts that a failed result always yields
+// something quotable.
+//
+// The CLI reports some failures with an empty Result and the explanation in
+// Errors, which produced the error message "agent reported an error: " with
+// nothing after the colon — an error that names no cause at all.
+func TestResultDetailNeverEmpty(t *testing.T) {
+	t.Parallel()
+
+	fromErrors := resultDetail(claudeagent.ResultMessage{
+		Errors: []string{"[ede_diagnostic] result_type=user"},
+	})
+	require.Contains(t, fromErrors, "ede_diagnostic")
+
+	fromSubtype := resultDetail(claudeagent.ResultMessage{
+		Subtype: "error_max_turns",
+	})
+	require.Contains(t, fromSubtype, "error_max_turns")
+
+	require.NotEmpty(t, resultDetail(claudeagent.ResultMessage{}))
+
+	// A populated Result still wins, since it is the most specific.
+	require.Equal(t, "boom", resultDetail(claudeagent.ResultMessage{
+		Result: "boom",
+		Errors: []string{"less specific"},
+	}))
+}
+
+// TestMaxTurnsMatchesCapability asserts the turn ceiling tracks whether the
+// generator was given a repository to read. A text-only judgment that takes
+// more than one turn is wandering, not working.
+func TestMaxTurnsMatchesCapability(t *testing.T) {
+	t.Parallel()
+
+	g := New(Config{})
+
+	require.Equal(t, TextOnlyMaxTurns,
+		g.maxTurns(readingdiff.Request{}))
+	require.Equal(t, RepoReadMaxTurns,
+		g.maxTurns(readingdiff.Request{RepoRoot: t.TempDir()}))
 }
