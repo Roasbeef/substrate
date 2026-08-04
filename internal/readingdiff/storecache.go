@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"strings"
 
 	"github.com/roasbeef/subtrate/internal/store"
 )
@@ -105,4 +106,44 @@ func (c *storeCache) Store(ctx context.Context, key, model, rubric string,
 	})
 
 	return err
+}
+
+// storeMessages adapts the application store to MessageLister.
+type storeMessages struct {
+	store InboxLister
+	// marker identifies a body carrying a patch, so obviously irrelevant
+	// messages are filtered before they reach the warmer.
+	marker string
+}
+
+// InboxLister is the slice of the store needed to find recent diff mail.
+type InboxLister interface {
+	GetAllInboxMessages(ctx context.Context, limit, offset int) (
+		[]store.InboxMessage, error)
+}
+
+// NewStoreMessages adapts a store into a MessageLister, keeping only bodies
+// that carry the given diff marker.
+func NewStoreMessages(st InboxLister, marker string) MessageLister {
+	return &storeMessages{store: st, marker: marker}
+}
+
+// RecentDiffBodies returns the bodies of recent messages carrying a patch,
+// newest first.
+func (m *storeMessages) RecentDiffBodies(ctx context.Context, limit int) (
+	[]string, error) {
+
+	msgs, err := m.store.GetAllInboxMessages(ctx, limit, 0)
+	if err != nil {
+		return nil, err
+	}
+
+	out := make([]string, 0, len(msgs))
+	for _, msg := range msgs {
+		if strings.Contains(msg.Body, m.marker) {
+			out = append(out, msg.Body)
+		}
+	}
+
+	return out, nil
 }

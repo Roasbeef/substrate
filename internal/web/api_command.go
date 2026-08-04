@@ -8,10 +8,15 @@ import (
 	"time"
 )
 
-// diffMarker is the marker used by `substrate send-diff` to embed raw
+// DiffMarker is the marker used by `substrate send-diff` to embed raw
 // patches inside a message body. The command feed uses it to classify
-// messages as diffs without shipping extra metadata.
-const diffMarker = "<!-- substrate:diff -->"
+// messages as diffs without shipping extra metadata, and the reading-diff
+// warmer uses it to find patches worth pre-computing.
+const DiffMarker = "<!-- substrate:diff -->"
+
+// diffMarker is the unexported alias retained for readability at the many
+// existing use sites in this package.
+const diffMarker = DiffMarker
 
 // waitingForPrefix marks the trailing "Waiting for:" line that
 // `substrate status-update` appends to status message bodies.

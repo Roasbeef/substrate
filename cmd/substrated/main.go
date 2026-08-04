@@ -32,10 +32,24 @@ import (
 
 func main() {
 	var (
-		dbPath         = flag.String("db", "~/.subtrate/subtrate.db", "Path to SQLite database")
-		webAddr        = flag.String("web", ":8080", "Web server address (empty to disable)")
-		grpcAddr       = flag.String("grpc", "localhost:10009", "gRPC server address (empty to disable)")
-		enableMCP      = flag.Bool("mcp", false, "Enable MCP stdio transport (default: web + gRPC only)")
+		dbPath    = flag.String("db", "~/.subtrate/subtrate.db", "Path to SQLite database")
+		webAddr   = flag.String("web", ":8080", "Web server address (empty to disable)")
+		grpcAddr  = flag.String("grpc", "localhost:10009", "gRPC server address (empty to disable)")
+		enableMCP = flag.Bool("mcp", false, "Enable MCP stdio transport (default: web + gRPC only)")
+
+		readingDiffWarm = flag.Bool(
+			"reading-diff-warm", true,
+			"Pre-compute reading diffs for incoming diff mail so they "+
+				"open instantly (spends tokens without being asked)",
+		)
+		readingDiffWarmBytes = flag.Int(
+			"reading-diff-warm-max-bytes", readingdiff.DefaultWarmMaxBytes,
+			"Largest patch the warmer will abridge unprompted",
+		)
+		readingDiffModel = flag.String(
+			"reading-diff-model", plangen.DefaultModel,
+			"Model used to plan reading diffs",
+		)
 		logDir         = flag.String("log-dir", "~/.subtrate/logs", "Directory for log files (empty to disable file logging)")
 		maxLogFiles    = flag.Int("max-log-files", build.DefaultMaxLogFiles, "Maximum number of rotated log files to keep")
 		maxLogFileSize = flag.Int("max-log-file-size", build.DefaultMaxLogFileSize, "Maximum log file size in MB before rotation")
@@ -263,16 +277,31 @@ func main() {
 	// so results are cached by a hash of the patch, model, and rubric.
 	readingDiffSvc, err := readingdiff.NewService(readingdiff.ServiceConfig{
 		Generator: plangen.New(plangen.Config{
-			Logf: log.Printf,
+			Model: *readingDiffModel,
+			Logf:  log.Printf,
 		}),
 		Cache:      readingdiff.NewStoreCache(storage),
-		Model:      plangen.DefaultModel,
+		Model:      *readingDiffModel,
 		RubricHash: plangen.RubricHash(),
 	})
 	if err != nil {
 		log.Fatalf("Failed to create reading diff service: %v", err)
 	}
 	log.Println("Reading diff service created")
+
+	// Warm reading diffs in the background. A diff arriving by mail is a known
+	// event, so there is no reason to make the reader wait minutes for a model
+	// to read a patch that landed before they opened it.
+	readingDiffWarmer, err := readingdiff.NewWarmer(readingdiff.WarmerConfig{
+		Service:  readingDiffSvc,
+		Messages: readingdiff.NewStoreMessages(storage, web.DiffMarker),
+		Marker:   web.DiffMarker,
+		MaxBytes: *readingDiffWarmBytes,
+		Log:      slog.Default(),
+	})
+	if err != nil {
+		log.Fatalf("Failed to create reading diff warmer: %v", err)
+	}
 
 	// Create the MCP server if MCP stdio mode is enabled.
 	var mcpServer *mcp.Server
@@ -389,6 +418,12 @@ func main() {
 
 	// Start the background summary refresh loop.
 	go summarySvc.RunBackgroundRefresh(ctx)
+
+	if *readingDiffWarm {
+		go readingDiffWarmer.Run(ctx)
+		log.Printf("Reading diff warmer started (max %d KB per patch)",
+			*readingDiffWarmBytes>>10)
+	}
 	log.Println("Summary background refresh started")
 
 	// Run the MCP server on stdio transport if enabled, otherwise
