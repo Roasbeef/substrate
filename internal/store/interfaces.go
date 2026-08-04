@@ -1191,10 +1191,11 @@ type ReadingDiffRecord struct {
 	ReadingDiff string
 	Summary     string
 
-	// Segments is the JSON segment map tiling the original patch lines. It is
-	// carried as encoded text because the store layer has no reason to know
-	// the compiler's types.
+	// Segments is the JSON segment map tiling the original patch lines, and
+	// Stats the JSON retention record. Both are carried as encoded text
+	// because the store layer has no reason to know the compiler's types.
 	Segments string
+	Stats    string
 
 	RawChanged     int
 	VisibleChanged int
@@ -1211,6 +1212,7 @@ type SaveReadingDiffParams struct {
 	ReadingDiff    string
 	Summary        string
 	Segments       string
+	Stats          string
 	RawChanged     int
 	VisibleChanged int
 	RawFiles       int

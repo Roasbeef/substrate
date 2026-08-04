@@ -1491,6 +1491,7 @@ func (m *MockStore) SaveReadingDiff(
 		ReadingDiff:    params.ReadingDiff,
 		Summary:        params.Summary,
 		Segments:       params.Segments,
+		Stats:          params.Stats,
 		RawChanged:     params.RawChanged,
 		VisibleChanged: params.VisibleChanged,
 		RawFiles:       params.RawFiles,

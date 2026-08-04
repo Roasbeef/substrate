@@ -22,14 +22,15 @@ func (q *Queries) CountReadingDiffs(ctx context.Context) (int64, error) {
 
 const CreateReadingDiff = `-- name: CreateReadingDiff :one
 INSERT INTO reading_diffs (
-    cache_key, reading_diff, summary, segments,
+    cache_key, reading_diff, summary, segments, stats,
     raw_changed, visible_changed, raw_files, visible_files,
     model, rubric_hash, created_at
-) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 ON CONFLICT(cache_key) DO UPDATE SET
     reading_diff = excluded.reading_diff,
     summary = excluded.summary,
     segments = excluded.segments,
+    stats = excluded.stats,
     raw_changed = excluded.raw_changed,
     visible_changed = excluded.visible_changed,
     raw_files = excluded.raw_files,
@@ -37,7 +38,7 @@ ON CONFLICT(cache_key) DO UPDATE SET
     model = excluded.model,
     rubric_hash = excluded.rubric_hash,
     created_at = excluded.created_at
-RETURNING id, cache_key, reading_diff, summary, segments, raw_changed, visible_changed, raw_files, visible_files, model, rubric_hash, created_at
+RETURNING id, cache_key, reading_diff, summary, segments, stats, raw_changed, visible_changed, raw_files, visible_files, model, rubric_hash, created_at
 `
 
 type CreateReadingDiffParams struct {
@@ -45,6 +46,7 @@ type CreateReadingDiffParams struct {
 	ReadingDiff    string
 	Summary        string
 	Segments       string
+	Stats          string
 	RawChanged     int64
 	VisibleChanged int64
 	RawFiles       int64
@@ -60,6 +62,7 @@ func (q *Queries) CreateReadingDiff(ctx context.Context, arg CreateReadingDiffPa
 		arg.ReadingDiff,
 		arg.Summary,
 		arg.Segments,
+		arg.Stats,
 		arg.RawChanged,
 		arg.VisibleChanged,
 		arg.RawFiles,
@@ -75,6 +78,7 @@ func (q *Queries) CreateReadingDiff(ctx context.Context, arg CreateReadingDiffPa
 		&i.ReadingDiff,
 		&i.Summary,
 		&i.Segments,
+		&i.Stats,
 		&i.RawChanged,
 		&i.VisibleChanged,
 		&i.RawFiles,
@@ -97,7 +101,7 @@ func (q *Queries) DeleteReadingDiffsBefore(ctx context.Context, createdAt int64)
 }
 
 const GetReadingDiffByKey = `-- name: GetReadingDiffByKey :one
-SELECT id, cache_key, reading_diff, summary, segments, raw_changed, visible_changed, raw_files, visible_files, model, rubric_hash, created_at FROM reading_diffs
+SELECT id, cache_key, reading_diff, summary, segments, stats, raw_changed, visible_changed, raw_files, visible_files, model, rubric_hash, created_at FROM reading_diffs
 WHERE cache_key = ?
 `
 
@@ -110,6 +114,7 @@ func (q *Queries) GetReadingDiffByKey(ctx context.Context, cacheKey string) (Rea
 		&i.ReadingDiff,
 		&i.Summary,
 		&i.Segments,
+		&i.Stats,
 		&i.RawChanged,
 		&i.VisibleChanged,
 		&i.RawFiles,

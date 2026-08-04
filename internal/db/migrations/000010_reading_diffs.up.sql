@@ -22,8 +22,14 @@ CREATE TABLE reading_diffs (
     -- lets the viewer expand an elided region back in place.
     segments TEXT NOT NULL DEFAULT '[]',
 
-    -- Retention counters are stored as columns rather than only inside the
-    -- stats blob so the elision manifest can be rendered without decoding it.
+    -- stats is the complete JSON retention record. It is stored whole so a
+    -- cache hit reproduces a miss exactly; persisting only the headline
+    -- counters would silently zero the rest on the way back out.
+    stats TEXT NOT NULL DEFAULT '{}',
+
+    -- The headline counters are additionally denormalized into columns so the
+    -- elision manifest can be rendered, sorted, and filtered without decoding
+    -- the blob.
     raw_changed INTEGER NOT NULL DEFAULT 0,
     visible_changed INTEGER NOT NULL DEFAULT 0,
     raw_files INTEGER NOT NULL DEFAULT 0,

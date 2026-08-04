@@ -35,6 +35,16 @@ type Config struct {
 	// CLIPath overrides the claude binary location when non-empty.
 	CLIPath string
 
+	// IsolateConfigDir runs the agent against a throwaway config directory.
+	//
+	// This is off by default because relocating the config directory also
+	// relocates where the CLI looks for its credentials, and the agent then
+	// fails with "Not logged in" on a machine whose login lives in the system
+	// keychain. The isolation that actually matters here comes from disabling
+	// setting sources and skills, which is unconditional: those are what stop
+	// the operator's own hooks from running inside a read-only analysis.
+	IsolateConfigDir bool
+
 	// Logf, when set, receives diagnostic lines.
 	Logf func(format string, args ...any)
 }
@@ -91,7 +101,10 @@ func (g *Generator) Generate(ctx context.Context, req readingdiff.Request,
 
 	prompt := buildPrompt(req, feedback)
 
-	var lastText string
+	var (
+		lastText  string
+		resultErr error
+	)
 	for msg := range client.Query(ctx, prompt) {
 		switch m := msg.(type) {
 		case claudeagent.AssistantMessage:
@@ -110,9 +123,24 @@ func (g *Generator) Generate(ctx context.Context, req readingdiff.Request,
 			if m.Result != "" {
 				lastText = m.Result
 			}
-			g.cfg.Logf("plangen: result cost=%v duration=%dms error=%v",
-				m.TotalCostUSD, m.DurationMs, m.IsError)
+			g.cfg.Logf("plangen: result cost=%v duration=%dms error=%v "+
+				"result=%q errors=%v",
+				m.TotalCostUSD, m.DurationMs, m.IsError,
+				truncate(m.Result, 400), m.Errors)
+
+			if m.IsError {
+				resultErr = fmt.Errorf(
+					"agent reported an error: %s",
+					strings.TrimSpace(truncate(m.Result, 400)))
+			}
 		}
+	}
+
+	// An agent that failed outright is reported as such. Falling through to
+	// "no json plan found" would blame the parser for an auth or subprocess
+	// failure and send the caller looking in the wrong place.
+	if resultErr != nil {
+		return zero, resultErr
 	}
 
 	if err := ctx.Err(); err != nil {
@@ -142,23 +170,6 @@ func (g *Generator) clientOptions(req readingdiff.Request) ([]claudeagent.Option
 
 	cleanup := func() {}
 
-	tmp, err := os.MkdirTemp("", "readingdiff-*")
-	if err != nil {
-		return nil, cleanup, fmt.Errorf("create temp config dir: %w", err)
-	}
-	cleanup = func() {
-		if rerr := os.RemoveAll(tmp); rerr != nil {
-			g.cfg.Logf("plangen: removing temp dir: %v", rerr)
-		}
-	}
-
-	configDir := filepath.Join(tmp, ".claude")
-	if err := os.MkdirAll(configDir, 0o755); err != nil {
-		cleanup()
-
-		return nil, func() {}, fmt.Errorf("create config dir: %w", err)
-	}
-
 	opts := []claudeagent.Option{
 		claudeagent.WithModel(g.cfg.Model),
 		claudeagent.WithSystemPrompt(systemPrompt),
@@ -166,7 +177,6 @@ func (g *Generator) clientOptions(req readingdiff.Request) ([]claudeagent.Option
 		claudeagent.WithNoSessionPersistence(),
 		claudeagent.WithSettingSources(nil),
 		claudeagent.WithSkillsDisabled(),
-		claudeagent.WithConfigDir(configDir),
 		claudeagent.WithStderr(func(data string) {
 			g.cfg.Logf("plangen: cli stderr: %s", data)
 		}),
@@ -185,6 +195,26 @@ func (g *Generator) clientOptions(req readingdiff.Request) ([]claudeagent.Option
 	}
 	if len(authEnv) > 0 {
 		opts = append(opts, claudeagent.WithEnv(authEnv))
+	}
+
+	if g.cfg.IsolateConfigDir {
+		tmp, err := os.MkdirTemp("", "readingdiff-*")
+		if err != nil {
+			return nil, cleanup, fmt.Errorf("create temp config dir: %w", err)
+		}
+		cleanup = func() {
+			if rerr := os.RemoveAll(tmp); rerr != nil {
+				g.cfg.Logf("plangen: removing temp dir: %v", rerr)
+			}
+		}
+
+		configDir := filepath.Join(tmp, ".claude")
+		if err := os.MkdirAll(configDir, 0o755); err != nil {
+			cleanup()
+
+			return nil, func() {}, fmt.Errorf("create config dir: %w", err)
+		}
+		opts = append(opts, claudeagent.WithConfigDir(configDir))
 	}
 
 	if g.cfg.CLIPath != "" && g.cfg.CLIPath != "claude" {
@@ -292,4 +322,13 @@ func decodePlan(raw string) (readingdiff.Plan, error) {
 	}
 
 	return plan, nil
+}
+
+// truncate shortens s for logging, marking that it was cut.
+func truncate(s string, max int) string {
+	if len(s) <= max {
+		return s
+	}
+
+	return s[:max] + "..."
 }

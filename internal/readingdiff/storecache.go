@@ -59,16 +59,20 @@ func (c *storeCache) Load(ctx context.Context, key string) (*Result, bool) {
 		return nil, false
 	}
 
+	// Decode the whole stats record rather than rebuilding it from the
+	// denormalized columns. Those cover only the headline counters, so
+	// reconstructing from them would zero the fold and removal counts and make
+	// a cache hit disagree with a miss.
+	var stats Stats
+	if err := json.Unmarshal([]byte(rec.Stats), &stats); err != nil {
+		return nil, false
+	}
+
 	return &Result{
 		ReadingDiff: rec.ReadingDiff,
 		Summary:     rec.Summary,
 		Segments:    segments,
-		Stats: Stats{
-			RawChanged:     rec.RawChanged,
-			VisibleChanged: rec.VisibleChanged,
-			RawFiles:       rec.RawFiles,
-			VisibleFiles:   rec.VisibleFiles,
-		},
+		Stats:       stats,
 	}, true
 }
 
@@ -81,11 +85,17 @@ func (c *storeCache) Store(ctx context.Context, key, model, rubric string,
 		return fmt.Errorf("encode segments: %w", err)
 	}
 
+	stats, err := json.Marshal(res.Stats)
+	if err != nil {
+		return fmt.Errorf("encode stats: %w", err)
+	}
+
 	_, err = c.store.SaveReadingDiff(ctx, store.SaveReadingDiffParams{
 		CacheKey:       key,
 		ReadingDiff:    res.ReadingDiff,
 		Summary:        res.Summary,
 		Segments:       string(segments),
+		Stats:          string(stats),
 		RawChanged:     res.Stats.RawChanged,
 		VisibleChanged: res.Stats.VisibleChanged,
 		RawFiles:       res.Stats.RawFiles,

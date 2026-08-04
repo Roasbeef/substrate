@@ -193,6 +193,7 @@ type ReadingDiff struct {
 	ReadingDiff    string
 	Summary        string
 	Segments       string
+	Stats          string
 	RawChanged     int64
 	VisibleChanged int64
 	RawFiles       int64
