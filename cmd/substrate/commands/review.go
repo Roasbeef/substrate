@@ -218,7 +218,9 @@ func runReviewRequest(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	// Build the request with the appropriate target type.
+	// Build the request with the appropriate target type. The diff
+	// inputs depend on which target was selected, so we set both the
+	// Target oneof and the diff inputs together.
 	req := &subtraterpc.CreateReviewRequest{
 		RequesterId: agentID,
 		RepoPath:    reviewRepoPath,
@@ -228,10 +230,12 @@ func runReviewRequest(cmd *cobra.Command, args []string) error {
 		Description: reviewDesc,
 	}
 
-	// Set the target based on what was explicitly requested.
+	// diffBranch / diffBase / diffSHA are the inputs to computeReviewDiff
+	// matching the selected target. For commit-mode reviews we want
+	// `git show <sha>`, not a branch diff.
+	var diffBranch, diffBase, diffSHA string
 	switch {
 	case prExplicit && reviewPRNumber > 0:
-		// PR review mode.
 		req.Target = &subtraterpc.CreateReviewRequest_PrTarget{
 			PrTarget: &subtraterpc.PRTarget{
 				Number:     int32(reviewPRNumber),
@@ -239,23 +243,35 @@ func runReviewRequest(cmd *cobra.Command, args []string) error {
 				BaseBranch: reviewBaseBranch,
 			},
 		}
+		diffBranch, diffBase = reviewBranch, reviewBaseBranch
 	case commitExplicit:
-		// Single commit review mode.
 		req.Target = &subtraterpc.CreateReviewRequest_CommitTarget{
 			CommitTarget: &subtraterpc.CommitTarget{
 				Sha:    reviewCommitSHA,
 				Branch: reviewBranch,
 			},
 		}
+		diffSHA = reviewCommitSHA
 	default:
-		// Full branch diff review mode.
 		req.Target = &subtraterpc.CreateReviewRequest_BranchTarget{
 			BranchTarget: &subtraterpc.BranchTarget{
 				Branch:     reviewBranch,
 				BaseBranch: reviewBaseBranch,
 			},
 		}
+		diffBranch, diffBase = reviewBranch, reviewBaseBranch
 	}
+
+	// Compute the diff locally so substrated never needs the agent's
+	// repo on its filesystem (Option A from K8s-native review work).
+	diffContent, diffCommand, err := computeReviewDiff(
+		reviewRepoPath, diffBranch, diffBase, diffSHA,
+	)
+	if err != nil {
+		return fmt.Errorf("compute diff: %w", err)
+	}
+	req.DiffContent = diffContent
+	req.DiffCommand = diffCommand
 
 	resp, err := client.CreateReview(ctx, req)
 	if err != nil {
@@ -422,7 +438,27 @@ func runReviewResubmit(cmd *cobra.Command, args []string) error {
 		)
 	}
 
-	resp, err := client.ResubmitReview(ctx, reviewID, commitSHA)
+	// Look up the review so we can compute the same diff selection
+	// substrated would.
+	prior, err := client.GetReview(ctx, reviewID)
+	if err != nil {
+		return fmt.Errorf("get review: %w", err)
+	}
+	if prior.Error != "" {
+		return fmt.Errorf("get review: %s", prior.Error)
+	}
+
+	repoPath := gitRepoRoot()
+	diffContent, diffCommand, err := computeReviewDiff(
+		repoPath, prior.Branch, prior.BaseBranch, commitSHA,
+	)
+	if err != nil {
+		return fmt.Errorf("compute diff: %w", err)
+	}
+
+	resp, err := client.ResubmitReview(
+		ctx, reviewID, commitSHA, diffContent, diffCommand,
+	)
 	if err != nil {
 		return fmt.Errorf("resubmit review: %w", err)
 	}
@@ -563,4 +599,50 @@ func gitRemoteURL() string {
 		return ""
 	}
 	return strings.TrimSpace(string(out))
+}
+
+// computeReviewDiff runs git in the review's repo directory and returns the
+// unified diff plus the command string used to produce it. The selection
+// rules match the sub-actor's three-dot-diff convention so the reviewer
+// agent sees the same patch substrated stores. An empty repoPath uses the
+// current working directory.
+func computeReviewDiff(
+	repoPath, branch, baseBranch, commitSHA string,
+) (string, string, error) {
+	var (
+		args   []string
+		cmdStr string
+	)
+	switch {
+	case baseBranch != "" && branch != "":
+		args = []string{
+			"diff", baseBranch + "..." + branch, "--",
+		}
+		cmdStr = fmt.Sprintf(
+			"git diff %s...%s --", baseBranch, branch,
+		)
+	case baseBranch != "":
+		args = []string{"diff", baseBranch + "...HEAD", "--"}
+		cmdStr = fmt.Sprintf("git diff %s...HEAD --", baseBranch)
+	case commitSHA != "":
+		args = []string{"show", commitSHA, "--"}
+		cmdStr = fmt.Sprintf("git show %s --", commitSHA)
+	default:
+		args = []string{"diff", "HEAD~1", "--"}
+		cmdStr = "git diff HEAD~1 --"
+	}
+
+	cmd := exec.Command("git", args...)
+	if repoPath != "" {
+		cmd.Dir = repoPath
+	}
+
+	out, err := cmd.Output()
+	if err != nil {
+		return "", cmdStr, fmt.Errorf(
+			"run %q: %w", cmdStr, err,
+		)
+	}
+
+	return string(out), cmdStr, nil
 }

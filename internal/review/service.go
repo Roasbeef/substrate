@@ -1,12 +1,8 @@
 package review
 
 import (
-	"bytes"
 	"context"
 	"fmt"
-	"os/exec"
-	"regexp"
-	"strings"
 	"sync"
 
 	"github.com/google/uuid"
@@ -140,7 +136,9 @@ func (s *Service) handleCreateReview(ctx context.Context,
 		priority = "normal"
 	}
 
-	// Create the review record in the database.
+	// Create the review record in the database. The diff is computed
+	// by the requesting agent and shipped via the RPC; we persist it so
+	// substrated never needs filesystem access to the agent's repo.
 	review, err := s.store.CreateReview(ctx, store.CreateReviewParams{
 		ReviewID:    reviewID,
 		ThreadID:    threadID,
@@ -153,6 +151,8 @@ func (s *Service) handleCreateReview(ctx context.Context,
 		RemoteURL:   msg.RemoteURL,
 		ReviewType:  reviewType,
 		Priority:    priority,
+		DiffContent: msg.DiffContent,
+		DiffCommand: msg.DiffCommand,
 	})
 	if err != nil {
 		return CreateReviewResp{Error: err}
@@ -311,6 +311,17 @@ func (s *Service) handleResubmit(ctx context.Context,
 		s.mu.Unlock()
 	}
 
+	// Replace the stored diff if the agent supplied a fresh one for the
+	// new commit. Older clients that don't yet ship a diff fall through
+	// without modifying the existing one.
+	if msg.DiffContent != "" {
+		if err := s.store.UpdateReviewDiff(
+			ctx, msg.ReviewID, msg.DiffContent, msg.DiffCommand,
+		); err != nil {
+			return ResubmitResp{Error: err}
+		}
+	}
+
 	outbox, err := fsm.ProcessEvent(ctx, ResubmitEvent{
 		NewCommitSHA: msg.CommitSHA,
 	})
@@ -381,13 +392,13 @@ func (s *Service) handleDelete(ctx context.Context,
 	return DeleteReviewResp{}
 }
 
-// handleGetDiff runs git diff for a review's branch and returns the
-// unified diff output. The diff command is constructed from the review's
-// branch and base_branch fields stored in the database.
+// handleGetDiff returns the unified diff stored on the review row. The
+// diff is captured at review-request time by the requesting agent's CLI
+// and persisted in SQLite, so substrated never needs the agent's repo on
+// its filesystem (Option A from K8s-native review work).
 func (s *Service) handleGetDiff(
 	ctx context.Context, msg GetReviewDiffMsg,
 ) GetReviewDiffResp {
-	// Look up the review to get repo path and branch info.
 	rev, err := s.store.GetReview(ctx, msg.ReviewID)
 	if err != nil {
 		return GetReviewDiffResp{
@@ -395,104 +406,19 @@ func (s *Service) handleGetDiff(
 		}
 	}
 
-	if rev.RepoPath == "" {
+	if rev.DiffContent == "" {
 		return GetReviewDiffResp{
-			Error: fmt.Errorf("review has no repo_path"),
-		}
-	}
-
-	// Validate git refs before using them in commands. Although
-	// exec.Command does not use shell interpretation (so shell
-	// injection is not possible), malformed refs could confuse
-	// git or be interpreted as flags.
-	if rev.Branch != "" {
-		if err := validateGitRef(rev.Branch); err != nil {
-			return GetReviewDiffResp{
-				Error: fmt.Errorf(
-					"invalid branch: %w", err,
-				),
-			}
-		}
-	}
-	if rev.BaseBranch != "" {
-		if err := validateGitRef(rev.BaseBranch); err != nil {
-			return GetReviewDiffResp{
-				Error: fmt.Errorf(
-					"invalid base branch: %w", err,
-				),
-			}
-		}
-	}
-	if rev.CommitSHA != "" {
-		if err := validateCommitSHA(rev.CommitSHA); err != nil {
-			return GetReviewDiffResp{
-				Error: fmt.Errorf(
-					"invalid commit SHA: %w", err,
-				),
-			}
-		}
-	}
-
-	// Build the diff command matching the sub-actor's logic. The
-	// "--" separator prevents refs from being interpreted as flags.
-	var args []string
-	var cmdStr string
-
-	switch {
-	case rev.BaseBranch != "" && rev.Branch != "":
-		args = []string{
-			"diff",
-			rev.BaseBranch + "..." + rev.Branch,
-			"--",
-		}
-		cmdStr = fmt.Sprintf(
-			"git diff %s...%s --",
-			rev.BaseBranch, rev.Branch,
-		)
-
-	case rev.BaseBranch != "":
-		args = []string{
-			"diff",
-			rev.BaseBranch + "...HEAD",
-			"--",
-		}
-		cmdStr = fmt.Sprintf(
-			"git diff %s...HEAD --", rev.BaseBranch,
-		)
-
-	case rev.CommitSHA != "":
-		args = []string{"show", rev.CommitSHA, "--"}
-		cmdStr = fmt.Sprintf(
-			"git show %s --", rev.CommitSHA,
-		)
-
-	default:
-		args = []string{"diff", "HEAD~1", "--"}
-		cmdStr = "git diff HEAD~1 --"
-	}
-
-	// Execute git diff in the review's repo directory.
-	cmd := exec.CommandContext(ctx, "git", args...)
-	cmd.Dir = rev.RepoPath
-
-	var stdout, stderr bytes.Buffer
-	cmd.Stdout = &stdout
-	cmd.Stderr = &stderr
-
-	if err := cmd.Run(); err != nil {
-		errMsg := strings.TrimSpace(stderr.String())
-		if errMsg == "" {
-			errMsg = err.Error()
-		}
-		return GetReviewDiffResp{
-			Command: cmdStr,
-			Error:   fmt.Errorf("git diff: %s", errMsg),
+			Command: rev.DiffCommand,
+			Error: fmt.Errorf(
+				"review has no stored diff; the requesting " +
+					"agent did not include one",
+			),
 		}
 	}
 
 	return GetReviewDiffResp{
-		Patch:   stdout.String(),
-		Command: cmdStr,
+		Patch:   rev.DiffContent,
+		Command: rev.DiffCommand,
 	}
 }
 
@@ -970,52 +896,3 @@ func (s *Service) ActiveReviewCount() int {
 	return len(s.activeReviews)
 }
 
-// gitRefPattern matches valid git ref characters. Git refs may contain
-// alphanumerics, slashes, dashes, underscores, dots, and the at-sign
-// (for HEAD@{n} reflog syntax). This rejects shell metacharacters,
-// spaces, colons, tildes, carets, and other characters that could be
-// misinterpreted.
-var gitRefPattern = regexp.MustCompile(
-	`^[a-zA-Z0-9][a-zA-Z0-9/_.\-@{}]*$`,
-)
-
-// gitSHAPattern matches a hex commit SHA (short or full, 7-40 chars).
-var gitSHAPattern = regexp.MustCompile(`^[0-9a-fA-F]{7,40}$`)
-
-// validateGitRef checks that a branch or tag name contains only safe
-// characters for use as a git ref argument. This is defense-in-depth
-// since exec.Command does not use shell interpretation, but it prevents
-// refs that start with "--" from being interpreted as git flags.
-func validateGitRef(ref string) error {
-	if ref == "" {
-		return fmt.Errorf("empty ref")
-	}
-	if strings.HasPrefix(ref, "-") {
-		return fmt.Errorf(
-			"ref %q starts with dash (could be flag)", ref,
-		)
-	}
-	if strings.Contains(ref, "..") {
-		return fmt.Errorf(
-			"ref %q contains '..' (path traversal)", ref,
-		)
-	}
-	if !gitRefPattern.MatchString(ref) {
-		return fmt.Errorf(
-			"ref %q contains invalid characters", ref,
-		)
-	}
-
-	return nil
-}
-
-// validateCommitSHA checks that a string is a valid hex commit SHA.
-func validateCommitSHA(sha string) error {
-	if !gitSHAPattern.MatchString(sha) {
-		return fmt.Errorf(
-			"SHA %q is not a valid hex commit hash", sha,
-		)
-	}
-
-	return nil
-}

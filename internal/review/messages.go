@@ -91,6 +91,14 @@ type CreateReviewMsg struct {
 	Priority      string // urgent, normal, low.
 	Reviewers     []string
 	Description   string
+
+	// DiffContent is the unified diff produced by the requesting agent.
+	// Persisted on the review row and replayed to the reviewer agent in
+	// place of running git locally.
+	DiffContent string
+	// DiffCommand is the git command the agent ran to produce DiffContent,
+	// stored for display and audit only.
+	DiffCommand string
 }
 
 // MessageType implements actor.Message.
@@ -125,6 +133,12 @@ type ResubmitMsg struct {
 
 	ReviewID  string
 	CommitSHA string
+
+	// DiffContent is the diff for the new commit. Replaces the diff
+	// stored on the review.
+	DiffContent string
+	// DiffCommand is the git command used to produce DiffContent.
+	DiffCommand string
 }
 
 // MessageType implements actor.Message.
