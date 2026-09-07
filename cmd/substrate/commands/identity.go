@@ -4,7 +4,6 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
-	"os"
 
 	"github.com/spf13/cobra"
 )
@@ -85,16 +84,16 @@ func runIdentityEnsure(cmd *cobra.Command, args []string) error {
 	// Get session ID from flag or environment.
 	sid := sessionID
 	if sid == "" {
-		sid = os.Getenv("CLAUDE_SESSION_ID")
+		sid = getSessionIDFromEnv()
 	}
 	if sid == "" {
-		return fmt.Errorf("session ID required (use --session-id or set CLAUDE_SESSION_ID)")
+		return fmt.Errorf("session ID required (use --session-id or set CLAUDE_SESSION_ID/CODEX_SESSION_ID)")
 	}
 
 	// Get project dir from flag or environment.
 	proj := projectDir
 	if proj == "" {
-		proj = os.Getenv("CLAUDE_PROJECT_DIR")
+		proj = getProjectDirFromEnv()
 	}
 
 	gitBranch := getGitBranch()
@@ -132,10 +131,10 @@ func runIdentityRestore(cmd *cobra.Command, args []string) error {
 
 	sid := sessionID
 	if sid == "" {
-		sid = os.Getenv("CLAUDE_SESSION_ID")
+		sid = getSessionIDFromEnv()
 	}
 	if sid == "" {
-		return fmt.Errorf("session ID required (use --session-id or set CLAUDE_SESSION_ID)")
+		return fmt.Errorf("session ID required (use --session-id or set CLAUDE_SESSION_ID/CODEX_SESSION_ID)")
 	}
 
 	identity, err := client.RestoreIdentity(ctx, sid)
@@ -169,10 +168,10 @@ func runIdentitySave(cmd *cobra.Command, args []string) error {
 
 	sid := sessionID
 	if sid == "" {
-		sid = os.Getenv("CLAUDE_SESSION_ID")
+		sid = getSessionIDFromEnv()
 	}
 	if sid == "" {
-		return fmt.Errorf("session ID required (use --session-id or set CLAUDE_SESSION_ID)")
+		return fmt.Errorf("session ID required (use --session-id or set CLAUDE_SESSION_ID/CODEX_SESSION_ID)")
 	}
 
 	// First restore the identity to get current state.
@@ -292,10 +291,10 @@ func runIdentitySetDefault(cmd *cobra.Command, args []string) error {
 
 	proj := projectDir
 	if proj == "" {
-		proj = os.Getenv("CLAUDE_PROJECT_DIR")
+		proj = getProjectDirFromEnv()
 	}
 	if proj == "" {
-		return fmt.Errorf("project required (use --project or set CLAUDE_PROJECT_DIR)")
+		return fmt.Errorf("project required (use --project or set CLAUDE_PROJECT_DIR/CODEX_PROJECT_DIR)")
 	}
 
 	if err := client.SetProjectDefault(ctx, proj, setDefaultAgentName); err != nil {

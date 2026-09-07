@@ -9,7 +9,9 @@ import (
 	"strings"
 )
 
-// ClaudeSettings represents the structure of ~/.claude/settings.json.
+// ClaudeSettings represents a JSON hook configuration file. The name is kept
+// for API compatibility with the original Claude-only installer; Codex uses
+// the same top-level hooks shape in ~/.codex/hooks.json.
 type ClaudeSettings struct {
 	Hooks   map[string][]HookEntry `json:"hooks,omitempty"`
 	Other   map[string]any         `json:"-"` // Preserve other settings
@@ -20,6 +22,7 @@ type ClaudeSettings struct {
 type HookEntry struct {
 	Matcher string        `json:"matcher"`
 	Hooks   []HookCommand `json:"hooks"`
+	rawData map[string]any
 }
 
 // HookCommand represents a single hook command.
@@ -27,6 +30,7 @@ type HookCommand struct {
 	Type    string `json:"type"`
 	Command string `json:"command"`
 	Timeout int    `json:"timeout,omitempty"`
+	rawData map[string]any
 }
 
 // substrateHookID is used to identify Subtrate hooks in settings.json.
@@ -84,6 +88,49 @@ var HookDefinitions = map[string]HookEntry{
 	},
 }
 
+// CodexHookDefinitions defines the Subtrate lifecycle hooks supported by
+// Codex. Notification is intentionally omitted because Codex does not expose
+// that event. Claude-specific plan and task hooks are installed separately and
+// are not part of this set.
+var CodexHookDefinitions = map[string]HookEntry{
+	"SessionStart": {
+		Matcher: "",
+		Hooks: []HookCommand{{
+			Type:    "command",
+			Command: "~/.codex/hooks/substrate/session_start.sh",
+		}},
+	},
+	"UserPromptSubmit": {
+		Matcher: "",
+		Hooks: []HookCommand{{
+			Type:    "command",
+			Command: "~/.codex/hooks/substrate/user_prompt.sh",
+		}},
+	},
+	"Stop": {
+		Matcher: "",
+		Hooks: []HookCommand{{
+			Type:    "command",
+			Command: "~/.codex/hooks/substrate/stop.sh",
+			Timeout: 600,
+		}},
+	},
+	"SubagentStop": {
+		Matcher: "",
+		Hooks: []HookCommand{{
+			Type:    "command",
+			Command: "~/.codex/hooks/substrate/subagent_stop.sh",
+		}},
+	},
+	"PreCompact": {
+		Matcher: "",
+		Hooks: []HookCommand{{
+			Type:    "command",
+			Command: "~/.codex/hooks/substrate/pre_compact.sh",
+		}},
+	},
+}
+
 // PlanHookDefinitions defines hooks for plan mode integration.
 // PostToolUse tracks plan file writes; PermissionRequest intercepts
 // ExitPlanMode to submit plans for review before proceeding. The
@@ -126,7 +173,11 @@ var TaskHookDefinitions = map[string]HookEntry{
 
 // LoadSettings loads the Claude settings file.
 func LoadSettings(claudeDir string) (*ClaudeSettings, error) {
-	settingsPath := filepath.Join(claudeDir, "settings.json")
+	return LoadSettingsFile(filepath.Join(claudeDir, "settings.json"))
+}
+
+// LoadSettingsFile loads a JSON hook configuration from settingsPath.
+func LoadSettingsFile(settingsPath string) (*ClaudeSettings, error) {
 
 	settings := &ClaudeSettings{
 		Hooks:   make(map[string][]HookEntry),
@@ -163,6 +214,7 @@ func LoadSettings(claudeDir string) (*ClaudeSettings, error) {
 
 				entry := HookEntry{
 					Matcher: getStringField(entryMap, "matcher"),
+					rawData: entryMap,
 				}
 
 				// Parse hooks array within entry.
@@ -176,6 +228,7 @@ func LoadSettings(claudeDir string) (*ClaudeSettings, error) {
 							Type:    getStringField(hookMap, "type"),
 							Command: getStringField(hookMap, "command"),
 							Timeout: getIntField(hookMap, "timeout"),
+							rawData: hookMap,
 						})
 					}
 				}
@@ -191,7 +244,14 @@ func LoadSettings(claudeDir string) (*ClaudeSettings, error) {
 
 // SaveSettings saves the Claude settings file.
 func SaveSettings(claudeDir string, settings *ClaudeSettings) error {
-	settingsPath := filepath.Join(claudeDir, "settings.json")
+	return SaveSettingsFile(
+		filepath.Join(claudeDir, "settings.json"), settings,
+	)
+}
+
+// SaveSettingsFile saves a JSON hook configuration to settingsPath while
+// preserving unrelated top-level fields loaded from the file.
+func SaveSettingsFile(settingsPath string, settings *ClaudeSettings) error {
 
 	// Merge hooks back into raw data.
 	if settings.rawData == nil {
@@ -203,18 +263,18 @@ func SaveSettings(claudeDir string, settings *ClaudeSettings) error {
 	for event, entries := range settings.Hooks {
 		entriesRaw := make([]any, 0, len(entries))
 		for _, entry := range entries {
-			entryMap := map[string]any{
-				"matcher": entry.Matcher,
-			}
+			entryMap := cloneMap(entry.rawData)
+			entryMap["matcher"] = entry.Matcher
 
 			hooksArr := make([]any, 0, len(entry.Hooks))
 			for _, hook := range entry.Hooks {
-				hookMap := map[string]any{
-					"type":    hook.Type,
-					"command": hook.Command,
-				}
+				hookMap := cloneMap(hook.rawData)
+				hookMap["type"] = hook.Type
+				hookMap["command"] = hook.Command
 				if hook.Timeout > 0 {
 					hookMap["timeout"] = hook.Timeout
+				} else {
+					delete(hookMap, "timeout")
 				}
 				hooksArr = append(hooksArr, hookMap)
 			}
@@ -232,7 +292,7 @@ func SaveSettings(claudeDir string, settings *ClaudeSettings) error {
 	}
 
 	// Ensure directory exists.
-	if err := os.MkdirAll(claudeDir, 0o755); err != nil {
+	if err := os.MkdirAll(filepath.Dir(settingsPath), 0o755); err != nil {
 		return fmt.Errorf("failed to create directory: %w", err)
 	}
 
@@ -243,10 +303,31 @@ func SaveSettings(claudeDir string, settings *ClaudeSettings) error {
 	return nil
 }
 
+func cloneMap(source map[string]any) map[string]any {
+	result := make(map[string]any, len(source))
+	for key, value := range source {
+		result[key] = value
+	}
+
+	return result
+}
+
 // InstallHooks adds Subtrate hooks to the settings.
 // This appends to existing hooks rather than replacing them.
 func InstallHooks(settings *ClaudeSettings) {
-	for event, hookDef := range HookDefinitions {
+	installHookDefinitions(settings, HookDefinitions)
+}
+
+// InstallCodexHooks adds the Codex-compatible Subtrate hooks. Existing hooks
+// are preserved and duplicate Subtrate entries are not added.
+func InstallCodexHooks(settings *ClaudeSettings) {
+	installHookDefinitions(settings, CodexHookDefinitions)
+}
+
+func installHookDefinitions(settings *ClaudeSettings,
+	definitions map[string]HookEntry,
+) {
+	for event, hookDef := range definitions {
 		// Check if we already have a Subtrate hook for this event.
 		entries := settings.Hooks[event]
 		alreadyInstalled := slices.ContainsFunc(entries, isSubstrateHook)
@@ -274,6 +355,11 @@ func UninstallHooks(settings *ClaudeSettings) {
 	}
 }
 
+// UninstallCodexHooks removes Subtrate hooks from a Codex hook config.
+func UninstallCodexHooks(settings *ClaudeSettings) {
+	UninstallHooks(settings)
+}
+
 // IsInstalled checks if Subtrate hooks are installed.
 func IsInstalled(settings *ClaudeSettings) bool {
 	// Check if at least the SessionStart hook is present.
@@ -283,6 +369,12 @@ func IsInstalled(settings *ClaudeSettings) bool {
 	}
 
 	return slices.ContainsFunc(entries, isSubstrateHook)
+}
+
+// IsCodexInstalled checks whether the Subtrate SessionStart hook is present in
+// a Codex hook config.
+func IsCodexInstalled(settings *ClaudeSettings) bool {
+	return IsInstalled(settings)
 }
 
 // GetInstalledHookEvents returns which events have Subtrate hooks installed.

@@ -382,10 +382,15 @@ Install Subtrate hooks into Claude Code.
 
 ```bash
 substrate hooks install
+substrate hooks install --codex
 ```
 
 Installs hook scripts to `~/.claude/hooks/substrate/` and registers them
 in `~/.claude/settings.json`.
+
+With `--codex`, installs the compatible lifecycle scripts to
+`~/.codex/hooks/substrate/`, merges registrations into `~/.codex/hooks.json`,
+and installs the Subtrate skill under `~/.codex/skills/substrate/`.
 
 ### hooks status
 
@@ -393,6 +398,7 @@ Check hook installation status.
 
 ```bash
 substrate hooks status
+substrate hooks status --codex
 ```
 
 ### hooks uninstall
@@ -401,6 +407,7 @@ Remove Subtrate hooks.
 
 ```bash
 substrate hooks uninstall
+substrate hooks uninstall --codex
 ```
 
 ## Review Commands

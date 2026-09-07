@@ -1,14 +1,42 @@
 # Installation Guide
 
-This guide covers installing Subtrate as a Claude Code plugin or manually via
-the CLI, starting the daemon, and configuring your global `~/.claude/CLAUDE.md`
-with Subtrate integration fragments.
+This guide covers installing Subtrate for Claude Code or Codex, starting the
+daemon, and configuring agent instructions.
 
 ## Prerequisites
 
 - **Go 1.22+** with CGO enabled (for building from source)
 - **jq** (used by hook scripts for JSON parsing)
 - **Claude Code** 1.0.33+ (for plugin support)
+- **Codex** with lifecycle hook support (for Codex integration)
+
+## Codex Installation
+
+Build the binaries, then install the Codex lifecycle hooks and skill:
+
+```bash
+make install
+substrate hooks install --codex
+substrate hooks status --codex
+```
+
+This creates:
+
+- `~/.codex/hooks/substrate/` — SessionStart, UserPromptSubmit, Stop,
+  SubagentStop, and PreCompact scripts
+- `~/.codex/hooks.json` — hook registrations merged with existing hooks
+- `~/.codex/skills/substrate/SKILL.md` — Subtrate command guidance
+
+Start a new Codex session and use `/hooks` to review and trust the installed
+definitions. Codex hooks are enabled by default, but non-managed hooks do not
+run until trusted. Claude-only Notification, plan review, and Task tool sync
+hooks are not installed for Codex because those lifecycle/tool surfaces differ.
+
+To remove only the Codex integration:
+
+```bash
+substrate hooks uninstall --codex
+```
 
 ## Option 1: Plugin Installation (Recommended)
 

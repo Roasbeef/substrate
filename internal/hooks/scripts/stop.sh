@@ -28,6 +28,12 @@
 input=$(cat)
 session_id=$(echo "$input" | jq -r '.session_id // empty')
 stop_hook_active=$(echo "$input" | jq -r '.stop_hook_active // false')
+cwd=$(echo "$input" | jq -r '.cwd // empty')
+is_codex=$(echo "$input" | jq -r 'if has("model") then "true" else "false" end')
+
+if [ -z "$session_id" ]; then
+    session_id="${CLAUDE_SESSION_ID:-$CODEX_SESSION_ID}"
+fi
 
 # Build session ID args if available (critical for agent identity
 # resolution). Use a bash array so a session_id containing whitespace
@@ -35,6 +41,36 @@ stop_hook_active=$(echo "$input" | jq -r '.stop_hook_active // false')
 session_args=()
 if [ -n "$session_id" ]; then
     session_args=(--session-id "$session_id")
+fi
+project_dir="${CLAUDE_PROJECT_DIR:-${CODEX_PROJECT_DIR:-$cwd}}"
+if [ -n "$project_dir" ]; then
+    session_args+=(--project "$project_dir")
+fi
+
+# Use Codex's explicit Stop continuation instead of depending on detached
+# shell-command completion. Keep the long poll inside the hook and only
+# continue when polling succeeds.
+if [ "$is_codex" = "true" ] || [ -n "$CODEX_SESSION_ID" ]; then
+    substrate heartbeat "${session_args[@]}" --format context \
+        2>/dev/null || true
+
+    if ! codex_result=$(substrate poll "${session_args[@]}" \
+        --wait=570s --format hook --quiet 2>/dev/null); then
+
+        echo '{}'
+        exit 0
+    fi
+
+    codex_decision=$(echo "$codex_result" | jq -r '.decision // empty')
+    if [ "$codex_decision" = "block" ]; then
+        echo "$codex_result"
+    else
+        jq -cn '{
+            "decision": "block",
+            "reason": "No new Subtrate messages yet. Continue waiting for mail."
+        }'
+    fi
+    exit 0
 fi
 
 # Arming-nudge stamp: marks that we already blocked once for arming in
@@ -129,7 +165,7 @@ if [ -n "$session_id" ]; then
     fi
 fi
 
-reason="No mail watcher is armed. ${task_note}Arm the watcher now: run \`substrate watch --session-id ${session_id:-\$CLAUDE_SESSION_ID}\` via the Bash tool with run_in_background set to true, then end your turn. The watcher exits when mail arrives, which wakes you automatically with a digest; re-arm it after handling each wake."
+reason="No mail watcher is armed. ${task_note}Arm the watcher now: run \`substrate watch --session-id ${session_id:-\${CLAUDE_SESSION_ID:-\$CODEX_SESSION_ID}}\` as a background shell command, then end your turn. The watcher exits when mail arrives with a digest; re-arm it after handling each wake."
 
 # Record that the nudge fired so we do not block again this cycle.
 touch "$nudge_stamp" 2>/dev/null

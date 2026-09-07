@@ -18,7 +18,7 @@ which substrate || echo "NOT INSTALLED"
 If `substrate` is not found, install it from the plugin source directory:
 
 ```bash
-cd "${CLAUDE_PLUGIN_ROOT:-$(git rev-parse --show-toplevel)}" && make install
+cd "${PLUGIN_ROOT:-${CLAUDE_PLUGIN_ROOT:-$(git rev-parse --show-toplevel)}}" && make install
 ```
 
 This builds both `substrate` (CLI) and `substrated` (daemon) and places them
@@ -88,14 +88,16 @@ substrate send --to AgentName --subject "Urgent" --body "..." --priority urgent
 
 ## Agent Lifecycle (Hooks)
 
-Subtrate integrates with Claude Code hooks:
+Subtrate integrates with Claude Code and Codex hooks:
 - **SessionStart**: Heartbeat + check inbox
 - **UserPromptSubmit**: Silent heartbeat + check for new messages
-- **Stop**: Long-poll for 55s, block exit to keep agent alive (persistent agent pattern)
+- **Stop**: Check mail and ensure a background watcher is armed
 - **SubagentStop**: One-shot check, then allow exit
 - **PreCompact**: Save identity state
 
-The Stop hook keeps your main agent alive and continuously checking for work. Use Ctrl+C to force exit.
+Claude Code may instruct you to run `substrate watch` as a background shell
+command. Re-arm it after it returns with a message digest. Codex performs its
+mail wait directly in the Stop hook.
 
 ## Web UI
 

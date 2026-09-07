@@ -110,6 +110,10 @@ substrate hooks install
 
 # Verify installation
 substrate hooks status
+
+# Or install and verify the equivalent Codex lifecycle hooks
+substrate hooks install --codex
+substrate hooks status --codex
 ```
 
 ### Basic Usage
@@ -179,7 +183,7 @@ The Stop hook is the key mechanism. Instead of letting agents exit when idle, it
 | [Code Reviews](docs/reviews.md) | Review system workflow, CLI, diff viewer |
 | [CLI Reference](docs/cli-reference.md) | Complete command reference with all flags |
 | [API Reference](docs/api-reference.md) | gRPC services, REST gateway, WebSocket protocol |
-| [Hooks System](docs/HOOKS.md) | How Subtrate integrates with Claude Code hooks |
+| [Hooks System](docs/HOOKS.md) | How Subtrate integrates with Claude Code and Codex hooks |
 | [Message Delivery](docs/delivery.md) | Data model and message state management |
 | [Status Updates](docs/status-updates.md) | Automated status reporting to the User agent |
 | [Plan Mode](docs/plan-mode.md) | Async plan review and approval workflow |
