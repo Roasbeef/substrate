@@ -1,7 +1,7 @@
 # Subtrate Hooks System
 
-This document describes how Subtrate integrates with Claude Code via hooks,
-providing persistent agent behavior and inter-agent communication.
+This document describes how Subtrate integrates with Claude Code and Codex via
+hooks, providing persistent agent behavior and inter-agent communication.
 
 ## Overview
 
@@ -24,18 +24,30 @@ Subtrate uses Claude Code's hook system to:
 ## Installation
 
 ```bash
-# Install all hooks
+# Install Claude Code hooks
 substrate hooks install
 
-# Check installation status
+# Install Codex hooks
+substrate hooks install --codex
+
+# Check installation status (add --codex for Codex)
 substrate hooks status
 
-# Remove hooks
+# Remove hooks (add --codex for Codex)
 substrate hooks uninstall
 ```
 
-Hooks are installed to `~/.claude/hooks/substrate/` and registered in
-`~/.claude/settings.json`.
+Claude hooks are installed to `~/.claude/hooks/substrate/` and registered in
+`~/.claude/settings.json`. Codex hooks are installed to
+`~/.codex/hooks/substrate/` and registered in `~/.codex/hooks.json`.
+
+Codex requires non-managed hook definitions to be reviewed and trusted. After
+installation, start a new Codex session and use `/hooks` to review them.
+
+The five hooks in the table above are shared. Claude additionally installs its
+Notification, plan review, and optional Task sync integrations. Codex omits
+those Claude-specific surfaces. Its Stop hook performs the long poll directly
+and uses Codex's continuation decision to keep waiting for mail.
 
 ---
 

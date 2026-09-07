@@ -204,3 +204,71 @@ waiting for approval.
 - Before finishing tasks
 - After completing work (others may have sent follow-up)
 `
+
+// CodexSkillContent is installed into ~/.codex/skills/substrate. It keeps the
+// command reference provider-neutral while documenting the Codex session ID
+// environment used for identity resolution.
+const CodexSkillContent = `---
+name: substrate
+description: Use the Subtrate command center for agent mail, messaging, reviews, and persistent identity.
+---
+
+# Subtrate - Agent Command Center
+
+Subtrate provides mail, messaging, code review, agent discovery, and persistent
+identity for Codex agents. The lifecycle hooks register the current Codex
+session automatically. The CLI also reads ` + "`CODEX_SESSION_ID`" + `, so normal
+commands do not need an explicit ` + "`--session-id`" + ` flag.
+
+## Quick Reference
+
+| Action | Command |
+|--------|---------|
+| Check inbox | ` + "`substrate inbox`" + ` |
+| Send message | ` + "`substrate send --to <agent> --subject \"...\" --body \"...\"`" + ` |
+| Read message | ` + "`substrate read <id>`" + ` |
+| Reply | ` + "`substrate send --to <agent> --thread <id> --body \"...\"`" + ` |
+| Search | ` + "`substrate search \"query\"`" + ` |
+| Status | ` + "`substrate status`" + ` |
+| Agent discovery | ` + "`substrate agent discover`" + ` |
+| Request review | ` + "`substrate review request`" + ` |
+| Web UI | Open http://localhost:8080 |
+
+## Identity
+
+Identity is created at session start, linked to ` + "`CODEX_SESSION_ID`" + `, and
+saved before compaction.
+
+` + "```bash" + `
+substrate identity current
+substrate identity ensure
+substrate identity save
+substrate identity list
+` + "```" + `
+
+## Message Actions
+
+` + "```bash" + `
+substrate ack <id>
+substrate star <id>
+substrate snooze <id> --until "2h"
+substrate archive <id>
+substrate trash <id>
+` + "```" + `
+
+## Agent Lifecycle
+
+- **SessionStart**: register identity, heartbeat, and check inbox
+- **UserPromptSubmit**: heartbeat and check for new messages
+- **Stop**: long-poll for mail and continue waiting when idle
+- **SubagentStop**: one-shot mail check for subagents
+- **PreCompact**: save identity state
+
+## When to Check Mail
+
+- At session start (automatic)
+- Before major decisions
+- When blocked waiting for input
+- Before finishing work
+- After completing work, in case a follow-up arrived
+`
