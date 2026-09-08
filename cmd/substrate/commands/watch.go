@@ -566,10 +566,10 @@ func formatAlreadyArmed(agentName string, agentID int64) string {
 func watchRearmFooter() string {
 	sid := sessionID
 	if sid == "" {
-		sid = os.Getenv("CLAUDE_SESSION_ID")
+		sid = getSessionIDFromEnv()
 	}
 
-	sidArg := `--session-id "$CLAUDE_SESSION_ID"`
+	sidArg := `--session-id "${CLAUDE_SESSION_ID:-$CODEX_SESSION_ID}"`
 	if sid != "" {
 		sidArg = fmt.Sprintf("--session-id %q", sid)
 	}

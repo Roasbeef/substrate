@@ -25,6 +25,33 @@ func getGitBranch() string {
 	return strings.TrimSpace(string(output))
 }
 
+// getSessionIDFromEnv returns the current agent session ID for supported
+// coding agents. Keep the Claude variable first to preserve existing behavior
+// when both integrations are present.
+func getSessionIDFromEnv() string {
+	for _, name := range []string{
+		"CLAUDE_SESSION_ID", "CODEX_SESSION_ID", "CODEX_THREAD_ID",
+	} {
+		if value := os.Getenv(name); value != "" {
+			return value
+		}
+	}
+
+	return ""
+}
+
+// getProjectDirFromEnv returns the project directory exposed by a supported
+// coding agent, when one is available.
+func getProjectDirFromEnv() string {
+	for _, name := range []string{"CLAUDE_PROJECT_DIR", "CODEX_PROJECT_DIR"} {
+		if value := os.Getenv(name); value != "" {
+			return value
+		}
+	}
+
+	return ""
+}
+
 // getStore opens the database and returns a store instance.
 // NOTE: This is only used as fallback when daemon is not running.
 func getStore() (*db.Store, error) {
@@ -88,17 +115,17 @@ func getCurrentAgentWithClient(ctx context.Context, client *Client) (int64,
 	// Try to get session ID from environment.
 	sessID := sessionID
 	if sessID == "" {
-		sessID = os.Getenv("CLAUDE_SESSION_ID")
+		sessID = getSessionIDFromEnv()
 	}
 
 	projDir := projectDir
 	if projDir == "" {
-		projDir = os.Getenv("CLAUDE_PROJECT_DIR")
+		projDir = getProjectDirFromEnv()
 	}
 
 	if sessID == "" && projDir == "" {
 		return 0, "", fmt.Errorf("no agent specified; use --agent, " +
-			"--session-id, or set CLAUDE_SESSION_ID")
+			"--session-id, or set CLAUDE_SESSION_ID/CODEX_SESSION_ID")
 	}
 
 	// In queue mode, use cached identity from the filesystem.
@@ -123,7 +150,7 @@ func resolveQueuedIdentity(sessID string) (int64, string, error) {
 	if sessID == "" {
 		return 0, "", fmt.Errorf(
 			"queue mode requires --session-id or " +
-				"CLAUDE_SESSION_ID for identity resolution",
+				"CLAUDE_SESSION_ID/CODEX_SESSION_ID for identity resolution",
 		)
 	}
 

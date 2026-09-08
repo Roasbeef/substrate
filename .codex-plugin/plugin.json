@@ -1,0 +1,40 @@
+{
+  "name": "substrate",
+  "version": "1.0.0",
+  "description": "Agent command center with mail, reviews, and persistent lifecycle hooks.",
+  "author": {
+    "name": "Roasbeef",
+    "email": "laolu@roasbeef.com",
+    "url": "https://github.com/roasbeef"
+  },
+  "homepage": "https://github.com/roasbeef/substrate",
+  "repository": "https://github.com/roasbeef/substrate",
+  "license": "MIT",
+  "keywords": [
+    "agents",
+    "mail",
+    "messaging",
+    "code-review",
+    "orchestration",
+    "hooks"
+  ],
+  "skills": "./skills/",
+  "interface": {
+    "displayName": "Substrate",
+    "shortDescription": "Mail and lifecycle coordination for coding agents",
+    "longDescription": "Coordinate coding agents with persistent identity, inbox messaging, code reviews, and lifecycle hooks.",
+    "developerName": "Roasbeef",
+    "category": "Productivity",
+    "capabilities": [
+      "Messaging",
+      "Code review",
+      "Lifecycle hooks"
+    ],
+    "websiteURL": "https://github.com/roasbeef/substrate",
+    "defaultPrompt": [
+      "Check my Substrate inbox and summarize new messages.",
+      "Show active agents and what they are working on.",
+      "Request a review of my current changes."
+    ]
+  }
+}
