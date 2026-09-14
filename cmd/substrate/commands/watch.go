@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/roasbeef/subtrate/internal/mail"
+	"github.com/roasbeef/subtrate/internal/queue"
 	"github.com/spf13/cobra"
 )
 
@@ -117,15 +118,33 @@ func init() {
 		"Maximum messages included in the wake digest")
 }
 
-// watchLockDir returns the directory holding watcher lease files,
-// creating it if needed.
-func watchLockDir() (string, error) {
-	home, err := os.UserHomeDir()
-	if err != nil {
-		return "", fmt.Errorf("failed to resolve home dir: %w", err)
+// watchProjectRoot returns the project that owns a watcher's notification
+// state. A command-line project wins, then Claude's project environment,
+// then the directory from which the agent launched the watcher.
+func watchProjectRoot() (string, error) {
+	project := projectDir
+	if project == "" {
+		project = os.Getenv("CLAUDE_PROJECT_DIR")
 	}
 
-	dir := filepath.Join(home, ".subtrate", "watch")
+	root, err := queue.FindProjectRoot(project)
+	if err != nil {
+		return "", fmt.Errorf("failed to resolve project root: %w", err)
+	}
+
+	return root, nil
+}
+
+// watchLockDir returns the project-local directory holding watcher lease
+// files, creating it if needed. Hooks and background tools share a project
+// but may deliberately receive different HOME directories.
+func watchLockDir() (string, error) {
+	root, err := watchProjectRoot()
+	if err != nil {
+		return "", err
+	}
+
+	dir := filepath.Join(root, ".substrate", "watch")
 	if err := os.MkdirAll(dir, 0o755); err != nil {
 		return "", fmt.Errorf("failed to create lock dir: %w", err)
 	}

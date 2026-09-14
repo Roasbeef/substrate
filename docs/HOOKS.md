@@ -17,7 +17,7 @@ Subtrate uses Claude Code's hook system to:
 |------|---------|---------|
 | **SessionStart** | Claude Code session begins | Heartbeat + inject pending messages |
 | **UserPromptSubmit** | User sends a message | Silent heartbeat + check for new mail |
-| **Stop** | Main agent tries to exit | **Keep agent alive** - long-poll for work |
+| **Stop** | Main agent tries to exit | Check mail and ensure its background watcher is armed |
 | **SubagentStop** | Subagent (Task-spawned) tries to exit | One-shot check - block once if messages exist |
 | **PreCompact** | Before context compaction | Save identity state for restoration |
 
@@ -53,8 +53,9 @@ and uses Codex's continuation decision to keep waiting for mail.
 
 ## Stop Hook (Main Agents)
 
-The Stop hook implements a **Persistent Agent Pattern** that keeps main agents
-alive indefinitely, continuously checking for work.
+The Stop hook makes sure a main agent has a background `substrate watch`
+process before it becomes idle. The watcher, not the hook, waits for mail and
+exits with a digest that wakes the agent.
 
 ### Behavior Flow
 
@@ -62,30 +63,36 @@ alive indefinitely, continuously checking for work.
 flowchart TD
     A[STOP HOOK TRIGGERED] --> B{Quick Mail Check}
     B -->|Mail exists| C[BLOCK - Show messages]
-    B -->|No mail| D{Check Incomplete Tasks}
-    D -->|Tasks incomplete| E[BLOCK - List tasks]
-    D -->|No incomplete tasks| F[Long Poll 9m30s]
-    F -->|New message| C
-    F -->|Timeout| G[BLOCK - Heartbeat mode]
-    G --> H[Ctrl+C to force exit]
+    B -->|No mail| D{Watcher armed?}
+    D -->|Yes| E[Allow exit]
+    D -->|No| F{Arming nudge sent this stop cycle?}
+    F -->|Yes| E
+    F -->|No| G[BLOCK - Instruct agent to arm watcher]
 
     style A fill:#f9f,stroke:#333,stroke-width:2px
     style C fill:#fbb,stroke:#333
-    style E fill:#fbb,stroke:#333
-    style G fill:#bbf,stroke:#333
+    style G fill:#fbb,stroke:#333
 ```
 
 ### Key Characteristics
 
-1. **Always blocks by default** - The Stop hook always outputs `{"decision": "block"}`
-   to keep the agent alive, even when there are no messages.
+1. **The watcher owns persistence** - Run `substrate watch --session-id
+   "$CLAUDE_SESSION_ID"` as a background task. It waits for mail and wakes
+   the agent when it exits with a digest.
 
-2. **Checks mail before tasks** - Mail is more actionable and time-sensitive.
+2. **At most one arming block per stop cycle** - If no watcher is live, the
+   hook writes an arming-nudge stamp and blocks once. It allows exit on a
+   repeated stop hook invocation, preventing a loop while retaining the
+   instruction to arm the watcher.
 
-3. **9.5-minute long poll** - Under the 10-minute hook timeout, continuously
-   checking for incoming messages.
+3. **Checks mail before watcher state** - Mail is actionable immediately and
+   must be shown before the agent is asked to arm anything.
 
-4. **Ctrl+C force exit** - Users can bypass the hook with Ctrl+C.
+4. **Project-local watcher state** - Lease files and arming-nudge stamps live
+   under `<project>/.substrate/watch/`. The project is `--project` when set,
+   then `CLAUDE_PROJECT_DIR`, otherwise the nearest ancestor with a `.git`
+   directory. This keeps hooks and background tools in agreement even when
+   they receive different `HOME` values.
 
 ### Output Format
 
@@ -98,25 +105,19 @@ The Stop hook outputs JSON in this format:
   "reason": "You have 2 unread messages:\n- From: User - \"Please review this\"\n- From: AgentX - \"Status update\""
 }
 
-// When tasks are incomplete:
+// When no watcher is armed:
 {
   "decision": "block",
-  "reason": "3 incomplete task(s): #1 [in_progress], #2 [pending]. Complete ALL tasks before stopping."
-}
-
-// When in heartbeat mode (no mail, no tasks):
-{
-  "decision": "block",
-  "reason": "No new messages. Agent staying alive (heartbeat). Use Ctrl+C to force exit."
+  "reason": "No mail watcher is armed. Arm the watcher now: run substrate watch ..."
 }
 ```
 
-### Why Always Block?
+### Watcher State Transition
 
-The persistent agent pattern ensures that agents registered with Subtrate stay
-available for inter-agent communication. When Agent A sends a message to Agent B,
-Agent B will receive it within seconds (on the next poll cycle) rather than
-waiting for the human user to restart Agent B.
+Older releases stored watcher leases below `$HOME/.subtrate/watch`. Those files
+are not read by the project-local watcher and can be left behind after an
+upgrade. One upgrade may briefly permit a watcher from each release to run,
+but the old lease does not affect the project-local watcher.
 
 ---
 

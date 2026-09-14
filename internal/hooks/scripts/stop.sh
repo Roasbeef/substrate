@@ -77,12 +77,45 @@ if [ "$is_codex" = "true" ]; then
 fi
 
 # Arming-nudge stamp: marks that we already blocked once for arming in
-# this stop cycle. stop_hook_active alone cannot distinguish "blocked
-# for mail" from "blocked for arming", and a mail block must not
-# suppress the arming nudge (that would strand the agent watcher-less
-# after every mail interaction). A fresh stop cycle is detected by
-# stop_hook_active=false, which clears the stamp.
-stamp_dir="$HOME/.subtrate/watch"
+# this stop cycle. It is project-local because Loom deliberately gives
+# hooks the operator HOME to resolve their script, while its background
+# tools use a private HOME. The state directory uses the same root-selection
+# rule as `substrate watch`: an explicit CLAUDE_PROJECT_DIR wins; otherwise
+# walk upward from the hook's working directory to a .git directory.
+# stop_hook_active alone cannot distinguish "blocked for mail" from
+# "blocked for arming", and a mail block must not suppress the arming
+# nudge (that would strand the agent watcher-less after every mail
+# interaction). A fresh stop cycle is detected by stop_hook_active=false,
+# which clears the stamp.
+watch_project_root() {
+    if [ -n "${CLAUDE_PROJECT_DIR:-}" ]; then
+        # FindProjectRoot treats an explicit project directory as the root
+        # itself, even when it is a subdirectory of a Git worktree.
+        cd -L -- "$CLAUDE_PROJECT_DIR" 2>/dev/null && pwd -L
+        return
+    fi
+
+    local candidate="$PWD"
+    while :; do
+        # Match queue.FindProjectRoot: a worktree's .git file is not a root.
+        if [ -d "$candidate/.git" ]; then
+            printf '%s\n' "$candidate"
+            return
+        fi
+
+        local parent
+        parent=$(dirname "$candidate")
+        if [ "$parent" = "$candidate" ]; then
+            printf '%s\n' "$PWD"
+            return
+        fi
+
+        candidate="$parent"
+    done
+}
+
+watch_root=$(watch_project_root)
+stamp_dir="${watch_root:-$PWD}/.substrate/watch"
 mkdir -p "$stamp_dir" 2>/dev/null
 nudge_stamp="$stamp_dir/nudged-${session_id:-default}"
 

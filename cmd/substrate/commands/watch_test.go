@@ -15,15 +15,114 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// withTempHome points HOME at a temp dir so lease files do not touch
-// the real ~/.subtrate, restoring the original value on cleanup.
+// withTempHome gives a test separate home and project directories. Watch
+// state belongs under the latter, while HOME remains relevant to the other
+// CLI paths these tests exercise.
 func withTempHome(t *testing.T) string {
 	t.Helper()
 
 	home := t.TempDir()
 	t.Setenv("HOME", home)
+	t.Setenv("CLAUDE_PROJECT_DIR", t.TempDir())
 
 	return home
+}
+
+// TestWatchLockDirUsesProjectState proves the watcher and an imported hook
+// can agree on their notification state even when their HOME directories
+// differ. Loom deliberately gives those two processes different homes while
+// keeping their project directory the same.
+func TestWatchLockDirUsesProjectState(t *testing.T) {
+	watcherHome := withTempHome(t)
+	hookHome := t.TempDir()
+	workspace := t.TempDir()
+	nested := filepath.Join(workspace, "nested", "deeper")
+	require.NoError(t, os.MkdirAll(nested, 0o755))
+
+	t.Setenv("CLAUDE_PROJECT_DIR", workspace)
+
+	previousProject := projectDir
+	projectDir = ""
+	t.Cleanup(func() {
+		projectDir = previousProject
+	})
+
+	previousDir, err := os.Getwd()
+	require.NoError(t, err)
+	require.NoError(t, os.Chdir(nested))
+	t.Cleanup(func() {
+		require.NoError(t, os.Chdir(previousDir))
+	})
+
+	dir, err := watchLockDir()
+	require.NoError(t, err)
+	require.Equal(t, filepath.Join(workspace, ".substrate", "watch"), dir)
+	require.DirExists(t, dir)
+
+	key := sessionLeaseKey("lease-probe")
+
+	lease, err := acquireWatchLease(key)
+	require.NoError(t, err)
+	t.Cleanup(func() {
+		lease.release()
+	})
+
+	// The hook's real HOME cannot hide the watcher the tool acquired.
+	t.Setenv("HOME", hookHome)
+	armed, err := watcherArmed(key)
+	require.NoError(t, err)
+	require.True(t, armed)
+	require.NoDirExists(t, filepath.Join(watcherHome, ".subtrate", "watch"))
+	require.NoDirExists(t, filepath.Join(hookHome, ".subtrate", "watch"))
+}
+
+// TestWatchLockDirFindsGitRootFromNestedWorkingDir proves that an unset
+// project environment still selects the worktree root. The Stop hook uses
+// this same walk when Claude does not provide CLAUDE_PROJECT_DIR.
+func TestWatchLockDirFindsGitRootFromNestedWorkingDir(t *testing.T) {
+	withTempHome(t)
+	workspace := t.TempDir()
+	nested := filepath.Join(workspace, "nested", "deeper")
+	require.NoError(t, os.MkdirAll(filepath.Join(workspace, ".git"), 0o755))
+	require.NoError(t, os.MkdirAll(nested, 0o755))
+	t.Setenv("CLAUDE_PROJECT_DIR", "")
+
+	previousProject := projectDir
+	projectDir = ""
+	t.Cleanup(func() {
+		projectDir = previousProject
+	})
+
+	previousDir, err := os.Getwd()
+	require.NoError(t, err)
+	require.NoError(t, os.Chdir(nested))
+	t.Cleanup(func() {
+		require.NoError(t, os.Chdir(previousDir))
+	})
+	canonicalWorkspace, err := filepath.EvalSymlinks(workspace)
+	require.NoError(t, err)
+
+	dir, err := watchLockDir()
+	require.NoError(t, err)
+	require.Equal(t, filepath.Join(canonicalWorkspace, ".substrate", "watch"), dir)
+}
+
+// TestWatchLockDirPrefersExplicitProject keeps a caller's explicit project
+// selection ahead of both its environment and current directory.
+func TestWatchLockDirPrefersExplicitProject(t *testing.T) {
+	withTempHome(t)
+	explicit := t.TempDir()
+	t.Setenv("CLAUDE_PROJECT_DIR", t.TempDir())
+
+	previousProject := projectDir
+	projectDir = explicit
+	t.Cleanup(func() {
+		projectDir = previousProject
+	})
+
+	dir, err := watchLockDir()
+	require.NoError(t, err)
+	require.Equal(t, filepath.Join(explicit, ".substrate", "watch"), dir)
 }
 
 // TestWatchLeaseAcquireRelease verifies the basic lease lifecycle:

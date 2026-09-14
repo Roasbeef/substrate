@@ -34,3 +34,6 @@ node_modules/
 .reviews/
 review.test
 .claude/.substrate-plan-context
+
+# Project-local watcher leases and wake watermarks
+.substrate/watch/
