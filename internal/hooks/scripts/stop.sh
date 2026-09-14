@@ -129,7 +129,7 @@ if [ -n "$session_id" ]; then
     fi
 fi
 
-reason="No mail watcher is armed. ${task_note}Arm the watcher now: run \`substrate watch --session-id ${session_id:-\$CLAUDE_SESSION_ID}\` via the Bash tool with run_in_background set to true, then end your turn. The watcher exits when mail arrives, which wakes you automatically with a digest; re-arm it after handling each wake."
+reason="No mail watcher is armed. ${task_note}Arm the watcher now: run \`substrate watch --session-id ${session_id:-\$CLAUDE_SESSION_ID}\` via the Bash tool with run_in_background set to true. The watcher is only for notification while this session is idle; it does not require ending your turn. Continue the current task if work remains, and re-arm it after handling each wake."
 
 # Record that the nudge fired so we do not block again this cycle.
 touch "$nudge_stamp" 2>/dev/null
