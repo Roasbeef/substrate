@@ -391,7 +391,6 @@ type storePlanRef struct {
 func buildEvent(subject, body, priority, state, threadID string,
 	messageID int64, createdAt time.Time, plan *storePlanRef,
 ) CommandEvent {
-
 	kind := classifyEvent(subject, body, priority, plan != nil)
 
 	waiting := ""
@@ -431,7 +430,6 @@ func buildLane(id int64, name, projectKey, gitBranch, purpose,
 	status, sessionID string, lastActive time.Time,
 	events []CommandEvent,
 ) CommandLane {
-
 	if events == nil {
 		events = []CommandEvent{}
 	}
