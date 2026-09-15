@@ -94,11 +94,17 @@ Exit codes:
   1    fatal error (identity resolution, lease I/O)
   130  interrupted by signal (not a wake; do not re-arm)
 
+Always pass --project. The lease lives under that project's root, and a
+watcher armed without it walks up from the current directory instead,
+which lands somewhere --check will not look whenever the project is not
+the nearest ancestor holding a .git directory — inside a linked
+worktree, say, where .git is a file. The hooks pass it for you.
+
 Use --check to test the lease without arming: exit 0 if a live watcher
 is armed, exit 1 otherwise (for hook scripts).`,
-	Example: `  substrate watch --session-id "$CLAUDE_SESSION_ID"
-  substrate watch --session-id "$CLAUDE_SESSION_ID" --timeout 4h
-  substrate watch --session-id "$CLAUDE_SESSION_ID" --check`,
+	Example: `  substrate watch --session-id "$SID" --project "$CLAUDE_PROJECT_DIR"
+  substrate watch --session-id "$SID" --project "$DIR" --timeout 4h
+  substrate watch --session-id "$SID" --project "$DIR" --check`,
 	// Errors are semantic (lease conflict, not-armed); usage spam would
 	// only pollute the agent's context.
 	SilenceUsage: true,
@@ -119,12 +125,22 @@ func init() {
 }
 
 // watchProjectRoot returns the project that owns a watcher's notification
-// state. A command-line project wins, then Claude's project environment,
-// then the directory from which the agent launched the watcher.
+// state. An explicit --project wins, then the host's project environment,
+// then a walk up from the directory the watcher was launched in.
+//
+// Callers that must agree with each other pass --project, and for good
+// reason. The last two sources are ambient, and the two processes that
+// have to name the same lease do not share them: the watcher is armed
+// from the agent's shell, which gets no project environment, while
+// --check runs inside a hook, which does. Left to the ambient sources
+// those two resolve different roots whenever the project directory is
+// not the nearest .git-directory ancestor of the agent's cwd — in a
+// linked worktree, whose .git is a file, or in a session started from a
+// subdirectory. The hooks therefore pass --project on both sides.
 func watchProjectRoot() (string, error) {
 	project := projectDir
 	if project == "" {
-		project = os.Getenv("CLAUDE_PROJECT_DIR")
+		project = getProjectDirFromEnv()
 	}
 
 	root, err := queue.FindProjectRoot(project)
@@ -133,6 +149,33 @@ func watchProjectRoot() (string, error) {
 	}
 
 	return root, nil
+}
+
+// watchStateGitignore is the self-ignore file written alongside the
+// watcher's state. The state lives inside whatever repository the agent
+// is working in, so without this every session would leave lock files
+// showing as untracked, and an agent running `git add -A` would commit
+// them. A directory that ignores itself needs no cooperation from the
+// host repository's .gitignore, which we do not control.
+const watchStateGitignore = "*\n"
+
+// ensureWatchStateDir creates the project-local state directory and its
+// self-ignore file, returning the watch subdirectory. The ignore write
+// is best effort: failing it costs tidiness, not correctness.
+func ensureWatchStateDir(root string) (string, error) {
+	state := filepath.Join(root, ".substrate")
+
+	dir := filepath.Join(state, "watch")
+	if err := os.MkdirAll(dir, 0o700); err != nil {
+		return "", fmt.Errorf("failed to create lock dir: %w", err)
+	}
+
+	ignore := filepath.Join(state, ".gitignore")
+	if _, err := os.Stat(ignore); os.IsNotExist(err) {
+		_ = os.WriteFile(ignore, []byte(watchStateGitignore), 0o644)
+	}
+
+	return dir, nil
 }
 
 // watchLockDir returns the project-local directory holding watcher lease
@@ -144,9 +187,9 @@ func watchLockDir() (string, error) {
 		return "", err
 	}
 
-	dir := filepath.Join(root, ".substrate", "watch")
-	if err := os.MkdirAll(dir, 0o755); err != nil {
-		return "", fmt.Errorf("failed to create lock dir: %w", err)
+	dir, err := ensureWatchStateDir(root)
+	if err != nil {
+		return "", err
 	}
 
 	return dir, nil
@@ -690,11 +733,21 @@ func watchRearmFooter() string {
 		sidArg = fmt.Sprintf("--session-id %q", sid)
 	}
 
+	// The re-arm runs from the agent's shell, which carries no project
+	// environment, so it would walk up from whatever directory the agent
+	// happens to be in. Naming the root this watcher resolved keeps the
+	// replacement lease in the same place as the one it succeeds, and in
+	// the same place the hook's --check looks.
+	watchArg := sidArg
+	if root, err := watchProjectRoot(); err == nil {
+		watchArg = fmt.Sprintf("%s --project %q", sidArg, root)
+	}
+
 	return fmt.Sprintf(`Next steps:
 1. Handle the messages above. Read with `+"`substrate read <id> %s`"+`,
    reply with `+"`substrate send %s --to <sender> --thread <thread-id> ...`"+`.
 2. Re-arm the watcher so you keep getting woken: run
    `+"`substrate watch %s`"+`
    via the Bash tool with run_in_background: true, then end your turn.
-`, sidArg, sidArg, sidArg)
+`, sidArg, sidArg, watchArg)
 }

@@ -77,8 +77,9 @@ flowchart TD
 ### Key Characteristics
 
 1. **The watcher owns persistence** - Run `substrate watch --session-id
-   "$CLAUDE_SESSION_ID"` as a background task. It waits for mail and wakes
-   the agent when it exits with a digest.
+   "$CLAUDE_SESSION_ID" --project "$CLAUDE_PROJECT_DIR"` as a background task.
+   It waits for mail and wakes the agent when it exits with a digest. Always
+   pass `--project`; see below.
 
 2. **At most one arming block per stop cycle** - If no watcher is live, the
    hook writes an arming-nudge stamp and blocks once. It allows exit on a
@@ -89,10 +90,22 @@ flowchart TD
    must be shown before the agent is asked to arm anything.
 
 4. **Project-local watcher state** - Lease files and arming-nudge stamps live
-   under `<project>/.substrate/watch/`. The project is `--project` when set,
-   then `CLAUDE_PROJECT_DIR`, otherwise the nearest ancestor with a `.git`
-   directory. This keeps hooks and background tools in agreement even when
-   they receive different `HOME` values.
+   under `<project>/.substrate/watch/`, which keeps hooks and background tools
+   in agreement even when they receive different `HOME` values. That directory
+   carries its own `.gitignore`, so leases never surface as untracked files in
+   the repository the agent is working in.
+
+5. **The project is always named, never derived** - The hook passes
+   `--project` both when it checks the lease and in the arming instruction it
+   hands back. The two processes that must name the same lease do not share
+   an environment: the watcher is armed from the agent's shell, which gets no
+   project variables, while the hook has them. Left to derive the root, each
+   side walks up from a different place and they agree only when the project
+   directory happens to be the nearest ancestor holding a `.git` *directory* —
+   which is false inside a linked worktree, where `.git` is a file, and false
+   for a session started in a subdirectory. `--project` removes the guesswork
+   from both sides. The CLI still falls back to `CLAUDE_PROJECT_DIR` and then
+   to a `.git` walk for interactive use.
 
 ### Output Format
 

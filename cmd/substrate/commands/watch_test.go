@@ -107,24 +107,6 @@ func TestWatchLockDirFindsGitRootFromNestedWorkingDir(t *testing.T) {
 	require.Equal(t, filepath.Join(canonicalWorkspace, ".substrate", "watch"), dir)
 }
 
-// TestWatchLockDirPrefersExplicitProject keeps a caller's explicit project
-// selection ahead of both its environment and current directory.
-func TestWatchLockDirPrefersExplicitProject(t *testing.T) {
-	withTempHome(t)
-	explicit := t.TempDir()
-	t.Setenv("CLAUDE_PROJECT_DIR", t.TempDir())
-
-	previousProject := projectDir
-	projectDir = explicit
-	t.Cleanup(func() {
-		projectDir = previousProject
-	})
-
-	dir, err := watchLockDir()
-	require.NoError(t, err)
-	require.Equal(t, filepath.Join(explicit, ".substrate", "watch"), dir)
-}
-
 // TestWatchLeaseAcquireRelease verifies the basic lease lifecycle:
 // acquire takes the lock and records our PID, watcherArmed reports
 // armed while held, and release drops the lock so the agent reads as
@@ -434,4 +416,82 @@ func TestWatchLeaseKeyFallbackAndSanitizing(t *testing.T) {
 		t, "session-.._.._etc_passwd",
 		sessionLeaseKey("../../etc/passwd"),
 	)
+}
+
+// TestWatchLockDirExplicitProjectIgnoresAmbientContext is the Go half of
+// the arm/check agreement. The watcher and the hook run with different
+// working directories and different project environments, so the only
+// way they can name one lease is for both to be told the project. This
+// asserts that an explicit project wins over both ambient sources.
+func TestWatchLockDirExplicitProjectIgnoresAmbientContext(t *testing.T) {
+	withTempHome(t)
+
+	workspace := t.TempDir()
+	nested := filepath.Join(workspace, "nested", "deeper")
+	require.NoError(t, os.MkdirAll(filepath.Join(workspace, ".git"), 0o755))
+	require.NoError(t, os.MkdirAll(nested, 0o755))
+
+	previousProject := projectDir
+	t.Cleanup(func() {
+		projectDir = previousProject
+	})
+
+	previousDir, err := os.Getwd()
+	require.NoError(t, err)
+	t.Cleanup(func() {
+		require.NoError(t, os.Chdir(previousDir))
+	})
+
+	// Arm-shaped call: no project environment, cwd below the .git root,
+	// but the project named explicitly.
+	require.NoError(t, os.Chdir(nested))
+	t.Setenv("CLAUDE_PROJECT_DIR", "")
+	projectDir = workspace
+
+	armDir, err := watchLockDir()
+	require.NoError(t, err)
+
+	// Check-shaped call: a project environment pointing somewhere else
+	// and a different cwd, with the same explicit project.
+	require.NoError(t, os.Chdir(workspace))
+	t.Setenv("CLAUDE_PROJECT_DIR", nested)
+
+	checkDir, err := watchLockDir()
+	require.NoError(t, err)
+
+	require.Equal(t, armDir, checkDir,
+		"an explicit project must pin the lease directory")
+	require.Equal(
+		t, filepath.Join(workspace, ".substrate", "watch"), armDir,
+	)
+}
+
+// TestWatchStateDirIgnoresItself verifies the state directory carries its
+// own .gitignore. The leases live inside whatever repository the agent is
+// working in, and we cannot edit that repository's .gitignore, so without
+// this an agent running `git add -A` would commit its own lock files.
+func TestWatchStateDirIgnoresItself(t *testing.T) {
+	withTempHome(t)
+
+	workspace := t.TempDir()
+
+	dir, err := ensureWatchStateDir(workspace)
+	require.NoError(t, err)
+	require.Equal(
+		t, filepath.Join(workspace, ".substrate", "watch"), dir,
+	)
+
+	ignore := filepath.Join(workspace, ".substrate", ".gitignore")
+	contents, err := os.ReadFile(ignore)
+	require.NoError(t, err)
+	require.Equal(t, "*\n", string(contents))
+
+	// A second call must not clobber a file the user edited.
+	require.NoError(t, os.WriteFile(ignore, []byte("custom\n"), 0o644))
+	_, err = ensureWatchStateDir(workspace)
+	require.NoError(t, err)
+
+	contents, err = os.ReadFile(ignore)
+	require.NoError(t, err)
+	require.Equal(t, "custom\n", string(contents))
 }

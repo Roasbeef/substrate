@@ -26,23 +26,47 @@ func TestStopScriptArmsWithoutEndingTheCurrentTurn(t *testing.T) {
 	require.Equal(t, StopScript, GetScript("stop"))
 }
 
-// TestStopScriptSharesProjectWatchStateWithTool verifies the Stop hook uses
-// project-local notification state instead of its own HOME. Loom points an
-// imported hook at the operator home to resolve its script, while a tool
-// receives a private home below the project.
-func TestStopScriptSharesProjectWatchStateWithTool(t *testing.T) {
+// TestStopScriptNamesProjectForArmAndCheck is the regression test for a
+// lease the hook could never find. The watcher is armed from the agent's
+// shell, which gets no project environment, while this hook has one. When
+// each side derived the project for itself, they agreed only when the
+// project directory happened to be the nearest .git-directory ancestor of
+// the agent's cwd — false inside a linked worktree, whose .git is a file,
+// and false for a session started in a subdirectory. The lease then went
+// one place and --check looked in another, so the hook nudged forever and
+// each re-arm answered "already armed".
+//
+// The fix is that neither side derives anything: the hook names the
+// project on the check and in the arming instruction it hands back. This
+// asserts those two values are the same, which is the whole invariant.
+func TestStopScriptNamesProjectForArmAndCheck(t *testing.T) {
+	// The script is executed for real, so it needs its interpreter and
+	// the JSON parser it pipes through. Skipping names the dependency
+	// instead of failing on an empty payload further down.
+	for _, tool := range []string{"bash", "jq"} {
+		if _, err := exec.LookPath(tool); err != nil {
+			t.Skipf("%s not on PATH", tool)
+		}
+	}
+
 	workspace := t.TempDir()
 	require.NoError(t, os.Mkdir(filepath.Join(workspace, ".git"), 0o755))
-	projectSubdir := filepath.Join(workspace, "project-subdir")
+
+	// A worktree-shaped layout: the agent works below the .git root, so a
+	// derived root and the declared project directory disagree.
 	nested := filepath.Join(workspace, "nested", "deeper")
-	require.NoError(t, os.MkdirAll(projectSubdir, 0o755))
 	require.NoError(t, os.MkdirAll(nested, 0o755))
+
 	hookHome := t.TempDir()
-	toolHome := t.TempDir()
 	binDir := t.TempDir()
 	scriptPath := filepath.Join(t.TempDir(), "stop.sh")
+	argsLog := filepath.Join(t.TempDir(), "check-args")
 
 	require.NoError(t, os.WriteFile(scriptPath, []byte(StopScript), 0o755))
+
+	// The fake CLI records the arguments it was handed rather than
+	// consulting an expectation the test supplies, so the assertions below
+	// describe the script's behavior and not their own setup.
 	require.NoError(t, os.WriteFile(
 		filepath.Join(binDir, "substrate"),
 		[]byte(`#!/bin/sh
@@ -50,9 +74,9 @@ case "$1" in
 heartbeat) exit 0 ;;
 poll) printf '{"decision":"allow"}' ;;
 watch)
-  if [ "$2" = "--check" ] && [ -f "$EXPECTED_WATCH_ROOT/.substrate/watch/armed" ]; then
-    exit 0
-  fi
+  shift
+  printf '%s\n' "$*" > "$CHECK_ARGS_LOG"
+  [ -f "$ARMED_MARKER" ] && exit 0
   exit 1
   ;;
 esac
@@ -61,54 +85,67 @@ exit 1
 		0o755,
 	))
 
-	run := func(active, dir, project, expectedRoot string) string {
+	run := func(active, dir, project, armedMarker string) string {
 		cmd := exec.Command("bash", scriptPath)
 		cmd.Dir = dir
 		cmd.Env = []string{
 			"HOME=" + hookHome,
 			"PATH=" + binDir + ":" + os.Getenv("PATH"),
-			"EXPECTED_WATCH_ROOT=" + expectedRoot,
+			"CHECK_ARGS_LOG=" + argsLog,
+			"ARMED_MARKER=" + armedMarker,
 		}
 		if project != "" {
 			cmd.Env = append(cmd.Env, "CLAUDE_PROJECT_DIR="+project)
 		}
 		cmd.Stdin = strings.NewReader(
-			`{"session_id":"same-session","stop_hook_active":` + active + `}`,
+			`{"session_id":"same-session","stop_hook_active":` +
+				active + `}`,
 		)
 		output, err := cmd.CombinedOutput()
 		require.NoError(t, err, string(output))
+
 		return string(output)
 	}
 
-	first := run("false", nested, projectSubdir, projectSubdir)
+	// No watcher armed: the hook blocks once and tells the agent to arm.
+	first := run("false", nested, workspace, "")
 	require.Contains(t, first, `"decision":"block"`)
+
+	checkArgs, err := os.ReadFile(argsLog)
+	require.NoError(t, err)
+
+	// The check named the project rather than deriving it from the cwd.
+	require.Contains(t, string(checkArgs), "--project "+workspace)
+	require.NotContains(t, string(checkArgs), nested)
+
+	// The arming instruction names the same project, so the lease the
+	// agent creates is the one this check just looked for. The path is
+	// quoted because the agent runs this text as a shell command and a
+	// project directory may contain spaces.
+	require.Contains(t, first, "--project '"+workspace+"'")
+
+	// The stamp is hook-local state and follows the same directory.
 	require.FileExists(t, filepath.Join(
-		projectSubdir, ".substrate", "watch", "nudged-same-session",
-	))
-	require.NoFileExists(t, filepath.Join(
 		workspace, ".substrate", "watch", "nudged-same-session",
 	))
 	require.NoFileExists(t, filepath.Join(
 		hookHome, ".subtrate", "watch", "nudged-same-session",
 	))
-	require.NoFileExists(t, filepath.Join(
-		toolHome, ".subtrate", "watch", "nudged-same-session",
-	))
 
-	second := run("true", nested, projectSubdir, projectSubdir)
-	require.JSONEq(t, `{}`, second)
+	// The hook creates that directory, so the hook also makes it ignore
+	// itself — the CLI may not have run yet, or may predate this.
+	ignored, err := os.ReadFile(
+		filepath.Join(workspace, ".substrate", ".gitignore"),
+	)
+	require.NoError(t, err)
+	require.Equal(t, "*\n", string(ignored))
 
-	armed := filepath.Join(projectSubdir, ".substrate", "watch", "armed")
+	// Second stop in the same cycle: nudge already fired, so allow exit
+	// rather than stack another block.
+	require.JSONEq(t, `{}`, run("true", nested, workspace, ""))
+
+	// Once a watcher is armed the hook allows the exit outright.
+	armed := filepath.Join(t.TempDir(), "armed")
 	require.NoError(t, os.WriteFile(armed, []byte("armed"), 0o600))
-	third := run("false", nested, projectSubdir, projectSubdir)
-	require.JSONEq(t, `{}`, third)
-
-	noEnvironment := run("false", nested, "", workspace)
-	require.Contains(t, noEnvironment, `"decision":"block"`)
-	require.FileExists(t, filepath.Join(
-		workspace, ".substrate", "watch", "nudged-same-session",
-	))
-	require.NoFileExists(t, filepath.Join(
-		nested, ".substrate", "watch", "nudged-same-session",
-	))
+	require.JSONEq(t, `{}`, run("false", nested, workspace, armed))
 }
