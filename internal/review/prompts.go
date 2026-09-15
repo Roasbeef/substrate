@@ -62,8 +62,15 @@ type reviewPromptData struct {
 	// ReviewID is the unique identifier for this review.
 	ReviewID string
 
-	// DiffCmd is the git diff command the reviewer should run.
+	// DiffCmd is the git command the requesting agent ran to produce
+	// the diff. Recorded for display only; the reviewer reads the
+	// content from DiffContent below rather than re-running it.
 	DiffCmd string
+
+	// DiffContent is the unified diff captured at review-request time
+	// and replayed inline so the reviewer doesn't need filesystem
+	// access to the requester's repo.
+	DiffContent string
 
 	// Branch is the feature branch being reviewed.
 	Branch string
@@ -305,12 +312,12 @@ The project's CLAUDE.md rules are appended at the end of this prompt. When check
 ## Review Process
 
 ### Pass 1: Diff-Only Analysis
-1. Run the git diff command from the review prompt.
-2. Read the diff output carefully. For each changed file, note any obvious issues visible directly in the diff hunks without reading surrounding code.
+1. Read the diff embedded in the user prompt. Do NOT run git yourself — substrated provides the diff inline so the reviewer can run on a host without the requester's repo on disk.
+2. For each changed file, note any obvious issues visible directly in the diff hunks without reading surrounding code.
 3. Produce a brief change summary (2-3 sentences) describing what the diff modifies and the apparent intent.
 
 ### Pass 2: Contextual Analysis
-4. For each potential issue from Pass 1, read the surrounding code in the affected files using the Read tool. Check whether the issue is real given the full context.
+4. For each potential issue from Pass 1, if the requester's repo is on the local filesystem you may use the Read tool to check surrounding code. If it is not (the common K8s-deployed case), reason from the diff alone — flag only what you can prove from what's shown.
 5. For logic and security concerns, trace the code path to confirm the issue is reachable under normal operation.
 6. Note positive observations — good patterns, thorough tests, clean interfaces.
 
@@ -391,7 +398,7 @@ The review file must contain a **full, rich review** in markdown format (similar
 
 Use markdown headers, code blocks, and formatting for readability.
 
-If you receive messages (injected by the stop hook), process them and respond. For re-review requests, run the diff command again and provide an updated review.
+If you receive messages (injected by the stop hook), process them and respond. For re-review requests, the new diff will be supplied inline in the next review prompt — re-read it and provide an updated review.
 {{- if .ClaudeMD}}
 
 ## Project Guidelines (from CLAUDE.md)
@@ -403,7 +410,10 @@ The following are the project's coding guidelines. Use these to inform your revi
 
 // reviewPromptTmplText is the raw Go template for the review user prompt.
 // It provides structured context and step-by-step instructions that mirror
-// the three-pass workflow defined in the system prompt.
+// the three-pass workflow defined in the system prompt. The diff itself is
+// embedded inline so the reviewer doesn't need to (and shouldn't try to)
+// run git in its working directory — substrated may be running on a host
+// that doesn't have the requester's repo on its filesystem.
 const reviewPromptTmplText = `## Review Request: {{.ReviewID}}
 
 ### Branch Context
@@ -413,22 +423,27 @@ const reviewPromptTmplText = `## Review Request: {{.ReviewID}}
 {{- if .BaseBranch}}
 - **Base**: {{.BaseBranch}}
 {{- end}}
+{{- if .DiffCmd}}
+- **Diff command (informational)**: ` + "`{{.DiffCmd}}`" + `
+{{- end}}
+
+### Diff
+The unified diff was captured by the requesting agent and is included
+inline below. Do NOT run git yourself — review only what is shown here.
+
+` + "```diff" + `
+{{.DiffContent}}
+` + "```" + `
 
 ### Instructions
 
-**Step 1 — Read the diff**: Run the following command to see what changed:
+**Step 1 — Change summary**: Produce a brief summary (2-3 sentences) describing what the diff modifies and the apparent intent based on file names and code patterns visible in the diff.
 
-` + "```" + `
-{{.DiffCmd}}
-` + "```" + `
+**Step 2 — Analyze each file**: For each file in the diff, assess whether any issues from the high-signal list are present. If you have filesystem access to the repo, you may use the Read tool to check surrounding code context; otherwise reason from the diff alone.
 
-**Step 2 — Change summary**: Produce a brief summary (2-3 sentences) describing what the diff modifies and the apparent intent based on commit messages, file names, and code patterns.
+**Step 3 — Self-validate**: Before including any issue in your output, confirm you are certain it is real. Drop any issue where you are not confident. Do not mention dropped issues.
 
-**Step 3 — Analyze each file**: For each file in the diff, assess whether any issues from the high-signal list are present. For non-obvious issues, use the Read tool to check surrounding code context. Trace code paths for logic and security concerns.
-
-**Step 4 — Self-validate**: Before including any issue in your output, confirm you are certain it is real. Drop any issue where you are not confident. Do not mention dropped issues.
-
-**Step 5 — Emit your review**: Include the YAML block at the END of your response with your decision and validated issues.
+**Step 4 — Emit your review**: Include the YAML block at the END of your response with your decision and validated issues.
 `
 
 // coordinatorPromptTmplText is the system prompt for the coordinator
@@ -448,11 +463,9 @@ You orchestrate a comprehensive, multi-agent code review using a tiered dispatch
 
 ## Phase 1: Context Gathering
 
-1. **Read the diff** using the git command from the review prompt to understand what changed.
+1. **Read the diff** that is embedded inline in the review prompt to understand what changed. Do NOT run git yourself — substrated may be running on a host that does not have the requester's repo on disk, so the diff is shipped as part of the prompt.
 
-2. **Extract the changed file list** by running:
-   ` + "`" + `git diff --name-only {{.BaseBranch}}...{{.Branch}}` + "`" + `
-   This gives you the exact set of files modified in this branch. ONLY these files are in scope.
+2. **Extract the changed file list** by parsing the file headers in the diff (lines beginning with ` + "`diff --git`" + ` or ` + "`+++ `" + `). ONLY those files are in scope.
 
 3. **Classify changed files** by scanning filenames and diff content into these categories:
    - **Crypto/Auth**: Files touching keys, signatures, hashing, authentication, crypto/rand, TLS, certificates.
@@ -470,9 +483,9 @@ Launch agents using the **Task tool**. All agents in a tier MUST be launched in 
 **CRITICAL — Use Synchronous Parallel Dispatch**: Launch ALL agents in a SINGLE assistant message with multiple Task tool_use blocks. The SDK runs them concurrently and delivers every agent's findings inline in one batch of tool_results once all have finished. Do NOT pass ` + "`" + `run_in_background: true` + "`" + ` on any Task call. The async/background path returns an empty ` + "`" + `outputFile` + "`" + ` path immediately and requires a separate polling loop that this prompt does not implement. If you set it, your next turn will see empty results, you'll emit a "waiting for agents" message, end the turn, and the stop hook will block the review for ~10 minutes before it times out. Do NOT split launches across messages. Do NOT emit text or thinking between launching and the next tool call (aggregation, writing the report). A turn that ends with no pending tool call triggers the stop hook.
 
 For EACH agent, you MUST provide:
-- The exact git diff command so they can read the changes.
+- The full diff content from the review prompt so they can read the changes (do NOT instruct them to run git — they may not have the repo on disk).
 - The explicit list of changed files.
-- Instruction: "ONLY flag issues in these changed files. You may read other files for context but must not flag issues in them."
+- Instruction: "ONLY flag issues in these changed files. You may read other files for context if the repo is on the local filesystem, but must not flag issues in unchanged code."
 {{- if eq .SecurityDepth "standard"}}
 
 ### Standard Depth: Code Reviewer Only
@@ -634,7 +647,7 @@ The review file must contain a **full, rich review** in markdown format. Include
 
 Use markdown headers, code blocks, and formatting for readability.
 
-If you receive messages (injected by the stop hook), process them and respond. For re-review requests, run the diff command again and provide an updated review.
+If you receive messages (injected by the stop hook), process them and respond. For re-review requests, the new diff will be supplied inline in the next review prompt — re-read it and provide an updated review.
 {{- if .ClaudeMD}}
 
 ## Project Guidelines (from CLAUDE.md)
@@ -656,16 +669,24 @@ const coordinatorReviewPromptTmplText = `## Review Request: {{.ReviewID}}
 {{- if .BaseBranch}}
 - **Base**: {{.BaseBranch}}
 {{- end}}
+{{- if .DiffCmd}}
+- **Diff command (informational)**: ` + "`{{.DiffCmd}}`" + `
+{{- end}}
+
+### Diff
+The unified diff was captured by the requesting agent and is included
+inline below. Do NOT run git yourself — review only what is shown here,
+and pass the same content along to your sub-agents.
+
+` + "```diff" + `
+{{.DiffContent}}
+` + "```" + `
 
 ### Instructions
 
-**Step 1 — Read the diff**: Run the following command to see what changed:
+**Step 1 — Read the embedded diff above** to understand what changed.
 
-` + "```" + `
-{{.DiffCmd}}
-` + "```" + `
-
-**Step 2 — Get changed file list and classify**: Run ` + "`" + `git diff --name-only {{.BaseBranch}}...{{.Branch}}` + "`" + ` to get the exact list of files modified. Then classify each file into risk categories (Crypto/Auth, Consensus/Protocol, API/Config, Value Transfer, General) by scanning filenames and diff content.
+**Step 2 — Extract the changed file list and classify**: Parse the file headers in the diff above (lines beginning with ` + "`diff --git`" + ` or ` + "`+++ `" + `) to build the list of modified files. Then classify each file into risk categories (Crypto/Auth, Consensus/Protocol, API/Config, Value Transfer, General) by scanning filenames and diff content.
 
 **Step 3 — Launch ALL agents synchronously in parallel (ONE message)**: Launch ALL applicable agents (Tier 1 + any triggered Tier 2) in a SINGLE assistant message with multiple Task tool_use blocks. Do NOT pass ` + "`" + `run_in_background: true` + "`" + ` — the SDK runs the agents concurrently and delivers every finding inline in one batch of tool_results when all are done. Do NOT split launches across messages. Do NOT emit any text or thinking between dispatch and your next tool call (aggregation, writing the report). A turn that ends with no pending tool call triggers the stop hook and blocks the review for ~10 minutes before the CLI gives up and exits.
 
@@ -682,8 +703,13 @@ type reReviewPromptData struct {
 	// Messages is the list of feedback messages from the author.
 	Messages []reReviewMessage
 
-	// DiffCmd is the git diff command to re-read the changes.
+	// DiffCmd is the git command the requesting agent ran to produce
+	// the diff, recorded for reference.
 	DiffCmd string
+
+	// DiffContent is the unified diff captured at request time, replayed
+	// inline so the reviewer doesn't need filesystem access to the repo.
+	DiffContent string
 }
 
 // reReviewMessage represents a single feedback message for the
@@ -717,12 +743,20 @@ The author has responded to your review with the following feedback:
 {{.Body}}
 
 {{end -}}
+## Diff
+The unified diff for this review is included inline below.{{if .DiffCmd}} It was produced with ` + "`{{.DiffCmd}}`" + ` on the requesting agent's host.{{end}}
+
+` + "```diff" + `
+{{.DiffContent}}
+` + "```" + `
+
 ## Instructions
 
 1. Read the feedback carefully. Some of your findings may have been
    identified as false positives (e.g., flagging pre-existing code
    not modified in this diff).
-2. Re-read the diff using: ` + "`{{.DiffCmd}}`" + `
+2. Re-read the diff above (do NOT run git yourself — the substrate pod
+   may not have the requester's repo on disk).
 3. Produce an UPDATED review. Drop any findings the author correctly
    identified as false positives. Keep findings that are genuinely
    problematic.

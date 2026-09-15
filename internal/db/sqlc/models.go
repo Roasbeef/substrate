@@ -204,6 +204,8 @@ type Review struct {
 	CreatedAt   int64
 	UpdatedAt   int64
 	CompletedAt sql.NullInt64
+	DiffContent sql.NullString
+	DiffCommand sql.NullString
 }
 
 type ReviewIssue struct {

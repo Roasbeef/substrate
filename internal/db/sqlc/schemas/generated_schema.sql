@@ -286,7 +286,7 @@ CREATE TABLE reviews (
     created_at INTEGER NOT NULL,
     updated_at INTEGER NOT NULL,
     completed_at INTEGER
-);
+, diff_content TEXT, diff_command TEXT);
 
 CREATE TABLE session_identities (
     session_id TEXT PRIMARY KEY,

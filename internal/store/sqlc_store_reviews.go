@@ -31,6 +31,8 @@ func (s *SqlcStore) CreateReview(ctx context.Context,
 		ReviewType:  params.ReviewType,
 		Priority:    params.Priority,
 		State:       "new",
+		DiffContent: ToSqlcNullString(params.DiffContent),
+		DiffCommand: ToSqlcNullString(params.DiffCommand),
 		CreatedAt:   now,
 		UpdatedAt:   now,
 	})
@@ -39,6 +41,19 @@ func (s *SqlcStore) CreateReview(ctx context.Context,
 	}
 
 	return ReviewFromSqlc(row), nil
+}
+
+// UpdateReviewDiff replaces the stored diff for a review. Used on resubmit
+// when the author has pushed new changes.
+func (s *SqlcStore) UpdateReviewDiff(ctx context.Context,
+	reviewID, diffContent, diffCommand string,
+) error {
+	return s.db.UpdateReviewDiff(ctx, sqlc.UpdateReviewDiffParams{
+		ReviewID:    reviewID,
+		DiffContent: ToSqlcNullString(diffContent),
+		DiffCommand: ToSqlcNullString(diffCommand),
+		UpdatedAt:   time.Now().Unix(),
+	})
 }
 
 // GetReview retrieves a review by its UUID.
@@ -307,6 +322,8 @@ func (s *txSqlcStore) CreateReview(ctx context.Context,
 		ReviewType:  params.ReviewType,
 		Priority:    params.Priority,
 		State:       "new",
+		DiffContent: ToSqlcNullString(params.DiffContent),
+		DiffCommand: ToSqlcNullString(params.DiffCommand),
 		CreatedAt:   now,
 		UpdatedAt:   now,
 	})
@@ -315,6 +332,19 @@ func (s *txSqlcStore) CreateReview(ctx context.Context,
 	}
 
 	return ReviewFromSqlc(row), nil
+}
+
+// UpdateReviewDiff replaces the stored diff for a review within a
+// transaction. Used on resubmit when the author has pushed new changes.
+func (s *txSqlcStore) UpdateReviewDiff(ctx context.Context,
+	reviewID, diffContent, diffCommand string,
+) error {
+	return s.queries.UpdateReviewDiff(ctx, sqlc.UpdateReviewDiffParams{
+		ReviewID:    reviewID,
+		DiffContent: ToSqlcNullString(diffContent),
+		DiffCommand: ToSqlcNullString(diffCommand),
+		UpdatedAt:   time.Now().Unix(),
+	})
 }
 
 // GetReview retrieves a review by its UUID within a transaction.

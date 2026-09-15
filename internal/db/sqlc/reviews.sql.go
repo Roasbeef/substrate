@@ -66,9 +66,10 @@ INSERT INTO reviews (
     review_id, thread_id, requester_id,
     pr_number, branch, base_branch, commit_sha, repo_path, remote_url,
     review_type, priority, state,
+    diff_content, diff_command,
     created_at, updated_at
-) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-RETURNING id, review_id, thread_id, requester_id, pr_number, branch, base_branch, commit_sha, repo_path, remote_url, review_type, priority, state, created_at, updated_at, completed_at
+) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+RETURNING id, review_id, thread_id, requester_id, pr_number, branch, base_branch, commit_sha, repo_path, remote_url, review_type, priority, state, created_at, updated_at, completed_at, diff_content, diff_command
 `
 
 type CreateReviewParams struct {
@@ -84,6 +85,8 @@ type CreateReviewParams struct {
 	ReviewType  string
 	Priority    string
 	State       string
+	DiffContent sql.NullString
+	DiffCommand sql.NullString
 	CreatedAt   int64
 	UpdatedAt   int64
 }
@@ -102,6 +105,8 @@ func (q *Queries) CreateReview(ctx context.Context, arg CreateReviewParams) (Rev
 		arg.ReviewType,
 		arg.Priority,
 		arg.State,
+		arg.DiffContent,
+		arg.DiffCommand,
 		arg.CreatedAt,
 		arg.UpdatedAt,
 	)
@@ -123,6 +128,8 @@ func (q *Queries) CreateReview(ctx context.Context, arg CreateReviewParams) (Rev
 		&i.CreatedAt,
 		&i.UpdatedAt,
 		&i.CompletedAt,
+		&i.DiffContent,
+		&i.DiffCommand,
 	)
 	return i, err
 }
@@ -365,7 +372,7 @@ func (q *Queries) GetOpenReviewIssues(ctx context.Context, reviewID string) ([]R
 }
 
 const GetReview = `-- name: GetReview :one
-SELECT id, review_id, thread_id, requester_id, pr_number, branch, base_branch, commit_sha, repo_path, remote_url, review_type, priority, state, created_at, updated_at, completed_at FROM reviews WHERE review_id = ?
+SELECT id, review_id, thread_id, requester_id, pr_number, branch, base_branch, commit_sha, repo_path, remote_url, review_type, priority, state, created_at, updated_at, completed_at, diff_content, diff_command FROM reviews WHERE review_id = ?
 `
 
 func (q *Queries) GetReview(ctx context.Context, reviewID string) (Review, error) {
@@ -388,12 +395,14 @@ func (q *Queries) GetReview(ctx context.Context, reviewID string) (Review, error
 		&i.CreatedAt,
 		&i.UpdatedAt,
 		&i.CompletedAt,
+		&i.DiffContent,
+		&i.DiffCommand,
 	)
 	return i, err
 }
 
 const GetReviewByID = `-- name: GetReviewByID :one
-SELECT id, review_id, thread_id, requester_id, pr_number, branch, base_branch, commit_sha, repo_path, remote_url, review_type, priority, state, created_at, updated_at, completed_at FROM reviews WHERE id = ?
+SELECT id, review_id, thread_id, requester_id, pr_number, branch, base_branch, commit_sha, repo_path, remote_url, review_type, priority, state, created_at, updated_at, completed_at, diff_content, diff_command FROM reviews WHERE id = ?
 `
 
 func (q *Queries) GetReviewByID(ctx context.Context, id int64) (Review, error) {
@@ -416,6 +425,8 @@ func (q *Queries) GetReviewByID(ctx context.Context, id int64) (Review, error) {
 		&i.CreatedAt,
 		&i.UpdatedAt,
 		&i.CompletedAt,
+		&i.DiffContent,
+		&i.DiffCommand,
 	)
 	return i, err
 }
@@ -628,7 +639,7 @@ func (q *Queries) GetReviewIterations(ctx context.Context, reviewID string) ([]R
 }
 
 const ListActiveReviews = `-- name: ListActiveReviews :many
-SELECT id, review_id, thread_id, requester_id, pr_number, branch, base_branch, commit_sha, repo_path, remote_url, review_type, priority, state, created_at, updated_at, completed_at FROM reviews
+SELECT id, review_id, thread_id, requester_id, pr_number, branch, base_branch, commit_sha, repo_path, remote_url, review_type, priority, state, created_at, updated_at, completed_at, diff_content, diff_command FROM reviews
 WHERE state NOT IN ('approved', 'rejected', 'cancelled')
 ORDER BY created_at DESC
 `
@@ -660,6 +671,8 @@ func (q *Queries) ListActiveReviews(ctx context.Context) ([]Review, error) {
 			&i.CreatedAt,
 			&i.UpdatedAt,
 			&i.CompletedAt,
+			&i.DiffContent,
+			&i.DiffCommand,
 		); err != nil {
 			return nil, err
 		}
@@ -675,7 +688,7 @@ func (q *Queries) ListActiveReviews(ctx context.Context) ([]Review, error) {
 }
 
 const ListReviews = `-- name: ListReviews :many
-SELECT id, review_id, thread_id, requester_id, pr_number, branch, base_branch, commit_sha, repo_path, remote_url, review_type, priority, state, created_at, updated_at, completed_at FROM reviews
+SELECT id, review_id, thread_id, requester_id, pr_number, branch, base_branch, commit_sha, repo_path, remote_url, review_type, priority, state, created_at, updated_at, completed_at, diff_content, diff_command FROM reviews
 ORDER BY created_at DESC
 LIMIT ? OFFSET ?
 `
@@ -711,6 +724,8 @@ func (q *Queries) ListReviews(ctx context.Context, arg ListReviewsParams) ([]Rev
 			&i.CreatedAt,
 			&i.UpdatedAt,
 			&i.CompletedAt,
+			&i.DiffContent,
+			&i.DiffCommand,
 		); err != nil {
 			return nil, err
 		}
@@ -726,7 +741,7 @@ func (q *Queries) ListReviews(ctx context.Context, arg ListReviewsParams) ([]Rev
 }
 
 const ListReviewsByRequester = `-- name: ListReviewsByRequester :many
-SELECT id, review_id, thread_id, requester_id, pr_number, branch, base_branch, commit_sha, repo_path, remote_url, review_type, priority, state, created_at, updated_at, completed_at FROM reviews
+SELECT id, review_id, thread_id, requester_id, pr_number, branch, base_branch, commit_sha, repo_path, remote_url, review_type, priority, state, created_at, updated_at, completed_at, diff_content, diff_command FROM reviews
 WHERE requester_id = ?
 ORDER BY created_at DESC
 LIMIT ?
@@ -763,6 +778,8 @@ func (q *Queries) ListReviewsByRequester(ctx context.Context, arg ListReviewsByR
 			&i.CreatedAt,
 			&i.UpdatedAt,
 			&i.CompletedAt,
+			&i.DiffContent,
+			&i.DiffCommand,
 		); err != nil {
 			return nil, err
 		}
@@ -778,7 +795,7 @@ func (q *Queries) ListReviewsByRequester(ctx context.Context, arg ListReviewsByR
 }
 
 const ListReviewsByState = `-- name: ListReviewsByState :many
-SELECT id, review_id, thread_id, requester_id, pr_number, branch, base_branch, commit_sha, repo_path, remote_url, review_type, priority, state, created_at, updated_at, completed_at FROM reviews
+SELECT id, review_id, thread_id, requester_id, pr_number, branch, base_branch, commit_sha, repo_path, remote_url, review_type, priority, state, created_at, updated_at, completed_at, diff_content, diff_command FROM reviews
 WHERE state = ?
 ORDER BY created_at DESC
 LIMIT ?
@@ -815,6 +832,8 @@ func (q *Queries) ListReviewsByState(ctx context.Context, arg ListReviewsByState
 			&i.CreatedAt,
 			&i.UpdatedAt,
 			&i.CompletedAt,
+			&i.DiffContent,
+			&i.DiffCommand,
 		); err != nil {
 			return nil, err
 		}
@@ -856,6 +875,29 @@ func (q *Queries) UpdateReviewCompleted(ctx context.Context, arg UpdateReviewCom
 		arg.State,
 		arg.UpdatedAt,
 		arg.CompletedAt,
+		arg.ReviewID,
+	)
+	return err
+}
+
+const UpdateReviewDiff = `-- name: UpdateReviewDiff :exec
+UPDATE reviews
+SET diff_content = ?, diff_command = ?, updated_at = ?
+WHERE review_id = ?
+`
+
+type UpdateReviewDiffParams struct {
+	DiffContent sql.NullString
+	DiffCommand sql.NullString
+	UpdatedAt   int64
+	ReviewID    string
+}
+
+func (q *Queries) UpdateReviewDiff(ctx context.Context, arg UpdateReviewDiffParams) error {
+	_, err := q.db.ExecContext(ctx, UpdateReviewDiff,
+		arg.DiffContent,
+		arg.DiffCommand,
+		arg.UpdatedAt,
 		arg.ReviewID,
 	)
 	return err

@@ -334,53 +334,46 @@ func TestBuildSystemPrompt_WithIgnorePatterns(t *testing.T) {
 	require.Contains(t, prompt, "*.generated.go")
 }
 
-// TestBuildReviewPrompt verifies the user prompt content with branch info.
+// TestBuildReviewPrompt verifies the user prompt embeds the diff content
+// captured at request time and references the diff command for context.
 func TestBuildReviewPrompt(t *testing.T) {
-	tests := []struct {
-		name       string
-		branch     string
-		baseBranch string
-		commitSHA  string
-		expected   string
-	}{
-		{
-			name:       "full branch info",
-			branch:     "feature/auth",
-			baseBranch: "main",
-			expected:   "git diff main...feature/auth",
-		},
-		{
-			name:       "base branch only",
-			baseBranch: "develop",
-			expected:   "git diff develop...HEAD",
-		},
-		{
-			name:      "commit SHA only",
-			commitSHA: "abc123def",
-			expected:  "git show abc123def",
-		},
-		{
-			name:     "fallback no info",
-			expected: "git diff HEAD~1",
-		},
+	const (
+		reviewID    = "abc-123"
+		diffContent = "diff --git a/foo.go b/foo.go\n+added line\n"
+		diffCommand = "git diff main...feature/auth --"
+	)
+
+	st := store.NewMockStore()
+	_, err := st.CreateReview(context.Background(), store.CreateReviewParams{
+		ReviewID:    reviewID,
+		ThreadID:    "thread-1",
+		RequesterID: 1,
+		Branch:      "feature/auth",
+		BaseBranch:  "main",
+		ReviewType:  "full",
+		Priority:    "normal",
+		DiffContent: diffContent,
+		DiffCommand: diffCommand,
+	})
+	require.NoError(t, err)
+
+	a := &reviewSubActor{
+		reviewID:   reviewID,
+		branch:     "feature/auth",
+		baseBranch: "main",
+		config:     DefaultReviewerConfig(),
+		store:      st,
 	}
 
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			a := &reviewSubActor{
-				reviewID:   "abc-123",
-				branch:     tt.branch,
-				baseBranch: tt.baseBranch,
-				commitSHA:  tt.commitSHA,
-				config:     DefaultReviewerConfig(),
-			}
-
-			prompt := a.buildReviewPrompt()
-			require.Contains(t, prompt, "abc-123")
-			require.Contains(t, prompt, tt.expected)
-			require.Contains(t, prompt, "YAML block")
-		})
-	}
+	prompt := a.buildReviewPrompt(context.Background())
+	require.Contains(t, prompt, reviewID)
+	require.Contains(t, prompt, diffContent)
+	require.Contains(t, prompt, diffCommand)
+	require.Contains(t, prompt, "YAML block")
+	require.Contains(t,
+		prompt, "Do NOT run git",
+		"reviewer must be told to read inline diff, not shell out",
+	)
 }
 
 // TestBuildClientOptions verifies SDK options are correctly constructed.
@@ -1386,12 +1379,14 @@ func TestFormatMailAsReReviewPrompt(t *testing.T) {
 	}
 
 	diffCmd := "git diff main...feature-branch"
-	prompt := formatMailAsReReviewPrompt(msgs, diffCmd)
+	diffContent := "diff --git a/foo.go b/foo.go\n+added line\n"
+	prompt := formatMailAsReReviewPrompt(msgs, diffContent, diffCmd)
 	require.Contains(t, prompt, "dev-agent")
 	require.Contains(t, prompt, "Re-review requested")
 	require.Contains(t, prompt, "I fixed the issues")
 	require.Contains(t, prompt, "Message 1")
 	require.Contains(t, prompt, diffCmd)
+	require.Contains(t, prompt, diffContent)
 	require.Contains(t, prompt, "UPDATED review")
 	require.Contains(t, prompt, "false positives")
 }
