@@ -63,5 +63,5 @@ fi
 if [ "$is_codex" != "true" ] && \
     ! substrate watch --check "${agent_args[@]}" >/dev/null 2>&1; then
     echo ""
-    echo "[Subtrate Watch] Arm your mail watcher: run \`substrate watch --session-id ${session_id:-\$CLAUDE_SESSION_ID}\` via the Bash tool with run_in_background set to true. It blocks until mail arrives, then exits with a digest, which wakes you automatically. Re-arm it after handling each wake."
+    echo "[Subtrate Watch] Arm your mail watcher: run \`substrate watch --session-id ${session_id:-\$CLAUDE_SESSION_ID} --project '${project_dir}'\` via the Bash tool with run_in_background set to true. It blocks until mail arrives, then exits with a digest, which wakes you automatically. Re-arm it after handling each wake."
 fi

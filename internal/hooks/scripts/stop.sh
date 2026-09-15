@@ -53,10 +53,15 @@ session_args=()
 if [ -n "$session_id" ]; then
     session_args=(--session-id "$session_id")
 fi
-project_dir="${CLAUDE_PROJECT_DIR:-${CODEX_PROJECT_DIR:-$cwd}}"
-if [ -n "$project_dir" ]; then
-    session_args+=(--project "$project_dir")
-fi
+
+# The project is always named, never left to the CLI to derive. The
+# watcher is armed from the agent's shell, which carries no project
+# environment, while this hook has one; left to derive it, the two walk
+# up from different places and name different leases. Falling back to
+# $PWD keeps the argument present even when the payload and environment
+# are both empty.
+project_dir="${CLAUDE_PROJECT_DIR:-${CODEX_PROJECT_DIR:-${cwd:-$PWD}}}"
+session_args+=(--project "$project_dir")
 
 # Codex has no equivalent of the Claude Code background task that the
 # `substrate watch` arming pattern relies on, so persistence has to live in
@@ -82,8 +87,23 @@ fi
 # suppress the arming nudge (that would strand the agent watcher-less
 # after every mail interaction). A fresh stop cycle is detected by
 # stop_hook_active=false, which clears the stamp.
-stamp_dir="$HOME/.subtrate/watch"
+#
+# The stamp is read and written only by this script, so it does not
+# have to agree with the directory the Go CLI picks — it only has to be
+# stable from one hook invocation to the next, and hooks always run
+# with the same environment. The lease is the state the hook and the
+# watcher genuinely share, and we keep those two in agreement by naming
+# the project explicitly on both sides rather than by having each side
+# derive it.
+watch_root="$project_dir"
+stamp_dir="$watch_root/.substrate/watch"
 mkdir -p "$stamp_dir" 2>/dev/null
+
+# The state directory ignores itself so leases never show up as untracked
+# in the repository the agent is working in. The CLI writes this too; the
+# hook repeats it because the hook may create the directory first, and may
+# be paired with a CLI predating it.
+[ -e "$watch_root/.substrate/.gitignore" ] ||     printf '*\n' > "$watch_root/.substrate/.gitignore" 2>/dev/null
 nudge_stamp="$stamp_dir/nudged-${session_id:-default}"
 
 if [ "$stop_hook_active" != "true" ]; then
@@ -168,7 +188,7 @@ if [ -n "$session_id" ]; then
     fi
 fi
 
-reason="No mail watcher is armed. ${task_note}Arm the watcher now: run \`substrate watch --session-id ${session_id:-\$CLAUDE_SESSION_ID}\` via the Bash tool with run_in_background set to true. The watcher is only for notification while this session is idle; it does not require ending your turn. Continue the current task if work remains, and re-arm it after handling each wake."
+reason="No mail watcher is armed. ${task_note}Arm the watcher now: run \`substrate watch --session-id ${session_id:-\$CLAUDE_SESSION_ID} --project '${watch_root}'\` via the Bash tool with run_in_background set to true. The watcher is only for notification while this session is idle; it does not require ending your turn. Continue the current task if work remains, and re-arm it after handling each wake."
 
 # Record that the nudge fired so we do not block again this cycle.
 touch "$nudge_stamp" 2>/dev/null
