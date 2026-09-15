@@ -13,7 +13,15 @@
 input=$(cat)
 session_id=$(echo "$input" | jq -r '.session_id // empty')
 cwd=$(echo "$input" | jq -r '.cwd // empty')
-is_codex=$(echo "$input" | jq -r 'if has("model") then "true" else "false" end')
+
+# Determine the host agent. The Codex hook definitions append --codex to the
+# installed command; Claude Code invokes the same script with no arguments.
+# Sniffing the payload or the environment instead would misfire whenever a
+# Claude session inherits CODEX_* variables from a parent shell.
+is_codex=false
+if [ "${1:-}" = "--codex" ]; then
+    is_codex=true
+fi
 
 if [ -z "$session_id" ]; then
     session_id="${CLAUDE_SESSION_ID:-$CODEX_SESSION_ID}"
@@ -91,7 +99,7 @@ $summary
 
 # Codex ignores plain text for PreCompact and expects a single JSON object.
 # Claude uses the status text as context around compaction.
-if [ "$is_codex" = "true" ] || [ -n "$CODEX_SESSION_ID" ]; then
+if [ "$is_codex" = "true" ]; then
     echo '{}'
 else
     substrate status "${session_args[@]}" --format context 2>/dev/null || true

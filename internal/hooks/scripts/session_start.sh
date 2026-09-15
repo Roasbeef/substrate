@@ -12,7 +12,15 @@
 input=$(cat)
 session_id=$(echo "$input" | jq -r '.session_id // empty')
 cwd=$(echo "$input" | jq -r '.cwd // empty')
-is_codex=$(echo "$input" | jq -r 'if has("model") then "true" else "false" end')
+
+# Determine the host agent. The Codex hook definitions append --codex to the
+# installed command; Claude Code invokes the same script with no arguments.
+# Sniffing the payload or the environment instead would misfire whenever a
+# Claude session inherits CODEX_* variables from a parent shell.
+is_codex=false
+if [ "${1:-}" = "--codex" ]; then
+    is_codex=true
+fi
 
 # Hook input is authoritative. Environment fallbacks also make the script easy
 # to test manually in either supported agent.
@@ -52,8 +60,8 @@ fi
 # the Claude Code process, so every new session needs a fresh watcher.
 # Skip the instruction if one is somehow already armed for this agent.
 # Array form prevents word-splitting of odd session IDs.
-if [ "$is_codex" != "true" ] && [ -z "$CODEX_SESSION_ID" ] && \
+if [ "$is_codex" != "true" ] && \
     ! substrate watch --check "${agent_args[@]}" >/dev/null 2>&1; then
     echo ""
-    echo "[Subtrate Watch] Arm your mail watcher: run \`substrate watch --session-id ${session_id:-\${CLAUDE_SESSION_ID:-\$CODEX_SESSION_ID}}\` as a background shell command. It blocks until mail arrives, then exits with a digest. Re-arm it after handling each wake."
+    echo "[Subtrate Watch] Arm your mail watcher: run \`substrate watch --session-id ${session_id:-\$CLAUDE_SESSION_ID}\` via the Bash tool with run_in_background set to true. It blocks until mail arrives, then exits with a digest, which wakes you automatically. Re-arm it after handling each wake."
 fi

@@ -2,8 +2,10 @@ package commands
 
 import (
 	"fmt"
+	"maps"
 	"os"
 	"path/filepath"
+	"slices"
 	"sort"
 
 	"github.com/roasbeef/subtrate/internal/hooks"
@@ -86,7 +88,8 @@ func init() {
 func runHooksInstall(cmd *cobra.Command, args []string) error {
 	if hooksCodex {
 		if installWithTasks {
-			return fmt.Errorf("--with-tasks is only supported for Claude Code hooks")
+			return fmt.Errorf("--with-tasks is only " +
+				"supported for Claude Code hooks")
 		}
 
 		return runCodexHooksInstall()
@@ -324,6 +327,9 @@ func runHooksStatus(cmd *cobra.Command, args []string) error {
 	return nil
 }
 
+// codexScriptNames lists the lifecycle scripts installed for Codex. The
+// Claude-only notification, plan, and task scripts are deliberately absent
+// because Codex does not emit the events they hang off.
 var codexScriptNames = []string{
 	"session_start",
 	"user_prompt",
@@ -332,6 +338,9 @@ var codexScriptNames = []string{
 	"pre_compact",
 }
 
+// runCodexHooksInstall writes the lifecycle scripts into ~/.codex, registers
+// them in hooks.json without disturbing any hooks already configured there,
+// and installs the Codex flavour of the Subtrate skill.
 func runCodexHooksInstall() error {
 	codexDir := getCodexDir()
 	scriptsDir := filepath.Join(codexDir, "hooks", "substrate")
@@ -368,18 +377,23 @@ func runCodexHooksInstall() error {
 	fmt.Println("Installed components:")
 	fmt.Printf("  - Hook scripts: %s\n", scriptsDir)
 	fmt.Printf("  - Hooks config: %s\n", hooksPath)
-	fmt.Printf("  - Skill: %s\n", filepath.Join(codexDir, "skills", "substrate"))
+	fmt.Printf("  - Skill: %s\n",
+		filepath.Join(codexDir, "skills", "substrate"))
 	fmt.Println()
 	fmt.Println("Hooks installed:")
-	for event := range hooks.CodexHookDefinitions {
+	events := slices.Sorted(maps.Keys(hooks.CodexHookDefinitions))
+	for _, event := range events {
 		fmt.Printf("  - %s\n", event)
 	}
 	fmt.Println()
-	fmt.Println("Start a new Codex session, then use /hooks to review and trust them.")
+	fmt.Println("Start a new Codex session, then use /hooks to review and " +
+		"trust them.")
 
 	return nil
 }
 
+// runCodexHooksUninstall removes the Subtrate scripts, skill, and hooks.json
+// entries from ~/.codex, leaving any third-party hooks in place.
 func runCodexHooksUninstall() error {
 	codexDir := getCodexDir()
 	scriptsDir := filepath.Join(codexDir, "hooks", "substrate")
@@ -392,7 +406,7 @@ func runCodexHooksUninstall() error {
 	if err != nil {
 		return fmt.Errorf("failed to load Codex hooks: %w", err)
 	}
-	hooks.UninstallCodexHooks(settings)
+	hooks.UninstallHooks(settings)
 	if err := hooks.SaveSettingsFile(hooksPath, settings); err != nil {
 		return fmt.Errorf("failed to save Codex hooks: %w", err)
 	}
@@ -411,6 +425,9 @@ func runCodexHooksUninstall() error {
 	return nil
 }
 
+// runCodexHooksStatus reports which halves of the Codex integration are
+// present, so a partial install (scripts without config, or the reverse) is
+// visible rather than silently broken.
 func runCodexHooksStatus() error {
 	codexDir := getCodexDir()
 	hooksPath := filepath.Join(codexDir, "hooks.json")
@@ -434,7 +451,7 @@ func runCodexHooksStatus() error {
 	_, skillErr := os.Stat(filepath.Join(skillDir, "SKILL.md"))
 	skillExists := skillErr == nil
 	installedEvents := hooks.GetInstalledHookEvents(settings)
-	installed := hooks.IsCodexInstalled(settings)
+	installed := hooks.IsInstalled(settings)
 
 	if outputFormat == "json" {
 		return outputJSON(map[string]any{
@@ -455,7 +472,8 @@ func runCodexHooksStatus() error {
 	case installed && scriptsExist:
 		fmt.Println("Status: INSTALLED")
 	case installed || scriptsExist:
-		fmt.Println("Status: PARTIAL (run 'substrate hooks install --codex' to complete)")
+		fmt.Println("Status: PARTIAL (run 'substrate hooks " +
+			"install --codex' to complete)")
 	default:
 		fmt.Println("Status: NOT INSTALLED")
 	}
@@ -479,6 +497,7 @@ func runCodexHooksStatus() error {
 	return nil
 }
 
+// presentOrMissing renders a file-existence check for the status output.
 func presentOrMissing(present bool) string {
 	if present {
 		return "Present"
@@ -502,6 +521,7 @@ func getCodexDir() string {
 	if err != nil {
 		return ".codex"
 	}
+
 	return filepath.Join(home, ".codex")
 }
 
@@ -516,6 +536,8 @@ func installSkill(claudeDir string) error {
 	return os.WriteFile(skillPath, []byte(hooks.SkillContent), 0o644)
 }
 
+// installCodexSkill installs the Subtrate skill to
+// ~/.codex/skills/substrate/.
 func installCodexSkill(codexDir string) error {
 	skillDir := filepath.Join(codexDir, "skills", "substrate")
 	if err := os.MkdirAll(skillDir, 0o755); err != nil {

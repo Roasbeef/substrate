@@ -88,6 +88,13 @@ var HookDefinitions = map[string]HookEntry{
 	},
 }
 
+// CodexTargetFlag is passed to the lifecycle scripts by the Codex hook
+// definitions. The scripts are byte-identical across both installs, so the
+// flag is what tells a script which host invoked it. Sniffing the hook payload
+// or the environment instead would misfire whenever a Claude Code session
+// inherits Codex variables from its parent shell.
+const CodexTargetFlag = "--codex"
+
 // CodexHookDefinitions defines the Subtrate lifecycle hooks supported by
 // Codex. Notification is intentionally omitted because Codex does not expose
 // that event. Claude-specific plan and task hooks are installed separately and
@@ -96,37 +103,42 @@ var CodexHookDefinitions = map[string]HookEntry{
 	"SessionStart": {
 		Matcher: "",
 		Hooks: []HookCommand{{
-			Type:    "command",
-			Command: "~/.codex/hooks/substrate/session_start.sh",
+			Type: "command",
+			Command: "~/.codex/hooks/substrate/" +
+				"session_start.sh " + CodexTargetFlag,
 		}},
 	},
 	"UserPromptSubmit": {
 		Matcher: "",
 		Hooks: []HookCommand{{
-			Type:    "command",
-			Command: "~/.codex/hooks/substrate/user_prompt.sh",
+			Type: "command",
+			Command: "~/.codex/hooks/substrate/" +
+				"user_prompt.sh " + CodexTargetFlag,
 		}},
 	},
 	"Stop": {
 		Matcher: "",
 		Hooks: []HookCommand{{
-			Type:    "command",
-			Command: "~/.codex/hooks/substrate/stop.sh",
+			Type: "command",
+			Command: "~/.codex/hooks/substrate/stop.sh " +
+				CodexTargetFlag,
 			Timeout: 600,
 		}},
 	},
 	"SubagentStop": {
 		Matcher: "",
 		Hooks: []HookCommand{{
-			Type:    "command",
-			Command: "~/.codex/hooks/substrate/subagent_stop.sh",
+			Type: "command",
+			Command: "~/.codex/hooks/substrate/" +
+				"subagent_stop.sh " + CodexTargetFlag,
 		}},
 	},
 	"PreCompact": {
 		Matcher: "",
 		Hooks: []HookCommand{{
-			Type:    "command",
-			Command: "~/.codex/hooks/substrate/pre_compact.sh",
+			Type: "command",
+			Command: "~/.codex/hooks/substrate/" +
+				"pre_compact.sh " + CodexTargetFlag,
 		}},
 	},
 }
@@ -178,7 +190,6 @@ func LoadSettings(claudeDir string) (*ClaudeSettings, error) {
 
 // LoadSettingsFile loads a JSON hook configuration from settingsPath.
 func LoadSettingsFile(settingsPath string) (*ClaudeSettings, error) {
-
 	settings := &ClaudeSettings{
 		Hooks:   make(map[string][]HookEntry),
 		rawData: make(map[string]any),
@@ -252,7 +263,6 @@ func SaveSettings(claudeDir string, settings *ClaudeSettings) error {
 // SaveSettingsFile saves a JSON hook configuration to settingsPath while
 // preserving unrelated top-level fields loaded from the file.
 func SaveSettingsFile(settingsPath string, settings *ClaudeSettings) error {
-
 	// Merge hooks back into raw data.
 	if settings.rawData == nil {
 		settings.rawData = make(map[string]any)
@@ -303,6 +313,10 @@ func SaveSettingsFile(settingsPath string, settings *ClaudeSettings) error {
 	return nil
 }
 
+// cloneMap returns a shallow copy of source so that unknown fields read from
+// the config file survive a round trip without aliasing the loaded map. A nil
+// source yields an empty, non-nil map, which is what a freshly defined hook
+// needs.
 func cloneMap(source map[string]any) map[string]any {
 	result := make(map[string]any, len(source))
 	for key, value := range source {
@@ -324,6 +338,9 @@ func InstallCodexHooks(settings *ClaudeSettings) {
 	installHookDefinitions(settings, CodexHookDefinitions)
 }
 
+// installHookDefinitions appends each definition to the settings unless an
+// existing Subtrate hook is already registered for that event, which keeps
+// repeated installs idempotent.
 func installHookDefinitions(settings *ClaudeSettings,
 	definitions map[string]HookEntry,
 ) {
@@ -355,11 +372,6 @@ func UninstallHooks(settings *ClaudeSettings) {
 	}
 }
 
-// UninstallCodexHooks removes Subtrate hooks from a Codex hook config.
-func UninstallCodexHooks(settings *ClaudeSettings) {
-	UninstallHooks(settings)
-}
-
 // IsInstalled checks if Subtrate hooks are installed.
 func IsInstalled(settings *ClaudeSettings) bool {
 	// Check if at least the SessionStart hook is present.
@@ -369,12 +381,6 @@ func IsInstalled(settings *ClaudeSettings) bool {
 	}
 
 	return slices.ContainsFunc(entries, isSubstrateHook)
-}
-
-// IsCodexInstalled checks whether the Subtrate SessionStart hook is present in
-// a Codex hook config.
-func IsCodexInstalled(settings *ClaudeSettings) bool {
-	return IsInstalled(settings)
 }
 
 // GetInstalledHookEvents returns which events have Subtrate hooks installed.

@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -19,6 +20,9 @@ func TestCodexHookDefinitions(t *testing.T) {
 		require.Len(t, entry.Hooks, 1, event)
 		require.Contains(t, entry.Hooks[0].Command,
 			"~/.codex/hooks/substrate/", event)
+		require.True(t, strings.HasSuffix(
+			entry.Hooks[0].Command, " "+CodexTargetFlag,
+		), event)
 	}
 	require.Equal(t, 600,
 		CodexHookDefinitions["Stop"].Hooks[0].Timeout)
@@ -48,7 +52,7 @@ func TestInstallCodexHooksIdempotentAndPreservesExisting(t *testing.T) {
 			event)
 	}
 
-	UninstallCodexHooks(settings)
+	UninstallHooks(settings)
 	require.Len(t, settings.Hooks["SessionStart"], 1)
 	require.Equal(t, "/custom/session-start.sh",
 		settings.Hooks["SessionStart"][0].Hooks[0].Command)

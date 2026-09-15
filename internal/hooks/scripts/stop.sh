@@ -22,6 +22,9 @@
 # 4. Otherwise block ONCE with arming instructions (folding in a
 #    reminder about incomplete tasks, if any).
 #
+# Codex has no background-task equivalent, so when invoked with --codex the
+# script takes a separate path that long-polls inside the hook instead.
+#
 # Output format: JSON for Stop hook decision
 
 # Read hook input from stdin
@@ -29,7 +32,15 @@ input=$(cat)
 session_id=$(echo "$input" | jq -r '.session_id // empty')
 stop_hook_active=$(echo "$input" | jq -r '.stop_hook_active // false')
 cwd=$(echo "$input" | jq -r '.cwd // empty')
-is_codex=$(echo "$input" | jq -r 'if has("model") then "true" else "false" end')
+
+# Determine the host agent. The Codex hook definitions append --codex to the
+# installed command; Claude Code invokes the same script with no arguments.
+# Sniffing the payload or the environment instead would misfire whenever a
+# Claude session inherits CODEX_* variables from a parent shell.
+is_codex=false
+if [ "${1:-}" = "--codex" ]; then
+    is_codex=true
+fi
 
 if [ -z "$session_id" ]; then
     session_id="${CLAUDE_SESSION_ID:-$CODEX_SESSION_ID}"
@@ -47,29 +58,21 @@ if [ -n "$project_dir" ]; then
     session_args+=(--project "$project_dir")
 fi
 
-# Use Codex's explicit Stop continuation instead of depending on detached
-# shell-command completion. Keep the long poll inside the hook and only
-# continue when polling succeeds.
-if [ "$is_codex" = "true" ] || [ -n "$CODEX_SESSION_ID" ]; then
+# Codex has no equivalent of the Claude Code background task that the
+# `substrate watch` arming pattern relies on, so persistence has to live in
+# the hook itself: long-poll for mail and always block, which is exactly what
+# `substrate poll --always-block` emits. It blocks with the digest when mail
+# arrives, blocks with a keep-alive reason when the wait expires, and blocks
+# rather than failing when the daemon is unreachable. Only a missing or
+# broken CLI reaches the fallback below, where allowing the exit beats
+# trapping the agent in a loop it cannot escape.
+if [ "$is_codex" = "true" ]; then
     substrate heartbeat "${session_args[@]}" --format context \
         2>/dev/null || true
 
-    if ! codex_result=$(substrate poll "${session_args[@]}" \
-        --wait=570s --format hook --quiet 2>/dev/null); then
+    substrate poll "${session_args[@]}" --wait=570s --format hook \
+        --always-block --quiet 2>/dev/null || echo '{}'
 
-        echo '{}'
-        exit 0
-    fi
-
-    codex_decision=$(echo "$codex_result" | jq -r '.decision // empty')
-    if [ "$codex_decision" = "block" ]; then
-        echo "$codex_result"
-    else
-        jq -cn '{
-            "decision": "block",
-            "reason": "No new Subtrate messages yet. Continue waiting for mail."
-        }'
-    fi
     exit 0
 fi
 
