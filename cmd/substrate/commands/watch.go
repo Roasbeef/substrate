@@ -164,25 +164,27 @@ func sanitizeLeaseKey(s string) string {
 	}, s)
 }
 
-// watchLeaseKey names the lease and watermark files for this watcher.
-// The watcher is a per-session wake mechanism: it exits so Claude Code
-// re-invokes the session that spawned it. The lease must therefore be
-// keyed by session, not by agent. Agent identities are shared — every
+// sessionLeaseKey names the lease and watermark files for a watcher
+// armed on behalf of a session. The watcher is a per-session wake
+// mechanism: it exits so the harness re-invokes the session that
+// spawned it. The lease must therefore be keyed by session, not agent. Agent identities are shared — every
 // session opened in one project resolves to that project's default
 // agent — so an agent-keyed lease let the first session claim the only
 // slot while every later session read as "already armed", ended its
 // turn believing it was covered, and was never woken.
 //
-// An invocation with no session ID (an explicit --agent call) falls
-// back to the agent key, which keeps that path behaving as before. The
-// fixed prefixes also keep a key like ".." from naming a parent
+// The fixed prefix also keeps a key like ".." from naming a parent
 // directory.
-func watchLeaseKey(sessID string, agentID int64) string {
-	if sessID == "" {
-		return fmt.Sprintf("agent-%d", agentID)
-	}
-
+func sessionLeaseKey(sessID string) string {
 	return "session-" + sanitizeLeaseKey(sessID)
+}
+
+// agentLeaseKey names the lease for an invocation that has no session
+// ID, which means an explicit --agent call from outside any Claude Code
+// session. That path keeps the original agent-scoped key: there is no
+// session to starve, because there is no session to wake.
+func agentLeaseKey(agentID int64) string {
+	return fmt.Sprintf("agent-%d", agentID)
 }
 
 // watchLockPath returns the lease file path for a lease key.
@@ -431,7 +433,7 @@ func runWatch(cmd *cobra.Command, args []string) error {
 	// already parked.
 	if watchCheck && sessID != "" {
 		return reportWatchArmed(
-			watchLeaseKey(sessID, 0),
+			sessionLeaseKey(sessID),
 			fmt.Sprintf("session %s", sessID),
 		)
 	}
@@ -442,6 +444,16 @@ func runWatch(cmd *cobra.Command, args []string) error {
 	}
 	defer client.Close()
 
+	// A queued client has no daemon and no database behind it: its
+	// registry and mail service are both nil, so every call the park
+	// loop makes below would nil-panic. Watching is inherently online
+	// — there is nothing local to wake on — so say so and exit rather
+	// than arming a lease over a watcher that cannot poll.
+	if client.mode == ModeQueued {
+		return fmt.Errorf("watch needs a reachable daemon or " +
+			"database; none available")
+	}
+
 	agentID, agentNameStr, err := getCurrentAgentWithClient(ctx, client)
 	if err != nil {
 		return err
@@ -451,12 +463,15 @@ func runWatch(cmd *cobra.Command, args []string) error {
 	// the identity lookup above to name it.
 	if watchCheck {
 		return reportWatchArmed(
-			watchLeaseKey(sessID, agentID),
+			agentLeaseKey(agentID),
 			fmt.Sprintf("agent %s", agentNameStr),
 		)
 	}
 
-	leaseKey := watchLeaseKey(sessID, agentID)
+	leaseKey := agentLeaseKey(agentID)
+	if sessID != "" {
+		leaseKey = sessionLeaseKey(sessID)
+	}
 
 	lease, err := acquireWatchLease(leaseKey)
 	switch {

@@ -303,10 +303,8 @@ func TestWatchRearmFooterSessionID(t *testing.T) {
 func TestWatchLeaseKeySessionScoped(t *testing.T) {
 	withTempHome(t)
 
-	const agentID = 7
-
-	keyA := watchLeaseKey("session-a", agentID)
-	keyB := watchLeaseKey("session-b", agentID)
+	keyA := sessionLeaseKey("session-a")
+	keyB := sessionLeaseKey("session-b")
 	require.NotEqual(t, keyA, keyB)
 
 	// Both sessions arm concurrently on the same agent.
@@ -332,9 +330,9 @@ func TestWatchLeaseKeySessionScoped(t *testing.T) {
 // without a session ID still gets the agent-keyed lease, and that a
 // session ID cannot name anything outside the lease directory.
 func TestWatchLeaseKeyFallbackAndSanitizing(t *testing.T) {
-	require.Equal(t, "agent-42", watchLeaseKey("", 42))
-
-	key := watchLeaseKey("../../etc/passwd", 0)
-	require.Equal(t, "session-.._.._etc_passwd", key)
-	require.NotContains(t, key, "/")
+	require.Equal(t, "agent-42", agentLeaseKey(42))
+	require.Equal(
+		t, "session-.._.._etc_passwd",
+		sessionLeaseKey("../../etc/passwd"),
+	)
 }
