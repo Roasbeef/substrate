@@ -22,12 +22,29 @@
 # 4. Otherwise block ONCE with arming instructions (folding in a
 #    reminder about incomplete tasks, if any).
 #
+# Codex has no background-task equivalent, so when invoked with --codex the
+# script takes a separate path that long-polls inside the hook instead.
+#
 # Output format: JSON for Stop hook decision
 
 # Read hook input from stdin
 input=$(cat)
 session_id=$(echo "$input" | jq -r '.session_id // empty')
 stop_hook_active=$(echo "$input" | jq -r '.stop_hook_active // false')
+cwd=$(echo "$input" | jq -r '.cwd // empty')
+
+# Determine the host agent. The Codex hook definitions append --codex to the
+# installed command; Claude Code invokes the same script with no arguments.
+# Sniffing the payload or the environment instead would misfire whenever a
+# Claude session inherits CODEX_* variables from a parent shell.
+is_codex=false
+if [ "${1:-}" = "--codex" ]; then
+    is_codex=true
+fi
+
+if [ -z "$session_id" ]; then
+    session_id="${CLAUDE_SESSION_ID:-$CODEX_SESSION_ID}"
+fi
 
 # Build session ID args if available (critical for agent identity
 # resolution). Use a bash array so a session_id containing whitespace
@@ -35,6 +52,28 @@ stop_hook_active=$(echo "$input" | jq -r '.stop_hook_active // false')
 session_args=()
 if [ -n "$session_id" ]; then
     session_args=(--session-id "$session_id")
+fi
+project_dir="${CLAUDE_PROJECT_DIR:-${CODEX_PROJECT_DIR:-$cwd}}"
+if [ -n "$project_dir" ]; then
+    session_args+=(--project "$project_dir")
+fi
+
+# Codex has no equivalent of the Claude Code background task that the
+# `substrate watch` arming pattern relies on, so persistence has to live in
+# the hook itself: long-poll for mail and always block, which is exactly what
+# `substrate poll --always-block` emits. It blocks with the digest when mail
+# arrives, blocks with a keep-alive reason when the wait expires, and blocks
+# rather than failing when the daemon is unreachable. Only a missing or
+# broken CLI reaches the fallback below, where allowing the exit beats
+# trapping the agent in a loop it cannot escape.
+if [ "$is_codex" = "true" ]; then
+    substrate heartbeat "${session_args[@]}" --format context \
+        2>/dev/null || true
+
+    substrate poll "${session_args[@]}" --wait=570s --format hook \
+        --always-block --quiet 2>/dev/null || echo '{}'
+
+    exit 0
 fi
 
 # Arming-nudge stamp: marks that we already blocked once for arming in

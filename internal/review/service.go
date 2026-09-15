@@ -895,4 +895,3 @@ func (s *Service) ActiveReviewCount() int {
 	defer s.mu.RUnlock()
 	return len(s.activeReviews)
 }
-

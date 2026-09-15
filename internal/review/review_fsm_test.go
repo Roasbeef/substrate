@@ -854,7 +854,6 @@ func TestFSM_ResubmitEmitsSendMail(t *testing.T) {
 	t.Fatal("SendMailToReviewer not found in outbox")
 }
 
-
 // assertHasOutboxEvent checks that at least one outbox event matches the
 // given type.
 func assertHasOutboxEvent[T ReviewOutboxEvent](

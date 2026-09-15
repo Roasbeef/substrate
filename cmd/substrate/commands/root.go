@@ -17,7 +17,7 @@ var (
 	// agentName is the name of the current agent.
 	agentName string
 
-	// sessionID is the Claude Code session ID.
+	// sessionID is the coding-agent session ID.
 	sessionID string
 
 	// projectDir is the project directory.
@@ -53,10 +53,10 @@ var rootCmd = &cobra.Command{
 	Use:     "subtrate-cli",
 	Short:   "Subtrate agent command center CLI",
 	Version: build.Version(),
-	Long: `Subtrate CLI provides mail/messaging capabilities for Claude Code agents.
+	Long: `Subtrate CLI provides mail/messaging capabilities for coding agents.
 
 Use this CLI to send and receive messages, subscribe to topics, and manage
-agent identity across Claude Code sessions.`,
+agent identity across Claude Code and Codex sessions.`,
 	SilenceErrors: true,
 }
 
@@ -92,11 +92,11 @@ func init() {
 	)
 	rootCmd.PersistentFlags().StringVar(
 		&sessionID, "session-id", "",
-		"Claude Code session ID (from $CLAUDE_SESSION_ID)",
+		"Agent session ID (from $CLAUDE_SESSION_ID or $CODEX_SESSION_ID)",
 	)
 	rootCmd.PersistentFlags().StringVar(
 		&projectDir, "project", "",
-		"Project directory (from $CLAUDE_PROJECT_DIR)",
+		"Project directory (from $CLAUDE_PROJECT_DIR or $CODEX_PROJECT_DIR)",
 	)
 	rootCmd.PersistentFlags().StringVar(
 		&outputFormat, "format", "text",
