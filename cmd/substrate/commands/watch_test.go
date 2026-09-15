@@ -34,20 +34,20 @@ func withTempHome(t *testing.T) string {
 func TestWatchLeaseAcquireRelease(t *testing.T) {
 	withTempHome(t)
 
-	lease, err := acquireWatchLease(42)
+	lease, err := acquireWatchLease("agent-42")
 	require.NoError(t, err)
 
-	path, err := watchLockPath(42)
+	path, err := watchLockPath("agent-42")
 	require.NoError(t, err)
 	require.Equal(t, os.Getpid(), readLeasePID(path))
 
-	armed, err := watcherArmed(42)
+	armed, err := watcherArmed("agent-42")
 	require.NoError(t, err)
 	require.True(t, armed)
 
 	lease.release()
 
-	armed, err = watcherArmed(42)
+	armed, err = watcherArmed("agent-42")
 	require.NoError(t, err)
 	require.False(t, armed, "lease must read unarmed after release")
 }
@@ -59,11 +59,11 @@ func TestWatchLeaseAcquireRelease(t *testing.T) {
 func TestWatchLeaseConflict(t *testing.T) {
 	withTempHome(t)
 
-	lease, err := acquireWatchLease(7)
+	lease, err := acquireWatchLease("agent-7")
 	require.NoError(t, err)
 	defer lease.release()
 
-	_, err = acquireWatchLease(7)
+	_, err = acquireWatchLease("agent-7")
 	require.ErrorIs(t, err, errAlreadyArmed)
 }
 
@@ -80,16 +80,16 @@ func TestWatchLeaseStaleReclaim(t *testing.T) {
 	require.NoError(t, cmd.Run())
 	deadPID := cmd.Process.Pid
 
-	path, err := watchLockPath(9)
+	path, err := watchLockPath("agent-9")
 	require.NoError(t, err)
 	err = os.WriteFile(path, []byte(strconv.Itoa(deadPID)), 0o644)
 	require.NoError(t, err)
 
-	armed, err := watcherArmed(9)
+	armed, err := watcherArmed("agent-9")
 	require.NoError(t, err)
 	require.False(t, armed, "unlocked stale file must not read armed")
 
-	lease, err := acquireWatchLease(9)
+	lease, err := acquireWatchLease("agent-9")
 	require.NoError(t, err)
 	defer lease.release()
 
@@ -123,7 +123,7 @@ func TestWatchLeaseConcurrent(t *testing.T) {
 			// Block until released so all attempts contend at once.
 			<-start
 
-			lease, err := acquireWatchLease(123)
+			lease, err := acquireWatchLease("agent-123")
 
 			mu.Lock()
 			defer mu.Unlock()
@@ -147,7 +147,7 @@ func TestWatchLeaseConcurrent(t *testing.T) {
 	// Releasing the sole winner frees the lease for a fresh acquire.
 	winners[0].release()
 
-	lease, err := acquireWatchLease(123)
+	lease, err := acquireWatchLease("agent-123")
 	require.NoError(t, err)
 	lease.release()
 }
@@ -171,19 +171,19 @@ func TestReadLeasePIDMalformed(t *testing.T) {
 func TestWatchWatermarkRoundTrip(t *testing.T) {
 	withTempHome(t)
 
-	require.Equal(t, int64(0), readWatchWatermark(42))
+	require.Equal(t, int64(0), readWatchWatermark("agent-42"))
 
-	writeWatchWatermark(42, 7428)
-	require.Equal(t, int64(7428), readWatchWatermark(42))
+	writeWatchWatermark("agent-42", 7428)
+	require.Equal(t, int64(7428), readWatchWatermark("agent-42"))
 
-	// Watermarks are per-agent.
-	require.Equal(t, int64(0), readWatchWatermark(43))
+	// Watermarks are per lease key.
+	require.Equal(t, int64(0), readWatchWatermark("agent-43"))
 
 	// Malformed content reads as 0.
-	path, err := watchWatermarkPath(42)
+	path, err := watchWatermarkPath("agent-42")
 	require.NoError(t, err)
 	require.NoError(t, os.WriteFile(path, []byte("junk"), 0o644))
-	require.Equal(t, int64(0), readWatchWatermark(42))
+	require.Equal(t, int64(0), readWatchWatermark("agent-42"))
 }
 
 // TestFilterFreshMessages verifies that messages at or below the
@@ -291,4 +291,50 @@ func TestWatchRearmFooterSessionID(t *testing.T) {
 
 	out := watchRearmFooter()
 	require.Contains(t, out, `--session-id "sess-123"`)
+}
+
+// TestWatchLeaseKeySessionScoped is the regression test for the bug
+// that left most sessions watcher-less: the lease used to be keyed by
+// agent, but many sessions share one agent (every session opened in a
+// project resolves to that project's default agent). The first session
+// took the only lease and every later one read as "already armed" while
+// no watcher was ever armed on its behalf. Distinct sessions must get
+// distinct keys even on a single agent.
+func TestWatchLeaseKeySessionScoped(t *testing.T) {
+	withTempHome(t)
+
+	const agentID = 7
+
+	keyA := watchLeaseKey("session-a", agentID)
+	keyB := watchLeaseKey("session-b", agentID)
+	require.NotEqual(t, keyA, keyB)
+
+	// Both sessions arm concurrently on the same agent.
+	leaseA, err := acquireWatchLease(keyA)
+	require.NoError(t, err)
+	defer leaseA.release()
+
+	leaseB, err := acquireWatchLease(keyB)
+	require.NoError(t, err, "a second session must be able to arm")
+	defer leaseB.release()
+
+	// Re-arming the same session is still the benign no-op.
+	_, err = acquireWatchLease(keyA)
+	require.ErrorIs(t, err, errAlreadyArmed)
+
+	// Watermarks are session-scoped too: one session waking on a
+	// message must not suppress the other session's wake.
+	writeWatchWatermark(keyA, 900)
+	require.Equal(t, int64(0), readWatchWatermark(keyB))
+}
+
+// TestWatchLeaseKeyFallbackAndSanitizing verifies that an invocation
+// without a session ID still gets the agent-keyed lease, and that a
+// session ID cannot name anything outside the lease directory.
+func TestWatchLeaseKeyFallbackAndSanitizing(t *testing.T) {
+	require.Equal(t, "agent-42", watchLeaseKey("", 42))
+
+	key := watchLeaseKey("../../etc/passwd", 0)
+	require.Equal(t, "session-.._.._etc_passwd", key)
+	require.NotContains(t, key, "/")
 }

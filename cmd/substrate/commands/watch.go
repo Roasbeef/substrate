@@ -133,14 +133,66 @@ func watchLockDir() (string, error) {
 	return dir, nil
 }
 
-// watchLockPath returns the lease file path for an agent.
-func watchLockPath(agentID int64) (string, error) {
+// resolveWatchSessionID returns the session this watcher belongs to,
+// preferring the explicit flag over the harness environment. It goes
+// through getSessionIDFromEnv so a Codex-hosted session resolves too:
+// the lease is keyed off this value, and a host whose session ID we
+// failed to read would fall back to the shared agent key and starve
+// exactly as every session did before the key changed.
+func resolveWatchSessionID() string {
+	if sessionID != "" {
+		return sessionID
+	}
+
+	return getSessionIDFromEnv()
+}
+
+// sanitizeLeaseKey maps an identifier onto a safe single path element,
+// replacing anything outside [A-Za-z0-9._-] so an unusual session ID
+// cannot escape the lease directory.
+func sanitizeLeaseKey(s string) string {
+	return strings.Map(func(r rune) rune {
+		switch {
+		case r >= 'a' && r <= 'z', r >= 'A' && r <= 'Z',
+			r >= '0' && r <= '9', r == '.', r == '-', r == '_':
+
+			return r
+
+		default:
+			return '_'
+		}
+	}, s)
+}
+
+// watchLeaseKey names the lease and watermark files for this watcher.
+// The watcher is a per-session wake mechanism: it exits so Claude Code
+// re-invokes the session that spawned it. The lease must therefore be
+// keyed by session, not by agent. Agent identities are shared — every
+// session opened in one project resolves to that project's default
+// agent — so an agent-keyed lease let the first session claim the only
+// slot while every later session read as "already armed", ended its
+// turn believing it was covered, and was never woken.
+//
+// An invocation with no session ID (an explicit --agent call) falls
+// back to the agent key, which keeps that path behaving as before. The
+// fixed prefixes also keep a key like ".." from naming a parent
+// directory.
+func watchLeaseKey(sessID string, agentID int64) string {
+	if sessID == "" {
+		return fmt.Sprintf("agent-%d", agentID)
+	}
+
+	return "session-" + sanitizeLeaseKey(sessID)
+}
+
+// watchLockPath returns the lease file path for a lease key.
+func watchLockPath(key string) (string, error) {
 	dir, err := watchLockDir()
 	if err != nil {
 		return "", err
 	}
 
-	return filepath.Join(dir, fmt.Sprintf("agent-%d.lock", agentID)), nil
+	return filepath.Join(dir, key+".lock"), nil
 }
 
 // readLeasePID reads the PID stored in a lease file. Returns 0 if the
@@ -162,13 +214,13 @@ func readLeasePID(path string) int {
 }
 
 // watcherArmed reports whether a live watcher holds the advisory lock
-// for the given agent. It probes with a non-blocking flock: if the lock
-// is held the probe fails with EWOULDBLOCK (armed); if it succeeds no
-// watcher is live, so it immediately drops the lock again. The kernel
-// frees the lock when a holder dies, so a crashed watcher never reads
-// as armed — there is no stale-lock or PID-reuse hazard.
-func watcherArmed(agentID int64) (bool, error) {
-	path, err := watchLockPath(agentID)
+// for the given lease key. It probes with a non-blocking flock: if the
+// lock is held the probe fails with EWOULDBLOCK (armed); if it succeeds
+// no watcher is live, so it immediately drops the lock again. The
+// kernel frees the lock when a holder dies, so a crashed watcher never
+// reads as armed — there is no stale-lock or PID-reuse hazard.
+func watcherArmed(key string) (bool, error) {
+	path, err := watchLockPath(key)
 	if err != nil {
 		return false, err
 	}
@@ -202,26 +254,28 @@ func watcherArmed(agentID int64) (bool, error) {
 	return false, nil
 }
 
-// watchWatermarkPath returns the digest watermark file path for an
-// agent. The watermark records the highest message ID already emitted
-// in a wake digest, so a re-armed watcher does not re-wake on the same
-// unread backlog (the agent may act on a digest without marking the
-// messages read, e.g. replying via send).
-func watchWatermarkPath(agentID int64) (string, error) {
+// watchWatermarkPath returns the digest watermark file path for a
+// lease key. The watermark records the highest message ID already
+// emitted in a wake digest, so a re-armed watcher does not re-wake on
+// the same unread backlog (the agent may act on a digest without
+// marking the messages read, e.g. replying via send).
+//
+// It shares the lease key, so it is per-session for the same reason:
+// an agent-keyed watermark would let the first session to wake on a
+// message suppress that wake for every other session on that agent.
+func watchWatermarkPath(key string) (string, error) {
 	dir, err := watchLockDir()
 	if err != nil {
 		return "", err
 	}
 
-	return filepath.Join(
-		dir, fmt.Sprintf("agent-%d.watermark", agentID),
-	), nil
+	return filepath.Join(dir, key+".watermark"), nil
 }
 
-// readWatchWatermark returns the stored watermark for an agent, or 0
+// readWatchWatermark returns the stored watermark for a lease key, or 0
 // if missing or malformed.
-func readWatchWatermark(agentID int64) int64 {
-	path, err := watchWatermarkPath(agentID)
+func readWatchWatermark(key string) int64 {
+	path, err := watchWatermarkPath(key)
 	if err != nil {
 		return 0
 	}
@@ -239,10 +293,10 @@ func readWatchWatermark(agentID int64) int64 {
 	return id
 }
 
-// writeWatchWatermark persists the highest digested message ID for an
-// agent. Best effort: a failed write only risks one duplicate wake.
-func writeWatchWatermark(agentID, id int64) {
-	path, err := watchWatermarkPath(agentID)
+// writeWatchWatermark persists the highest digested message ID for a
+// lease key. Best effort: a failed write only risks one duplicate wake.
+func writeWatchWatermark(key string, id int64) {
+	path, err := watchWatermarkPath(key)
 	if err != nil {
 		return
 	}
@@ -284,16 +338,16 @@ type watchLease struct {
 	f *os.File
 }
 
-// acquireWatchLease claims the watcher lock for an agent with a
+// acquireWatchLease claims the watcher lock for a lease key with a
 // non-blocking exclusive flock. The check and the claim are a single
 // atomic kernel operation, so two watchers racing to arm cannot both
 // win — exactly one gets the lock and the rest get errAlreadyArmed.
 // This closes the TOCTOU hole in the old check-then-write lease, which
-// could leave two live watchers for one agent. Returns the held lease,
+// could leave two live watchers for one key. Returns the held lease,
 // errAlreadyArmed if a live watcher already holds it, or a wrapped
 // error on I/O failure.
-func acquireWatchLease(agentID int64) (*watchLease, error) {
-	path, err := watchLockPath(agentID)
+func acquireWatchLease(key string) (*watchLease, error) {
+	path, err := watchLockPath(key)
 	if err != nil {
 		return nil, err
 	}
@@ -336,6 +390,24 @@ func (l *watchLease) release() {
 	_ = l.f.Close()
 }
 
+// reportWatchArmed prints the lease state for a key, naming the holder
+// as label. It returns an error when no watcher is armed so the command
+// exits non-zero, which is how hook scripts branch on the result.
+func reportWatchArmed(key, label string) error {
+	armed, err := watcherArmed(key)
+	if err != nil {
+		return err
+	}
+
+	if !armed {
+		return fmt.Errorf("not armed (%s)", label)
+	}
+
+	fmt.Printf("armed (%s)\n", label)
+
+	return nil
+}
+
 // runWatch implements the watch command. It arms the lease, parks until
 // a mail event (or timeout), prints a wake digest, and exits.
 func runWatch(cmd *cobra.Command, args []string) error {
@@ -345,6 +417,24 @@ func runWatch(cmd *cobra.Command, args []string) error {
 		context.Background(), syscall.SIGINT, syscall.SIGTERM,
 	)
 	defer cancel()
+
+	sessID := resolveWatchSessionID()
+
+	// --check reports lease state without arming: exit 0 if armed,
+	// exit 1 (via error) otherwise, so hook scripts can branch on it.
+	//
+	// With a session ID in hand the lease key needs no identity
+	// lookup, so the probe answers without touching the daemon. That
+	// matters: the check's exit code is the only signal the Stop hook
+	// has, so a daemon outage used to read as "no watcher armed" and
+	// send the agent off arming a second watcher next to the one
+	// already parked.
+	if watchCheck && sessID != "" {
+		return reportWatchArmed(
+			watchLeaseKey(sessID, 0),
+			fmt.Sprintf("session %s", sessID),
+		)
+	}
 
 	client, err := getClient()
 	if err != nil {
@@ -357,30 +447,25 @@ func runWatch(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	// --check: report lease state without arming. Exit 0 if armed,
-	// exit 1 (via error) otherwise, so hook scripts can branch on it.
+	// No session ID, so the lease is agent-keyed and the check needed
+	// the identity lookup above to name it.
 	if watchCheck {
-		armed, err := watcherArmed(agentID)
-		if err != nil {
-			return err
-		}
-
-		if armed {
-			fmt.Printf("armed (agent %s)\n", agentNameStr)
-			return nil
-		}
-
-		return fmt.Errorf("not armed (agent %s)", agentNameStr)
+		return reportWatchArmed(
+			watchLeaseKey(sessID, agentID),
+			fmt.Sprintf("agent %s", agentNameStr),
+		)
 	}
 
-	lease, err := acquireWatchLease(agentID)
+	leaseKey := watchLeaseKey(sessID, agentID)
+
+	lease, err := acquireWatchLease(leaseKey)
 	switch {
 	case errors.Is(err, errAlreadyArmed):
 		// A live watcher already covers this agent. Re-arming is a
 		// benign no-op, not a failure: print a notice and exit 0 so
 		// the background task does not surface as a red failure and
 		// the agent does not burn a turn investigating it.
-		fmt.Print(formatAlreadyArmed(agentNameStr, agentID))
+		fmt.Print(formatAlreadyArmed(agentNameStr, leaseKey))
 		return nil
 
 	case err != nil:
@@ -397,7 +482,7 @@ func runWatch(cmd *cobra.Command, args []string) error {
 	}
 
 	lastHeartbeat := time.Now()
-	watermark := readWatchWatermark(agentID)
+	watermark := readWatchWatermark(leaseKey)
 
 	for {
 		// Self-draining check: unread mail newer than the digest
@@ -415,7 +500,7 @@ func runWatch(cmd *cobra.Command, args []string) error {
 				msgs, watermark,
 			)
 			if len(fresh) > 0 {
-				writeWatchWatermark(agentID, maxID)
+				writeWatchWatermark(leaseKey, maxID)
 				fmt.Print(formatWatchDigest(
 					fresh, agentNameStr, watchMaxMsgs,
 				))
@@ -538,9 +623,9 @@ func formatWatchTimeout(agentName string, timeout time.Duration) string {
 // re-armed while a live one already holds the lease. It exits 0, so the
 // message must make clear this is expected and that the agent should
 // NOT re-arm again — otherwise the agent could loop, arming repeatedly.
-func formatAlreadyArmed(agentName string, agentID int64) string {
+func formatAlreadyArmed(agentName, key string) string {
 	holder := ""
-	if path, err := watchLockPath(agentID); err == nil {
+	if path, err := watchLockPath(key); err == nil {
 		if pid := readLeasePID(path); pid > 0 {
 			holder = fmt.Sprintf(" (held by PID %d)", pid)
 		}
@@ -564,10 +649,7 @@ func formatAlreadyArmed(agentName string, agentID int64) string {
 // watchRearmFooter returns the standing instruction appended to every
 // wake digest. It tells the agent how to process events and re-arm.
 func watchRearmFooter() string {
-	sid := sessionID
-	if sid == "" {
-		sid = getSessionIDFromEnv()
-	}
+	sid := resolveWatchSessionID()
 
 	sidArg := `--session-id "${CLAUDE_SESSION_ID:-$CODEX_SESSION_ID}"`
 	if sid != "" {
