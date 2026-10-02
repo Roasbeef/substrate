@@ -20,7 +20,7 @@ var hooksCmd = &cobra.Command{
 Subtrate hooks provide:
 - SessionStart: Heartbeat + check inbox at session start
 - UserPromptSubmit: Silent heartbeat + check mail on each prompt
-- Stop: Long-poll to keep main agent alive, blocking exit while checking mail
+- Stop: Check mail and ensure a background watcher is armed before idle
 - SubagentStop: One-shot check for subagents, then allow exit
 - PreCompact: Save identity state before context compaction
 

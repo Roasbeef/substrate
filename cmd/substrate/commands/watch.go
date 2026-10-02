@@ -113,9 +113,9 @@ worktree, say, where .git is a file. The hooks pass it for you.
 
 Use --check to test the lease without arming: exit 0 if a live watcher
 is armed, exit 1 otherwise (for hook scripts).`,
-	Example: `  substrate watch --session-id "$SID" --project "$CLAUDE_PROJECT_DIR"
-  substrate watch --session-id "$SID" --project "$DIR" --timeout 4h
-  substrate watch --session-id "$SID" --project "$DIR" --check`,
+	Example: `  substrate watch --session-id "$SID" --project "$CLAUDE_PROJECT_DIR" --timeout 25m
+	  substrate watch --session-id "$SID" --project "$DIR" --timeout 4h
+	  substrate watch --session-id "$SID" --project "$DIR" --check`,
 	// Errors are semantic (lease conflict, not-armed); usage spam would
 	// only pollute the agent's context.
 	SilenceUsage: true,
@@ -125,8 +125,8 @@ is armed, exit 1 otherwise (for hook scripts).`,
 func init() {
 	watchCmd.Flags().DurationVar(&watchTimeout, "timeout", 0,
 		"Exit after this long with no events (0 = wait forever). "+
-			"Under Claude Code, pass --timeout 25m: it kills "+
-			"background tasks after 30 minutes")
+			"Under Claude Code, pass --timeout "+WatchRearmTimeout.String()+
+			": it kills background tasks after 30 minutes")
 	watchCmd.Flags().DurationVar(&watchHeartbeat, "heartbeat",
 		30*time.Second, "Heartbeat interval while parked")
 	watchCmd.Flags().BoolVar(&watchCheck, "check", false,

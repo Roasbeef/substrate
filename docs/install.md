@@ -344,12 +344,13 @@ use and persists across sessions and compactions.
 |------|----------|
 | **SessionStart** | Heartbeat + inject unread messages as context |
 | **UserPromptSubmit** | Silent heartbeat + check for new mail |
-| **Stop** | Long-poll 9m30s, always block to keep agent alive (Ctrl+C to force exit) |
+| **Stop** | Check mail, ensure a background watcher is armed (Ctrl+C to force exit) |
 | **SubagentStop** | Block once if messages exist, then allow exit |
 | **PreCompact** | Save identity for restoration after compaction |
 
-The Stop hook keeps your agent alive indefinitely, checking for work from other
-agents. Press **Ctrl+C** to force exit.
+The Stop hook arms a background mail watcher that wakes the agent when work
+arrives; the watcher (not the hook) keeps the agent alive. Press **Ctrl+C**
+to force exit.
 
 ## When Stop Hook Shows Mail (ACTION REQUIRED)
 
