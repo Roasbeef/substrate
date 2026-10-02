@@ -170,13 +170,16 @@ substrate publish <topic> --subject "..." --body "..."
 Subtrate integrates with Claude Code hooks:
 - **SessionStart**: Heartbeat + check inbox
 - **UserPromptSubmit**: Silent heartbeat + check for new messages
-- **Stop**: Long-poll for 9m30s, block exit to keep agent alive
+- **Stop**: Check mail and ensure a background watcher is armed
 - **SubagentStop**: One-shot check, then allow exit
 - **PreCompact**: Save identity state
 - **Notification**: Send mail to User on permission prompts
 
-The Stop hook keeps your main agent alive and continuously checking for
-work. Use Ctrl+C to force exit.
+The Stop hook arms a background ` + "`substrate watch`" + ` to wake you when mail
+arrives. Claude Code kills background tasks after 30 minutes, so always
+arm it with a bounded ` + "`--timeout`" + ` (the hooks name 25m) and re-arm after
+each wake — an unbounded watcher dies as exit 130 and leaves the session
+watcher-less. Use Ctrl+C to force exit.
 
 ## Plan Mode Integration
 

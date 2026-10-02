@@ -188,8 +188,12 @@ if [ -n "$session_id" ]; then
     fi
 fi
 
-reason="No mail watcher is armed. ${task_note}Arm the watcher now: run \`substrate watch --session-id ${session_id:-\$CLAUDE_SESSION_ID} --project '${watch_root}'\` via the Bash tool with run_in_background set to true. The watcher is only for notification while this session is idle; it does not require ending your turn. Continue the current task if work remains, and re-arm it after handling each wake."
-
+# The arming instruction names a bounded timeout for the same reason the
+# SessionStart hook does: Claude Code kills background tasks at 30
+# minutes, so an unbounded watcher dies as exit 130 and this hook nudges
+# again every cycle. The timeout lets the watcher exit 0 with a re-arm
+# line first. The value matches the CLI's WatchRearmTimeout constant.
+reason="No mail watcher is armed. ${task_note}Arm the watcher now: run \`substrate watch --session-id ${session_id:-\$CLAUDE_SESSION_ID} --project '${watch_root}' --timeout 25m\` via the Bash tool with run_in_background set to true. The watcher is only for notification while this session is idle; it does not require ending your turn. Continue the current task if work remains, and re-arm it after handling each wake."
 # Record that the nudge fired so we do not block again this cycle.
 touch "$nudge_stamp" 2>/dev/null
 

@@ -1,7 +1,9 @@
 package commands
 
 import (
+	"database/sql"
 	"errors"
+	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -11,6 +13,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/roasbeef/subtrate/internal/db"
+	"github.com/roasbeef/subtrate/internal/hooks"
 	"github.com/roasbeef/subtrate/internal/mail"
 	"github.com/stretchr/testify/require"
 )
@@ -374,6 +378,122 @@ func TestWatchRearmFooterSessionID(t *testing.T) {
 	require.Contains(t, out, `--session-id "sess-123"`)
 }
 
+// Claude Code 30-minute background-task kill. A watcher armed without a
+// timeout dies as exit 130 ("do not re-arm"), and the Stop hook nudges
+// again every 30 minutes forever. The footer must therefore name a
+// timeout under the harness cap so a re-armed watcher exits 0 with the
+// re-arm line before the kill — and it must respect an explicit
+// --timeout the operator chose for this watcher instead of overriding it.
+func TestWatchRearmFooterBoundedTimeout(t *testing.T) {
+	oldTimeout := watchTimeout
+	watchTimeout = 0
+	t.Cleanup(func() { watchTimeout = oldTimeout })
+
+	out := watchRearmFooter()
+	require.Contains(t, out,
+		fmt.Sprintf("--timeout %s", WatchRearmTimeout))
+	require.Less(t, WatchRearmTimeout, 30*time.Minute,
+		"the default must exit before Claude Code kills the task")
+
+	// An explicit timeout is the operator's policy; the footer names it
+	// rather than replacing it with the default.
+	watchTimeout = 4 * time.Hour
+	out = watchRearmFooter()
+	require.Contains(t, out, "--timeout 4h0m0s")
+	require.NotContains(t, out, WatchRearmTimeout.String())
+}
+
+// TestHookScriptsMatchRearmTimeoutConst pins the shell scripts' embedded
+// arming timeout to the Go constant. The hooks cannot read Go constants,
+// so they carry a literal "--timeout 25m"; without this check the two
+// sources of truth drift independently and both existing tests stay
+// green while the scripts arm a different horizon than the CLI's footer.
+func TestHookScriptsMatchRearmTimeoutConst(t *testing.T) {
+	const literal = "--timeout 25m"
+	scriptTimeout, err := time.ParseDuration("25m")
+	require.NoError(t, err)
+	require.Equal(t, WatchRearmTimeout, scriptTimeout,
+		"hook literal %q and WatchRearmTimeout diverged; update both",
+		literal)
+
+	// The scripts really embed that literal right now; this is what
+	// turns the equality above into a live invariant rather than two
+	// copies of the same hardcoded expectation.
+	require.Contains(t, hooks.SessionStartScript, literal)
+	require.Contains(t, hooks.StopScript, literal)
+}
+
+// TestWatchTimeoutFiresWhilePollsFail is the regression test for the
+// review finding that the deadline check used to sit below the
+// error-retry branch: a watcher whose daemon or database went
+// unreachable across its deadline kept parking forever, took the
+// harness's 30-minute kill as exit 130 ("do not re-arm"), and
+// recreated the very re-arm loop the bounded timeout exists to end.
+// The check now runs at the top of every iteration, so the loop must
+// exit cleanly on its own deadline even while every poll fails.
+func TestWatchTimeoutFiresWhilePollsFail(t *testing.T) {
+	withTempHome(t)
+
+	// A migrated scratch database gives the direct client (dead gRPC
+	// address forces the fallback) a working identity path. Once the
+	// watcher has armed, the messages table is dropped so every
+	// subsequent poll errors — the transient-outage shape the retry
+	// branch exists for.
+	tmpDir := t.TempDir()
+	testDBPath := filepath.Join(tmpDir, "watch.db")
+	sqlDB, err := db.OpenSQLite(testDBPath)
+	require.NoError(t, err)
+
+	err = db.RunMigrations(sqlDB, "../../../internal/db/migrations")
+	require.NoError(t, err)
+
+	prevDB, prevGRPC := dbPath, grpcAddr
+	dbPath, grpcAddr = testDBPath, "127.0.0.1:1"
+	prevTimeout, prevRetry, prevPoll := watchTimeout, watchRetryInterval, watchPollInterval
+	watchTimeout, watchRetryInterval, watchPollInterval = 2*time.Second, 10*time.Millisecond, 10*time.Millisecond
+	prevSession := sessionID
+	sessionID = "watch-poll-fail"
+	t.Cleanup(func() {
+		dbPath, grpcAddr = prevDB, prevGRPC
+		watchTimeout, watchRetryInterval, watchPollInterval = prevTimeout, prevRetry, prevPoll
+		sessionID = prevSession
+	})
+
+	leaseKey := sessionLeaseKey(sessionID)
+
+	type watchResult struct {
+		err error
+	}
+	done := make(chan watchResult, 1)
+	start := time.Now()
+	go func() {
+		done <- watchResult{err: runWatch(nil, nil)}
+	}()
+
+	// Wait until the watcher has resolved its identity and armed the
+	// lease; from this point on, its polls are the only DB work left.
+	require.Eventually(t, func() bool {
+		armed, err := watcherArmed(leaseKey)
+		return err == nil && armed
+	}, 10*time.Second, 20*time.Millisecond)
+
+	// Break the mail tables so every subsequent poll errors — the
+	// daemon-unreachable shape the retry branch parks through. The
+	// schema_version table is untouched so the client keeps its
+	// connection; only the polled table is gone.
+	require.NoError(t, dropPollTable(sqlDB))
+
+	select {
+	case res := <-done:
+		require.NoError(t, res.err)
+		require.Less(t, time.Since(start), 15*time.Second,
+			"the deadline must fire from the error branch, not park forever")
+	case <-time.After(30 * time.Second):
+		t.Fatal("watcher never exited; the deadline check was skipped " +
+			"while polls failed")
+	}
+}
+
 // TestWatchLeaseKeySessionScoped is the regression test for the bug
 // that left most sessions watcher-less: the lease used to be keyed by
 // agent, but many sessions share one agent (every session opened in a
@@ -494,4 +614,12 @@ func TestWatchStateDirIgnoresItself(t *testing.T) {
 	contents, err = os.ReadFile(ignore)
 	require.NoError(t, err)
 	require.Equal(t, "custom\n", string(contents))
+}
+
+// dropPollTable removes the messages table an armed watcher polls, so
+// every PollChanges call fails with a query error while the connection
+// itself stays alive.
+func dropPollTable(sqlDB *sql.DB) error {
+	_, err := sqlDB.Exec("DROP TABLE IF EXISTS messages")
+	return err
 }

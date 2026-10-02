@@ -77,9 +77,16 @@ flowchart TD
 ### Key Characteristics
 
 1. **The watcher owns persistence** - Run `substrate watch --session-id
-   "$CLAUDE_SESSION_ID" --project "$CLAUDE_PROJECT_DIR"` as a background task.
-   It waits for mail and wakes the agent when it exits with a digest. Always
-   pass `--project`; see below.
+   "$CLAUDE_SESSION_ID" --project "$CLAUDE_PROJECT_DIR" --timeout 25m` as a
+   background task. It waits for mail and wakes the agent when it exits
+   with a digest. Always pass `--project`; see below. The timeout matters
+   under Claude Code: it kills background tasks after 30 minutes, so an
+   unbounded watcher dies as exit 130 ("do not re-arm") and the Stop
+   hook re-nudges in a loop. A bounded timeout exits 0 with a re-arm
+   line before the kill. The 25-minute value matches the CLI's
+   `WatchRearmTimeout` constant; the Bash tool's own `timeout` argument
+   cannot substitute for it (its maximum is 10 minutes, which is
+   shorter, not longer).
 
 2. **At most one arming block per stop cycle** - If no watcher is live, the
    hook writes an arming-nudge stamp and blocks once. It allows exit on a
@@ -158,7 +165,7 @@ flowchart TD
 
 | Aspect | Stop (Main Agent) | SubagentStop |
 |--------|-------------------|--------------|
-| Long poll | Yes (9m30s) | No |
+| Mail wait | Via armed background watcher | One-shot check |
 | Default decision | Always block | Allow exit if no mail |
 | Task checking | Yes | No |
 | Purpose | Stay alive indefinitely | Complete work and exit |
@@ -301,9 +308,8 @@ sequenceDiagram
         else No mail, has tasks
             AH-->>CC: Block + list tasks
         else No mail, no tasks
-            AH->>S: Long poll (9m30s)
-            S-->>AH: Wait for messages
-            AH-->>CC: Block (heartbeat)
+            AH->>S: Watcher armed?
+            S-->>AH: Yes / no (arm nudge, once per cycle)
         end
     end
 
@@ -434,10 +440,11 @@ mechanism to:
 
 ### Hook Timeout
 
-Claude Code command hooks have a default 10-minute (600-second) timeout. The
-Stop hook's 9.5-minute (570-second) long poll stays under this limit while
-maximizing the time agents stay alive waiting for work. The timeout is
-explicitly set to 600 seconds in the hook configuration.
+Claude Code command hooks have a default 10-minute (600-second) timeout, set
+explicitly in the hook configuration. The Claude Stop hook no longer
+long-polls inside the hook — persistence comes from the armed background
+watcher — so the hook itself finishes quickly; only the Codex path
+long-polls (570s, under this limit).
 
 ---
 

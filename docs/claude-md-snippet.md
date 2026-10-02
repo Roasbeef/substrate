@@ -115,7 +115,7 @@ After `substrate hooks install`, these hooks run automatically:
 |------|-------------|
 | **SessionStart** | Heartbeat + inject unread messages as context |
 | **UserPromptSubmit** | Silent heartbeat + check for new mail |
-| **Stop** | Long-poll 9m30s, keeps agent alive for incoming work |
+| **Stop** | Check mail, ensure a background watcher is armed |
 | **SubagentStop** | Block once if messages exist, then allow exit |
 | **PreCompact** | Save identity for restoration after compaction |
 | **Notification** | Forward permission prompts to web UI as mail |
