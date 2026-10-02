@@ -77,9 +77,16 @@ flowchart TD
 ### Key Characteristics
 
 1. **The watcher owns persistence** - Run `substrate watch --session-id
-   "$CLAUDE_SESSION_ID" --project "$CLAUDE_PROJECT_DIR"` as a background task.
-   It waits for mail and wakes the agent when it exits with a digest. Always
-   pass `--project`; see below.
+   "$CLAUDE_SESSION_ID" --project "$CLAUDE_PROJECT_DIR" --timeout 25m` as a
+   background task. It waits for mail and wakes the agent when it exits
+   with a digest. Always pass `--project`; see below. The timeout matters
+   under Claude Code: it kills background tasks after 30 minutes, so an
+   unbounded watcher dies as exit 130 ("do not re-arm") and the Stop
+   hook re-nudges in a loop. A bounded timeout exits 0 with a re-arm
+   line before the kill. The 25-minute value matches the CLI's
+   `WatchRearmTimeout` constant; the Bash tool's own `timeout` argument
+   cannot substitute for it (its maximum is 10 minutes, which is
+   shorter, not longer).
 
 2. **At most one arming block per stop cycle** - If no watcher is live, the
    hook writes an arming-nudge stamp and blocks once. It allows exit on a

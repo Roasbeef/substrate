@@ -40,6 +40,17 @@ var watchRetryInterval = 30 * time.Second
 // not need a follow-up inbox round-trip, without flooding its context.
 const watchBodyLimit = 2000
 
+// WatchRearmTimeout is the --timeout every instruction that arms the
+// watcher should name. Claude Code kills background tasks after 30
+// minutes, and its Bash tool's own timeout flag caps them at 10 minutes,
+// so an unbounded watcher is SIGTERM'd to exit 130 ("do not re-arm")
+// and the Stop hook re-nudges, every 30 minutes, forever. A timeout
+// safely under the cap instead exits 0 with an explicit re-arm line:
+// the wake cycle becomes deterministic and self-describing rather than
+// a race against the harness kill. The value leaves headroom below
+// the 30-minute kill so a re-armed task is never born already late.
+const WatchRearmTimeout = 25 * time.Minute
+
 // errAlreadyArmed is returned by acquireWatchLease when another live
 // watcher already holds the advisory lock for this agent. It is a
 // benign condition, not a fatal error: runWatch treats it as an exit-0
@@ -113,7 +124,9 @@ is armed, exit 1 otherwise (for hook scripts).`,
 
 func init() {
 	watchCmd.Flags().DurationVar(&watchTimeout, "timeout", 0,
-		"Exit after this long with no events (0 = wait forever)")
+		"Exit after this long with no events (0 = wait forever). "+
+			"Under Claude Code, pass --timeout 25m: it kills "+
+			"background tasks after 30 minutes")
 	watchCmd.Flags().DurationVar(&watchHeartbeat, "heartbeat",
 		30*time.Second, "Heartbeat interval while parked")
 	watchCmd.Flags().BoolVar(&watchCheck, "check", false,
@@ -742,6 +755,17 @@ func watchRearmFooter() string {
 	if root, err := watchProjectRoot(); err == nil {
 		watchArg = fmt.Sprintf("%s --project %q", sidArg, root)
 	}
+
+	// The re-arm inherits this watcher's timeout policy so the
+	// replacement behaves identically: an unbounded default names the
+	// bounded timeout every Claude Code arming must carry (a watcher
+	// without one is SIGTERM'd at the harness's 30-minute cap), and an
+	// explicit --timeout is echoed back rather than silently dropped.
+	rearmTimeout := WatchRearmTimeout
+	if watchTimeout > 0 {
+		rearmTimeout = watchTimeout
+	}
+	watchArg = fmt.Sprintf("%s --timeout %s", watchArg, rearmTimeout)
 
 	return fmt.Sprintf(`Next steps:
 1. Handle the messages above. Read with `+"`substrate read <id> %s`"+`,

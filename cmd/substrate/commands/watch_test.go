@@ -2,6 +2,7 @@ package commands
 
 import (
 	"errors"
+	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -372,6 +373,31 @@ func TestWatchRearmFooterSessionID(t *testing.T) {
 
 	out := watchRearmFooter()
 	require.Contains(t, out, `--session-id "sess-123"`)
+}
+
+// Claude Code 30-minute background-task kill. A watcher armed without a
+// timeout dies as exit 130 ("do not re-arm"), and the Stop hook nudges
+// again every 30 minutes forever. The footer must therefore name a
+// timeout under the harness cap so a re-armed watcher exits 0 with the
+// re-arm line before the kill — and it must respect an explicit
+// --timeout the operator chose for this watcher instead of overriding it.
+func TestWatchRearmFooterBoundedTimeout(t *testing.T) {
+	oldTimeout := watchTimeout
+	watchTimeout = 0
+	t.Cleanup(func() { watchTimeout = oldTimeout })
+
+	out := watchRearmFooter()
+	require.Contains(t, out,
+		fmt.Sprintf("--timeout %s", WatchRearmTimeout))
+	require.Less(t, WatchRearmTimeout, 30*time.Minute,
+		"the default must exit before Claude Code kills the task")
+
+	// An explicit timeout is the operator's policy; the footer names it
+	// rather than replacing it with the default.
+	watchTimeout = 4 * time.Hour
+	out = watchRearmFooter()
+	require.Contains(t, out, "--timeout 4h0m0s")
+	require.NotContains(t, out, WatchRearmTimeout.String())
 }
 
 // TestWatchLeaseKeySessionScoped is the regression test for the bug

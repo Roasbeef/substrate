@@ -26,6 +26,23 @@ func TestStopScriptArmsWithoutEndingTheCurrentTurn(t *testing.T) {
 	require.Equal(t, StopScript, GetScript("stop"))
 }
 
+// TestArmingInstructionsNameBoundedTimeout is the regression test for
+// the Claude Code 30-minute background-task kill. The arming texts the
+// hooks hand the agent must name a --timeout safely under that cap:
+// an unbounded watcher is SIGTERM'd to exit 130 ("do not re-arm"), the
+// session is left watcher-less, and the Stop hook re-nudges every cycle.
+// The value matches the CLI's WatchRearmTimeout; the hooks cannot read
+// the Go constant, so this pins the literal the scripts embed.
+func TestArmingInstructionsNameBoundedTimeout(t *testing.T) {
+	for name, script := range map[string]string{
+		"session_start": SessionStartScript,
+		"stop":          StopScript,
+	} {
+		require.Contains(t, script, "--timeout 25m",
+			name+" arming instruction must bound the watcher")
+	}
+}
+
 // TestStopScriptNamesProjectForArmAndCheck is the regression test for a
 // lease the hook could never find. The watcher is armed from the agent's
 // shell, which gets no project environment, while this hook has one. When
