@@ -575,6 +575,20 @@ func runWatch(cmd *cobra.Command, args []string) error {
 	watermark := readWatchWatermark(leaseKey)
 
 	for {
+		// Timeout: wake with an empty digest so the agent renews
+		// the lease on its own schedule. This check runs at the top
+		// of every iteration so the error-retry branch below cannot
+		// skip it: a watcher whose daemon is unreachable across the
+		// deadline would otherwise park forever, take the harness's
+		// 30-minute kill as exit 130, and re-arm into the loop this
+		// bounded timeout exists to end.
+		if !deadline.IsZero() && time.Now().After(deadline) {
+			fmt.Print(formatWatchTimeout(
+				agentNameStr, watchTimeout,
+			))
+			return nil
+		}
+
 		// Self-draining check: unread mail newer than the digest
 		// watermark ends the park immediately, including backlog
 		// that arrived while no watcher was armed. Messages at or
@@ -607,15 +621,6 @@ func runWatch(cmd *cobra.Command, args []string) error {
 				return errWatchInterrupted
 			}
 			continue
-		}
-
-		// Timeout: wake with an empty digest so the agent renews
-		// the lease on its own schedule.
-		if !deadline.IsZero() && time.Now().After(deadline) {
-			fmt.Print(formatWatchTimeout(
-				agentNameStr, watchTimeout,
-			))
-			return nil
 		}
 
 		// Periodic heartbeat keeps agent status accurate while

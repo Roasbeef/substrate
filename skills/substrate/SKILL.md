@@ -96,7 +96,10 @@ Subtrate integrates with Claude Code and Codex hooks:
 - **PreCompact**: Save identity state
 
 Claude Code may instruct you to run `substrate watch` as a background shell
-command. Re-arm it after it returns with a message digest. Codex performs its
+command. Always pass a bounded `--timeout` (the hooks name 25m): Claude Code
+kills background tasks after 30 minutes, so an unbounded watcher dies as
+exit 130 and leaves the session watcher-less. Re-arm it after it returns —
+with a digest or with the timeout-expired notice. Codex performs its
 mail wait directly in the Stop hook.
 
 ## Web UI
